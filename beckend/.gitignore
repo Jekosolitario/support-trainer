@@ -6,8 +6,6 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
-.mvn/wrapper/maven-wrapper.jar
-
 ### Logs ###
 *.log
 logs/
@@ -15,8 +13,6 @@ logs/
 ### Application config sensibili ###
 src/main/resources/application.properties
 src/main/resources/application-*.properties
-
-# Mantieni versionabile un template
 !src/main/resources/application-example.properties
 
 ### STS ###
