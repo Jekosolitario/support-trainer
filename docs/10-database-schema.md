@@ -1,0 +1,749 @@
+# Database Schema — Support Trainer
+
+## 1. Obiettivo del documento
+Questo documento definisce lo schema relazionale iniziale del database di Support Trainer.
+
+Lo scopo è:
+- tradurre il domain model in tabelle SQL
+- definire chiavi primarie e foreign key
+- chiarire i vincoli principali
+- preparare la fase successiva di implementazione con JPA / MySQL
+
+---
+
+## 2. Convenzioni adottate
+
+### 2.1 Naming
+- nomi tabelle in **snake_case plurale**
+- nomi colonne in **snake_case**
+
+### 2.2 Chiavi primarie
+Tutte le tabelle principali usano:
+- `id BIGINT PRIMARY KEY AUTO_INCREMENT`
+
+### 2.3 Timestamps
+- tabelle principali: `created_at`, `updated_at`
+- tabelle evento/token: almeno `created_at`
+- dove serve, si aggiungono campi specifici come:
+  - `expires_at`
+  - `used_at`
+  - `recorded_at`
+
+### 2.4 Soft delete
+Per alcune tabelle principali si usa:
+- `active BOOLEAN NOT NULL DEFAULT TRUE`
+
+---
+
+## 3. Tabelle principali
+
+## 3.1 `users`
+Tabella base della gerarchia utenti.
+
+### Colonne principali
+- `id`
+- `first_name`
+- `last_name`
+- `email`
+- `password`
+- `profile_image_url`
+- `role`
+- `account_status`
+- `email_verified`
+- `created_at`
+- `updated_at`
+
+### Vincoli principali
+- `email` **UNIQUE**
+- `first_name` `NOT NULL`
+- `last_name` `NOT NULL`
+- `email` `NOT NULL`
+- `password` `NOT NULL`
+- `role` `NOT NULL`
+- `account_status` `NOT NULL`
+- `email_verified` `NOT NULL`
+
+### Note
+Questa tabella contiene i campi comuni a tutti gli utenti.
+
+---
+
+## 3.2 `professional_profiles`
+Tabella figlia di `users` per i professionisti.
+
+### Colonne principali
+- `id`
+- `specialization`
+- `operational_status`
+- `phone_number`
+- `bio`
+- `workplace_name`
+- `city`
+- `instagram_url`
+- `website_url`
+- `active`
+- `created_at`
+- `updated_at`
+
+### Chiavi
+- `id` → PK e FK verso `users(id)`
+
+### Vincoli principali
+- `specialization` `NOT NULL`
+- `operational_status` `NOT NULL`
+- `active` `NOT NULL DEFAULT TRUE`
+
+### Note
+Rappresenta i dati specifici del professionista.
+
+---
+
+## 3.3 `client_profiles`
+Tabella figlia di `users` per i clienti.
+
+### Colonne principali
+- `id`
+- `operational_status`
+- `birth_date`
+- `height_cm`
+- `primary_goal`
+- `gender`
+- `medical_notes`
+- `injury_notes`
+- `notes`
+- `active`
+- `created_at`
+- `updated_at`
+
+### Chiavi
+- `id` → PK e FK verso `users(id)`
+
+### Vincoli principali
+- `operational_status` `NOT NULL`
+- `birth_date` `NOT NULL`
+- `height_cm` `NOT NULL`
+- `primary_goal` `NOT NULL`
+- `gender` `NOT NULL`
+- `active` `NOT NULL DEFAULT TRUE`
+
+---
+
+## 3.4 `professional_client_links`
+Tabella intermedia per la relazione molti-a-molti tra professionisti e clienti.
+
+### Colonne principali
+- `id`
+- `professional_id`
+- `client_id`
+- `active`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+- `professional_id` → `professional_profiles(id)`
+- `client_id` → `client_profiles(id)`
+
+### Vincoli principali
+- `professional_id` `NOT NULL`
+- `client_id` `NOT NULL`
+- `active` `NOT NULL DEFAULT TRUE`
+
+### Note
+Non si impone qui un vincolo SQL rigido su `(professional_id, client_id, active)`.  
+La regola di unicità del collegamento attivo viene gestita da:
+- business logic
+- query dedicate
+- validazioni service layer
+
+---
+
+## 3.5 `invite_codes`
+Codici invito generati dai professionisti.
+
+### Colonne principali
+- `id`
+- `code`
+- `professional_id`
+- `expires_at`
+- `used`
+- `used_at`
+- `active`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+- `professional_id` → `professional_profiles(id)`
+
+### Vincoli principali
+- `code` `NOT NULL UNIQUE`
+- `professional_id` `NOT NULL`
+- `expires_at` `NOT NULL`
+- `used` `NOT NULL DEFAULT FALSE`
+- `active` `NOT NULL DEFAULT TRUE`
+
+### Note
+`active` è utile per eventuale disattivazione logica di codici non ancora usati.
+
+---
+
+## 3.6 `availability_slots`
+Slot di disponibilità dei personal trainer.
+
+### Colonne principali
+- `id`
+- `professional_id`
+- `start_date_time`
+- `end_date_time`
+- `status`
+- `active`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+- `professional_id` → `professional_profiles(id)`
+
+### Vincoli principali
+- `professional_id` `NOT NULL`
+- `start_date_time` `NOT NULL`
+- `end_date_time` `NOT NULL`
+- `status` `NOT NULL`
+- `active` `NOT NULL DEFAULT TRUE`
+
+### Note
+La regola “niente sovrapposizione slot” viene gestita dalla business logic.
+
+---
+
+## 3.7 `booking_requests`
+Richieste di prenotazione create dai clienti.
+
+### Colonne principali
+- `id`
+- `client_id`
+- `professional_id`
+- `status`
+- `note`
+- `active`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+- `client_id` → `client_profiles(id)`
+- `professional_id` → `professional_profiles(id)`
+
+### Vincoli principali
+- `client_id` `NOT NULL`
+- `professional_id` `NOT NULL`
+- `status` `NOT NULL`
+- `active` `NOT NULL DEFAULT TRUE`
+
+---
+
+## 3.8 `booking_request_items`
+Dettaglio slot collegati a una richiesta di prenotazione.
+
+### Colonne principali
+- `id`
+- `booking_request_id`
+- `availability_slot_id`
+- `created_at`
+
+### Foreign key
+- `booking_request_id` → `booking_requests(id)`
+- `availability_slot_id` → `availability_slots(id)`
+
+### Vincoli principali
+- `booking_request_id` `NOT NULL`
+- `availability_slot_id` `NOT NULL`
+
+### Note
+Permette di gestire richieste con più slot/giorni.
+
+---
+
+## 3.9 `workout_plans`
+Schede di allenamento create dai PT.
+
+### Colonne principali
+- `id`
+- `professional_id`
+- `client_id`
+- `title`
+- `month_reference`
+- `active`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+- `professional_id` → `professional_profiles(id)`
+- `client_id` → `client_profiles(id)`
+
+### Vincoli principali
+- `professional_id` `NOT NULL`
+- `client_id` `NOT NULL`
+- `title` `NOT NULL`
+- `month_reference` `NOT NULL`
+- `active` `NOT NULL DEFAULT TRUE`
+
+### Note
+Può esistere una sola scheda attiva per coppia:
+- PT
+- cliente
+
+Questa regola resta a livello business/service.
+
+---
+
+## 3.10 `workout_weeks`
+
+### Colonne principali
+- `id`
+- `workout_plan_id`
+- `week_number`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+- `workout_plan_id` → `workout_plans(id)`
+
+### Vincoli principali
+- `workout_plan_id` `NOT NULL`
+- `week_number` `NOT NULL`
+
+---
+
+## 3.11 `workout_days`
+
+### Colonne principali
+- `id`
+- `workout_week_id`
+- `date`
+- `day_label`
+- `day_type`
+- `notes`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+- `workout_week_id` → `workout_weeks(id)`
+
+### Vincoli principali
+- `workout_week_id` `NOT NULL`
+- `date` `NOT NULL`
+- `day_label` `NOT NULL`
+- `day_type` `NOT NULL`
+
+---
+
+## 3.12 `workout_exercises`
+
+### Colonne principali
+- `id`
+- `workout_day_id`
+- `exercise_name`
+- `sets`
+- `reps`
+- `intensity`
+- `recovery_time`
+- `extra_techniques`
+- `description`
+- `logged_load`
+- `logged_reps`
+- `notes`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+- `workout_day_id` → `workout_days(id)`
+
+### Vincoli principali
+- `workout_day_id` `NOT NULL`
+- `exercise_name` `NOT NULL`
+- `sets` `NOT NULL`
+- `reps` `NOT NULL`
+
+---
+
+## 3.13 `nutrition_plans`
+Piani alimentari creati dai nutrizionisti.
+
+### Colonne principali
+- `id`
+- `professional_id`
+- `client_id`
+- `title`
+- `month_reference`
+- `active`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+- `professional_id` → `professional_profiles(id)`
+- `client_id` → `client_profiles(id)`
+
+### Vincoli principali
+- `professional_id` `NOT NULL`
+- `client_id` `NOT NULL`
+- `title` `NOT NULL`
+- `month_reference` `NOT NULL`
+- `active` `NOT NULL DEFAULT TRUE`
+
+### Note
+Può esistere un solo piano attivo per coppia:
+- nutrizionista
+- cliente
+
+Regola gestita a livello business/service.
+
+---
+
+## 3.14 `nutrition_weeks`
+
+### Colonne principali
+- `id`
+- `nutrition_plan_id`
+- `week_number`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+- `nutrition_plan_id` → `nutrition_plans(id)`
+
+### Vincoli principali
+- `nutrition_plan_id` `NOT NULL`
+- `week_number` `NOT NULL`
+
+---
+
+## 3.15 `nutrition_days`
+
+### Colonne principali
+- `id`
+- `nutrition_week_id`
+- `date`
+- `day_label`
+- `day_type`
+- `notes`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+- `nutrition_week_id` → `nutrition_weeks(id)`
+
+### Vincoli principali
+- `nutrition_week_id` `NOT NULL`
+- `date` `NOT NULL`
+- `day_label` `NOT NULL`
+- `day_type` `NOT NULL`
+
+---
+
+## 3.16 `nutrition_entries`
+
+### Colonne principali
+- `id`
+- `nutrition_day_id`
+- `meal_type`
+- `content`
+- `quantity`
+- `notes`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+- `nutrition_day_id` → `nutrition_days(id)`
+
+### Vincoli principali
+- `nutrition_day_id` `NOT NULL`
+- `meal_type` `NOT NULL`
+- `content` `NOT NULL`
+
+---
+
+## 3.17 `workout_feedbacks`
+
+### Colonne principali
+- `id`
+- `client_id`
+- `professional_id`
+- `workout_day_id`
+- `message`
+- `created_at`
+
+### Foreign key
+- `client_id` → `client_profiles(id)`
+- `professional_id` → `professional_profiles(id)`
+- `workout_day_id` → `workout_days(id)`
+
+### Vincoli principali
+- `client_id` `NOT NULL`
+- `professional_id` `NOT NULL`
+- `workout_day_id` `NOT NULL`
+- `message` `NOT NULL`
+
+---
+
+## 3.18 `nutrition_feedbacks`
+
+### Colonne principali
+- `id`
+- `client_id`
+- `professional_id`
+- `nutrition_day_id`
+- `message`
+- `created_at`
+
+### Foreign key
+- `client_id` → `client_profiles(id)`
+- `professional_id` → `professional_profiles(id)`
+- `nutrition_day_id` → `nutrition_days(id)`
+
+### Vincoli principali
+- `client_id` `NOT NULL`
+- `professional_id` `NOT NULL`
+- `nutrition_day_id` `NOT NULL`
+- `message` `NOT NULL`
+
+---
+
+## 3.19 `client_measurements`
+
+### Colonne principali
+- `id`
+- `client_id`
+- `recorded_at`
+- `weight_kg`
+- `body_fat_percentage`
+- `muscle_mass_kg`
+- `waist_cm`
+- `chest_cm`
+- `hips_cm`
+- `arm_cm`
+- `thigh_cm`
+- `shoulders_cm`
+- `notes`
+- `created_at`
+
+### Foreign key
+- `client_id` → `client_profiles(id)`
+
+### Vincoli principali
+- `client_id` `NOT NULL`
+- `recorded_at` `NOT NULL`
+- `weight_kg` `NOT NULL`
+
+### Note
+È una tabella storica, non va pensata come “profilo aggiornabile”.
+
+---
+
+## 4. Tabelle token e sicurezza
+
+## 4.1 `email_verification_tokens`
+
+### Colonne principali
+- `id`
+- `user_id`
+- `token`
+- `expires_at`
+- `used`
+- `used_at`
+- `created_at`
+
+### Foreign key
+- `user_id` → `users(id)`
+
+### Vincoli principali
+- `user_id` `NOT NULL`
+- `token` `NOT NULL UNIQUE`
+- `expires_at` `NOT NULL`
+- `used` `NOT NULL DEFAULT FALSE`
+
+---
+
+## 4.2 `refresh_tokens`
+
+### Colonne principali
+- `id`
+- `user_id`
+- `token`
+- `expires_at`
+- `revoked`
+- `created_at`
+
+### Foreign key
+- `user_id` → `users(id)`
+
+### Vincoli principali
+- `user_id` `NOT NULL`
+- `token` `NOT NULL UNIQUE`
+- `expires_at` `NOT NULL`
+- `revoked` `NOT NULL DEFAULT FALSE`
+
+### Note
+Serve per gestire il refresh token in modo tracciabile e revocabile.
+
+---
+
+## 4.3 `password_reset_tokens`
+
+### Colonne principali
+- `id`
+- `user_id`
+- `token`
+- `expires_at`
+- `used`
+- `used_at`
+- `created_at`
+
+### Foreign key
+- `user_id` → `users(id)`
+
+### Vincoli principali
+- `user_id` `NOT NULL`
+- `token` `NOT NULL UNIQUE`
+- `expires_at` `NOT NULL`
+- `used` `NOT NULL DEFAULT FALSE`
+
+---
+
+## 5. Enum da salvare come stringa
+I seguenti campi enum devono essere salvati come stringhe leggibili:
+
+- `users.role`
+- `users.account_status`
+- `professional_profiles.specialization`
+- `professional_profiles.operational_status`
+- `client_profiles.operational_status`
+- `client_profiles.gender`
+- `availability_slots.status`
+- `booking_requests.status`
+- `workout_days.day_type`
+- `nutrition_days.day_type`
+
+---
+
+## 6. Foreign key principali riassunte
+
+### Area utenti
+- `professional_profiles.id` → `users.id`
+- `client_profiles.id` → `users.id`
+
+### Area collegamenti
+- `professional_client_links.professional_id` → `professional_profiles.id`
+- `professional_client_links.client_id` → `client_profiles.id`
+
+### Area inviti
+- `invite_codes.professional_id` → `professional_profiles.id`
+
+### Area booking
+- `availability_slots.professional_id` → `professional_profiles.id`
+- `booking_requests.client_id` → `client_profiles.id`
+- `booking_requests.professional_id` → `professional_profiles.id`
+- `booking_request_items.booking_request_id` → `booking_requests.id`
+- `booking_request_items.availability_slot_id` → `availability_slots.id`
+
+### Area workout
+- `workout_plans.professional_id` → `professional_profiles.id`
+- `workout_plans.client_id` → `client_profiles.id`
+- `workout_weeks.workout_plan_id` → `workout_plans.id`
+- `workout_days.workout_week_id` → `workout_weeks.id`
+- `workout_exercises.workout_day_id` → `workout_days.id`
+
+### Area nutrition
+- `nutrition_plans.professional_id` → `professional_profiles.id`
+- `nutrition_plans.client_id` → `client_profiles.id`
+- `nutrition_weeks.nutrition_plan_id` → `nutrition_plans.id`
+- `nutrition_days.nutrition_week_id` → `nutrition_weeks.id`
+- `nutrition_entries.nutrition_day_id` → `nutrition_days.id`
+
+### Area feedback
+- `workout_feedbacks.client_id` → `client_profiles.id`
+- `workout_feedbacks.professional_id` → `professional_profiles.id`
+- `workout_feedbacks.workout_day_id` → `workout_days.id`
+- `nutrition_feedbacks.client_id` → `client_profiles.id`
+- `nutrition_feedbacks.professional_id` → `professional_profiles.id`
+- `nutrition_feedbacks.nutrition_day_id` → `nutrition_days.id`
+
+### Area misurazioni
+- `client_measurements.client_id` → `client_profiles.id`
+
+### Area sicurezza
+- `email_verification_tokens.user_id` → `users.id`
+- `refresh_tokens.user_id` → `users.id`
+- `password_reset_tokens.user_id` → `users.id`
+
+---
+
+## 7. Unique constraints principali
+
+### Da confermare come vincoli SQL
+- `users.email`
+- `invite_codes.code`
+- `email_verification_tokens.token`
+- `refresh_tokens.token`
+- `password_reset_tokens.token`
+
+### Da gestire a livello business/service
+- massimo 3 professionisti attivi per cliente
+- un solo collegamento attivo per coppia professionista-cliente
+- una sola scheda workout attiva per coppia PT-cliente
+- un solo piano nutrizione attivo per coppia nutrizionista-cliente
+- nessuna sovrapposizione slot per lo stesso PT
+- uno slot non può essere confermato due volte
+
+---
+
+## 8. Note progettuali importanti
+
+### 8.1 JOINED inheritance
+La scelta `JOINED` tra:
+- `users`
+- `professional_profiles`
+- `client_profiles`
+
+è coerente con:
+- domain model
+- strategia JPA definita
+- separazione pulita tra campi comuni e specifici
+
+### 8.2 Immagine profilo
+Nel database viene salvato solo:
+- `profile_image_url`
+
+Non si salvano file binari nel DB.
+
+### 8.3 Storico dati
+Restano storicizzati:
+- collegamenti disattivati
+- schede/piani non più attivi
+- misurazioni
+- booking requests
+- token usati/scaduti, se mantenuti
+
+---
+
+## 9. Decisioni confermate
+Per Support Trainer si confermano le seguenti scelte:
+
+- naming SQL in snake_case
+- tabelle plurali
+- PK `BIGINT AUTO_INCREMENT`
+- token separati in tabelle dedicate
+- immagine profilo salvata come URL/path
+- vincoli logici più complessi gestiti a livello business/service
+- timestamps su tutte le tabelle principali
+- tabelle evento con almeno `created_at`
+
+---
+
+## 10. Prossimo step naturale
+Dopo questo documento, il passo più utile è:
+
+- `docs/11-backend-implementation-roadmap.md`
+
+per definire:
+- ordine reale di sviluppo backend
+- priorità moduli
+- cosa implementare prima
+- roadmap concreta da seguire senza caos
