@@ -8,5 +8,10 @@
     "name": "app.security.jwt.secret",
     "type": "java.lang.String",
     "description": "A description for 'app.security.jwt.secret'"
+  },
+  {
+    "name": "app.security.jwt.refresh-expiration",
+    "type": "java.lang.String",
+    "description": "A description for 'app.security.jwt.refresh-expiration'"
   }
 ]}

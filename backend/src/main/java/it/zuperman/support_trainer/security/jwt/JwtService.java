@@ -25,17 +25,32 @@ public class JwtService {
     @Value("${app.security.jwt.expiration}")
     private long jwtExpiration;
 
+    @Value("${app.security.jwt.refresh-expiration}")
+    private long refreshExpiration;
+
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }
 
     public String generateToken(UserDetails userDetails) {
-        return generateToken(new HashMap<>(), userDetails);
+        return generateAccessToken(userDetails);
     }
 
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
+        return buildToken(extraClaims, userDetails, jwtExpiration);
+    }
+
+    public String generateAccessToken(UserDetails userDetails) {
+        return buildToken(new HashMap<>(), userDetails, jwtExpiration);
+    }
+
+    public String generateRefreshToken(UserDetails userDetails) {
+        return buildToken(new HashMap<>(), userDetails, refreshExpiration);
+    }
+
+    private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
         Date now = new Date();
-        Date expirationDate = new Date(now.getTime() + jwtExpiration);
+        Date expirationDate = new Date(now.getTime() + expiration);
 
         return Jwts.builder()
                 .claims(extraClaims)
@@ -48,7 +63,6 @@ public class JwtService {
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
         String username = extractUsername(token);
-
         return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
     }
 
