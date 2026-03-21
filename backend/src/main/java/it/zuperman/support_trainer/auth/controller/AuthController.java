@@ -14,6 +14,10 @@ import it.zuperman.support_trainer.auth.dto.request.LoginRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterProfessionalRequest;
 import it.zuperman.support_trainer.auth.dto.response.AuthResponse;
 import it.zuperman.support_trainer.auth.service.AuthService;
+import it.zuperman.support_trainer.invite.dto.request.ValidateInviteCodeRequest;
+import it.zuperman.support_trainer.invite.dto.response.ValidateInviteCodeResponse;
+import it.zuperman.support_trainer.invite.entity.InviteCode;
+import it.zuperman.support_trainer.invite.service.InviteCodeService;
 import jakarta.validation.Valid;
 
 @RestController
@@ -22,9 +26,11 @@ import jakarta.validation.Valid;
 public class AuthController {
 
     private final AuthService authService;
+    private final InviteCodeService inviteCodeService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, InviteCodeService inviteCodeService) {
         this.authService = authService;
+        this.inviteCodeService = inviteCodeService;
     }
 
     @PostMapping("/register/professional")
@@ -46,6 +52,16 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request
     ) {
         AuthResponse response = authService.login(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/register/client/validate-invite")
+    public ResponseEntity<ValidateInviteCodeResponse> validateInviteCode(
+            @Valid @RequestBody ValidateInviteCodeRequest request
+    ) {
+        InviteCode inviteCode = inviteCodeService.validateInviteCode(request.getCode());
+        ValidateInviteCodeResponse response = ValidateInviteCodeResponse.fromEntity(inviteCode);
+
         return ResponseEntity.ok(response);
     }
 }
