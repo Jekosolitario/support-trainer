@@ -51,6 +51,48 @@ public class InviteCodeService {
         return inviteCodeRepository.findAllByProfessional_IdOrderByCreatedAtDesc(professional.getId());
     }
 
+    @Transactional(readOnly = true)
+    public InviteCode validateInviteCode(String code) {
+        String normalizedCode = normalizeInviteCode(code);
+
+        InviteCode inviteCode = inviteCodeRepository.findByCode(normalizedCode)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.NOT_FOUND,
+                        "INVITE_CODE_NOT_FOUND",
+                        "Codice invito non valido"
+                ));
+
+        validateInviteCodeState(inviteCode);
+
+        return inviteCode;
+    }
+
+    private void validateInviteCodeState(InviteCode inviteCode) {
+        if (!Boolean.TRUE.equals(inviteCode.getActive())) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVITE_CODE_NOT_ACTIVE",
+                    "Codice invito non attivo"
+            );
+        }
+
+        if (Boolean.TRUE.equals(inviteCode.getUsed())) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVITE_CODE_ALREADY_USED",
+                    "Codice invito già utilizzato"
+            );
+        }
+
+        if (!inviteCode.getExpiresAt().isAfter(LocalDateTime.now())) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVITE_CODE_EXPIRED",
+                    "Codice invito scaduto"
+            );
+        }
+    }
+
     private ProfessionalProfile getVerifiedActiveProfessional(String professionalEmail) {
         ProfessionalProfile professional = professionalProfileRepository.findByEmail(professionalEmail)
                 .orElseThrow(() -> new AppException(
@@ -110,5 +152,9 @@ public class InviteCodeService {
                 .toUpperCase();
 
         return "INV-" + rawCode;
+    }
+
+    private String normalizeInviteCode(String code) {
+        return code.trim().toUpperCase();
     }
 }
