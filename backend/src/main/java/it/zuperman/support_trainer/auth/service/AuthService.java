@@ -12,15 +12,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import it.zuperman.support_trainer.auth.dto.request.LoginRequest;
+import it.zuperman.support_trainer.auth.dto.request.RegisterClientRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterProfessionalRequest;
 import it.zuperman.support_trainer.auth.dto.response.AuthResponse;
 import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
 import it.zuperman.support_trainer.auth.token.EmailVerificationToken;
+import it.zuperman.support_trainer.client.entity.ClientProfile;
+import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.Role;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.invite.entity.InviteCode;
+import it.zuperman.support_trainer.invite.service.InviteCodeService;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
 import it.zuperman.support_trainer.security.jwt.JwtService;
@@ -36,11 +41,15 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final ClientProfileRepository clientProfileRepository;
+    private final InviteCodeService inviteCodeService;
 
     public AuthService(
             UserRepository userRepository,
             ProfessionalProfileRepository professionalProfileRepository,
             EmailVerificationTokenRepository emailVerificationTokenRepository,
+            ClientProfileRepository clientProfileRepository,
+            InviteCodeService inviteCodeService,
             PasswordEncoder passwordEncoder,
             AuthenticationManager authenticationManager,
             JwtService jwtService
@@ -48,6 +57,8 @@ public class AuthService {
         this.userRepository = userRepository;
         this.professionalProfileRepository = professionalProfileRepository;
         this.emailVerificationTokenRepository = emailVerificationTokenRepository;
+        this.clientProfileRepository = clientProfileRepository;
+        this.inviteCodeService = inviteCodeService;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
@@ -87,13 +98,53 @@ public class AuthService {
     }
 
     @Transactional
+    public AuthResponse registerClient(RegisterClientRequest request) {
+        String normalizedEmail = normalizeEmail(request.getEmail());
+
+        if (userRepository.findByEmail(normalizedEmail).isPresent()) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "EMAIL_ALREADY_REGISTERED",
+                    "Email già registrata"
+            );
+        }
+
+        InviteCode inviteCode = inviteCodeService.validateInviteCode(request.getInviteCode());
+
+        ClientProfile client = new ClientProfile(
+                request.getFirstName().trim(),
+                request.getLastName().trim(),
+                normalizedEmail,
+                passwordEncoder.encode(request.getPassword()),
+                request.getBirthDate(),
+                request.getHeightCm(),
+                request.getPrimaryGoal().trim(),
+                request.getGender()
+        );
+
+        client.setMedicalNotes(normalizeOptionalText(request.getMedicalNotes()));
+        client.setInjuryNotes(normalizeOptionalText(request.getInjuryNotes()));
+        client.setNotes(normalizeOptionalText(request.getNotes()));
+
+        client.setAccountStatus(AccountStatus.ACTIVE);
+        client.setEmailVerified(true);
+
+        ClientProfile savedClient = clientProfileRepository.save(client);
+
+        inviteCode.setUsed(true);
+        inviteCode.setUsedAt(LocalDateTime.now());
+
+        return buildRegistrationResponse(savedClient);
+    }
+
+    @Transactional
     public void verifyEmail(String token) {
         EmailVerificationToken verificationToken = emailVerificationTokenRepository.findByToken(token)
                 .orElseThrow(() -> new AppException(
-                        HttpStatus.NOT_FOUND,
-                        "EMAIL_VERIFICATION_TOKEN_NOT_FOUND",
-                        "Token di verifica non valido"
-                ));
+                HttpStatus.NOT_FOUND,
+                "EMAIL_VERIFICATION_TOKEN_NOT_FOUND",
+                "Token di verifica non valido"
+        ));
 
         if (Boolean.TRUE.equals(verificationToken.getUsed())) {
             throw new AppException(
@@ -134,10 +185,10 @@ public class AuthService {
 
         User user = userRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new AppException(
-                        HttpStatus.NOT_FOUND,
-                        "USER_NOT_FOUND",
-                        "Utente non trovato"
-                ));
+                HttpStatus.NOT_FOUND,
+                "USER_NOT_FOUND",
+                "Utente non trovato"
+        ));
 
         validateLoginAccess(user);
 
@@ -197,5 +248,14 @@ public class AuthService {
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase();
+    }
+
+    private String normalizeOptionalText(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String normalizedValue = value.trim();
+        return normalizedValue.isEmpty() ? null : normalizedValue;
     }
 }
