@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import it.zuperman.support_trainer.auth.dto.request.LoginRequest;
+import it.zuperman.support_trainer.auth.dto.request.RegisterClientRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterProfessionalRequest;
 import it.zuperman.support_trainer.auth.dto.response.AuthResponse;
 import it.zuperman.support_trainer.auth.service.AuthService;
@@ -38,6 +39,14 @@ public class AuthController {
             @Valid @RequestBody RegisterProfessionalRequest request
     ) {
         AuthResponse response = authService.registerProfessional(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/register/client")
+    public ResponseEntity<AuthResponse> registerClient(
+            @Valid @RequestBody RegisterClientRequest request
+    ) {
+        AuthResponse response = authService.registerClient(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
