@@ -26,6 +26,8 @@ import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.invite.entity.InviteCode;
 import it.zuperman.support_trainer.invite.service.InviteCodeService;
+import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
+import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
 import it.zuperman.support_trainer.security.jwt.JwtService;
@@ -43,6 +45,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final ClientProfileRepository clientProfileRepository;
     private final InviteCodeService inviteCodeService;
+    private final ProfessionalClientLinkRepository professionalClientLinkRepository;
 
     public AuthService(
             UserRepository userRepository,
@@ -52,7 +55,8 @@ public class AuthService {
             InviteCodeService inviteCodeService,
             PasswordEncoder passwordEncoder,
             AuthenticationManager authenticationManager,
-            JwtService jwtService
+            JwtService jwtService,
+            ProfessionalClientLinkRepository professionalClientLinkRepository
     ) {
         this.userRepository = userRepository;
         this.professionalProfileRepository = professionalProfileRepository;
@@ -62,6 +66,7 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
+        this.professionalClientLinkRepository = professionalClientLinkRepository;
     }
 
     @Transactional
@@ -110,6 +115,7 @@ public class AuthService {
         }
 
         InviteCode inviteCode = inviteCodeService.validateInviteCode(request.getInviteCode());
+        ProfessionalProfile professional = inviteCode.getProfessional();
 
         ClientProfile client = new ClientProfile(
                 request.getFirstName().trim(),
@@ -131,10 +137,50 @@ public class AuthService {
 
         ClientProfile savedClient = clientProfileRepository.save(client);
 
+        createProfessionalClientLink(professional, savedClient);
+
         inviteCode.setUsed(true);
         inviteCode.setUsedAt(LocalDateTime.now());
 
         return buildRegistrationResponse(savedClient);
+    }
+
+    private void createProfessionalClientLink(ProfessionalProfile professional, ClientProfile client) {
+        if (professional.getId().equals(client.getId())) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "SELF_LINK_NOT_ALLOWED",
+                    "Non è possibile creare un collegamento verso se stessi"
+            );
+        }
+
+        boolean activeLinkAlreadyExists
+                = professionalClientLinkRepository.existsByProfessional_IdAndClient_IdAndActiveTrue(
+                        professional.getId(),
+                        client.getId()
+                );
+
+        if (activeLinkAlreadyExists) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "PROFESSIONAL_CLIENT_LINK_ALREADY_EXISTS",
+                    "Esiste già un collegamento attivo tra professionista e cliente"
+            );
+        }
+
+        long activeProfessionalCount
+                = professionalClientLinkRepository.countByClient_IdAndActiveTrue(client.getId());
+
+        if (activeProfessionalCount >= 3) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "CLIENT_MAX_PROFESSIONALS_REACHED",
+                    "Il cliente ha già raggiunto il numero massimo di professionisti attivi"
+            );
+        }
+
+        ProfessionalClientLink link = new ProfessionalClientLink(professional, client);
+        professionalClientLinkRepository.save(link);
     }
 
     @Transactional
