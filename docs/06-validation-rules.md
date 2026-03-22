@@ -453,14 +453,3 @@ Per Support Trainer si confermano le seguenti regole:
 - misurazioni inseribili solo da soggetti autorizzati e mantenute nello storico
 
 ---
-
-## 18. Prossimo step naturale
-Dopo questo documento, il passo più utile è:
-
-- `docs/07-api-modules-overview.md`
-
-per definire:
-- macro-moduli backend
-- aree funzionali delle API
-- primi gruppi di endpoint
-- confini tra controller e service

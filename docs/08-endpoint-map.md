@@ -436,16 +436,3 @@ Nei prossimi step andranno definiti:
 - payload e formato errori
 
 ---
-
-## 18. Prossimo step naturale
-Dopo questo documento, il passo più utile è:
-
-- `docs/09-security-flow.md`
-
-per definire:
-- autenticazione
-- autorizzazione
-- ruoli
-- specializzazione professionista
-- protezione endpoint
-- flusso login / verify email / accesso risorse

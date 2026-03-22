@@ -500,15 +500,3 @@ Per Support Trainer si confermano le seguenti scelte:
 - password hashata e validata con regole forti
 
 ---
-
-## 25. Prossimo step naturale
-Dopo questo documento, il passo più utile è:
-
-- `docs/10-database-schema.md`
-
-per definire:
-- tabelle
-- colonne principali
-- foreign key
-- unique constraints
-- struttura relazionale iniziale del database

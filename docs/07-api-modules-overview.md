@@ -291,26 +291,3 @@ Nei repository non deve finire la business logic vera.
 La logica resta nei service.
 
 ---
-
-## 20. Organizzazione consigliata dei package backend
-
-Esempio di struttura iniziale:
-
-```text
-backend/
-└─ src/main/java/.../supporttrainer/
-   ├─ auth/
-   ├─ profile/
-   ├─ professional/
-   ├─ client/
-   ├─ invite/
-   ├─ link/
-   ├─ availability/
-   ├─ booking/
-   ├─ workout/
-   ├─ nutrition/
-   ├─ feedback/
-   ├─ measurement/
-   ├─ common/
-   ├─ security/
-   └─ config/

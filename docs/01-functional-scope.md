@@ -254,12 +254,3 @@ La v1 non include:
 - gestione appuntamenti del nutrizionista tramite app
 
 ---
-
-## 13. Note aperte per i documenti successivi
-Restano da definire nei prossimi step:
-- entità principali del database
-- relazioni tra entità
-- struttura tecnica di schede e piani
-- dettagli del codice invito
-- regole di sicurezza e permessi
-- API principali

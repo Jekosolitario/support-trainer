@@ -572,15 +572,3 @@ Per Support Trainer si confermano le seguenti scelte:
 - DTO separati dalle entity JPA
 
 ---
-
-## 23. Cose da definire nel prossimo step
-Dopo questo documento, il passo naturale è:
-
-- `docs/06-validation-rules.md`
-
-dove definire in modo preciso:
-- validazioni per registrazione
-- validazioni codici invito
-- vincoli prenotazioni
-- regole schede/piani
-- controlli di coerenza tra utenti e contenuti

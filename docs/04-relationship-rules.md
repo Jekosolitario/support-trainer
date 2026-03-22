@@ -420,12 +420,3 @@ Il sistema deve garantire almeno le seguenti regole:
 - un piano nutrizione attivo è unico per coppia nutrizionista-cliente
 
 ---
-
-## 16. Decisioni aperte per i prossimi step
-Nei documenti successivi dovranno essere definiti meglio:
-- strategia JPA concreta delle relazioni
-- cascades e orphan removal a livello tecnico
-- validazioni temporali precise delle prenotazioni
-- struttura di versioning più dettagliata per schede e piani
-- eventuale audit più avanzato su chi crea o aggiorna le misurazioni
-- notifiche e promemoria applicativi

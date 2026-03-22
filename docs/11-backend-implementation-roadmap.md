@@ -500,21 +500,3 @@ L’ordine consigliato definitivo è:
 15. pulizia finale
 
 ---
-
-## 12. Prossimo passo operativo
-Il prossimo step concreto non è ancora “scrivere tutto”.
-
-Il prossimo step concreto è:
-
-- preparare `docs/12-sprint-01-setup-auth-base.md`
-
-con checklist precisa di cosa fare nel **primo sprint reale**:
-- dipendenze Spring Boot
-- struttura package
-- application.properties
-- MySQL
-- base entity
-- enum base
-- user model
-- security base
-- login base

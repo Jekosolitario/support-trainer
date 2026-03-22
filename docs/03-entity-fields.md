@@ -456,9 +456,3 @@ Per campi con valori chiusi si consiglia:
 - `sets`, `reps`, `quantity` come `String` nella v1 ti danno più flessibilità e meno attrito
 
 ---
-
-# 6. Cose da definire nel documento successivo
-Dopo questo, il passo naturale è uno tra questi due:
-
-- `docs/04-relationship-rules.md` → cardinalità, ownership, cascades, vincoli logici
-- `docs/04-jpa-strategy.md` → come tradurre questo modello in entity JPA reali

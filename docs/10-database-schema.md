@@ -736,14 +736,3 @@ Per Support Trainer si confermano le seguenti scelte:
 - tabelle evento con almeno `created_at`
 
 ---
-
-## 10. Prossimo step naturale
-Dopo questo documento, il passo più utile è:
-
-- `docs/11-backend-implementation-roadmap.md`
-
-per definire:
-- ordine reale di sviluppo backend
-- priorità moduli
-- cosa implementare prima
-- roadmap concreta da seguire senza caos

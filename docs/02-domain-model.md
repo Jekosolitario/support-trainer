@@ -469,14 +469,3 @@ Questa decisione verrà definita meglio in una fase successiva.
 - le misurazioni fisiche del cliente devono essere storicizzate in una entità dedicata
 
 ---
-
-## 6. Decisioni aperte da approfondire
-Nei prossimi documenti dovranno essere definiti meglio:
-
-- campi finali completi delle entità più complesse
-- strategia tecnica di ereditarietà JPA
-- struttura finale dei feedback cliente
-- regole precise sugli slot prenotabili
-- gestione notifiche e promemoria
-- validazioni principali
-- struttura dettagliata dei campi del piano alimentare

@@ -60,19 +60,3 @@ Aggiungere poi:
 - libreria JWT scelta per access token / refresh token
 
 ---
-
-## 5. Struttura package iniziale consigliata
-
-```text
-src/main/java/.../supporttrainer/
-├─ auth/
-├─ client/
-├─ professional/
-├─ security/
-├─ config/
-├─ common/
-│  ├─ entity/
-│  ├─ exception/
-│  ├─ enums/
-│  ├─ response/
-│  └─ util/
