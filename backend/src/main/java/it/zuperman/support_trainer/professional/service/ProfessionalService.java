@@ -1,0 +1,120 @@
+package it.zuperman.support_trainer.professional.service;
+
+import java.util.List;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import it.zuperman.support_trainer.client.entity.ClientProfile;
+import it.zuperman.support_trainer.common.entity.User;
+import it.zuperman.support_trainer.common.exception.AppException;
+import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
+import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
+import it.zuperman.support_trainer.professional.dto.response.ProfessionalDetailResponse;
+import it.zuperman.support_trainer.professional.dto.response.ProfessionalSummaryResponse;
+import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
+import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
+
+@Service
+public class ProfessionalService {
+
+    private final UserRepository userRepository;
+    private final ProfessionalProfileRepository professionalProfileRepository;
+    private final ProfessionalClientLinkRepository professionalClientLinkRepository;
+
+    public ProfessionalService(
+            UserRepository userRepository,
+            ProfessionalProfileRepository professionalProfileRepository,
+            ProfessionalClientLinkRepository professionalClientLinkRepository
+    ) {
+        this.userRepository = userRepository;
+        this.professionalProfileRepository = professionalProfileRepository;
+        this.professionalClientLinkRepository = professionalClientLinkRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProfessionalSummaryResponse> getMyProfessionals() {
+        ClientProfile authenticatedClient = getAuthenticatedClient();
+
+        List<ProfessionalClientLink> links =
+                professionalClientLinkRepository.findAllByClient_IdAndActiveTrue(authenticatedClient.getId());
+
+        return links.stream()
+                .map(ProfessionalClientLink::getProfessional)
+                .map(ProfessionalSummaryResponse::fromProfessional)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ProfessionalDetailResponse getProfessionalDetail(Long professionalId) {
+        ClientProfile authenticatedClient = getAuthenticatedClient();
+
+        ProfessionalProfile professional = professionalProfileRepository.findById(professionalId)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.NOT_FOUND,
+                        "PROFESSIONAL_NOT_FOUND",
+                        "Professionista non trovato"
+                ));
+
+        boolean linked = professionalClientLinkRepository.existsByProfessional_IdAndClient_IdAndActiveTrue(
+                professionalId,
+                authenticatedClient.getId()
+        );
+
+        if (!linked) {
+            throw new AppException(
+                    HttpStatus.FORBIDDEN,
+                    "PROFESSIONAL_ACCESS_DENIED",
+                    "Non puoi accedere a questo professionista"
+            );
+        }
+
+        return ProfessionalDetailResponse.fromProfessional(professional);
+    }
+
+    private ClientProfile getAuthenticatedClient() {
+        User user = getAuthenticatedUser();
+
+        if (!(user instanceof ClientProfile clientProfile)) {
+            throw new AppException(
+                    HttpStatus.FORBIDDEN,
+                    "ROLE_NOT_ALLOWED",
+                    "Solo il cliente può accedere a questa risorsa"
+            );
+        }
+
+        return clientProfile;
+    }
+
+    private User getAuthenticatedUser() {
+        String email = getAuthenticatedEmail();
+
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.UNAUTHORIZED,
+                        "AUTHENTICATED_USER_NOT_FOUND",
+                        "Utente autenticato non trovato"
+                ));
+    }
+
+    private String getAuthenticatedEmail() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication.getName() == null
+                || "anonymousUser".equals(authentication.getName())) {
+            throw new AppException(
+                    HttpStatus.UNAUTHORIZED,
+                    "UNAUTHORIZED",
+                    "Utente non autenticato"
+            );
+        }
+
+        return authentication.getName().trim().toLowerCase();
+    }
+}
