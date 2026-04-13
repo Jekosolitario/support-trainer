@@ -13,4 +13,6 @@ public interface ProfessionalClientLinkRepository extends JpaRepository<Professi
     boolean existsByProfessional_IdAndClient_IdAndActiveTrue(Long professionalId, Long clientId);
 
     List<ProfessionalClientLink> findAllByProfessional_IdAndActiveTrue(Long professionalId);
+
+    List<ProfessionalClientLink> findAllByClient_IdAndActiveTrue(Long clientId);
 }
