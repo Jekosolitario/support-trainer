@@ -54,6 +54,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                 .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                 .requestMatchers("/api/v1/clients/**").hasAuthority("PROFESSIONAL")
+                .requestMatchers("/api/v1/invites/**").hasAuthority("PROFESSIONAL")
                 .requestMatchers("/api/v1/professionals/**").hasAuthority("CLIENT")
                 .requestMatchers("/api/v1/me/**").authenticated()
                 .anyRequest().authenticated()
