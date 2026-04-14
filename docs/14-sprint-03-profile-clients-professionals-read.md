@@ -1,9 +1,9 @@
 # Sprint 03 — Profile + Clients + Professionals Read
 
 ## 1. Obiettivo dello sprint
-Questo sprint ha lo scopo di costruire il primo livello di consultazione reale del sistema dopo autenticazione, verifica email, inviti e collegamenti tra utenti.
+Questo sprint ha lo scopo di costruire il primo livello reale di consultazione e aggiornamento base del sistema dopo autenticazione, verifica email, inviti e collegamenti tra utenti.
 
-Alla fine dello sprint il backend dovrà permettere di:
+Alla fine dello sprint il backend deve permettere di:
 
 - recuperare i dati del profilo dell’utente autenticato
 - aggiornare i dati base del proprio profilo
@@ -17,27 +17,27 @@ Alla fine dello sprint il backend dovrà permettere di:
 ## 2. Perché questo sprint è importante
 Questo sprint è importante perché consolida la parte già costruita e la rende davvero utilizzabile.
 
-Fino ad ora il sistema sa:
+Fino a questo punto il sistema sa:
 - autenticare utenti
 - verificare professionisti
 - generare inviti
 - registrare clienti
 - creare collegamenti professionista-cliente
 
-Adesso serve fare il passo successivo: permettere agli utenti di **leggere e gestire i dati principali** in modo coerente con i collegamenti creati.
-
-In pratica, questo sprint rende il sistema:
-- più navigabile
-- più realistico
-- più vicino a un’app usabile davvero
+Con questo sprint il sistema diventa finalmente:
+- consultabile
+- navigabile
+- coerente con i collegamenti di dominio già creati
+- pronto per funzionalità future più operative
 
 ---
 
 ## 3. Risultato atteso
-Al termine di questo sprint devo poter testare questi flussi:
+Al termine di questo sprint devono essere testabili questi flussi:
 
 ### Lato utente autenticato
 - leggere il proprio profilo
+- leggere i propri dati account
 - aggiornare i propri dati base
 - aggiornare il proprio stato operativo
 
@@ -62,8 +62,10 @@ In questo sprint non si implementano ancora:
 - measurements
 - dashboard avanzate
 - notifiche
-- upload immagine profilo avanzato, se non già necessario
 - gestione admin
+- logout dedicato
+- differenziazione accessi per specializzazione
+- logiche avanzate di upload immagine profilo
 
 ---
 
@@ -75,11 +77,12 @@ In questo sprint si lavora soprattutto su:
 - `professional`
 - `link`
 
-Con possibile supporto di:
-- `auth`
+Con supporto di:
 - `security`
+- `common`
 
-solo se servono adattamenti minimi ai controlli di accesso.
+e con dipendenza dalla parte già esistente di:
+- `auth`
 
 ---
 
@@ -89,12 +92,13 @@ Questa parte del progetto serve a costruire le API di lettura e gestione base de
 ### In pratica deve permettere di:
 - capire chi è l’utente autenticato
 - vedere i dati rilevanti del proprio profilo
+- vedere i dati account base del proprio utente
 - distinguere chiaramente cliente e professionista
 - usare il collegamento professionista-cliente per autorizzare la lettura dei dati
-- preparare il terreno per availability, bookings, schede e piani
+- preparare il terreno per moduli futuri come availability e bookings
 
 ### Riassunto semplice
-Lo Sprint 03 non aggiunge ancora nuove funzioni “pesanti”, ma rende finalmente il sistema **consultabile e navigabile** in modo corretto.
+Lo Sprint 03 non aggiunge ancora nuove funzioni operative pesanti, ma rende il sistema consultabile e navigabile in modo coerente con i ruoli e con i collegamenti attivi.
 
 ---
 
@@ -102,8 +106,9 @@ Lo Sprint 03 non aggiunge ancora nuove funzioni “pesanti”, ma rende finalmen
 
 ### 7.1 Profilo utente autenticato
 Ogni utente autenticato deve poter:
-- recuperare i propri dati base
-- aggiornare i propri dati modificabili
+- recuperare il proprio profilo
+- recuperare i propri dati account
+- aggiornare i propri dati consentiti
 - aggiornare il proprio stato operativo
 
 ### 7.2 Lettura clienti da parte del professionista
@@ -128,17 +133,17 @@ I controlli devono rispettare:
 - relazione attiva
 - ownership logica della risorsa
 
-La specializzazione del professionista resta rilevante come dato business, ma in questo sprint l’obiettivo principale è la lettura corretta delle informazioni.
+La specializzazione del professionista resta un dato di dominio importante, ma in questo sprint non viene ancora usata per differenziare l’accesso agli endpoint.
 
 ---
 
-## 8. Endpoint previsti nello sprint
+## 8. Endpoint dello sprint
 
 ## Area Profile / Me
 - **GET** `/api/v1/me/profile`
+- **GET** `/api/v1/me/account`
 - **PATCH** `/api/v1/me/profile`
 - **PATCH** `/api/v1/me/profile/operational-status`
-- **GET** `/api/v1/me/account`
 
 ## Area Clients
 - **GET** `/api/v1/clients/my`
@@ -149,28 +154,30 @@ La specializzazione del professionista resta rilevante come dato business, ma in
 - **GET** `/api/v1/professionals/{professionalId}`
 
 ### Nota
-In questo sprint il focus è soprattutto su:
-- lettura liste
-- lettura dettaglio
-- aggiornamento proprio profilo
-
-Non serve aggiungere adesso endpoint inutili o troppo avanzati.
+Il focus dello sprint è su:
+- lettura profilo
+- lettura account
+- aggiornamento profilo
+- aggiornamento stato operativo
+- lettura lista relazioni
+- lettura dettaglio relazioni autorizzate
 
 ---
 
 ## 9. Blocco A — Profile / Me
 
-- [ ] Creare response DTO profilo/account autenticato
-- [ ] Implementare endpoint `GET /api/v1/me/profile`
-- [ ] Implementare endpoint `GET /api/v1/me/account`
-- [ ] Creare request DTO update profilo
-- [ ] Implementare endpoint `PATCH /api/v1/me/profile`
-- [ ] Creare request DTO update stato operativo
-- [ ] Implementare endpoint `PATCH /api/v1/me/profile/operational-status`
+- [ ] Creare `MyProfileResponse`
+- [ ] Creare `MyAccountResponse`
+- [ ] Creare `UpdateMyProfileRequest`
+- [ ] Creare `UpdateOperationalStatusRequest`
+- [ ] Implementare `GET /api/v1/me/profile`
+- [ ] Implementare `GET /api/v1/me/account`
+- [ ] Implementare `PATCH /api/v1/me/profile`
+- [ ] Implementare `PATCH /api/v1/me/profile/operational-status`
 
 ### Definition of Done
 - l’utente autenticato può leggere il proprio profilo
-- l’utente autenticato può leggere i dati account base
+- l’utente autenticato può leggere i propri dati account base
 - l’utente autenticato può aggiornare i propri dati consentiti
 - l’utente autenticato può aggiornare il proprio stato operativo
 
@@ -179,10 +186,10 @@ Non serve aggiungere adesso endpoint inutili o troppo avanzati.
 ## 10. Blocco B — Clients read
 
 - [ ] Implementare elenco clienti del professionista autenticato
-- [ ] Implementare endpoint `GET /api/v1/clients/my`
-- [ ] Creare response DTO lista clienti
-- [ ] Creare response DTO dettaglio cliente
-- [ ] Implementare endpoint `GET /api/v1/clients/{clientId}`
+- [ ] Implementare `GET /api/v1/clients/my`
+- [ ] Creare `ClientSummaryResponse`
+- [ ] Creare `ClientDetailResponse`
+- [ ] Implementare `GET /api/v1/clients/{clientId}`
 - [ ] Applicare controllo che il cliente richiesto sia collegato al professionista autenticato
 
 ### Definition of Done
@@ -195,10 +202,10 @@ Non serve aggiungere adesso endpoint inutili o troppo avanzati.
 ## 11. Blocco C — Professionals read
 
 - [ ] Implementare elenco professionisti del cliente autenticato
-- [ ] Implementare endpoint `GET /api/v1/professionals/my`
-- [ ] Creare response DTO lista professionisti
-- [ ] Creare response DTO dettaglio professionista
-- [ ] Implementare endpoint `GET /api/v1/professionals/{professionalId}`
+- [ ] Implementare `GET /api/v1/professionals/my`
+- [ ] Creare `ProfessionalSummaryResponse`
+- [ ] Creare `ProfessionalDetailResponse`
+- [ ] Implementare `GET /api/v1/professionals/{professionalId}`
 - [ ] Applicare controllo che il professionista richiesto sia collegato al cliente autenticato
 
 ### Definition of Done
@@ -210,15 +217,15 @@ Non serve aggiungere adesso endpoint inutili o troppo avanzati.
 
 ## 12. Blocco D — Regole di autorizzazione e coerenza
 
-- [ ] Verificare che gli endpoint `/clients/my` siano accessibili solo a `ROLE_PROFESSIONAL`
-- [ ] Verificare che gli endpoint `/professionals/my` siano accessibili solo a `ROLE_CLIENT`
-- [ ] Verificare che gli endpoint `/me/...` siano accessibili a utenti autenticati
-- [ ] Spostare i controlli di ownership/relazione nel service layer
+- [ ] Verificare che gli endpoint `/api/v1/clients/**` siano accessibili solo a `PROFESSIONAL`
+- [ ] Verificare che gli endpoint `/api/v1/professionals/**` siano accessibili solo a `CLIENT`
+- [ ] Verificare che gli endpoint `/api/v1/me/**` siano accessibili a utenti autenticati
+- [ ] Mantenere i controlli di ownership/relazione nel service layer
 - [ ] Restituire errori coerenti per accessi non autorizzati
 
 ### Definition of Done
 - ogni endpoint è coerente con il ruolo corretto
-- le relazioni vengono controllate in service
+- le relazioni vengono controllate nel service layer
 - accessi non validi sono bloccati in modo chiaro
 
 ---
@@ -240,23 +247,27 @@ Non serve aggiungere adesso endpoint inutili o troppo avanzati.
 - `ProfessionalDetailResponse`
 
 ### Nota
-I nomi finali possono adattarsi alla tua struttura reale, ma l’importante è mantenere:
-- chiarezza
-- separazione tra summary e detail
-- DTO separati da entity JPA
+I DTO devono restare separati dalle entity JPA e distinguere chiaramente:
+- response di profilo/account
+- request di update
+- summary response
+- detail response
 
 ---
 
-## 14. Service da implementare o completare
+## 14. Service e controller da implementare o completare
 
 ### Profile
-- `ProfileService`
+- `MeController`
+- `MeService`
 
 ### Clients
-- `ClientService` oppure service equivalente già esistente
+- `ClientController`
+- `ClientService`
 
 ### Professionals
-- `ProfessionalService` oppure service equivalente già esistente
+- `ProfessionalController`
+- `ProfessionalService`
 
 ### Link support
 - usare `ProfessionalClientLinkRepository` per verificare i collegamenti attivi
@@ -270,30 +281,52 @@ Deve restituire i dati del profilo dell’utente autenticato in base al suo tipo
 - cliente
 - professionista
 
-### 15.2 PATCH `/api/v1/me/profile`
+### 15.2 GET `/api/v1/me/account`
+Deve restituire i dati account base dell’utente autenticato:
+- id
+- email
+- role
+- accountStatus
+- emailVerified
+- createdAt
+- updatedAt
+
+### 15.3 PATCH `/api/v1/me/profile`
 Deve aggiornare solo i campi consentiti.
 
-Esempi:
-- nome
-- cognome
-- bio
-- city
-- website
-- primary goal
-- note modificabili
+#### Campi aggiornabili comuni
+- `firstName`
+- `lastName`
 
-### 15.3 PATCH `/api/v1/me/profile/operational-status`
+#### Campi aggiornabili professionista
+- `phoneNumber`
+- `bio`
+- `workplaceName`
+- `city`
+- `instagramUrl`
+- `websiteUrl`
+
+#### Campi aggiornabili cliente
+- `birthDate`
+- `heightCm`
+- `primaryGoal`
+- `gender`
+- `medicalNotes`
+- `injuryNotes`
+- `notes`
+
+### 15.4 PATCH `/api/v1/me/profile/operational-status`
 Deve consentire l’aggiornamento del solo stato operativo coerente con il tipo di utente:
 - professionista → `ProfessionalOperationalStatus`
 - cliente → `ClientOperationalStatus`
 
-### 15.4 GET `/api/v1/clients/my`
+### 15.5 GET `/api/v1/clients/my`
 Deve leggere i clienti collegati al professionista autenticato usando il link attivo.
 
-### 15.5 GET `/api/v1/professionals/my`
+### 15.6 GET `/api/v1/professionals/my`
 Deve leggere i professionisti collegati al cliente autenticato usando il link attivo.
 
-### 15.6 GET dettaglio
+### 15.7 GET dettaglio
 Il dettaglio deve essere leggibile solo se:
 - la relazione è attiva
 - il ruolo è corretto
@@ -304,9 +337,18 @@ Il dettaglio deve essere leggibile solo se:
 ## 16. Validazioni minime da implementare
 
 ### Profile update
-- campi obbligatori non vuoti dove previsti
-- formati validi per URL, se presenti
-- valori enum consentiti per stato operativo
+- limiti di lunghezza sui campi testuali
+- `birthDate` nel passato
+- `heightCm` maggiore di zero
+- `heightCm` con massimo 3 cifre intere e 2 decimali
+- `operationalStatus` obbligatorio nel relativo endpoint
+
+### Nota importante
+Nel codice attuale i campi URL del profilo:
+- `instagramUrl`
+- `websiteUrl`
+
+hanno validazione di lunghezza, ma non hanno ancora una validazione formale del formato URL.
 
 ### Clients / Professionals read
 - utente autenticato valido
@@ -319,20 +361,21 @@ Bloccare con errore corretto almeno:
 - risorsa inesistente
 - ruolo errato
 - relazione non esistente
-- relazione disattivata
 
 ---
 
 ## 17. Eccezioni applicative attese
-Durante questo sprint dovranno essere gestiti in modo chiaro almeno questi errori:
+Durante questo sprint devono essere gestiti in modo chiaro almeno questi errori:
 
-- profilo utente non trovato
+- utente autenticato non trovato
+- utente non autenticato
+- tipo utente non supportato
 - cliente non trovato
 - professionista non trovato
 - accesso negato per ruolo errato
 - accesso negato per relazione non valida
 - stato operativo non valido
-- update non consentito su campi non ammessi
+- richiesta non valida per campi vuoti dopo trim
 
 ---
 
@@ -363,38 +406,41 @@ Durante questo sprint dovranno essere gestiti in modo chiaro almeno questi error
 - [ ] Gestire errori coerenti
 
 ## Blocco E — Test
-- [ ] Testare `GET /me/profile`
-- [ ] Testare `GET /me/account`
-- [ ] Testare `PATCH /me/profile`
-- [ ] Testare `PATCH /me/profile/operational-status`
-- [ ] Testare `GET /clients/my`
-- [ ] Testare `GET /clients/{id}` valido e non valido
-- [ ] Testare `GET /professionals/my`
-- [ ] Testare `GET /professionals/{id}` valido e non valido
+- [ ] Testare `GET /api/v1/me/profile`
+- [ ] Testare `GET /api/v1/me/account`
+- [ ] Testare `PATCH /api/v1/me/profile`
+- [ ] Testare `PATCH /api/v1/me/profile/operational-status`
+- [ ] Testare `GET /api/v1/clients/my`
+- [ ] Testare `GET /api/v1/clients/{id}` valido e non valido
+- [ ] Testare `GET /api/v1/professionals/my`
+- [ ] Testare `GET /api/v1/professionals/{id}` valido e non valido
 - [ ] Testare accessi con ruolo errato
 - [ ] Testare accessi senza collegamento attivo
 
 ---
 
 ## 19. Ordine consigliato di esecuzione
-Per non perderti, l’ordine migliore è questo:
+Per procedere con ordine, l’ordine consigliato è questo:
 
-1. area `/me/profile`
-2. area `/me/account`
-3. update profilo
-4. update stato operativo
-5. elenco clienti del professionista
-6. dettaglio cliente
-7. elenco professionisti del cliente
-8. dettaglio professionista
-9. test completi
+1. `GET /api/v1/me/profile`
+2. `GET /api/v1/me/account`
+3. `PATCH /api/v1/me/profile`
+4. `PATCH /api/v1/me/profile/operational-status`
+5. `GET /api/v1/clients/my`
+6. `GET /api/v1/clients/{clientId}`
+7. `GET /api/v1/professionals/my`
+8. `GET /api/v1/professionals/{professionalId}`
+9. test completi di autorizzazione e casi negativi
 
 ---
 
 ## 20. Definition of Done dello sprint
 Lo sprint è completato solo se:
 
-- l’utente autenticato può leggere e aggiornare il proprio profilo base
+- l’utente autenticato può leggere il proprio profilo base
+- l’utente autenticato può leggere i propri dati account
+- l’utente autenticato può aggiornare il proprio profilo base
+- l’utente autenticato può aggiornare il proprio stato operativo
 - il professionista può vedere solo i propri clienti collegati
 - il cliente può vedere solo i propri professionisti collegati
 - i dettagli sono visibili solo se la relazione è valida
@@ -404,29 +450,28 @@ Lo sprint è completato solo se:
 ---
 
 ## 21. Cose da NON fare in questo sprint
-Per non complicarti inutilmente, evita di:
+Per non complicare inutilmente questa fase, evitare di:
 
 - iniziare availability
 - iniziare bookings
-- iniziare workout/nutrition
-- iniziare feedback/measurements
-- introdurre query troppo complesse se non servono
-- creare DTO inutilmente giganteschi
-- mischiare lettura profili con logiche future di agenda o contenuti
+- iniziare workout plans o nutrition plans
+- iniziare feedback o measurements
+- introdurre query più complesse del necessario
+- creare DTO inutilmente troppo grandi
+- mescolare la lettura profili con logiche future di agenda o contenuti
+- introdurre regole di autorizzazione per specializzazione non ancora richieste
 
 ---
 
 ## 22. Output finale dello sprint
-Alla fine di questo sprint dovresti avere:
+Alla fine di questo sprint il progetto deve avere:
 
-- un modulo profile `/me` stabile
+- un modulo `/api/v1/me` stabile
 - lettura relazioni cliente-professionista funzionante
 - controlli di autorizzazione concreti e realistici
-- una base perfetta per gli sprint successivi su availability e bookings
+- una base pronta per gli sprint successivi
 
 ---
 
 ## 23. Prossimo step dopo questo sprint
-Una volta completato questo sprint, il passo successivo più naturale sarà:
-
-- `docs/15-sprint-04-availability.md`
+Una volta completato questo sprint, il passo successivo naturale sarà aprire il nuovo sprint dedicato alle funzionalità operative successive, partendo da una documentazione coerente con la struttura ormai consolidata del progetto.
