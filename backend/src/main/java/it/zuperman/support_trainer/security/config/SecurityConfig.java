@@ -17,6 +17,9 @@ import it.zuperman.support_trainer.security.jwt.JwtAuthenticationFilter;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+    private final RestAccessDeniedHandler restAccessDeniedHandler;
+
     private static final String[] PUBLIC_ENDPOINTS = {
         "/error",
         "/swagger-ui/**",
@@ -26,8 +29,14 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            RestAuthenticationEntryPoint restAuthenticationEntryPoint,
+            RestAccessDeniedHandler restAccessDeniedHandler
+    ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.restAuthenticationEntryPoint = restAuthenticationEntryPoint;
+        this.restAccessDeniedHandler = restAccessDeniedHandler;
     }
 
     @Bean
@@ -38,12 +47,16 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(form -> form.disable())
                 .httpBasic(httpBasic -> httpBasic.disable())
+                .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(restAuthenticationEntryPoint)
+                .accessDeniedHandler(restAccessDeniedHandler)
+                )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-                        .requestMatchers("/api/v1/clients/**").hasAuthority("PROFESSIONAL")
-                        .requestMatchers("/api/v1/professionals/**").hasAuthority("CLIENT")
-                        .requestMatchers("/api/v1/me/**").authenticated()
-                        .anyRequest().authenticated()
+                .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                .requestMatchers("/api/v1/clients/**").hasAuthority("PROFESSIONAL")
+                .requestMatchers("/api/v1/professionals/**").hasAuthority("CLIENT")
+                .requestMatchers("/api/v1/me/**").authenticated()
+                .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
