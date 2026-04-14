@@ -3,7 +3,7 @@
 ## 1. Obiettivo dello sprint
 Questo sprint ha lo scopo di completare il primo vero flusso business del progetto dopo l’auth base.
 
-Alla fine dello sprint il sistema dovrà permettere di:
+Alla fine dello sprint il sistema deve permettere di:
 
 - registrare un professionista
 - verificare il suo account tramite email
@@ -17,10 +17,10 @@ Alla fine dello sprint il sistema dovrà permettere di:
 ---
 
 ## 2. Risultato atteso
-Al termine di questo sprint devo poter testare questo flusso completo:
+Al termine di questo sprint deve essere testabile questo flusso completo:
 
 1. il professionista si registra
-2. il professionista riceve/verifica il token email
+2. il professionista verifica il token email
 3. il suo account diventa attivo
 4. il professionista genera un codice invito
 5. il cliente valida il codice invito
@@ -33,7 +33,7 @@ Al termine di questo sprint devo poter testare questo flusso completo:
 ## 3. Fuori scope di questo sprint
 In questo sprint non si implementano ancora:
 
-- forgot password / reset password completi, se non già presenti come base
+- forgot password / reset password
 - availability
 - bookings
 - workout plans
@@ -43,6 +43,7 @@ In questo sprint non si implementano ancora:
 - frontend integrato
 - notifiche automatiche reali
 - upload file avanzati
+- modulo API REST dedicato ai link professionista-cliente
 
 ---
 
@@ -77,7 +78,7 @@ In questo sprint si lavora soprattutto su:
   - `accountStatus = PENDING_VERIFICATION`
   - `emailVerified = false`
 - finché non verifica email:
-  - non può usare funzionalità operative
+  - non può completare correttamente il login operativo
   - non può generare codici invito
 - dopo verifica:
   - `accountStatus = ACTIVE`
@@ -93,14 +94,15 @@ In questo sprint si lavora soprattutto su:
   - deve essere univoco
   - deve avere scadenza
   - deve essere monouso
-  - può essere disattivato logicamente, se previsto
-- un professionista può avere più codici attivi contemporaneamente
+  - deve avere stato logico coerente (`active`, `used`)
+- un professionista può avere più codici contemporaneamente
 
 ### 6.3 Registrazione cliente con invito
 - il cliente non può registrarsi liberamente
 - il cliente deve usare un codice invito valido
 - il codice deve:
   - esistere
+  - essere attivo
   - non essere scaduto
   - non essere già usato
 - la registrazione deve concludersi entro la validità del codice
@@ -114,8 +116,8 @@ In questo sprint si lavora soprattutto su:
   - professionista
   - cliente
 - il sistema non deve permettere self-link logici
-- la fine del rapporto non elimina il record:
-  - il collegamento viene disattivato logicamente
+- il collegamento nasce come record di dominio persistito
+- in questo sprint il collegamento **non viene ancora esposto con endpoint REST dedicati**
 
 ---
 
@@ -155,11 +157,9 @@ In questo sprint si lavora soprattutto su:
 ## 9. DTO da creare
 
 ## Auth / verification
-- `VerifyEmailRequest` *(solo se scegli token via body; se usi query param può non servire)*
 - eventuale `MessageResponse` o risposta semplice per verifica email
 
 ## Invite
-- `CreateInviteCodeRequest` *(solo se vuoi passare dati come durata/scadenza custom)*
 - `InviteCodeResponse`
 - `ValidateInviteCodeRequest`
 - `ValidateInviteCodeResponse`
@@ -168,7 +168,11 @@ In questo sprint si lavora soprattutto su:
 - `RegisterClientRequest`
 
 ## Link
-- eventuale `ProfessionalClientLinkResponse`
+- nessun endpoint REST dedicato obbligatorio in questo sprint
+
+### Nota
+Un DTO tipo `VerifyEmailRequest` serve solo se si sceglie una verifica via body.  
+Nel codice attuale la verifica email usa query param sul token.
 
 ---
 
@@ -182,14 +186,9 @@ In questo sprint si lavora soprattutto su:
 ## Invites
 - **POST** `/api/v1/invites`
 - **GET** `/api/v1/invites`
-- **GET** `/api/v1/invites/{inviteId}`
-- **PATCH** `/api/v1/invites/{inviteId}/deactivate` *(se lo implementi già ora)*
 
-## Links
-- **GET** `/api/v1/links/professional`
-- **GET** `/api/v1/links/client`
-- **GET** `/api/v1/links/{linkId}`
-- **PATCH** `/api/v1/links/{linkId}/deactivate` *(opzionale nello sprint, ma utile)*
+### Nota importante
+In Sprint 02 il collegamento `ProfessionalClientLink` viene introdotto come parte del dominio e della business logic, ma **non** viene ancora esposto tramite endpoint REST dedicati.
 
 ---
 
@@ -241,6 +240,7 @@ In questo sprint si lavora soprattutto su:
   - codice inesistente
   - codice scaduto
   - codice già usato
+  - codice non attivo
 
 ---
 
@@ -280,11 +280,11 @@ In questo sprint si lavora soprattutto su:
 - [ ] Testare registrazione professionista
 - [ ] Testare generazione token verifica email
 - [ ] Testare verifica email valida
-- [ ] Testare verifica email con token non valido/scaduto
+- [ ] Testare verifica email con token non valido/scaduto/usato
 - [ ] Testare generazione invite code da professionista verificato
 - [ ] Testare blocco generazione invite da professionista non verificato
 - [ ] Testare validazione invite corretta
-- [ ] Testare validazione invite non valida/scaduta/usata
+- [ ] Testare validazione invite non valida/scaduta/usata/non attiva
 - [ ] Testare registrazione cliente con codice valido
 - [ ] Testare consumo codice dopo uso
 - [ ] Testare creazione `ProfessionalClientLink`
@@ -296,5 +296,3 @@ In questo sprint si lavora soprattutto su:
 - tutto il flusso professionista -> verifica -> invito -> cliente -> link è testato
 - i casi di errore principali sono coperti
 - i dati risultano coerenti nel DB
-
----
