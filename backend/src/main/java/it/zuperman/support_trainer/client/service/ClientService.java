@@ -40,8 +40,8 @@ public class ClientService {
     public List<ClientSummaryResponse> getMyClients() {
         ProfessionalProfile authenticatedProfessional = getAuthenticatedProfessional();
 
-        List<ProfessionalClientLink> links =
-                professionalClientLinkRepository.findAllByProfessional_IdAndActiveTrue(authenticatedProfessional.getId());
+        List<ProfessionalClientLink> links
+                = professionalClientLinkRepository.findAllByProfessional_IdAndActiveTrue(authenticatedProfessional.getId());
 
         return links.stream()
                 .map(ProfessionalClientLink::getClient)
@@ -52,16 +52,26 @@ public class ClientService {
     @Transactional(readOnly = true)
     public ClientDetailResponse getClientDetail(Long clientId) {
         ProfessionalProfile authenticatedProfessional = getAuthenticatedProfessional();
+        ClientProfile client = getAccessibleClient(authenticatedProfessional.getId(), clientId);
 
+        return ClientDetailResponse.fromClient(client);
+    }
+
+    private ClientProfile getAccessibleClient(Long professionalId, Long clientId) {
         ClientProfile client = clientProfileRepository.findById(clientId)
                 .orElseThrow(() -> new AppException(
-                        HttpStatus.NOT_FOUND,
-                        "CLIENT_NOT_FOUND",
-                        "Cliente non trovato"
-                ));
+                HttpStatus.NOT_FOUND,
+                "CLIENT_NOT_FOUND",
+                "Cliente non trovato"
+        ));
 
+        validateClientAccess(professionalId, clientId);
+        return client;
+    }
+
+    private void validateClientAccess(Long professionalId, Long clientId) {
         boolean linked = professionalClientLinkRepository.existsByProfessional_IdAndClient_IdAndActiveTrue(
-                authenticatedProfessional.getId(),
+                professionalId,
                 clientId
         );
 
@@ -72,8 +82,6 @@ public class ClientService {
                     "Non puoi accedere a questo cliente"
             );
         }
-
-        return ClientDetailResponse.fromClient(client);
     }
 
     private ProfessionalProfile getAuthenticatedProfessional() {
@@ -95,10 +103,10 @@ public class ClientService {
 
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(
-                        HttpStatus.UNAUTHORIZED,
-                        "AUTHENTICATED_USER_NOT_FOUND",
-                        "Utente autenticato non trovato"
-                ));
+                HttpStatus.UNAUTHORIZED,
+                "AUTHENTICATED_USER_NOT_FOUND",
+                "Utente autenticato non trovato"
+        ));
     }
 
     private String getAuthenticatedEmail() {
