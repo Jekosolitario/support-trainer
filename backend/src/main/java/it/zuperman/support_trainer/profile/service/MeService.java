@@ -75,12 +75,14 @@ public class MeService {
         }
 
         if (user instanceof ProfessionalProfile professionalProfile) {
+            validateNoClientOnlyFields(request);
             applyProfessionalProfileUpdates(professionalProfile, request);
             ProfessionalProfile savedProfessional = professionalProfileRepository.save(professionalProfile);
             return MyProfileResponse.fromProfessional(savedProfessional);
         }
 
         if (user instanceof ClientProfile clientProfile) {
+            validateNoProfessionalOnlyFields(request);
             applyClientProfileUpdates(clientProfile, request);
             ClientProfile savedClient = clientProfileRepository.save(clientProfile);
             return MyProfileResponse.fromClient(savedClient);
@@ -91,6 +93,37 @@ public class MeService {
                 "UNSUPPORTED_USER_TYPE",
                 "Tipo utente non supportato"
         );
+    }
+
+    private void validateNoClientOnlyFields(UpdateMyProfileRequest request) {
+        if (request.getBirthDate() != null
+                || request.getHeightCm() != null
+                || request.getPrimaryGoal() != null
+                || request.getGender() != null
+                || request.getMedicalNotes() != null
+                || request.getInjuryNotes() != null
+                || request.getNotes() != null) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "PROFILE_FIELDS_NOT_ALLOWED",
+                    "Questi campi non sono modificabili per un professionista"
+            );
+        }
+    }
+
+    private void validateNoProfessionalOnlyFields(UpdateMyProfileRequest request) {
+        if (request.getPhoneNumber() != null
+                || request.getBio() != null
+                || request.getWorkplaceName() != null
+                || request.getCity() != null
+                || request.getInstagramUrl() != null
+                || request.getWebsiteUrl() != null) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "PROFILE_FIELDS_NOT_ALLOWED",
+                    "Questi campi non sono modificabili per un cliente"
+            );
+        }
     }
 
     @Transactional
