@@ -4,9 +4,12 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import it.zuperman.support_trainer.common.enums.Gender;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
@@ -38,9 +41,12 @@ public class RegisterClientRequest {
     private String inviteCode;
 
     @NotNull(message = "La data di nascita è obbligatoria")
+    @Past(message = "La data di nascita deve essere nel passato")
     private LocalDate birthDate;
 
     @NotNull(message = "L'altezza è obbligatoria")
+    @DecimalMin(value = "0.01", message = "L'altezza deve essere maggiore di 0")
+    @Digits(integer = 3, fraction = 2, message = "L'altezza deve avere massimo 3 cifre intere e 2 decimali")
     private BigDecimal heightCm;
 
     @NotBlank(message = "L'obiettivo principale è obbligatorio")
