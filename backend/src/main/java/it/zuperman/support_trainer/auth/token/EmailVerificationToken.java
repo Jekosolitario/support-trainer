@@ -61,8 +61,8 @@ public class EmailVerificationToken {
     }
 
     public boolean isExpired() {
-        return expiresAt.isBefore(LocalDateTime.now());
-    }
+    return !expiresAt.isAfter(LocalDateTime.now());
+}
 
     public boolean isUsable() {
         return Boolean.FALSE.equals(used) && !isExpired();
