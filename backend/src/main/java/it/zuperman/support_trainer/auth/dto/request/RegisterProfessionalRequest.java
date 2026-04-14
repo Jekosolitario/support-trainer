@@ -4,6 +4,7 @@ import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public class RegisterProfessionalRequest {
@@ -23,6 +24,10 @@ public class RegisterProfessionalRequest {
 
     @NotBlank(message = "La password è obbligatoria")
     @Size(min = 8, max = 100, message = "La password deve essere tra 8 e 100 caratteri")
+    @Pattern(
+            regexp = "^(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).+$",
+            message = "La password deve contenere almeno una maiuscola, un numero e un carattere speciale"
+    )
     private String password;
 
     @NotNull(message = "La specializzazione è obbligatoria")
