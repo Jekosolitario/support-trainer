@@ -1,13 +1,17 @@
 # Database Schema — Support Trainer
 
 ## 1. Obiettivo del documento
-Questo documento definisce lo schema relazionale iniziale del database di Support Trainer.
+Questo documento definisce lo schema del database di Support Trainer distinguendo chiaramente tra:
+
+- schema **attualmente integrato nel backend**
+- tabelle **già presenti nel database ma non ancora integrate nel codice**
+- schema **pianificato per moduli futuri**
 
 Lo scopo è:
 - tradurre il domain model in tabelle SQL
 - definire chiavi primarie e foreign key
 - chiarire i vincoli principali
-- preparare la fase successiva di implementazione con JPA / MySQL
+- mantenere coerenza tra database reale, codice attuale e roadmap futura
 
 ---
 
@@ -35,7 +39,7 @@ Per alcune tabelle principali si usa:
 
 ---
 
-## 3. Tabelle principali
+## 3. Schema attualmente integrato nel backend
 
 ## 3.1 `users`
 Tabella base della gerarchia utenti.
@@ -82,8 +86,6 @@ Tabella figlia di `users` per i professionisti.
 - `instagram_url`
 - `website_url`
 - `active`
-- `created_at`
-- `updated_at`
 
 ### Chiavi
 - `id` → PK e FK verso `users(id)`
@@ -112,8 +114,6 @@ Tabella figlia di `users` per i clienti.
 - `injury_notes`
 - `notes`
 - `active`
-- `created_at`
-- `updated_at`
 
 ### Chiavi
 - `id` → PK e FK verso `users(id)`
@@ -186,8 +186,93 @@ Codici invito generati dai professionisti.
 
 ---
 
-## 3.6 `availability_slots`
-Slot di disponibilità dei personal trainer.
+## 3.6 `email_verification_tokens`
+
+### Colonne principali
+- `id`
+- `user_id`
+- `token`
+- `expires_at`
+- `used`
+- `used_at`
+- `created_at`
+
+### Foreign key
+- `user_id` → `users(id)`
+
+### Vincoli principali
+- `user_id` `NOT NULL`
+- `token` `NOT NULL UNIQUE`
+- `expires_at` `NOT NULL`
+- `used` `NOT NULL DEFAULT FALSE`
+
+### Note
+È il token di sicurezza attualmente realmente integrato nel backend per il flusso di verifica email del professionista.
+
+---
+
+## 4. Tabelle già presenti nel database ma non ancora integrate nel codice
+
+Queste tabelle possono già essere presenti nel database MySQL locale come preparazione ai moduli successivi, ma **al momento non risultano ancora integrate nei flussi runtime del backend attuale**.
+
+## 4.1 `refresh_tokens`
+
+### Colonne principali
+- `id`
+- `user_id`
+- `token`
+- `expires_at`
+- `revoked`
+- `created_at`
+
+### Foreign key
+- `user_id` → `users(id)`
+
+### Vincoli principali
+- `user_id` `NOT NULL`
+- `token` `NOT NULL UNIQUE`
+- `expires_at` `NOT NULL`
+- `revoked` `NOT NULL DEFAULT FALSE`
+
+### Nota importante
+Nel backend attuale il refresh token:
+- viene generato
+- viene restituito nella risposta di login
+- **non viene ancora persistito e gestito tramite questa tabella**
+
+---
+
+## 4.2 `password_reset_tokens`
+
+### Colonne principali
+- `id`
+- `user_id`
+- `token`
+- `expires_at`
+- `used`
+- `used_at`
+- `created_at`
+
+### Foreign key
+- `user_id` → `users(id)`
+
+### Vincoli principali
+- `user_id` `NOT NULL`
+- `token` `NOT NULL UNIQUE`
+- `expires_at` `NOT NULL`
+- `used` `NOT NULL DEFAULT FALSE`
+
+### Nota importante
+Questa tabella può già essere presente nel database, ma il flusso di forgot/reset password **non è ancora implementato nel backend attuale**.
+
+---
+
+## 5. Schema pianificato per moduli futuri
+
+Le tabelle seguenti appartengono alla roadmap progettuale, ma **non sono ancora da considerare integrate nel backend attuale**.
+
+## 5.1 `availability_slots`
+Slot di disponibilità dei professionisti.
 
 ### Colonne principali
 - `id`
@@ -210,11 +295,11 @@ Slot di disponibilità dei personal trainer.
 - `active` `NOT NULL DEFAULT TRUE`
 
 ### Note
-La regola “niente sovrapposizione slot” viene gestita dalla business logic.
+La regola “niente sovrapposizione slot” andrà gestita dalla business logic.
 
 ---
 
-## 3.7 `booking_requests`
+## 5.2 `booking_requests`
 Richieste di prenotazione create dai clienti.
 
 ### Colonne principali
@@ -239,7 +324,7 @@ Richieste di prenotazione create dai clienti.
 
 ---
 
-## 3.8 `booking_request_items`
+## 5.3 `booking_request_items`
 Dettaglio slot collegati a una richiesta di prenotazione.
 
 ### Colonne principali
@@ -256,13 +341,10 @@ Dettaglio slot collegati a una richiesta di prenotazione.
 - `booking_request_id` `NOT NULL`
 - `availability_slot_id` `NOT NULL`
 
-### Note
-Permette di gestire richieste con più slot/giorni.
-
 ---
 
-## 3.9 `workout_plans`
-Schede di allenamento create dai PT.
+## 5.4 `workout_plans`
+Schede di allenamento create dai professionisti.
 
 ### Colonne principali
 - `id`
@@ -286,15 +368,11 @@ Schede di allenamento create dai PT.
 - `active` `NOT NULL DEFAULT TRUE`
 
 ### Note
-Può esistere una sola scheda attiva per coppia:
-- PT
-- cliente
-
-Questa regola resta a livello business/service.
+La regola della singola scheda attiva per coppia professionista-cliente andrà gestita a livello business/service.
 
 ---
 
-## 3.10 `workout_weeks`
+## 5.5 `workout_weeks`
 
 ### Colonne principali
 - `id`
@@ -312,7 +390,7 @@ Questa regola resta a livello business/service.
 
 ---
 
-## 3.11 `workout_days`
+## 5.6 `workout_days`
 
 ### Colonne principali
 - `id`
@@ -335,7 +413,7 @@ Questa regola resta a livello business/service.
 
 ---
 
-## 3.12 `workout_exercises`
+## 5.7 `workout_exercises`
 
 ### Colonne principali
 - `id`
@@ -364,8 +442,8 @@ Questa regola resta a livello business/service.
 
 ---
 
-## 3.13 `nutrition_plans`
-Piani alimentari creati dai nutrizionisti.
+## 5.8 `nutrition_plans`
+Piani alimentari creati dai professionisti.
 
 ### Colonne principali
 - `id`
@@ -389,15 +467,11 @@ Piani alimentari creati dai nutrizionisti.
 - `active` `NOT NULL DEFAULT TRUE`
 
 ### Note
-Può esistere un solo piano attivo per coppia:
-- nutrizionista
-- cliente
-
-Regola gestita a livello business/service.
+La regola del singolo piano attivo per coppia professionista-cliente andrà gestita a livello business/service.
 
 ---
 
-## 3.14 `nutrition_weeks`
+## 5.9 `nutrition_weeks`
 
 ### Colonne principali
 - `id`
@@ -415,7 +489,7 @@ Regola gestita a livello business/service.
 
 ---
 
-## 3.15 `nutrition_days`
+## 5.10 `nutrition_days`
 
 ### Colonne principali
 - `id`
@@ -438,7 +512,7 @@ Regola gestita a livello business/service.
 
 ---
 
-## 3.16 `nutrition_entries`
+## 5.11 `nutrition_entries`
 
 ### Colonne principali
 - `id`
@@ -460,7 +534,7 @@ Regola gestita a livello business/service.
 
 ---
 
-## 3.17 `workout_feedbacks`
+## 5.12 `workout_feedbacks`
 
 ### Colonne principali
 - `id`
@@ -483,7 +557,7 @@ Regola gestita a livello business/service.
 
 ---
 
-## 3.18 `nutrition_feedbacks`
+## 5.13 `nutrition_feedbacks`
 
 ### Colonne principali
 - `id`
@@ -506,7 +580,7 @@ Regola gestita a livello business/service.
 
 ---
 
-## 3.19 `client_measurements`
+## 5.14 `client_measurements`
 
 ### Colonne principali
 - `id`
@@ -537,77 +611,9 @@ Regola gestita a livello business/service.
 
 ---
 
-## 4. Tabelle token e sicurezza
+## 6. Enum da salvare come stringa
 
-## 4.1 `email_verification_tokens`
-
-### Colonne principali
-- `id`
-- `user_id`
-- `token`
-- `expires_at`
-- `used`
-- `used_at`
-- `created_at`
-
-### Foreign key
-- `user_id` → `users(id)`
-
-### Vincoli principali
-- `user_id` `NOT NULL`
-- `token` `NOT NULL UNIQUE`
-- `expires_at` `NOT NULL`
-- `used` `NOT NULL DEFAULT FALSE`
-
----
-
-## 4.2 `refresh_tokens`
-
-### Colonne principali
-- `id`
-- `user_id`
-- `token`
-- `expires_at`
-- `revoked`
-- `created_at`
-
-### Foreign key
-- `user_id` → `users(id)`
-
-### Vincoli principali
-- `user_id` `NOT NULL`
-- `token` `NOT NULL UNIQUE`
-- `expires_at` `NOT NULL`
-- `revoked` `NOT NULL DEFAULT FALSE`
-
-### Note
-Serve per gestire il refresh token in modo tracciabile e revocabile.
-
----
-
-## 4.3 `password_reset_tokens`
-
-### Colonne principali
-- `id`
-- `user_id`
-- `token`
-- `expires_at`
-- `used`
-- `used_at`
-- `created_at`
-
-### Foreign key
-- `user_id` → `users(id)`
-
-### Vincoli principali
-- `user_id` `NOT NULL`
-- `token` `NOT NULL UNIQUE`
-- `expires_at` `NOT NULL`
-- `used` `NOT NULL DEFAULT FALSE`
-
----
-
-## 5. Enum da salvare come stringa
+## 6.1 Enum attualmente integrati nel backend
 I seguenti campi enum devono essere salvati come stringhe leggibili:
 
 - `users.role`
@@ -616,6 +622,10 @@ I seguenti campi enum devono essere salvati come stringhe leggibili:
 - `professional_profiles.operational_status`
 - `client_profiles.operational_status`
 - `client_profiles.gender`
+
+## 6.2 Enum previsti per moduli futuri
+Quando verranno implementati i moduli futuri, andranno salvati come stringhe leggibili anche:
+
 - `availability_slots.status`
 - `booking_requests.status`
 - `workout_days.day_type`
@@ -623,7 +633,7 @@ I seguenti campi enum devono essere salvati come stringhe leggibili:
 
 ---
 
-## 6. Foreign key principali riassunte
+## 7. Foreign key attualmente integrate
 
 ### Area utenti
 - `professional_profiles.id` → `users.id`
@@ -635,6 +645,17 @@ I seguenti campi enum devono essere salvati come stringhe leggibili:
 
 ### Area inviti
 - `invite_codes.professional_id` → `professional_profiles.id`
+
+### Area sicurezza
+- `email_verification_tokens.user_id` → `users.id`
+
+---
+
+## 8. Foreign key future o non ancora integrate
+
+### Tabelle già presenti nel DB ma non ancora integrate
+- `refresh_tokens.user_id` → `users.id`
+- `password_reset_tokens.user_id` → `users.id`
 
 ### Area booking
 - `availability_slots.professional_id` → `professional_profiles.id`
@@ -668,35 +689,35 @@ I seguenti campi enum devono essere salvati come stringhe leggibili:
 ### Area misurazioni
 - `client_measurements.client_id` → `client_profiles.id`
 
-### Area sicurezza
-- `email_verification_tokens.user_id` → `users.id`
-- `refresh_tokens.user_id` → `users.id`
-- `password_reset_tokens.user_id` → `users.id`
-
 ---
 
-## 7. Unique constraints principali
+## 9. Unique constraints principali
 
-### Da confermare come vincoli SQL
+## 9.1 Da confermare come vincoli SQL nello schema attualmente integrato
 - `users.email`
 - `invite_codes.code`
 - `email_verification_tokens.token`
+
+## 9.2 Tabelle già presenti nel DB ma non ancora integrate
 - `refresh_tokens.token`
 - `password_reset_tokens.token`
 
-### Da gestire a livello business/service
+## 9.3 Da gestire a livello business/service
 - massimo 3 professionisti attivi per cliente
 - un solo collegamento attivo per coppia professionista-cliente
-- una sola scheda workout attiva per coppia PT-cliente
-- un solo piano nutrizione attivo per coppia nutrizionista-cliente
-- nessuna sovrapposizione slot per lo stesso PT
+
+## 9.4 Vincoli futuri previsti
+Quando i relativi moduli verranno implementati, andranno gestiti anche:
+- una sola scheda workout attiva per coppia professionista-cliente
+- un solo piano nutrizione attivo per coppia professionista-cliente
+- nessuna sovrapposizione slot per lo stesso professionista
 - uno slot non può essere confermato due volte
 
 ---
 
-## 8. Note progettuali importanti
+## 10. Note progettuali importanti
 
-### 8.1 JOINED inheritance
+### 10.1 JOINED inheritance
 La scelta `JOINED` tra:
 - `users`
 - `professional_profiles`
@@ -707,32 +728,34 @@ La scelta `JOINED` tra:
 - strategia JPA definita
 - separazione pulita tra campi comuni e specifici
 
-### 8.2 Immagine profilo
+### 10.2 Immagine profilo
 Nel database viene salvato solo:
 - `profile_image_url`
 
 Non si salvano file binari nel DB.
 
-### 8.3 Storico dati
+### 10.3 Storico dati
 Restano storicizzati:
 - collegamenti disattivati
-- schede/piani non più attivi
-- misurazioni
-- booking requests
-- token usati/scaduti, se mantenuti
+- codici invito usati o scaduti
+- token usati o scaduti, se mantenuti
+- dati futuri storici quando i relativi moduli verranno implementati
+
+### 10.4 Regola di lettura del documento
+Questo documento va sempre letto distinguendo tra:
+- tabelle già supportate dal backend attuale
+- tabelle già presenti nel DB ma non ancora usate dal codice
+- tabelle solo pianificate per i moduli futuri
 
 ---
 
-## 9. Decisioni confermate
+## 11. Decisioni confermate
 Per Support Trainer si confermano le seguenti scelte:
 
 - naming SQL in snake_case
 - tabelle plurali
 - PK `BIGINT AUTO_INCREMENT`
-- token separati in tabelle dedicate
 - immagine profilo salvata come URL/path
 - vincoli logici più complessi gestiti a livello business/service
-- timestamps su tutte le tabelle principali
-- tabelle evento con almeno `created_at`
-
----
+- separazione chiara tra schema attuale e schema futuro
+- tabelle token documentate distinguendo tra uso reale e preparazione tecnica
