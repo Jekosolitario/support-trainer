@@ -12,15 +12,15 @@ Lo scopo è:
 ---
 
 ## 2. Principio guida
-Il backend non va sviluppato “per moduli isolati tutti insieme”, ma per **strati progressivi**.
+Il backend non va sviluppato per moduli isolati tutti insieme, ma per strati progressivi.
 
 Ordine corretto:
 1. base progetto
 2. persistenza dati
 3. sicurezza e autenticazione
-4. registrazione e collegamenti
-5. primi moduli business
-6. moduli avanzati
+4. verifica account e registrazione con collegamenti
+5. primi moduli business consultabili
+6. moduli operativi avanzati
 7. rifinitura, test e preparazione al deploy
 
 ---
@@ -56,21 +56,14 @@ Preparare il progetto Spring Boot in modo pulito.
 - configurazione JPA/Hibernate
 - gestione environment base
 - creazione struttura package iniziale:
-  - `config`
-  - `security`
   - `common`
+  - `security`
   - `auth`
   - `profile`
   - `professional`
   - `client`
   - `invite`
   - `link`
-  - `availability`
-  - `booking`
-  - `workout`
-  - `nutrition`
-  - `feedback`
-  - `measurement`
 
 ### Definition of Done
 - progetto avviabile
@@ -90,8 +83,8 @@ Costruire la base riutilizzabile del backend.
 - eccezioni custom base
 - global exception handler
 - response/error model coerente
-- utility comuni
-- configurazione CORS iniziale
+- repository comuni se necessari
+- configurazione iniziale coerente per API REST
 
 ### Definition of Done
 - base tecnica pronta
@@ -122,7 +115,7 @@ Implementare la gerarchia utenti e la persistenza base.
 
 ## FASE 3 — Sicurezza e autenticazione
 ### Obiettivo
-Far funzionare accesso, ruoli e protezione endpoint.
+Far funzionare accesso, authority e protezione endpoint.
 
 ### Da fare
 - Spring Security config
@@ -132,103 +125,110 @@ Far funzionare accesso, ruoli e protezione endpoint.
 - filtro JWT
 - `UserDetailsService`
 - login
-- endpoint protetti/pubblici
-- ruoli:
-  - `ROLE_PROFESSIONAL`
-  - `ROLE_CLIENT`
+- endpoint pubblici e protetti
+- authority:
+  - `PROFESSIONAL`
+  - `CLIENT`
+
+### Nota importante
+Nel progetto attuale:
+- access token e refresh token vengono generati
+- il login è funzionante
+- il refresh token è presente nel modello
+- il flusso completo di refresh con endpoint dedicato non è ancora stato implementato
 
 ### Definition of Done
 - login funzionante
-- token validi
+- token generati correttamente
 - endpoint protetti correttamente
 - accesso base funzionante con Postman
 
 ---
 
-## FASE 4 — Verifica email e password reset
+## FASE 4 — Verifica email professionista
 ### Obiettivo
-Chiudere bene il ciclo di accesso reale.
+Chiudere bene il ciclo di attivazione del professionista.
 
 ### Da fare
 - `EmailVerificationToken`
-- `PasswordResetToken`
 - endpoint verify email
-- endpoint forgot password
-- endpoint reset password
+- generazione token alla registrazione professionista
 - blocco professionista non verificato
+- attivazione account dopo verifica
 
 ### Definition of Done
 - professionista registrabile ma non operativo finché non verifica email
-- password reset funzionante
-- flusso auth realistico
+- `emailVerified = true` dopo verifica
+- `accountStatus = ACTIVE` dopo verifica
+- flusso auth realistico e coerente
 
 ---
 
-## FASE 5 — Registrazione professionista + cliente con invito
+## FASE 5 — Inviti, registrazione cliente e collegamenti
 ### Obiettivo
 Realizzare il primo flusso business completo.
 
 ### Da fare
-- registrazione professionista
 - generazione `InviteCode`
 - validazione codice invito
 - registrazione cliente con codice
 - creazione `ProfessionalClientLink`
 - regole:
-  - max 3 professionisti
+  - max 3 professionisti per cliente
   - no self-link
   - no duplicati attivi
 
 ### Definition of Done
-- professionista si registra
-- verifica email
-- genera codice
-- cliente si registra con codice
+- professionista verificato genera codice
+- cliente si registra con codice valido
+- codice viene marcato come usato
 - collegamento creato correttamente
 
 ### Nota
-Questa è la **prima milestone vera del progetto**.
+Questa è la prima milestone business completa del progetto.
 
 ---
 
 ## FASE 6 — Modulo profilo/account
 ### Obiettivo
-Permettere agli utenti di gestire i propri dati base.
+Permettere agli utenti di leggere e aggiornare i propri dati base.
 
 ### Da fare
-- `/me/profile`
-- `/me/account`
-- update profilo
-- update stato operativo
-- cambio password
-- upload foto profilo
+- `GET /api/v1/me/profile`
+- `GET /api/v1/me/account`
+- `PATCH /api/v1/me/profile`
+- `PATCH /api/v1/me/profile/operational-status`
 
 ### Definition of Done
-- utente autenticato gestisce il proprio profilo
-- aggiornamenti base funzionanti
+- utente autenticato legge il proprio profilo
+- utente autenticato legge i propri dati account
+- utente autenticato aggiorna i campi consentiti del profilo
+- utente autenticato aggiorna il proprio stato operativo
 
 ---
 
-## FASE 7 — Modulo clienti e professionisti
+## FASE 7 — Modulo clienti e professionisti in lettura
 ### Obiettivo
 Consentire navigazione e lettura delle relazioni create.
 
 ### Da fare
 - elenco clienti del professionista autenticato
+- dettaglio cliente collegato
 - elenco professionisti del cliente autenticato
-- dettaglio cliente
-- dettaglio professionista
-- filtri base sui collegamenti
+- dettaglio professionista collegato
+- controlli su relazione attiva
+- controlli di autorizzazione coerenti tra security e service layer
 
 ### Definition of Done
 - lato lettura relazioni pronto
-- professionista e cliente vedono i propri collegamenti
+- professionista e cliente vedono solo i propri collegamenti
+- i dettagli sono accessibili solo se la relazione è valida
 
 ---
 
 ## FASE 8 — Availability
 ### Obiettivo
-Permettere al PT di definire le proprie disponibilità.
+Permettere al professionista di definire le proprie disponibilità.
 
 ### Da fare
 - `AvailabilitySlot`
@@ -237,12 +237,12 @@ Permettere al PT di definire le proprie disponibilità.
 - blocco/sblocco slot
 - query per intervallo date
 - validazioni:
-  - solo PT
+  - solo professionista autorizzato
   - no sovrapposizioni
   - intervalli validi
 
 ### Definition of Done
-- PT crea disponibilità valide
+- professionista crea disponibilità valide
 - lettura slot disponibile
 - regole principali rispettate
 
@@ -257,19 +257,19 @@ Implementare il flusso cliente → richiesta → conferma/rifiuto.
 - `BookingRequestItem`
 - creazione richiesta
 - elenco richieste cliente
-- elenco richieste PT
+- elenco richieste professionista
 - conferma richiesta
 - rifiuto richiesta
 - update stato slot
 
 ### Definition of Done
 - cliente invia richiesta
-- PT la vede
-- PT conferma/rifiuta
+- professionista la vede
+- professionista conferma/rifiuta
 - slot aggiornati correttamente
 
 ### Nota
-Questa è la **seconda grande milestone**.
+Questa è la seconda grande milestone del progetto.
 
 ---
 
@@ -284,13 +284,13 @@ Implementare l’area schede di allenamento.
 - `WorkoutExercise`
 - creazione scheda
 - lettura scheda cliente
-- lettura schede PT
+- lettura schede professionista
 - nuova versione scheda
 - storico schede
-- regola una sola scheda attiva per coppia PT-cliente
+- regola: una sola scheda attiva per coppia professionista-cliente, se previsto dal dominio
 
 ### Definition of Done
-- PT crea scheda completa
+- professionista crea scheda completa
 - cliente la visualizza
 - nuova versione archivia la precedente
 
@@ -307,25 +307,24 @@ Implementare l’area piani alimentari.
 - `NutritionEntry`
 - creazione piano
 - lettura piano cliente
-- lettura piani nutrizionista
+- lettura piani professionista
 - nuova versione piano
 - storico
-- regola un solo piano attivo per coppia nutrizionista-cliente
+- regola: un solo piano attivo per coppia professionista-cliente, se previsto dal dominio
 
 ### Definition of Done
-- nutrizionista crea piano
+- professionista crea piano
 - cliente lo visualizza
-- storico e versione base funzionanti
+- storico e versionamento base funzionanti
 
 ---
 
 ## FASE 12 — Feedback
 ### Obiettivo
-Permettere al cliente di segnalare problemi o richieste su schede e piani.
+Permettere al cliente di segnalare problemi o richieste su contenuti assegnati.
 
 ### Da fare
-- `WorkoutFeedback`
-- `NutritionFeedback`
+- feedback su schede o piani
 - invio feedback
 - lettura feedback lato professionista
 - storico feedback inviati lato cliente
@@ -356,7 +355,25 @@ Implementare lo storico misurazioni cliente.
 
 ---
 
-## FASE 14 — Hardening e pulizia
+## FASE 14 — Password reset
+### Obiettivo
+Aggiungere il recupero password in modo coerente con il sistema auth.
+
+### Da fare
+- `PasswordResetToken`
+- endpoint forgot password
+- endpoint reset password
+- token monouso con scadenza
+- invalidazione token dopo utilizzo
+
+### Definition of Done
+- utente può richiedere reset password
+- utente può impostare nuova password con token valido
+- token di reset sicuro e monouso
+
+---
+
+## FASE 15 — Hardening e pulizia
 ### Obiettivo
 Ripulire il backend prima dell’integrazione forte col frontend e del deploy.
 
@@ -379,30 +396,34 @@ Ripulire il backend prima dell’integrazione forte col frontend e del deploy.
 ---
 
 ## 5. Ordine reale consigliato delle milestone
-Se vuoi vedere il progetto in blocchi psicologicamente sostenibili, ragiona così:
+Per ragionare in blocchi sostenibili:
 
 ### Milestone 1
 - setup
+- fondazioni tecniche
 - utenti
 - auth
-- verify email
+- verifica email
 - inviti
 - registrazione cliente
 - link professionista-cliente
 
 ### Milestone 2
 - profilo
-- clienti/professionisti
+- clienti/professionisti read
+
+### Milestone 3
 - availability
 - bookings
 
-### Milestone 3
+### Milestone 4
 - workout
 - nutrition
 - feedback
 - measurements
 
-### Milestone 4
+### Milestone 5
+- password reset
 - pulizia
 - test
 - integrazione completa
@@ -410,93 +431,77 @@ Se vuoi vedere il progetto in blocchi psicologicamente sostenibili, ragiona cos�
 
 ---
 
-## 6. Cosa NON fare
+## 6. Stato attuale coerente del progetto
+In base all’avanzamento reale fin qui raggiunto, risultano completate:
+
+- FASE 0 — Setup iniziale progetto
+- FASE 1 — Fondazioni tecniche
+- FASE 2 — Modello utenti
+- FASE 3 — Sicurezza e autenticazione
+- FASE 4 — Verifica email professionista
+- FASE 5 — Inviti, registrazione cliente e collegamenti
+- FASE 6 — Modulo profilo/account
+- FASE 7 — Modulo clienti e professionisti in lettura
+
+Il prossimo blocco naturale da aprire è quindi:
+
+- **FASE 8 — Availability**
+
+---
+
+## 7. Cosa NON fare
 Per non perderti, evita questi errori:
 
 - fare backend e frontend insieme da subito
 - scrivere tutte le entity e poi lasciare i service vuoti
-- creare 30 endpoint senza testarli
+- creare molti endpoint senza testarli
 - passare a un nuovo modulo quando quello prima è rotto
 - fare security troppo tardi
 - saltare Postman e testare solo dal frontend
 
 ---
 
-## 7. Metodo di lavoro consigliato per ogni modulo
+## 8. Metodo di lavoro consigliato per ogni modulo
 Per ogni modulo usa sempre questo mini-flusso:
 
 1. entity
 2. repository
 3. service
 4. DTO
-5. mapper
+5. mapper o costruzione response
 6. controller
 7. test Postman
-8. rifinitura eccezioni/validazioni
+8. rifinitura eccezioni e validazioni
 
 ---
 
-## 8. Primo sprint consigliato
-Il primo sprint concreto che ti consiglio è questo:
-
-### Sprint 1
-- setup progetto
-- MySQL collegato
-- `User`, `ProfessionalProfile`, `ClientProfile`
-- enum base
-- repository base
-- Spring Security base
-- login base
-- JWT base
-
-### Perché questo sprint
-Perché ti costruisce il terreno sotto i piedi.  
-Senza questo, tutto il resto crolla o diventa confuso.
-
----
-
-## 9. Secondo sprint consigliato
-### Sprint 2
-- verifica email
-- registrazione professionista completa
-- invite code
-- validazione invite
-- registrazione cliente
-- professional-client link
-
-### Perché questo sprint
-Perché realizza il primo flusso business completo e ti fa sentire che il progetto esiste davvero.
-
----
-
-## 10. Criterio per capire se puoi passare allo step successivo
+## 9. Criterio per capire se puoi passare allo step successivo
 Puoi passare oltre solo se il blocco corrente è:
 
 - compilato senza errori
 - testato con Postman
 - con validazioni minime presenti
-- con errori gestiti in modo decente
+- con errori gestiti in modo chiaro
 - comprensibile anche se lo riapri dopo giorni
 
 ---
 
-## 11. Decisione pratica finale
+## 10. Decisione pratica finale
 L’ordine consigliato definitivo è:
 
 1. setup
 2. fondazioni tecniche
 3. utenti
-4. security
-5. verify/reset
-6. inviti + registrazione cliente
-7. profilo
-8. relazioni clienti/professionisti
+4. security e auth
+5. verifica email professionista
+6. inviti + registrazione cliente + link
+7. profilo/account
+8. relazioni clienti/professionisti read
 9. availability
 10. bookings
 11. workout
 12. nutrition
 13. feedback
 14. measurements
-15. pulizia finale
-
----
+15. password reset
+16. pulizia finale
