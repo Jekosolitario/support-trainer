@@ -46,6 +46,7 @@ public class ProfessionalService {
 
         return links.stream()
                 .map(ProfessionalClientLink::getProfessional)
+                .filter(ProfessionalProfile::getActive)
                 .map(ProfessionalSummaryResponse::fromProfessional)
                 .toList();
     }
@@ -65,6 +66,14 @@ public class ProfessionalService {
                 "PROFESSIONAL_NOT_FOUND",
                 "Professionista non trovato"
         ));
+
+        if (!professional.getActive()) {
+            throw new AppException(
+                    HttpStatus.NOT_FOUND,
+                    "PROFESSIONAL_NOT_FOUND",
+                    "Professionista non trovato"
+            );
+        }
 
         validateProfessionalAccess(clientId, professionalId);
         return professional;

@@ -46,6 +46,7 @@ public class ClientService {
 
         return links.stream()
                 .map(ProfessionalClientLink::getClient)
+                .filter(ClientProfile::getActive)
                 .map(ClientSummaryResponse::fromClient)
                 .toList();
     }
@@ -65,6 +66,14 @@ public class ClientService {
                 "CLIENT_NOT_FOUND",
                 "Cliente non trovato"
         ));
+
+        if (!client.getActive()) {
+            throw new AppException(
+                    HttpStatus.NOT_FOUND,
+                    "CLIENT_NOT_FOUND",
+                    "Cliente non trovato"
+            );
+        }
 
         validateClientAccess(professionalId, clientId);
         return client;
