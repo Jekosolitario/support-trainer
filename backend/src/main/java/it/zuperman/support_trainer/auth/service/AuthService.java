@@ -3,6 +3,7 @@ package it.zuperman.support_trainer.auth.service;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -88,7 +89,16 @@ public class AuthService {
                 request.getSpecialization()
         );
 
-        ProfessionalProfile savedProfessional = professionalProfileRepository.save(professional);
+        ProfessionalProfile savedProfessional;
+        try {
+            savedProfessional = professionalProfileRepository.saveAndFlush(professional);
+        } catch (DataIntegrityViolationException ex) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "EMAIL_ALREADY_REGISTERED",
+                    "Email già registrata"
+            );
+        }
 
         EmailVerificationToken verificationToken = new EmailVerificationToken(
                 savedProfessional,
@@ -134,7 +144,16 @@ public class AuthService {
         client.setAccountStatus(AccountStatus.ACTIVE);
         client.setEmailVerified(true);
 
-        ClientProfile savedClient = clientProfileRepository.save(client);
+        ClientProfile savedClient;
+        try {
+            savedClient = clientProfileRepository.saveAndFlush(client);
+        } catch (DataIntegrityViolationException ex) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "EMAIL_ALREADY_REGISTERED",
+                    "Email già registrata"
+            );
+        }
 
         createProfessionalClientLink(professional, savedClient);
 
