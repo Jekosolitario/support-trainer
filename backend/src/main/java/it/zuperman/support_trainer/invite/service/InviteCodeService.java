@@ -141,22 +141,6 @@ public class InviteCodeService {
         return professional;
     }
 
-    private String generateUniqueCode() {
-        for (int i = 0; i < MAX_GENERATION_ATTEMPTS; i++) {
-            String code = buildReadableCode();
-
-            if (!inviteCodeRepository.existsByCode(code)) {
-                return code;
-            }
-        }
-
-        throw new AppException(
-                HttpStatus.INTERNAL_SERVER_ERROR,
-                "INVITE_CODE_GENERATION_FAILED",
-                "Impossibile generare un codice invito univoco"
-        );
-    }
-
     private String buildReadableCode() {
         String rawCode = UUID.randomUUID()
                 .toString()

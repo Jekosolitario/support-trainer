@@ -203,7 +203,7 @@ public class AuthService {
 
     @Transactional
     public void verifyEmail(String token) {
-        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findByToken(token)
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findByTokenForUpdate(token)
                 .orElseThrow(() -> new AppException(
                 HttpStatus.NOT_FOUND,
                 "EMAIL_VERIFICATION_TOKEN_NOT_FOUND",
