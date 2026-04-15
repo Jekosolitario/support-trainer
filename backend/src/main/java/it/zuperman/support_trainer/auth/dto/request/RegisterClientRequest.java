@@ -56,8 +56,13 @@ public class RegisterClientRequest {
     @NotNull(message = "Il genere è obbligatorio")
     private Gender gender;
 
+    @Size(max = 5000, message = "Le note mediche non possono superare 5000 caratteri")
     private String medicalNotes;
+
+    @Size(max = 5000, message = "Le note sugli infortuni non possono superare 5000 caratteri")
     private String injuryNotes;
+
+    @Size(max = 5000, message = "Le note non possono superare 5000 caratteri")
     private String notes;
 
     public RegisterClientRequest() {
