@@ -1,5 +1,7 @@
 package it.zuperman.support_trainer.auth.controller;
 
+import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -51,9 +53,9 @@ public class AuthController {
     }
 
     @GetMapping("/verify-email")
-    public ResponseEntity<String> verifyEmail(@RequestParam("token") String token) {
+    public ResponseEntity<Map<String, String>> verifyEmail(@RequestParam("token") String token) {
         authService.verifyEmail(token);
-        return ResponseEntity.ok("Email verificata correttamente");
+        return ResponseEntity.ok(Map.of("message", "Email verificata correttamente"));
     }
 
     @PostMapping("/login")
