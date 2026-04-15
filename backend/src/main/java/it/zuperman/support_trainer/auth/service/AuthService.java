@@ -21,7 +21,6 @@ import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
-import it.zuperman.support_trainer.common.enums.Role;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.invite.entity.InviteCode;
@@ -255,12 +254,32 @@ public class AuthService {
             );
         }
 
-        if (user.getRole() == Role.PROFESSIONAL && Boolean.FALSE.equals(user.getEmailVerified())) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "EMAIL_NOT_VERIFIED",
-                    "Email non ancora verificata"
-            );
+        if (user instanceof ProfessionalProfile professionalProfile) {
+            if (Boolean.FALSE.equals(user.getEmailVerified())) {
+                throw new AppException(
+                        HttpStatus.FORBIDDEN,
+                        "EMAIL_NOT_VERIFIED",
+                        "Email non ancora verificata"
+                );
+            }
+
+            if (Boolean.FALSE.equals(professionalProfile.getActive())) {
+                throw new AppException(
+                        HttpStatus.FORBIDDEN,
+                        "PROFESSIONAL_NOT_ACTIVE",
+                        "Profilo professionista non attivo"
+                );
+            }
+        }
+
+        if (user instanceof ClientProfile clientProfile) {
+            if (Boolean.FALSE.equals(clientProfile.getActive())) {
+                throw new AppException(
+                        HttpStatus.FORBIDDEN,
+                        "CLIENT_NOT_ACTIVE",
+                        "Profilo cliente non attivo"
+                );
+            }
         }
     }
 
