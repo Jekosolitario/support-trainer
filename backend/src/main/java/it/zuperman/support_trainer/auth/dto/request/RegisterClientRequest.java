@@ -16,11 +16,11 @@ import jakarta.validation.constraints.Size;
 public class RegisterClientRequest {
 
     @NotBlank(message = "Il nome è obbligatorio")
-    @Size(max = 50, message = "Il nome non può superare 50 caratteri")
+    @Size(max = 100, message = "Il nome non può superare 100 caratteri")
     private String firstName;
 
     @NotBlank(message = "Il cognome è obbligatorio")
-    @Size(max = 50, message = "Il cognome non può superare 50 caratteri")
+    @Size(max = 100, message = "Il cognome non può superare 100 caratteri")
     private String lastName;
 
     @NotBlank(message = "L'email è obbligatoria")
