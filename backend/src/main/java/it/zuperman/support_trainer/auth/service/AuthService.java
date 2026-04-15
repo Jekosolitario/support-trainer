@@ -303,13 +303,15 @@ public class AuthService {
     }
 
     private AuthResponse buildRegistrationResponse(User user) {
-        return new AuthResponse(
+        AuthResponse response = new AuthResponse(
                 null,
                 null,
                 user.getId(),
                 user.getEmail(),
                 user.getRole().name()
         );
+        response.setTokenType(null);
+        return response;
     }
 
     private AuthResponse buildAuthResponse(User user, String accessToken, String refreshToken) {

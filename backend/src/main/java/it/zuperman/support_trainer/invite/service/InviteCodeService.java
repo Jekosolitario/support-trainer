@@ -20,7 +20,6 @@ import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRe
 public class InviteCodeService {
 
     private static final int INVITE_CODE_VALIDITY_DAYS = 7;
-    private static final int MAX_GENERATION_ATTEMPTS = 10;
 
     private final InviteCodeRepository inviteCodeRepository;
     private final ProfessionalProfileRepository professionalProfileRepository;
