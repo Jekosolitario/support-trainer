@@ -13,6 +13,7 @@ import it.zuperman.support_trainer.client.dto.response.ClientSummaryResponse;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.entity.User;
+import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
@@ -69,6 +70,44 @@ public class ClientService {
         return client;
     }
 
+    private void validateAuthenticatedUserAccess(User user) {
+        if (user.getAccountStatus() != AccountStatus.ACTIVE) {
+            throw new AppException(
+                    HttpStatus.FORBIDDEN,
+                    "ACCOUNT_NOT_ACTIVE",
+                    "Account non attivo"
+            );
+        }
+
+        if (user instanceof ProfessionalProfile professionalProfile) {
+            if (!professionalProfile.getEmailVerified()) {
+                throw new AppException(
+                        HttpStatus.FORBIDDEN,
+                        "EMAIL_NOT_VERIFIED",
+                        "Email non verificata"
+                );
+            }
+
+            if (!professionalProfile.getActive()) {
+                throw new AppException(
+                        HttpStatus.FORBIDDEN,
+                        "PROFESSIONAL_NOT_ACTIVE",
+                        "Profilo professionista non attivo"
+                );
+            }
+        }
+
+        if (user instanceof ClientProfile clientProfile) {
+            if (!clientProfile.getActive()) {
+                throw new AppException(
+                        HttpStatus.FORBIDDEN,
+                        "CLIENT_NOT_ACTIVE",
+                        "Profilo cliente non attivo"
+                );
+            }
+        }
+    }
+
     private void validateClientAccess(Long professionalId, Long clientId) {
         boolean linked = professionalClientLinkRepository.existsByProfessional_IdAndClient_IdAndActiveTrue(
                 professionalId,
@@ -101,12 +140,15 @@ public class ClientService {
     private User getAuthenticatedUser() {
         String email = getAuthenticatedEmail();
 
-        return userRepository.findByEmail(email)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(
                 HttpStatus.UNAUTHORIZED,
                 "AUTHENTICATED_USER_NOT_FOUND",
                 "Utente autenticato non trovato"
         ));
+
+        validateAuthenticatedUserAccess(user);
+        return user;
     }
 
     private String getAuthenticatedEmail() {
