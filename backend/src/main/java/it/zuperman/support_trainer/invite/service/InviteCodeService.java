@@ -57,10 +57,10 @@ public class InviteCodeService {
 
         InviteCode inviteCode = inviteCodeRepository.findByCode(normalizedCode)
                 .orElseThrow(() -> new AppException(
-                        HttpStatus.NOT_FOUND,
-                        "INVITE_CODE_NOT_FOUND",
-                        "Codice invito non valido"
-                ));
+                HttpStatus.NOT_FOUND,
+                "INVITE_CODE_NOT_FOUND",
+                "Codice invito non valido"
+        ));
 
         validateInviteCodeState(inviteCode);
 
@@ -96,10 +96,10 @@ public class InviteCodeService {
     private ProfessionalProfile getVerifiedActiveProfessional(String professionalEmail) {
         ProfessionalProfile professional = professionalProfileRepository.findByEmail(professionalEmail)
                 .orElseThrow(() -> new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "FORBIDDEN_OPERATION",
-                        "Solo i professionisti possono usare questa funzionalità"
-                ));
+                HttpStatus.FORBIDDEN,
+                "FORBIDDEN_OPERATION",
+                "Solo i professionisti possono usare questa funzionalità"
+        ));
 
         if (!Boolean.TRUE.equals(professional.getActive())) {
             throw new AppException(
@@ -156,5 +156,42 @@ public class InviteCodeService {
 
     private String normalizeInviteCode(String code) {
         return code.trim().toUpperCase();
+    }
+
+    public InviteCode validateInviteCodeForRegistration(String rawCode) {
+        String normalizedCode = rawCode.trim().toUpperCase();
+
+        InviteCode inviteCode = inviteCodeRepository.findByCodeForUpdate(normalizedCode)
+                .orElseThrow(() -> new AppException(
+                HttpStatus.NOT_FOUND,
+                "INVITE_CODE_NOT_FOUND",
+                "Codice invito non trovato"
+        ));
+
+        if (!inviteCode.getActive()) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVITE_CODE_NOT_ACTIVE",
+                    "Codice invito non attivo"
+            );
+        }
+
+        if (inviteCode.getUsed()) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVITE_CODE_ALREADY_USED",
+                    "Codice invito già utilizzato"
+            );
+        }
+
+        if (!inviteCode.getExpiresAt().isAfter(LocalDateTime.now())) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVITE_CODE_EXPIRED",
+                    "Codice invito scaduto"
+            );
+        }
+        
+        return inviteCode;
     }
 }
