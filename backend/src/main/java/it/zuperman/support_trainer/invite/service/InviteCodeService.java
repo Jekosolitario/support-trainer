@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,12 +37,24 @@ public class InviteCodeService {
     public InviteCode createInviteCode(String professionalEmail) {
         ProfessionalProfile professional = getVerifiedActiveProfessional(professionalEmail);
 
-        String code = generateUniqueCode();
-        LocalDateTime expiresAt = LocalDateTime.now().plusDays(INVITE_CODE_VALIDITY_DAYS);
+        for (int i = 0; i < MAX_GENERATION_ATTEMPTS; i++) {
+            String code = buildReadableCode();
+            LocalDateTime expiresAt = LocalDateTime.now().plusDays(INVITE_CODE_VALIDITY_DAYS);
 
-        InviteCode inviteCode = new InviteCode(code, professional, expiresAt);
+            InviteCode inviteCode = new InviteCode(code, professional, expiresAt);
 
-        return inviteCodeRepository.save(inviteCode);
+            try {
+                return inviteCodeRepository.saveAndFlush(inviteCode);
+            } catch (DataIntegrityViolationException ex) {
+                // Possibile collisione sul vincolo UNIQUE di invite_codes.code: riprovo con un nuovo codice
+            }
+        }
+
+        throw new AppException(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "INVITE_CODE_GENERATION_FAILED",
+                "Impossibile generare un codice invito univoco"
+        );
     }
 
     @Transactional(readOnly = true)
@@ -191,7 +204,7 @@ public class InviteCodeService {
                     "Codice invito scaduto"
             );
         }
-        
+
         return inviteCode;
     }
 }
