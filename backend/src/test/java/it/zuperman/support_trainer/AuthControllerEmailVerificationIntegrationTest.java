@@ -73,7 +73,7 @@ class AuthControllerEmailVerificationIntegrationTest {
                 .andExpect(status().isOk());
 
         User verifiedUser = userRepository.findByEmail("mario.rossi@example.com").orElseThrow();
-        EmailVerificationToken usedToken = emailVerificationTokenRepository.findByToken(verificationToken.getToken())
+        EmailVerificationToken usedToken = emailVerificationTokenRepository.findByTokenForUpdate(verificationToken.getToken())
                 .orElseThrow();
 
         assertThat(verifiedUser.getEmailVerified()).isTrue();
