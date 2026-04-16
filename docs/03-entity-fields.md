@@ -165,6 +165,8 @@ Per campi con valori chiusi si consiglia:
 | `professional` | `ProfessionalProfile` | Sì | No | — | Professionista che genera il codice |
 | `expiresAt` | `LocalDateTime` | Sì | No | — | Data/ora scadenza |
 | `used` | `Boolean` | Sì | No | `false` | Codice già usato o no |
+| `active` | `Boolean` | Sì | No | `true` | Flag logico di attivazione/disattivazione codice
+| `updatedAt` | `LocalDateTime` | Sì | No | auto | Timestamp ultimo aggiornamento
 | `usedAt` | `LocalDateTime` | No | Sì | `null` | Data/ora utilizzo |
 | `createdAt` | `LocalDateTime` | Sì | No | auto | Data creazione |
 
