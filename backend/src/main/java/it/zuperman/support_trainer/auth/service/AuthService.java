@@ -123,7 +123,7 @@ public class AuthService {
             );
         }
 
-        InviteCode inviteCode = inviteCodeService.validateInviteCode(request.getInviteCode());
+        InviteCode inviteCode = inviteCodeService.validateInviteCodeForRegistration(request.getInviteCode());
         ProfessionalProfile professional = inviteCode.getProfessional();
 
         validateProfessionalCanLinkClients(professional);
