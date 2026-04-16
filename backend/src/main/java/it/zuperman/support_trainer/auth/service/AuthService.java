@@ -123,8 +123,10 @@ public class AuthService {
             );
         }
 
-        InviteCode inviteCode = inviteCodeService.validateInviteCodeForRegistration(request.getInviteCode());
+        InviteCode inviteCode = inviteCodeService.validateInviteCode(request.getInviteCode());
         ProfessionalProfile professional = inviteCode.getProfessional();
+
+        validateProfessionalCanLinkClients(professional);
 
         ClientProfile client = new ClientProfile(
                 request.getFirstName().trim(),
@@ -161,6 +163,32 @@ public class AuthService {
         inviteCode.setUsedAt(LocalDateTime.now());
 
         return buildRegistrationResponse(savedClient);
+    }
+
+    private void validateProfessionalCanLinkClients(ProfessionalProfile professional) {
+        if (!Boolean.TRUE.equals(professional.getActive())) {
+            throw new AppException(
+                    HttpStatus.FORBIDDEN,
+                    "PROFESSIONAL_NOT_ACTIVE",
+                    "Il profilo professionista non è attivo"
+            );
+        }
+
+        if (!Boolean.TRUE.equals(professional.getEmailVerified())) {
+            throw new AppException(
+                    HttpStatus.FORBIDDEN,
+                    "EMAIL_NOT_VERIFIED",
+                    "Il professionista non ha verificato l'email"
+            );
+        }
+
+        if (professional.getAccountStatus() != AccountStatus.ACTIVE) {
+            throw new AppException(
+                    HttpStatus.FORBIDDEN,
+                    "ACCOUNT_NOT_ACTIVE",
+                    "L'account del professionista non è attivo"
+            );
+        }
     }
 
     private void createProfessionalClientLink(ProfessionalProfile professional, ClientProfile client) {
