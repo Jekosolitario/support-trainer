@@ -148,6 +148,7 @@ Per campi con valori chiusi si consiglia:
 | `professional` | `ProfessionalProfile` | Sì | No | — | Professionista collegato |
 | `client` | `ClientProfile` | Sì | No | — | Cliente collegato |
 | `createdAt` | `LocalDateTime` | Sì | No | auto | Data collegamento |
+| `updatedAt` | `LocalDateTime` | Sì | No | auto | Timestamp ultimo aggiornamento del collegamento
 | `active` | `Boolean` | Sì | No | `true` | Collegamento attivo/disattivato |
 
 ### Note
