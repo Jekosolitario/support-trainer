@@ -428,6 +428,9 @@ Nel codice attuale la password viene validata con:
 - obbligatorietà
 - lunghezza minima `8`
 - lunghezza massima `100`
+- almeno una lettera maiuscola
+- almeno un numero
+- almeno un carattere speciale
 
 ## 19.2 Cosa non è ancora implementato
 Attualmente **non** risultano implementate regole automatiche obbligatorie su:
