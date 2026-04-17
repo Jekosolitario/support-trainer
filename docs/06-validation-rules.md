@@ -136,10 +136,10 @@ Tra lo stesso professionista e lo stesso cliente non può esistere:
 - più di un collegamento attivo
 
 ### 5.4 Stato professionista
-Solo un professionista con account:
-- `ACTIVE`
+Solo un professionista con:
+- `accountStatus = ACTIVE`
 - email verificata
-
+- profilo `active = true`
 può collegare clienti tramite invito valido.
 
 ---
@@ -386,7 +386,10 @@ I campi enum devono accettare solo:
 - valori previsti dal sistema
 
 ### 14.2 Coerenza tra stato account e azioni
-Un utente con account non attivo o non verificato non può eseguire azioni operative riservate.
+Un utente non può eseguire azioni operative riservate se:
+- `accountStatus` non è `ACTIVE`
+- l’email richiesta non è verificata
+- il profilo applicativo è `active = false`
 
 ### 14.3 Coerenza specializzazione/funzionalità
 Le operazioni devono essere coerenti con la specializzazione del professionista:
