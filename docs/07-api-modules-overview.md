@@ -110,7 +110,8 @@ Il modulo **Invites** gestisce:
 - generazione codici invito
 - elenco codici generati
 - stato dei codici
-- eventuale invalidazione logica di un codice non ancora usato
+- stato dei codici
+- futura estensione per invalidazione logica di codici non ancora usati
 
 ### Obiettivo del modulo
 Gestire il meccanismo di accesso controllato dei clienti.
