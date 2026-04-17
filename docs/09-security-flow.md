@@ -347,8 +347,10 @@ Le regole base reali sono:
 
 - `/api/v1/auth/**` → pubblico
 - `/api/v1/clients/**` → solo `PROFESSIONAL`
+- `/api/v1/invites/**` → solo `PROFESSIONAL`
 - `/api/v1/professionals/**` → solo `CLIENT`
 - `/api/v1/me/**` → qualsiasi utente autenticato
+- per `/api/v1/invites/**`, oltre al controllo di ruolo in SecurityConfig, restano attivi anche i controlli business nel service (active, emailVerified, accountStatus)
 - tutto il resto → autenticato
 
 ## 16.2 Caso particolare: invites
