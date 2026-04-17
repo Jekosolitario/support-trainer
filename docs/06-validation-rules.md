@@ -84,21 +84,28 @@ Finché l’email non è verificata, il professionista non può:
 Il cliente non può registrarsi liberamente.  
 La registrazione cliente richiede un codice invito valido.
 
-### 4.2 Validazioni sul codice invito
+### 4.2 Password cliente
+La password del cliente deve rispettare almeno queste regole:
+- minimo **8 caratteri**
+- almeno **una lettera maiuscola**
+- almeno **un numero**
+- almeno **un carattere speciale**
+
+### 4.3 Validazioni sul codice invito
 Il codice deve:
 - esistere
 - essere associato a un professionista esistente
 - non essere già usato
 - non essere scaduto
 
-### 4.3 Registrazione entro scadenza
+### 4.4 Registrazione entro scadenza
 L’utente che utilizza il codice invito deve completare la registrazione entro la scadenza del codice.
 
 Se la registrazione non viene completata entro tale termine:
 - il codice non è più valido
 - la registrazione associata non deve essere considerata valida/completata
 
-### 4.4 Consumo del codice
+### 4.5 Consumo del codice
 Il codice invito deve essere considerato usato quando:
 - la registrazione cliente viene completata con successo
 
@@ -106,7 +113,7 @@ A quel punto:
 - `used = true`
 - `usedAt` valorizzato
 
-### 4.5 Collegamento finale
+### 4.6 Collegamento finale
 Il collegamento cliente-professionista deve essere creato solo dopo:
 - registrazione completata correttamente
 - validazione finale del codice invito
@@ -438,7 +445,7 @@ Le seguenti situazioni devono produrre errori applicativi chiari:
 ## 17. Decisioni confermate
 Per Support Trainer si confermano le seguenti regole:
 
-- password professionista con requisiti forti
+- password utenti con requisiti forti
 - professionista inizialmente `PENDING_VERIFICATION`
 - cliente registrabile solo tramite codice invito valido
 - registrazione cliente valida solo entro la scadenza del codice
