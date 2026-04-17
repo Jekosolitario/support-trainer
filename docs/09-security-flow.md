@@ -432,11 +432,8 @@ Nel codice attuale la password viene validata con:
 - almeno un numero
 - almeno un carattere speciale
 
-## 19.2 Cosa non è ancora implementato
-Attualmente **non** risultano implementate regole automatiche obbligatorie su:
-- maiuscola
-- numero
-- carattere speciale
+## 19.2 
+- la validazione forte della password è attualmente applicata in fase di registrazione professionista
 
 ## 19.3 Storage
 La password non viene mai salvata in chiaro.
