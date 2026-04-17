@@ -71,6 +71,7 @@ public class InviteCodeService {
         ));
 
         validateInviteCodeState(inviteCode);
+        validateInviteProfessionalState(inviteCode.getProfessional());
 
         return inviteCode;
     }
@@ -97,6 +98,32 @@ public class InviteCodeService {
                     HttpStatus.BAD_REQUEST,
                     "INVITE_CODE_EXPIRED",
                     "Codice invito scaduto"
+            );
+        }
+    }
+
+    private void validateInviteProfessionalState(ProfessionalProfile professional) {
+        if (!Boolean.TRUE.equals(professional.getActive())) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVITE_CODE_NOT_ACTIVE",
+                    "Codice invito non attivo"
+            );
+        }
+
+        if (!Boolean.TRUE.equals(professional.getEmailVerified())) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVITE_CODE_NOT_ACTIVE",
+                    "Codice invito non attivo"
+            );
+        }
+
+        if (professional.getAccountStatus() != AccountStatus.ACTIVE) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "INVITE_CODE_NOT_ACTIVE",
+                    "Codice invito non attivo"
             );
         }
     }
