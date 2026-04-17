@@ -46,9 +46,15 @@ public class ProfessionalService {
 
         return links.stream()
                 .map(ProfessionalClientLink::getProfessional)
-                .filter(ProfessionalProfile::getActive)
+                .filter(this::isReadableProfessional)
                 .map(ProfessionalSummaryResponse::fromProfessional)
                 .toList();
+    }
+
+    private boolean isReadableProfessional(ProfessionalProfile professional) {
+        return Boolean.TRUE.equals(professional.getActive())
+                && professional.getAccountStatus() == AccountStatus.ACTIVE
+                && Boolean.TRUE.equals(professional.getEmailVerified());
     }
 
     @Transactional(readOnly = true)
@@ -67,7 +73,7 @@ public class ProfessionalService {
                 "Professionista non trovato"
         ));
 
-        if (!professional.getActive()) {
+        if (!isReadableProfessional(professional)) {
             throw new AppException(
                     HttpStatus.NOT_FOUND,
                     "PROFESSIONAL_NOT_FOUND",

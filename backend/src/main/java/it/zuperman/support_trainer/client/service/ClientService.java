@@ -46,9 +46,14 @@ public class ClientService {
 
         return links.stream()
                 .map(ProfessionalClientLink::getClient)
-                .filter(ClientProfile::getActive)
+                .filter(this::isReadableClient)
                 .map(ClientSummaryResponse::fromClient)
                 .toList();
+    }
+
+    private boolean isReadableClient(ClientProfile client) {
+        return Boolean.TRUE.equals(client.getActive())
+                && client.getAccountStatus() == AccountStatus.ACTIVE;
     }
 
     @Transactional(readOnly = true)
@@ -67,7 +72,7 @@ public class ClientService {
                 "Cliente non trovato"
         ));
 
-        if (!client.getActive()) {
+        if (!isReadableClient(client)) {
             throw new AppException(
                     HttpStatus.NOT_FOUND,
                     "CLIENT_NOT_FOUND",
