@@ -449,6 +449,17 @@ Per campi con valori chiusi si consiglia:
 
 ---
 
+## 4.1.0 EmailVerificationToken
+- `id` → Long
+- `user` → User
+- `token` → String
+- `expiresAt` → LocalDateTime
+- `used` → Boolean
+- `usedAt` → LocalDateTime
+- `createdAt` → LocalDateTime
+
+---
+
 # 5. Note di progettazione utili
 
 - `email`, `code` dovranno avere vincolo di unicità
