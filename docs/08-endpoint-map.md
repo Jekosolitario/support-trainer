@@ -144,10 +144,10 @@ In particolare:
 Tutti gli altri endpoint richiedono autenticazione valida tramite JWT.
 
 ### 9.3 Regole per area
-- `/api/v1/clients/**` → accesso area professionista
-- `/api/v1/professionals/**` → accesso area cliente
-- `/api/v1/me/**` → accesso per utente autenticato
-- `/api/v1/invites/**` → endpoint protetti, con controlli business aggiuntivi lato service
+- `/api/v1/clients/**` → solo `PROFESSIONAL`
+- `/api/v1/professionals/**` → solo `CLIENT`
+- `/api/v1/me/**` → utente autenticato
+- `/api/v1/invites/**` → solo `PROFESSIONAL`, con controlli business aggiuntivi lato service
 
 ---
 
