@@ -106,9 +106,10 @@ Ogni codice deve rispettare queste regole:
 - dopo la scadenza non è più valido
 
 ### 5.4 Regola di abilitazione
-Solo un professionista con account:
-- verificato
-- attivo
+Solo un professionista con:
+- `accountStatus = ACTIVE`
+- `emailVerified = true`
+- profilo `active = true`
 
 può generare codici invito.
 
