@@ -2,6 +2,7 @@ package it.zuperman.support_trainer.security.config;
 
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -24,6 +25,8 @@ public class SecurityConfig {
 
     private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
     private final RestAccessDeniedHandler restAccessDeniedHandler;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final List<String> allowedOrigins;
 
     private static final String[] PUBLIC_ENDPOINTS = {
         "/error",
@@ -32,16 +35,16 @@ public class SecurityConfig {
         "/api/v1/auth/**"
     };
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
             RestAuthenticationEntryPoint restAuthenticationEntryPoint,
-            RestAccessDeniedHandler restAccessDeniedHandler
+            RestAccessDeniedHandler restAccessDeniedHandler,
+            @Value("${app.cors.allowed-origins}") List<String> allowedOrigins
     ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.restAuthenticationEntryPoint = restAuthenticationEntryPoint;
         this.restAccessDeniedHandler = restAccessDeniedHandler;
+        this.allowedOrigins = allowedOrigins;
     }
 
     @Bean
@@ -53,16 +56,16 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable())
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .exceptionHandling(ex -> ex
-                .authenticationEntryPoint(restAuthenticationEntryPoint)
-                .accessDeniedHandler(restAccessDeniedHandler)
+                        .authenticationEntryPoint(restAuthenticationEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
-                .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-                .requestMatchers("/api/v1/clients/**").hasAuthority("PROFESSIONAL")
-                .requestMatchers("/api/v1/invites/**").hasAuthority("PROFESSIONAL")
-                .requestMatchers("/api/v1/professionals/**").hasAuthority("CLIENT")
-                .requestMatchers("/api/v1/me/**").authenticated()
-                .anyRequest().authenticated()
+                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        .requestMatchers("/api/v1/clients/**").hasAuthority("PROFESSIONAL")
+                        .requestMatchers("/api/v1/invites/**").hasAuthority("PROFESSIONAL")
+                        .requestMatchers("/api/v1/professionals/**").hasAuthority("CLIENT")
+                        .requestMatchers("/api/v1/me/**").authenticated()
+                        .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -77,17 +80,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:5500",
-                "http://127.0.0.1:5500",
-                "http://localhost:3000"
-        ));
-
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
-        configuration.setExposedHeaders(List.of("Authorization"));
-        configuration.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
