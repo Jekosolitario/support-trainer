@@ -174,7 +174,10 @@ Per campi con valori chiusi si consiglia:
 ### Note
 - `code` deve essere **univoco**
 - Monouso fisso
-- Può essere generato solo da professionista verificato e attivo
+- Può essere generato solo da un professionista con:
+  - `accountStatus = ACTIVE`
+  - `emailVerified = true`
+  - profilo `active = true`
 
 ---
 
