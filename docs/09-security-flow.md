@@ -468,13 +468,18 @@ Nel codice attuale **non** risulta ancora implementato un token applicativo per:
 ## 21. CORS e frontend separato
 
 ## 21.1 Stato attuale
-Nel `SecurityConfig` il CORS è abilitato con:
-
-- `cors(Customizer.withDefaults())`
+il CORS è abilitato in SecurityConfig
+è presente un bean CorsConfigurationSource
+gli origin consentiti sono letti da property applicativa (app.cors.allowed-origins)
+metodi e header consentiti sono configurati esplicitamente
 
 ## 21.2 Nota importante
 Nel materiale attualmente analizzato non è presente una configurazione CORS dedicata più dettagliata.  
 Quindi sappiamo che il CORS è abilitato, ma la policy completa va eventualmente verificata in file di configurazione non inclusi oppure in step successivi del progetto.
+
+il backend è predisposto per frontend separato
+gli origin cambiano per ambiente tramite configuration/properties
+per JWT in header Authorization non è richiesto allowCredentials(true)
 
 ---
 
