@@ -7,6 +7,7 @@ import it.zuperman.support_trainer.common.enums.Gender;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public class UpdateMyProfileRequest {
@@ -31,9 +32,17 @@ public class UpdateMyProfileRequest {
     private String city;
 
     @Size(max = 255, message = "L'URL Instagram non può superare 255 caratteri")
+    @Pattern(
+            regexp = "^(https?://).+",
+            message = "L'URL Instagram deve iniziare con http:// o https://"
+    )
     private String instagramUrl;
 
     @Size(max = 255, message = "L'URL del sito web non può superare 255 caratteri")
+    @Pattern(
+            regexp = "^(https?://).+",
+            message = "L'URL del sito web deve iniziare con http:// o https://"
+    )
     private String websiteUrl;
 
     // Client fields
