@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import it.zuperman.support_trainer.availability.dto.response.AvailabilitySlotResponse;
+import it.zuperman.support_trainer.availability.service.AvailabilityService;
 import it.zuperman.support_trainer.professional.dto.response.ProfessionalDetailResponse;
 import it.zuperman.support_trainer.professional.dto.response.ProfessionalSummaryResponse;
 import it.zuperman.support_trainer.professional.service.ProfessionalService;
@@ -19,9 +21,14 @@ import it.zuperman.support_trainer.professional.service.ProfessionalService;
 public class ProfessionalController {
 
     private final ProfessionalService professionalService;
+    private final AvailabilityService availabilityService;
 
-    public ProfessionalController(ProfessionalService professionalService) {
+    public ProfessionalController(
+            ProfessionalService professionalService,
+            AvailabilityService availabilityService
+    ) {
         this.professionalService = professionalService;
+        this.availabilityService = availabilityService;
     }
 
     @GetMapping("/my")
@@ -33,6 +40,16 @@ public class ProfessionalController {
     @GetMapping("/{professionalId}")
     public ResponseEntity<ProfessionalDetailResponse> getProfessionalDetail(@PathVariable Long professionalId) {
         ProfessionalDetailResponse response = professionalService.getProfessionalDetail(professionalId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{professionalId}/availability")
+    public ResponseEntity<List<AvailabilitySlotResponse>> getProfessionalAvailability(
+            @PathVariable Long professionalId
+    ) {
+        List<AvailabilitySlotResponse> response
+                = availabilityService.getAvailableSlotsByProfessional(professionalId);
+
         return ResponseEntity.ok(response);
     }
 }

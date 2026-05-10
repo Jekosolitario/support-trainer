@@ -13,25 +13,35 @@ import it.zuperman.support_trainer.availability.dto.request.CreateAvailabilitySl
 import it.zuperman.support_trainer.availability.dto.response.AvailabilitySlotResponse;
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
+import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
+import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
+import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
 
 @Service
 public class AvailabilityService {
 
     private final AvailabilitySlotRepository availabilitySlotRepository;
     private final UserRepository userRepository;
+    private final ProfessionalProfileRepository professionalProfileRepository;
+    private final ProfessionalClientLinkRepository professionalClientLinkRepository;
 
     public AvailabilityService(
             AvailabilitySlotRepository availabilitySlotRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            ProfessionalProfileRepository professionalProfileRepository,
+            ProfessionalClientLinkRepository professionalClientLinkRepository
     ) {
         this.availabilitySlotRepository = availabilitySlotRepository;
         this.userRepository = userRepository;
+        this.professionalProfileRepository = professionalProfileRepository;
+        this.professionalClientLinkRepository = professionalClientLinkRepository;
     }
 
     @Transactional
@@ -62,6 +72,27 @@ public class AvailabilityService {
 
         return availabilitySlotRepository
                 .findAllByProfessional_IdAndActiveTrueOrderByStartDateTimeAsc(professional.getId())
+                .stream()
+                .map(AvailabilitySlotResponse::fromEntity)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AvailabilitySlotResponse> getAvailableSlotsByProfessional(Long professionalId) {
+        ClientProfile authenticatedClient = getAuthenticatedClient();
+
+        ProfessionalProfile professional = getAccessibleProfessionalForClient(
+                authenticatedClient.getId(),
+                professionalId
+        );
+
+        validateAvailabilitySpecialization(professional);
+
+        return availabilitySlotRepository
+                .findAllByProfessional_IdAndActiveTrueAndStatusOrderByStartDateTimeAsc(
+                        professionalId,
+                        AvailabilitySlotStatus.AVAILABLE
+                )
                 .stream()
                 .map(AvailabilitySlotResponse::fromEntity)
                 .toList();
@@ -108,6 +139,61 @@ public class AvailabilityService {
         }
     }
 
+    private ClientProfile getAuthenticatedClient() {
+        User user = getAuthenticatedUser();
+
+        if (!(user instanceof ClientProfile clientProfile)) {
+            throw new AppException(
+                    HttpStatus.FORBIDDEN,
+                    "ROLE_NOT_ALLOWED",
+                    "Solo il cliente può accedere a questa risorsa"
+            );
+        }
+
+        return clientProfile;
+    }
+
+    private ProfessionalProfile getAccessibleProfessionalForClient(Long clientId, Long professionalId) {
+        ProfessionalProfile professional = professionalProfileRepository.findById(professionalId)
+                .orElseThrow(() -> new AppException(
+                HttpStatus.NOT_FOUND,
+                "PROFESSIONAL_NOT_FOUND",
+                "Professionista non trovato"
+        ));
+
+        if (!isReadableProfessional(professional)) {
+            throw new AppException(
+                    HttpStatus.NOT_FOUND,
+                    "PROFESSIONAL_NOT_FOUND",
+                    "Professionista non trovato"
+            );
+        }
+
+        validateProfessionalAccess(clientId, professionalId);
+        return professional;
+    }
+
+    private boolean isReadableProfessional(ProfessionalProfile professional) {
+        return Boolean.TRUE.equals(professional.getActive())
+                && professional.getAccountStatus() == AccountStatus.ACTIVE
+                && Boolean.TRUE.equals(professional.getEmailVerified());
+    }
+
+    private void validateProfessionalAccess(Long clientId, Long professionalId) {
+        boolean linked = professionalClientLinkRepository.existsByProfessional_IdAndClient_IdAndActiveTrue(
+                professionalId,
+                clientId
+        );
+
+        if (!linked) {
+            throw new AppException(
+                    HttpStatus.FORBIDDEN,
+                    "PROFESSIONAL_ACCESS_DENIED",
+                    "Non puoi accedere a questo professionista"
+            );
+        }
+    }
+
     private ProfessionalProfile getAuthenticatedProfessional() {
         User user = getAuthenticatedUser();
 
@@ -127,10 +213,10 @@ public class AvailabilityService {
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(
-                        HttpStatus.UNAUTHORIZED,
-                        "AUTHENTICATED_USER_NOT_FOUND",
-                        "Utente autenticato non trovato"
-                ));
+                HttpStatus.UNAUTHORIZED,
+                "AUTHENTICATED_USER_NOT_FOUND",
+                "Utente autenticato non trovato"
+        ));
 
         validateAuthenticatedUserAccess(user);
         return user;
@@ -177,6 +263,16 @@ public class AvailabilityService {
                         "PROFESSIONAL_NOT_ACTIVE",
                         "Profilo professionista non attivo"
                 );
+            }
+
+            if (user instanceof ClientProfile clientProfile) {
+                if (!clientProfile.getActive()) {
+                    throw new AppException(
+                            HttpStatus.FORBIDDEN,
+                            "CLIENT_NOT_ACTIVE",
+                            "Profilo cliente non attivo"
+                    );
+                }
             }
         }
     }
