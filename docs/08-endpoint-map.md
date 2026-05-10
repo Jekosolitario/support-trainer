@@ -126,9 +126,37 @@ Restituisce i codici invito generati dal professionista autenticato.
 
 ---
 
-## 9. Regole generali di accesso
+## 9. Modulo Availability
 
-### 9.1 Endpoint pubblici
+### 9.1 Creazione slot disponibilità
+**POST** `/api/v1/availability`  
+Crea un nuovo slot di disponibilità per il professionista autenticato.
+
+### 9.2 Elenco slot del professionista autenticato
+**GET** `/api/v1/availability/my`  
+Restituisce gli slot di disponibilità del professionista autenticato.
+
+### 9.3 Elenco slot disponibili di un professionista
+**GET** `/api/v1/professionals/{professionalId}/availability`  
+Restituisce gli slot disponibili e attivi di un professionista.
+
+### 9.4 Aggiornamento slot disponibilità
+**PATCH** `/api/v1/availability/{slotId}`  
+Aggiorna parzialmente data/ora di uno slot appartenente al professionista autenticato.
+
+### 9.5 Blocco slot disponibilità
+**PATCH** `/api/v1/availability/{slotId}/block`  
+Blocca uno slot disponibile appartenente al professionista autenticato.
+
+### 9.6 Sblocco slot disponibilità
+**PATCH** `/api/v1/availability/{slotId}/unblock`  
+Sblocca uno slot bloccato appartenente al professionista autenticato.
+
+---
+
+## 10. Regole generali di accesso
+
+### 10.1 Endpoint pubblici
 Attualmente sono pubblici gli endpoint sotto:
 
 `/api/v1/auth/**`
@@ -140,18 +168,19 @@ In particolare:
 - `POST /api/v1/auth/login`
 - `GET /api/v1/auth/verify-email`
 
-### 9.2 Endpoint protetti
+### 10.2 Endpoint protetti
 Tutti gli altri endpoint richiedono autenticazione valida tramite JWT.
 
-### 9.3 Regole per area
+### 10.3 Regole per area
 - `/api/v1/clients/**` → solo `PROFESSIONAL`
 - `/api/v1/professionals/**` → solo `CLIENT`
 - `/api/v1/me/**` → utente autenticato
 - `/api/v1/invites/**` → solo `PROFESSIONAL`, con controlli business aggiuntivi lato service
+- `/api/v1/availability/**` → solo `PROFESSIONAL`, con controlli business aggiuntivi lato service
 
 ---
 
-## 10. Nota metodologica
+## 11. Nota metodologica
 Questa mappa rappresenta **solo lo stato reale attuale** del backend.
 
 Per ogni endpoint, nei documenti tecnici di dettaglio o nei prossimi sprint andranno eventualmente definiti meglio:
@@ -163,7 +192,7 @@ Per ogni endpoint, nei documenti tecnici di dettaglio o nei prossimi sprint andr
 
 ---
 
-## 11. Decisioni confermate
+## 12. Decisioni confermate
 Per Support Trainer si confermano le seguenti scelte:
 
 - prefisso globale `/api/v1`
@@ -172,3 +201,4 @@ Per Support Trainer si confermano le seguenti scelte:
 - lettura relazioni professionista-cliente già disponibile
 - inviti già esposti come modulo reale
 - endpoint futuri mantenuti fuori da questa mappa, in documento separato
+- modulo availability implementato con creazione, lettura, update, block e unblock degli slot

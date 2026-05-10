@@ -428,7 +428,65 @@ A livello database vanno previsti almeno:
 
 ---
 
-## 16. Regole da trasformare in eccezioni applicative
+## Modulo Availability
+
+### 16 Creazione slot disponibilità
+
+Regole applicate alla creazione di uno slot:
+
+- l’utente autenticato deve essere un professionista;
+- il professionista deve avere account attivo;
+- l’email del professionista deve essere verificata;
+- il professionista deve avere specializzazione `PERSONAL_TRAINER`;
+- `startDateTime` è obbligatorio;
+- `endDateTime` è obbligatorio;
+- `endDateTime` deve essere successivo a `startDateTime`;
+- lo slot non deve sovrapporsi ad altri slot attivi dello stesso professionista;
+- lo slot viene creato con stato iniziale `AVAILABLE`;
+- lo slot viene creato con `active = true`.
+
+### 16.1 Aggiornamento slot disponibilità
+
+Regole applicate all’aggiornamento parziale di uno slot:
+
+- lo slot deve appartenere al professionista autenticato;
+- lo slot deve essere attivo;
+- lo slot deve essere in stato `AVAILABLE`;
+- il body non può essere vuoto;
+- è possibile aggiornare solo `startDateTime` e/o `endDateTime`;
+- `endDateTime` deve essere successivo a `startDateTime`;
+- il nuovo intervallo non deve sovrapporsi ad altri slot attivi dello stesso professionista;
+- il controllo overlap esclude lo slot corrente.
+
+### 16.2 Blocco slot disponibilità
+
+Regole applicate al blocco di uno slot:
+
+- lo slot deve appartenere al professionista autenticato;
+- lo slot deve essere attivo;
+- lo slot deve essere in stato `AVAILABLE`;
+- uno slot `BLOCKED` o `BOOKED` non può essere bloccato nuovamente;
+- la transizione consentita è solo `AVAILABLE → BLOCKED`.
+
+### 16.3 Sblocco slot disponibilità
+
+Regole applicate allo sblocco di uno slot:
+
+- lo slot deve appartenere al professionista autenticato;
+- lo slot deve essere attivo;
+- lo slot deve essere in stato `BLOCKED`;
+- uno slot `AVAILABLE` o `BOOKED` non può essere sbloccato;
+- la transizione consentita è solo `BLOCKED → AVAILABLE`.
+
+### 16.4 Regole di ownership
+
+Gli slot disponibilità sono gestiti solo dal professionista proprietario.
+
+Se uno slot non esiste, non è attivo oppure appartiene a un altro professionista, il sistema restituisce errore `404 NOT_FOUND` con codice:
+
+---
+
+## 17 Regole da trasformare in eccezioni applicative
 Le seguenti situazioni devono produrre errori applicativi chiari:
 
 - email già registrata
@@ -445,7 +503,7 @@ Le seguenti situazioni devono produrre errori applicativi chiari:
 
 ---
 
-## 17. Decisioni confermate
+## 17.1 Decisioni confermate
 Per Support Trainer si confermano le seguenti regole:
 
 - password utenti con requisiti forti

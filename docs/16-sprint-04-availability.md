@@ -178,13 +178,18 @@ Gli endpoint pianificati coerenti con questo sprint sono:
 - **PATCH** `/api/v1/availability/{slotId}/block`
 - **PATCH** `/api/v1/availability/{slotId}/unblock`
 
-### Query param ipotizzati da confermare nello sprint
+### Query param non implementati nello Sprint 04
+
+In questo sprint non sono stati introdotti filtri tramite query param.
+
+Restano eventualmente valutabili in uno sprint futuro:
+
 - `status=AVAILABLE|BOOKED|BLOCKED`
 - `from=...`
 - `to=...`
 - `active=true|false`
 
-Nota: il contratto definitivo dei filtri va confermato prima di fissarlo come API finale.
+La versione attuale mantiene il modulo semplice e coerente con il flusso base.
 
 ---
 
@@ -261,5 +266,54 @@ Alla fine di questo sprint il progetto deve avere:
 
 ---
 
-## 15. Prossimo step dopo questo sprint
+## 15. Stato finale dello sprint
+
+Lo Sprint 04 risulta completato con il modulo `availability` funzionante.
+
+Funzionalità implementate:
+
+- creazione slot disponibilità;
+- lettura degli slot del professionista autenticato;
+- lettura degli slot disponibili di un professionista;
+- aggiornamento parziale di uno slot;
+- blocco manuale di uno slot;
+- sblocco manuale di uno slot.
+
+Endpoint finali implementati:
+
+- `POST /api/v1/availability`
+- `GET /api/v1/availability/my`
+- `GET /api/v1/professionals/{professionalId}/availability`
+- `PATCH /api/v1/availability/{slotId}`
+- `PATCH /api/v1/availability/{slotId}/block`
+- `PATCH /api/v1/availability/{slotId}/unblock`
+
+Regole validate manualmente:
+
+- solo professionisti possono accedere al modulo availability;
+- solo professionisti `PERSONAL_TRAINER` possono gestire slot;
+- il professionista può modificare solo i propri slot;
+- slot inesistenti o appartenenti ad altri professionisti restituiscono `404 NOT_FOUND`;
+- gli slot non possono avere intervalli temporali non validi;
+- gli slot non possono sovrapporsi ad altri slot attivi dello stesso professionista;
+- l’update è consentito solo su slot `AVAILABLE`;
+- `AVAILABLE → BLOCKED` è consentito;
+- `BLOCKED → AVAILABLE` è consentito;
+- blocco ripetuto, sblocco non valido e update su slot bloccato restituiscono `409 CONFLICT`;
+- body vuoto in update restituisce `400 BAD_REQUEST`.
+
+Stati slot gestiti nel modulo:
+
+- `AVAILABLE`
+- `BLOCKED`
+
+Stato previsto ma non ancora gestito operativamente:
+
+- `BOOKED`
+
+Lo stato `BOOKED` resta riservato al futuro modulo bookings.
+
+---
+
+## 16. Prossimo step dopo questo sprint
 Una volta completato questo sprint, il passo successivo naturale sarà introdurre il modulo bookings, usando availability come base già affidabile per il flusso cliente → richiesta → risposta del professionista.
