@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import it.zuperman.support_trainer.availability.dto.request.CreateAvailabilitySlotRequest;
+import it.zuperman.support_trainer.availability.dto.request.UpdateAvailabilitySlotRequest;
 import it.zuperman.support_trainer.availability.dto.response.AvailabilitySlotResponse;
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
@@ -77,6 +78,81 @@ public class AvailabilityService {
                 .toList();
     }
 
+    @Transactional
+    public AvailabilitySlotResponse updateAvailabilitySlot(Long slotId, UpdateAvailabilitySlotRequest request) {
+        ProfessionalProfile professional = getAuthenticatedProfessional();
+        validateAvailabilitySpecialization(professional);
+
+        AvailabilitySlot slot = getOwnedActiveSlot(slotId, professional.getId());
+
+        validateSlotCanBeUpdated(slot);
+        validateUpdateRequestNotEmpty(request);
+
+        LocalDateTime newStartDateTime = request.getStartDateTime() != null
+                ? request.getStartDateTime()
+                : slot.getStartDateTime();
+
+        LocalDateTime newEndDateTime = request.getEndDateTime() != null
+                ? request.getEndDateTime()
+                : slot.getEndDateTime();
+
+        validateTimeInterval(newStartDateTime, newEndDateTime);
+        validateNoOverlappingSlotsExcludingCurrent(
+                professional.getId(),
+                slot.getId(),
+                newStartDateTime,
+                newEndDateTime
+        );
+
+        slot.setStartDateTime(newStartDateTime);
+        slot.setEndDateTime(newEndDateTime);
+
+        AvailabilitySlot savedSlot = availabilitySlotRepository.save(slot);
+        return AvailabilitySlotResponse.fromEntity(savedSlot);
+    }
+
+    @Transactional
+    public AvailabilitySlotResponse blockAvailabilitySlot(Long slotId) {
+        ProfessionalProfile professional = getAuthenticatedProfessional();
+        validateAvailabilitySpecialization(professional);
+
+        AvailabilitySlot slot = getOwnedActiveSlot(slotId, professional.getId());
+
+        if (slot.getStatus() != AvailabilitySlotStatus.AVAILABLE) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "AVAILABILITY_SLOT_NOT_AVAILABLE",
+                    "Solo uno slot disponibile può essere bloccato"
+            );
+        }
+
+        slot.setStatus(AvailabilitySlotStatus.BLOCKED);
+
+        AvailabilitySlot savedSlot = availabilitySlotRepository.save(slot);
+        return AvailabilitySlotResponse.fromEntity(savedSlot);
+    }
+
+    @Transactional
+    public AvailabilitySlotResponse unblockAvailabilitySlot(Long slotId) {
+        ProfessionalProfile professional = getAuthenticatedProfessional();
+        validateAvailabilitySpecialization(professional);
+
+        AvailabilitySlot slot = getOwnedActiveSlot(slotId, professional.getId());
+
+        if (slot.getStatus() != AvailabilitySlotStatus.BLOCKED) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "AVAILABILITY_SLOT_NOT_BLOCKED",
+                    "Solo uno slot bloccato può essere sbloccato"
+            );
+        }
+
+        slot.setStatus(AvailabilitySlotStatus.AVAILABLE);
+
+        AvailabilitySlot savedSlot = availabilitySlotRepository.save(slot);
+        return AvailabilitySlotResponse.fromEntity(savedSlot);
+    }
+
     @Transactional(readOnly = true)
     public List<AvailabilitySlotResponse> getAvailableSlotsByProfessional(Long professionalId) {
         ClientProfile authenticatedClient = getAuthenticatedClient();
@@ -135,6 +211,59 @@ public class AvailabilityService {
                     HttpStatus.CONFLICT,
                     "AVAILABILITY_SLOT_OVERLAP",
                     "Esiste già uno slot sovrapposto per questo professionista"
+            );
+        }
+    }
+
+    private void validateNoOverlappingSlotsExcludingCurrent(
+            Long professionalId,
+            Long slotId,
+            LocalDateTime startDateTime,
+            LocalDateTime endDateTime
+    ) {
+        boolean overlapping = availabilitySlotRepository
+                .existsByProfessional_IdAndActiveTrueAndIdNotAndStartDateTimeLessThanAndEndDateTimeGreaterThan(
+                        professionalId,
+                        slotId,
+                        endDateTime,
+                        startDateTime
+                );
+
+        if (overlapping) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "AVAILABILITY_SLOT_OVERLAP",
+                    "Esiste già uno slot sovrapposto per questo professionista"
+            );
+        }
+    }
+
+    private AvailabilitySlot getOwnedActiveSlot(Long slotId, Long professionalId) {
+        return availabilitySlotRepository.findByIdAndProfessional_IdAndActiveTrue(slotId, professionalId)
+                .orElseThrow(() -> new AppException(
+                HttpStatus.NOT_FOUND,
+                "AVAILABILITY_SLOT_NOT_FOUND",
+                "Slot disponibilità non trovato"
+        ));
+    }
+
+    private void validateSlotCanBeUpdated(AvailabilitySlot slot) {
+        if (slot.getStatus() != AvailabilitySlotStatus.AVAILABLE) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "AVAILABILITY_SLOT_NOT_UPDATABLE",
+                    "Solo uno slot disponibile può essere aggiornato"
+            );
+        }
+    }
+
+    private void validateUpdateRequestNotEmpty(UpdateAvailabilitySlotRequest request) {
+        if (request == null
+                || request.getStartDateTime() == null && request.getEndDateTime() == null) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "AVAILABILITY_UPDATE_EMPTY",
+                    "Devi indicare almeno una data/ora da aggiornare"
             );
         }
     }
