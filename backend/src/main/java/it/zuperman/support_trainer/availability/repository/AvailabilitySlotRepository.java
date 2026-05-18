@@ -32,4 +32,6 @@ public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySl
     );
 
     Optional<AvailabilitySlot> findByIdAndProfessional_IdAndActiveTrue(Long slotId, Long professionalId);
+
+    Optional<AvailabilitySlot> findByIdAndActiveTrue(Long slotId);
 }
