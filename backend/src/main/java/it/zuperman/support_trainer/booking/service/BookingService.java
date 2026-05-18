@@ -124,6 +124,167 @@ public class BookingService {
         return BookingRequestResponse.fromEntity(bookingRequest);
     }
 
+    @Transactional
+    public BookingRequestResponse confirmBookingRequest(Long bookingRequestId) {
+        ProfessionalProfile professional = getAuthenticatedProfessional();
+
+        BookingRequest bookingRequest = getActiveBookingRequestForProfessional(
+                bookingRequestId,
+                professional.getId()
+        );
+
+        validateBookingRequestIsPending(bookingRequest);
+        validateSlotsCanBeConfirmed(bookingRequest);
+
+        bookingRequest.setStatus(BookingRequestStatus.CONFIRMED);
+        markSlotsAsBooked(bookingRequest);
+
+        BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
+        return BookingRequestResponse.fromEntity(savedBookingRequest);
+    }
+
+    @Transactional
+    public BookingRequestResponse rejectBookingRequest(Long bookingRequestId) {
+        ProfessionalProfile professional = getAuthenticatedProfessional();
+
+        BookingRequest bookingRequest = getActiveBookingRequestForProfessional(
+                bookingRequestId,
+                professional.getId()
+        );
+
+        validateBookingRequestIsPending(bookingRequest);
+
+        bookingRequest.setStatus(BookingRequestStatus.REJECTED);
+        releaseSlotsAfterNegativeOutcome(bookingRequest);
+
+        BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
+        return BookingRequestResponse.fromEntity(savedBookingRequest);
+    }
+
+    @Transactional
+    public BookingRequestResponse cancelBookingRequest(Long bookingRequestId) {
+        User user = getAuthenticatedUser();
+
+        BookingRequest bookingRequest = bookingRequestRepository.findByIdAndActiveTrue(bookingRequestId)
+                .orElseThrow(() -> new AppException(
+                HttpStatus.NOT_FOUND,
+                "BOOKING_REQUEST_NOT_FOUND",
+                "Richiesta di prenotazione non trovata"
+        ));
+
+        validateBookingRequestVisibility(user, bookingRequest);
+        validateCancellationAllowed(user, bookingRequest);
+
+        bookingRequest.setStatus(BookingRequestStatus.CANCELLED);
+        releaseSlotsAfterNegativeOutcome(bookingRequest);
+
+        BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
+        return BookingRequestResponse.fromEntity(savedBookingRequest);
+    }
+
+    private BookingRequest getActiveBookingRequestForProfessional(
+            Long bookingRequestId,
+            Long professionalId
+    ) {
+        return bookingRequestRepository.findByIdAndProfessional_IdAndActiveTrue(
+                bookingRequestId,
+                professionalId
+        ).orElseThrow(() -> new AppException(
+                HttpStatus.NOT_FOUND,
+                "BOOKING_REQUEST_NOT_FOUND",
+                "Richiesta di prenotazione non trovata"
+        ));
+    }
+
+    private void validateBookingRequestIsPending(BookingRequest bookingRequest) {
+        if (bookingRequest.getStatus() != BookingRequestStatus.PENDING) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "BOOKING_REQUEST_INVALID_TRANSITION",
+                    "La richiesta di prenotazione non è in stato PENDING"
+            );
+        }
+    }
+
+    private void validateSlotsCanBeConfirmed(BookingRequest bookingRequest) {
+        for (BookingRequestItem item : bookingRequest.getItems()) {
+            AvailabilitySlot slot = item.getAvailabilitySlot();
+
+            if (slot.getStatus() != AvailabilitySlotStatus.AVAILABLE) {
+                throw new AppException(
+                        HttpStatus.CONFLICT,
+                        "AVAILABILITY_SLOT_NOT_CONFIRMABLE",
+                        "Lo slot collegato non è più confermabile"
+                );
+            }
+        }
+    }
+
+    private void markSlotsAsBooked(BookingRequest bookingRequest) {
+        for (BookingRequestItem item : bookingRequest.getItems()) {
+            AvailabilitySlot slot = item.getAvailabilitySlot();
+            slot.setStatus(AvailabilitySlotStatus.BOOKED);
+            availabilitySlotRepository.save(slot);
+        }
+    }
+
+    private void releaseSlotsAfterNegativeOutcome(BookingRequest bookingRequest) {
+        for (BookingRequestItem item : bookingRequest.getItems()) {
+            AvailabilitySlot slot = item.getAvailabilitySlot();
+
+            if (slot.getStatus() == AvailabilitySlotStatus.BOOKED) {
+                slot.setStatus(AvailabilitySlotStatus.AVAILABLE);
+                availabilitySlotRepository.save(slot);
+            }
+        }
+    }
+
+    private void validateCancellationAllowed(User user, BookingRequest bookingRequest) {
+        BookingRequestStatus status = bookingRequest.getStatus();
+
+        if (status == BookingRequestStatus.CANCELLED) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "BOOKING_REQUEST_ALREADY_CANCELLED",
+                    "La richiesta di prenotazione è già stata cancellata"
+            );
+        }
+
+        if (status == BookingRequestStatus.REJECTED) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "BOOKING_REQUEST_ALREADY_REJECTED",
+                    "La richiesta di prenotazione è già stata rifiutata"
+            );
+        }
+
+        if (user instanceof ClientProfile) {
+            if (status == BookingRequestStatus.PENDING || status == BookingRequestStatus.CONFIRMED) {
+                return;
+            }
+        }
+
+        if (user instanceof ProfessionalProfile) {
+            if (status == BookingRequestStatus.CONFIRMED) {
+                return;
+            }
+
+            if (status == BookingRequestStatus.PENDING) {
+                throw new AppException(
+                        HttpStatus.CONFLICT,
+                        "BOOKING_REQUEST_REJECT_REQUIRED",
+                        "Una richiesta in attesa deve essere rifiutata dal professionista"
+                );
+            }
+        }
+
+        throw new AppException(
+                HttpStatus.CONFLICT,
+                "BOOKING_REQUEST_INVALID_TRANSITION",
+                "La richiesta di prenotazione non può essere cancellata nello stato attuale"
+        );
+    }
+
     private void validateBookableSlot(AvailabilitySlot slot) {
         if (slot.getStatus() != AvailabilitySlotStatus.AVAILABLE) {
             throw new AppException(
