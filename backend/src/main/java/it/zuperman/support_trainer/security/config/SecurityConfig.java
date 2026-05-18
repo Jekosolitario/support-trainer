@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -65,6 +66,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/invites/**").hasAuthority("PROFESSIONAL")
                 .requestMatchers("/api/v1/availability/**").hasAuthority("PROFESSIONAL")
                 .requestMatchers("/api/v1/professionals/**").hasAuthority("CLIENT")
+                .requestMatchers(HttpMethod.POST, "/api/v1/bookings").hasAuthority("CLIENT")
+                .requestMatchers(HttpMethod.GET, "/api/v1/bookings/client").hasAuthority("CLIENT")
                 .requestMatchers("/api/v1/me/**").authenticated()
                 .anyRequest().authenticated()
                 )
