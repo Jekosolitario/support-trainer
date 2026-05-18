@@ -97,6 +97,33 @@ public class BookingService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<BookingRequestResponse> getProfessionalBookingRequests() {
+        ProfessionalProfile professional = getAuthenticatedProfessional();
+
+        return bookingRequestRepository
+                .findAllByProfessional_IdAndActiveTrueOrderByCreatedAtDesc(professional.getId())
+                .stream()
+                .map(BookingRequestResponse::fromEntity)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public BookingRequestResponse getBookingRequestDetail(Long bookingRequestId) {
+        User user = getAuthenticatedUser();
+
+        BookingRequest bookingRequest = bookingRequestRepository.findByIdAndActiveTrue(bookingRequestId)
+                .orElseThrow(() -> new AppException(
+                HttpStatus.NOT_FOUND,
+                "BOOKING_REQUEST_NOT_FOUND",
+                "Richiesta di prenotazione non trovata"
+        ));
+
+        validateBookingRequestVisibility(user, bookingRequest);
+
+        return BookingRequestResponse.fromEntity(bookingRequest);
+    }
+
     private void validateBookableSlot(AvailabilitySlot slot) {
         if (slot.getStatus() != AvailabilitySlotStatus.AVAILABLE) {
             throw new AppException(
@@ -150,6 +177,38 @@ public class BookingService {
         }
     }
 
+    private void validateBookingRequestVisibility(User user, BookingRequest bookingRequest) {
+        if (user instanceof ClientProfile clientProfile) {
+            if (!bookingRequest.getClient().getId().equals(clientProfile.getId())) {
+                throw new AppException(
+                        HttpStatus.FORBIDDEN,
+                        "BOOKING_REQUEST_ACCESS_DENIED",
+                        "Non puoi accedere a questa richiesta di prenotazione"
+                );
+            }
+
+            return;
+        }
+
+        if (user instanceof ProfessionalProfile professionalProfile) {
+            if (!bookingRequest.getProfessional().getId().equals(professionalProfile.getId())) {
+                throw new AppException(
+                        HttpStatus.FORBIDDEN,
+                        "BOOKING_REQUEST_ACCESS_DENIED",
+                        "Non puoi accedere a questa richiesta di prenotazione"
+                );
+            }
+
+            return;
+        }
+
+        throw new AppException(
+                HttpStatus.FORBIDDEN,
+                "ROLE_NOT_ALLOWED",
+                "Solo cliente o professionista possono accedere a questa risorsa"
+        );
+    }
+
     private ClientProfile getAuthenticatedClient() {
         User user = getAuthenticatedUser();
 
@@ -162,6 +221,20 @@ public class BookingService {
         }
 
         return clientProfile;
+    }
+
+    private ProfessionalProfile getAuthenticatedProfessional() {
+        User user = getAuthenticatedUser();
+
+        if (!(user instanceof ProfessionalProfile professionalProfile)) {
+            throw new AppException(
+                    HttpStatus.FORBIDDEN,
+                    "ROLE_NOT_ALLOWED",
+                    "Solo il professionista può accedere a questa risorsa"
+            );
+        }
+
+        return professionalProfile;
     }
 
     private User getAuthenticatedUser() {
