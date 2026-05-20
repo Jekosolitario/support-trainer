@@ -1,5 +1,7 @@
 package it.zuperman.support_trainer;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -22,10 +24,15 @@ import it.zuperman.support_trainer.availability.dto.response.AvailabilitySlotRes
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
 import it.zuperman.support_trainer.availability.service.AvailabilityService;
+import it.zuperman.support_trainer.client.entity.ClientProfile;
+import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
+import it.zuperman.support_trainer.common.enums.Gender;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
+import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
+import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
 
@@ -42,6 +49,12 @@ class AvailabilityServiceIntegrationTest {
 
     @Autowired
     private AvailabilitySlotRepository availabilitySlotRepository;
+
+    @Autowired
+    private ClientProfileRepository clientProfileRepository;
+
+    @Autowired
+    private ProfessionalClientLinkRepository professionalClientLinkRepository;
 
     @AfterEach
     void tearDown() {
@@ -94,6 +107,27 @@ class AvailabilityServiceIntegrationTest {
         return professionalProfileRepository.save(professional);
     }
 
+    private ClientProfile createActiveClient() {
+        String email = "client-" + UUID.randomUUID() + "@test.com";
+
+        ClientProfile client = new ClientProfile(
+                "Luigi",
+                "Bianchi",
+                email,
+                "password123",
+                LocalDate.now().minusYears(30),
+                BigDecimal.valueOf(180),
+                "Dimagrimento",
+                Gender.MALE
+        );
+
+        client.setAccountStatus(AccountStatus.ACTIVE);
+        client.setEmailVerified(true);
+        client.setActive(true);
+
+        return clientProfileRepository.save(client);
+    }
+
     private void authenticateAs(String email, String authority) {
         UsernamePasswordAuthenticationToken authentication
                 = new UsernamePasswordAuthenticationToken(
@@ -131,5 +165,34 @@ class AvailabilityServiceIntegrationTest {
                 .hasMessage("Esiste già uno slot sovrapposto per questo professionista");
 
         assertThat(availabilitySlotRepository.findAll()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Cliente collegato deve vedere gli slot availability disponibili del professionista")
+    void shouldReturnAvailableSlotsForLinkedClient() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(9).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        List<AvailabilitySlotResponse> response
+                = availabilityService.getAvailableSlotsByProfessional(professional.getId());
+
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).getId()).isEqualTo(slot.getId());
+        assertThat(response.get(0).getStartDateTime()).isEqualTo(startDateTime);
+        assertThat(response.get(0).getEndDateTime()).isEqualTo(endDateTime);
+        assertThat(response.get(0).getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE.name());
     }
 }
