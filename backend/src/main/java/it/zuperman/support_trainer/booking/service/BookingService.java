@@ -70,7 +70,7 @@ public class BookingService {
         BookingRequest bookingRequest = new BookingRequest(
                 client,
                 professional,
-                request.getNote()
+                normalizeNote(request.getNote())
         );
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
@@ -180,6 +180,20 @@ public class BookingService {
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
         return BookingRequestResponse.fromEntity(savedBookingRequest);
+    }
+
+    private String normalizeNote(String note) {
+        if (note == null) {
+            return null;
+        }
+
+        String normalizedNote = note.trim();
+
+        if (normalizedNote.isBlank()) {
+            return null;
+        }
+
+        return normalizedNote;
     }
 
     private BookingRequest getActiveBookingRequestForProfessional(

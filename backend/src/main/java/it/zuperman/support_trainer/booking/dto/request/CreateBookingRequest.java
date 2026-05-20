@@ -1,12 +1,14 @@
 package it.zuperman.support_trainer.booking.dto.request;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 public class CreateBookingRequest {
 
     @NotNull(message = "Lo slot disponibilità è obbligatorio")
     private Long availabilitySlotId;
 
+    @Size(max = 1000, message = "La nota non può superare 1000 caratteri")
     private String note;
 
     public CreateBookingRequest() {
