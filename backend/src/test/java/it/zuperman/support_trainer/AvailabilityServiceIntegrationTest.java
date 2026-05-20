@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ import it.zuperman.support_trainer.availability.service.AvailabilityService;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
+import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
 
@@ -101,5 +103,33 @@ class AvailabilityServiceIntegrationTest {
                 );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
+    @Test
+    @DisplayName("Non deve creare uno slot availability sovrapposto per lo stesso professionista")
+    void shouldNotCreateOverlappingAvailabilitySlotForSameProfessional() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        LocalDateTime firstStartDateTime = LocalDateTime.now().plusDays(8).withNano(0);
+        LocalDateTime firstEndDateTime = firstStartDateTime.plusHours(2);
+
+        CreateAvailabilitySlotRequest firstRequest = new CreateAvailabilitySlotRequest(
+                firstStartDateTime,
+                firstEndDateTime
+        );
+
+        availabilityService.createAvailabilitySlot(firstRequest);
+
+        CreateAvailabilitySlotRequest overlappingRequest = new CreateAvailabilitySlotRequest(
+                firstStartDateTime.plusMinutes(30),
+                firstStartDateTime.plusHours(1).plusMinutes(30)
+        );
+
+        assertThatThrownBy(() -> availabilityService.createAvailabilitySlot(overlappingRequest))
+                .isInstanceOf(AppException.class)
+                .hasMessage("Esiste già uno slot sovrapposto per questo professionista");
+
+        assertThat(availabilitySlotRepository.findAll()).hasSize(1);
     }
 }
