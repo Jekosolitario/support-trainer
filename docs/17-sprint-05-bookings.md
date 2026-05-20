@@ -319,3 +319,28 @@ Ordine corretto consigliato:
 4. cancellazione + rifinitura sicurezza/coerenza + aggiornamento documentazione
 
 Questo ordine riduce il rischio di caos e mantiene il progetto coerente con la roadmap già esistente.
+
+---
+
+## Migliorie future importanti
+
+### Motivo del rifiuto di una richiesta di prenotazione
+
+In una versione successiva del modulo Bookings, il rifiuto di una richiesta di prenotazione dovrà permettere al professionista di indicare un messaggio esplicativo per il cliente.
+
+Obiettivo della feature:
+
+- permettere al professionista di spiegare perché una richiesta viene rifiutata
+- rendere più chiara la comunicazione verso il cliente
+- conservare il motivo del rifiuto nello storico della prenotazione
+- mostrare il messaggio al cliente nel dettaglio della richiesta
+
+Possibile evoluzione tecnica:
+
+- aggiungere un campo dedicato su `BookingRequest`, ad esempio `rejectionReason`
+- introdurre una request DTO per `PATCH /api/v1/bookings/{bookingRequestId}/reject`
+- validare il messaggio lato backend
+- includere il motivo nella response della booking
+- mostrare il motivo lato frontend nella pagina cliente
+
+Questa miglioria non è inclusa nello Sprint 05 attuale, ma va considerata una feature importante per migliorare la qualità del flusso di prenotazione.
