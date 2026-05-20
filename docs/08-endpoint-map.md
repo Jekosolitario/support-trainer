@@ -154,9 +154,58 @@ Sblocca uno slot bloccato appartenente al professionista autenticato.
 
 ---
 
-## 10. Regole generali di accesso
+## 10. Modulo Bookings
 
-### 10.1 Endpoint pubblici
+### 10.1 Creazione richiesta prenotazione
+**POST** `/api/v1/bookings`  
+Permette al cliente autenticato di creare una richiesta di prenotazione su uno slot disponibile di un professionista collegato.
+
+### 10.2 Elenco prenotazioni del cliente autenticato
+**GET** `/api/v1/bookings/client`  
+Restituisce le richieste di prenotazione del cliente autenticato.
+
+### 10.3 Elenco prenotazioni del professionista autenticato
+**GET** `/api/v1/bookings/professional`  
+Restituisce le richieste di prenotazione ricevute dal professionista autenticato.
+
+### 10.4 Dettaglio richiesta prenotazione
+**GET** `/api/v1/bookings/{bookingRequestId}`  
+Restituisce il dettaglio di una richiesta solo se l’utente autenticato è autorizzato.
+
+### 10.5 Conferma richiesta prenotazione
+**PATCH** `/api/v1/bookings/{bookingRequestId}/confirm`  
+Permette al professionista proprietario dello slot di confermare una richiesta `PENDING`.
+
+Quando la richiesta viene confermata:
+- la booking passa a `CONFIRMED`
+- lo slot collegato passa a `BOOKED`
+
+### 10.6 Rifiuto richiesta prenotazione
+**PATCH** `/api/v1/bookings/{bookingRequestId}/reject`  
+Permette al professionista proprietario dello slot di rifiutare una richiesta `PENDING`.
+
+Quando la richiesta viene rifiutata:
+- la booking passa a `REJECTED`
+- lo slot resta disponibile se non era già occupato
+
+### 10.7 Cancellazione richiesta prenotazione
+**PATCH** `/api/v1/bookings/{bookingRequestId}/cancel`  
+Permette la cancellazione di una richiesta secondo le regole di autorizzazione definite nel service.
+
+Regole attuali:
+- il cliente può cancellare una richiesta `PENDING`
+- il cliente può cancellare una richiesta `CONFIRMED`
+- il professionista proprietario può cancellare una richiesta `CONFIRMED`
+
+Quando una richiesta `CONFIRMED` viene cancellata:
+- la booking passa a `CANCELLED`
+- lo slot collegato torna `AVAILABLE`
+
+---
+
+## 11. Regole generali di accesso
+
+### 11.1 Endpoint pubblici
 Attualmente sono pubblici gli endpoint sotto:
 
 `/api/v1/auth/**`
@@ -168,19 +217,20 @@ In particolare:
 - `POST /api/v1/auth/login`
 - `GET /api/v1/auth/verify-email`
 
-### 10.2 Endpoint protetti
+### 11.2 Endpoint protetti
 Tutti gli altri endpoint richiedono autenticazione valida tramite JWT.
 
-### 10.3 Regole per area
+### 11.3 Regole per area
 - `/api/v1/clients/**` → solo `PROFESSIONAL`
 - `/api/v1/professionals/**` → solo `CLIENT`
 - `/api/v1/me/**` → utente autenticato
 - `/api/v1/invites/**` → solo `PROFESSIONAL`, con controlli business aggiuntivi lato service
 - `/api/v1/availability/**` → solo `PROFESSIONAL`, con controlli business aggiuntivi lato service
+- `/api/v1/bookings/**` → utente autenticato, con controlli business aggiuntivi lato service
 
 ---
 
-## 11. Nota metodologica
+## 12. Nota metodologica
 Questa mappa rappresenta **solo lo stato reale attuale** del backend.
 
 Per ogni endpoint, nei documenti tecnici di dettaglio o nei prossimi sprint andranno eventualmente definiti meglio:
@@ -192,7 +242,7 @@ Per ogni endpoint, nei documenti tecnici di dettaglio o nei prossimi sprint andr
 
 ---
 
-## 12. Decisioni confermate
+## 13. Decisioni confermate
 Per Support Trainer si confermano le seguenti scelte:
 
 - prefisso globale `/api/v1`
