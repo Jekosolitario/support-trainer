@@ -378,7 +378,7 @@ public class AvailabilityService {
         }
 
         if (user instanceof ProfessionalProfile professionalProfile) {
-            if (!professionalProfile.getEmailVerified()) {
+            if (!Boolean.TRUE.equals(professionalProfile.getEmailVerified())) {
                 throw new AppException(
                         HttpStatus.FORBIDDEN,
                         "EMAIL_NOT_VERIFIED",
@@ -386,22 +386,22 @@ public class AvailabilityService {
                 );
             }
 
-            if (!professionalProfile.getActive()) {
+            if (!Boolean.TRUE.equals(professionalProfile.getActive())) {
                 throw new AppException(
                         HttpStatus.FORBIDDEN,
                         "PROFESSIONAL_NOT_ACTIVE",
                         "Profilo professionista non attivo"
                 );
             }
+        }
 
-            if (user instanceof ClientProfile clientProfile) {
-                if (!clientProfile.getActive()) {
-                    throw new AppException(
-                            HttpStatus.FORBIDDEN,
-                            "CLIENT_NOT_ACTIVE",
-                            "Profilo cliente non attivo"
-                    );
-                }
+        if (user instanceof ClientProfile clientProfile) {
+            if (!Boolean.TRUE.equals(clientProfile.getActive())) {
+                throw new AppException(
+                        HttpStatus.FORBIDDEN,
+                        "CLIENT_NOT_ACTIVE",
+                        "Profilo cliente non attivo"
+                );
             }
         }
     }
