@@ -48,8 +48,9 @@ public class AvailabilityService {
     @Transactional
     public AvailabilitySlotResponse createAvailabilitySlot(CreateAvailabilitySlotRequest request) {
         ProfessionalProfile professional = getAuthenticatedProfessional();
-        validateAvailabilitySpecialization(professional);
         validateTimeInterval(request.getStartDateTime(), request.getEndDateTime());
+        validateSlotIsInFuture(request.getStartDateTime());
+
         validateNoOverlappingSlots(
                 professional.getId(),
                 request.getStartDateTime(),
@@ -97,6 +98,8 @@ public class AvailabilityService {
                 : slot.getEndDateTime();
 
         validateTimeInterval(newStartDateTime, newEndDateTime);
+        validateSlotIsInFuture(newStartDateTime);
+
         validateNoOverlappingSlotsExcludingCurrent(
                 professional.getId(),
                 slot.getId(),
@@ -190,6 +193,16 @@ public class AvailabilityService {
                     HttpStatus.BAD_REQUEST,
                     "INVALID_TIME_INTERVAL",
                     "L'intervallo temporale non è valido"
+            );
+        }
+    }
+
+    private void validateSlotIsInFuture(LocalDateTime startDateTime) {
+        if (!startDateTime.isAfter(LocalDateTime.now())) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "AVAILABILITY_SLOT_IN_PAST",
+                    "Lo slot disponibilità deve iniziare nel futuro"
             );
         }
     }
