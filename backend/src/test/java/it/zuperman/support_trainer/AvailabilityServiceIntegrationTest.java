@@ -214,4 +214,30 @@ class AvailabilityServiceIntegrationTest {
         assertThatThrownBy(() -> availabilityService.getAvailableSlotsByProfessional(professional.getId()))
                 .isInstanceOf(AppException.class);
     }
+
+    @Test
+    @DisplayName("Professionista deve bloccare e sbloccare un proprio slot availability")
+    void shouldBlockAndUnblockAvailabilitySlot() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(11).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        AvailabilitySlotResponse blockedResponse
+                = availabilityService.blockAvailabilitySlot(slot.getId());
+
+        assertThat(blockedResponse.getId()).isEqualTo(slot.getId());
+        assertThat(blockedResponse.getStatus()).isEqualTo(AvailabilitySlotStatus.BLOCKED.name());
+
+        AvailabilitySlotResponse unblockedResponse
+                = availabilityService.unblockAvailabilitySlot(slot.getId());
+
+        assertThat(unblockedResponse.getId()).isEqualTo(slot.getId());
+        assertThat(unblockedResponse.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE.name());
+    }
 }
