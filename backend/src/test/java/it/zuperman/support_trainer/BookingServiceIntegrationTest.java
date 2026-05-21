@@ -212,4 +212,45 @@ class BookingServiceIntegrationTest {
 
         assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.BOOKED);
     }
+
+    @Test
+    @DisplayName("Professionista deve rifiutare una richiesta booking pending")
+    void shouldRejectPendingBookingRequest() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(16).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        CreateBookingRequest request = new CreateBookingRequest(
+                slot.getId(),
+                "Vorrei prenotare questo slot."
+        );
+
+        BookingRequestResponse pendingResponse = bookingService.createBookingRequest(request);
+
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        BookingRequestResponse rejectedResponse
+                = bookingService.rejectBookingRequest(pendingResponse.getId());
+
+        assertThat(rejectedResponse.getStatus()).isEqualTo("REJECTED");
+        assertThat(rejectedResponse.getItems()).hasSize(1);
+        assertThat(rejectedResponse.getItems().get(0).getSlotStatus()).isEqualTo("AVAILABLE");
+
+        AvailabilitySlot updatedSlot = availabilitySlotRepository.findById(slot.getId())
+                .orElseThrow();
+
+        assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
+    }
 }
