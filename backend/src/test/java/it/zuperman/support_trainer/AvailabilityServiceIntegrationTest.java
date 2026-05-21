@@ -195,4 +195,23 @@ class AvailabilityServiceIntegrationTest {
         assertThat(response.get(0).getEndDateTime()).isEqualTo(endDateTime);
         assertThat(response.get(0).getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE.name());
     }
+
+    @Test
+    @DisplayName("Cliente non collegato non deve vedere gli slot availability del professionista")
+    void shouldNotReturnAvailableSlotsForUnlinkedClient() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(10).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        assertThatThrownBy(() -> availabilityService.getAvailableSlotsByProfessional(professional.getId()))
+                .isInstanceOf(AppException.class);
+    }
 }
