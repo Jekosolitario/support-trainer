@@ -343,43 +343,85 @@ Va controllata nel **service layer**.
 ## 16. Protezione endpoint per ruolo
 
 ## 16.1 Regole attualmente implementate in SecurityConfig
+
 Le regole base reali sono:
 
 - `/api/v1/auth/**` → pubblico
 - `/api/v1/clients/**` → solo `PROFESSIONAL`
 - `/api/v1/invites/**` → solo `PROFESSIONAL`
+- `/api/v1/availability/**` → solo `PROFESSIONAL`
 - `/api/v1/professionals/**` → solo `CLIENT`
 - `/api/v1/me/**` → qualsiasi utente autenticato
-- per `/api/v1/invites/**`, oltre al controllo di ruolo in SecurityConfig, restano attivi anche i controlli business nel service (active, emailVerified, accountStatus)
-- tutto il resto → autenticato
 
-## 16.2 Caso particolare: invites
-Gli endpoint `/api/v1/invites/**` non hanno nel `SecurityConfig` una regola esplicita `hasAuthority("PROFESSIONAL")`, ma sono comunque:
-- protetti da autenticazione
-- ulteriormente controllati nel service layer
+### Booking
 
-Infatti `InviteCodeService` consente l’operazione solo se l’utente autenticato è:
-- un professionista esistente
-- attivo
-- con email verificata
-- con account `ACTIVE`
+Le regole Booking sono definite in modo più specifico:
 
-## 16.3 Esempi reali di accesso
+- `POST /api/v1/bookings` → solo `CLIENT`
+- `GET /api/v1/bookings/client` → solo `CLIENT`
+- `GET /api/v1/bookings/professional` → solo `PROFESSIONAL`
+- `PATCH /api/v1/bookings/{bookingRequestId}/confirm` → solo `PROFESSIONAL`
+- `PATCH /api/v1/bookings/{bookingRequestId}/reject` → solo `PROFESSIONAL`
+- `GET /api/v1/bookings/{bookingRequestId}` → utente autenticato, con controllo ownership nel service
+- `PATCH /api/v1/bookings/{bookingRequestId}/cancel` → utente autenticato, con controllo ownership e stato nel service
+
+Tutto il resto richiede autenticazione valida.
+
+---
+
+## 16.2 Esempi reali di accesso
+
 ### Solo professionista
+
 - `GET /api/v1/clients/my`
 - `GET /api/v1/clients/{clientId}`
 - `POST /api/v1/invites`
 - `GET /api/v1/invites`
+- `POST /api/v1/availability`
+- `GET /api/v1/availability/my`
+- `PATCH /api/v1/availability/{slotId}`
+- `PATCH /api/v1/availability/{slotId}/block`
+- `PATCH /api/v1/availability/{slotId}/unblock`
+- `GET /api/v1/bookings/professional`
+- `PATCH /api/v1/bookings/{bookingRequestId}/confirm`
+- `PATCH /api/v1/bookings/{bookingRequestId}/reject`
 
 ### Solo cliente
+
 - `GET /api/v1/professionals/my`
 - `GET /api/v1/professionals/{professionalId}`
+- `GET /api/v1/professionals/{professionalId}/availability`
+- `POST /api/v1/bookings`
+- `GET /api/v1/bookings/client`
 
-### Entrambi
+### Entrambi, se coinvolti nella risorsa
+
+- `GET /api/v1/bookings/{bookingRequestId}`
+- `PATCH /api/v1/bookings/{bookingRequestId}/cancel`
+
+### Entrambi autenticati
+
 - `GET /api/v1/me/profile`
 - `GET /api/v1/me/account`
 - `PATCH /api/v1/me/profile`
 - `PATCH /api/v1/me/profile/operational-status`
+
+---
+
+## 16.3 Nota su SecurityConfig e service layer
+
+`SecurityConfig` controlla il ruolo minimo necessario per entrare nell’area corretta.
+
+Il service layer controlla invece:
+
+- account attivo
+- email verificata quando richiesta
+- profilo attivo
+- ownership della risorsa
+- relazione attiva professionista-cliente
+- stato dello slot
+- stato del booking
+- transizioni consentite
 
 ---
 
@@ -401,24 +443,52 @@ Per ora la specializzazione è:
 ## 18. Sicurezza sulle relazioni di dominio
 
 ## 18.1 Regola fondamentale
+
 Avere il ruolo corretto non basta.
 
 Bisogna anche verificare che la risorsa appartenga davvero all’utente o sia a lui accessibile.
 
+Questi controlli vengono gestiti nel service layer.
+
+---
+
 ## 18.2 Esempi già implementati
+
 ### Cliente
+
 Un cliente può:
+
 - vedere solo i professionisti a lui collegati
+- vedere gli slot availability solo dei professionisti collegati
+- creare booking solo su slot di professionisti collegati
+- vedere solo i propri booking
+- cancellare solo booking in cui è coinvolto
 
 ### Professionista
+
 Un professionista può:
+
 - vedere solo i clienti a lui collegati
+- creare, modificare, bloccare e sbloccare solo i propri slot availability
+- vedere solo i booking ricevuti dai propri clienti
+- confermare o rifiutare solo booking che riguardano i propri slot
+- cancellare booking confermati in cui è coinvolto
+
+---
 
 ## 18.3 Dove viene controllata
-Questo controllo viene fatto nel service layer tramite verifica dell’esistenza di un
-`ProfessionalClientLink` attivo tra le due parti.
 
-Se il collegamento non esiste:
+Il controllo sulla relazione cliente-professionista viene fatto tramite verifica dell’esistenza di un `ProfessionalClientLink` attivo tra le due parti.
+
+Il controllo ownership sulle risorse viene fatto nei service specifici:
+
+- `ClientService`
+- `ProfessionalService`
+- `AvailabilityService`
+- `BookingService`
+
+Se il collegamento non esiste o l’utente non è autorizzato:
+
 - viene restituito errore `403 FORBIDDEN`
 
 ---
@@ -507,11 +577,21 @@ Questa scelta è coerente con:
 - controllo base delle authority sugli endpoint configurati
 
 ## 23.2 Service layer gestisce
+
 - verifica email e stato account
+- profilo attivo
 - accesso reale alle risorse collegate
 - controllo del tipo utente richiesto
 - controlli business sui link professionista-cliente
 - blocco operativo per professionista non attivo o non verificato
+- validazione slot availability
+- blocco slot nel passato
+- assenza di sovrapposizioni availability
+- controllo ownership sugli slot
+- creazione booking solo su slot disponibili
+- creazione booking solo tra cliente e professionista collegati
+- transizioni di stato booking consentite
+- aggiornamento stato slot dopo conferma o cancellazione booking
 
 ---
 
@@ -524,9 +604,18 @@ Nel codice attuale le situazioni seguenti devono produrre errori chiari:
 - token mancante o non valido
 - account non attivo
 - email non verificata
+- profilo professionista non attivo
+- profilo cliente non attivo
 - accesso a endpoint con authority errata
 - accesso a risorsa non collegata all’utente
 - uso di codice invito non valido, non attivo, già usato o scaduto
+- creazione slot availability nel passato
+- creazione slot availability sovrapposto
+- modifica di slot non disponibile
+- booking su slot non disponibile
+- booking tra cliente e professionista non collegati
+- accesso a booking da utente non coinvolto
+- transizione booking non consentita
 
 ---
 
@@ -544,3 +633,9 @@ Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti
 - password hashata con BCrypt
 - refresh token già presente nel modello, ma flusso refresh non ancora esposto via endpoint
 - forgot password / reset password non ancora implementati
+- Availability è modulo backend implementato e protetto
+- Bookings è modulo backend implementato e protetto
+- gli endpoint booking principali hanno regole esplicite in `SecurityConfig`
+- ownership e transizioni booking restano controllate nel service layer
+- il cliente può vedere availability solo di professionisti collegati
+- il professionista può gestire solo i propri slot availability
