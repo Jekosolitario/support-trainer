@@ -20,6 +20,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import it.zuperman.support_trainer.availability.dto.request.CreateAvailabilitySlotRequest;
+import it.zuperman.support_trainer.availability.dto.request.UpdateAvailabilitySlotRequest;
 import it.zuperman.support_trainer.availability.dto.response.AvailabilitySlotResponse;
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
@@ -239,5 +240,29 @@ class AvailabilityServiceIntegrationTest {
 
         assertThat(unblockedResponse.getId()).isEqualTo(slot.getId());
         assertThat(unblockedResponse.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE.name());
+    }
+
+    @Test
+    @DisplayName("Non deve aggiornare uno slot availability se non è disponibile")
+    void shouldNotUpdateAvailabilitySlotWhenNotAvailable() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(12).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        availabilityService.blockAvailabilitySlot(slot.getId());
+
+        UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
+                startDateTime.plusDays(1),
+                endDateTime.plusDays(1)
+        );
+
+        assertThatThrownBy(() -> availabilityService.updateAvailabilitySlot(slot.getId(), updateRequest))
+                .isInstanceOf(AppException.class);
     }
 }
