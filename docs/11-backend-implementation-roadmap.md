@@ -246,6 +246,30 @@ Permettere al professionista di definire le proprie disponibilità.
 - lettura slot disponibile
 - regole principali rispettate
 
+### Stato attuale
+
+Completata e verificata.
+
+Endpoint implementati:
+
+- `POST /api/v1/availability`
+- `GET /api/v1/availability/my`
+- `GET /api/v1/professionals/{professionalId}/availability`
+- `PATCH /api/v1/availability/{slotId}`
+- `PATCH /api/v1/availability/{slotId}/block`
+- `PATCH /api/v1/availability/{slotId}/unblock`
+
+Sono presenti controlli su:
+
+- professionista autenticato
+- account attivo
+- email verificata per professionista
+- profilo attivo
+- intervalli temporali validi
+- slot nel futuro
+- assenza di sovrapposizioni
+- accesso cliente solo se collegato al professionista
+
 ---
 
 ## FASE 9 — Bookings
@@ -267,6 +291,36 @@ Implementare il flusso cliente → richiesta → conferma/rifiuto.
 - professionista la vede
 - professionista conferma/rifiuta
 - slot aggiornati correttamente
+
+### Stato attuale
+
+Completata e verificata.
+
+Endpoint implementati:
+
+- `POST /api/v1/bookings`
+- `GET /api/v1/bookings/client`
+- `GET /api/v1/bookings/professional`
+- `GET /api/v1/bookings/{bookingRequestId}`
+- `PATCH /api/v1/bookings/{bookingRequestId}/confirm`
+- `PATCH /api/v1/bookings/{bookingRequestId}/reject`
+- `PATCH /api/v1/bookings/{bookingRequestId}/cancel`
+
+Transizioni gestite:
+
+- `PENDING -> CONFIRMED`
+- `PENDING -> REJECTED`
+- `PENDING -> CANCELLED`
+- `CONFIRMED -> CANCELLED`
+
+Effetti sugli slot:
+
+- conferma booking: slot `AVAILABLE -> BOOKED`
+- cancellazione booking confermato: slot `BOOKED -> AVAILABLE`
+- rifiuto booking pending: slot resta `AVAILABLE`
+
+Nota: nel codice attuale la creazione booking avviene su un singolo `availabilitySlotId`.
+Il modello con `BookingRequestItem` resta estendibile per scenari multi-slot futuri.
 
 ### Nota
 Questa è la seconda grande milestone del progetto.
@@ -432,6 +486,7 @@ Per ragionare in blocchi sostenibili:
 ---
 
 ## 6. Stato attuale coerente del progetto
+
 In base all’avanzamento reale fin qui raggiunto, risultano completate:
 
 - FASE 0 — Setup iniziale progetto
@@ -442,10 +497,23 @@ In base all’avanzamento reale fin qui raggiunto, risultano completate:
 - FASE 5 — Inviti, registrazione cliente e collegamenti
 - FASE 6 — Modulo profilo/account
 - FASE 7 — Modulo clienti e professionisti in lettura
+- FASE 8 — Availability
+- FASE 9 — Bookings
 
-Il prossimo blocco naturale da aprire è quindi:
+Risultano inoltre aggiunti test automatici di copertura per i flussi principali di Availability e Bookings.
 
-- **FASE 8 — Availability**
+Il prossimo blocco naturale non è più l’aggiunta immediata di un nuovo modulo business, ma una fase di consolidamento:
+
+- hardening backend
+- pulizia documentazione
+- rafforzamento test
+- riallineamento roadmap
+- preparazione del progetto alla prossima grande scelta architetturale
+
+Dopo questa fase, le due strade più sensate saranno:
+
+1. iniziare l’integrazione frontend reale sugli endpoint già pronti
+2. iniziare il modulo Workout
 
 ---
 
@@ -487,21 +555,22 @@ Puoi passare oltre solo se il blocco corrente è:
 ---
 
 ## 10. Decisione pratica finale
-L’ordine consigliato definitivo è:
+L’ordine consigliato definitivo aggiornato è:
 
-1. setup
-2. fondazioni tecniche
-3. utenti
-4. security e auth
-5. verifica email professionista
-6. inviti + registrazione cliente + link
-7. profilo/account
-8. relazioni clienti/professionisti read
-9. availability
-10. bookings
-11. workout
-12. nutrition
-13. feedback
-14. measurements
-15. password reset
-16. pulizia finale
+1. setup — completato
+2. fondazioni tecniche — completato
+3. utenti — completato
+4. security e auth — completato
+5. verifica email professionista — completato
+6. inviti + registrazione cliente + link — completato
+7. profilo/account — completato
+8. relazioni clienti/professionisti read — completato
+9. availability — completato
+10. bookings — completato
+11. stabilizzazione backend, test e documentazione — in corso
+12. frontend integration oppure workout module
+13. nutrition module
+14. feedback
+15. measurements
+16. password reset
+17. pulizia finale e preparazione deploy
