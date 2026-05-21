@@ -211,6 +211,115 @@ Codici invito generati dai professionisti.
 
 ---
 
+## 3.7 `availability_slots`
+
+Slot di disponibilità dei professionisti.
+
+### Colonne principali
+
+- `id`
+- `professional_id`
+- `start_date_time`
+- `end_date_time`
+- `status`
+- `active`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+
+- `professional_id` → `professional_profiles(id)`
+
+### Vincoli principali
+
+- `professional_id` `NOT NULL`
+- `start_date_time` `NOT NULL`
+- `end_date_time` `NOT NULL`
+- `status` `NOT NULL`
+- `active` `NOT NULL DEFAULT TRUE`
+
+### Stati gestiti
+
+- `AVAILABLE`
+- `BLOCKED`
+- `BOOKED`
+
+### Note
+
+La regola “niente sovrapposizione slot” è gestita dalla business logic nel service layer.
+
+---
+
+## 3.8 `booking_requests`
+
+Richieste di prenotazione create dai clienti.
+
+### Colonne principali
+
+- `id`
+- `client_id`
+- `professional_id`
+- `status`
+- `note`
+- `active`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+
+- `client_id` → `client_profiles(id)`
+- `professional_id` → `professional_profiles(id)`
+
+### Vincoli principali
+
+- `client_id` `NOT NULL`
+- `professional_id` `NOT NULL`
+- `status` `NOT NULL`
+- `active` `NOT NULL DEFAULT TRUE`
+
+### Stati gestiti
+
+- `PENDING`
+- `CONFIRMED`
+- `REJECTED`
+- `CANCELLED`
+
+### Note
+
+Nel codice attuale la richiesta booking viene creata a partire da un singolo `availabilitySlotId`.
+
+La presenza della tabella `booking_request_items` mantiene il modello estendibile a più slot in futuro, ma l’API attuale lavora su una richiesta single-slot.
+
+---
+
+## 3.9 `booking_request_items`
+
+Dettaglio degli slot collegati a una richiesta booking.
+
+### Colonne principali
+
+- `id`
+- `booking_request_id`
+- `availability_slot_id`
+- `created_at`
+- `updated_at`
+
+### Foreign key
+
+- `booking_request_id` → `booking_requests(id)`
+- `availability_slot_id` → `availability_slots(id)`
+
+### Vincoli principali
+
+- `booking_request_id` `NOT NULL`
+- `availability_slot_id` `NOT NULL`
+
+### Note
+
+Nel backend attuale ogni booking creato tramite API contiene un solo item.
+
+---
+
 ## 4. Tabelle già presenti nel database ma non ancora integrate nel codice
 
 Queste tabelle possono già essere presenti nel database MySQL locale come preparazione ai moduli successivi, ma **al momento non risultano ancora integrate nei flussi runtime del backend attuale**.
@@ -267,83 +376,13 @@ Questa tabella può già essere presente nel database, ma il flusso di forgot/re
 
 ---
 
-## 5. Schema pianificato per moduli futuri
+## 5 Schema pianificato per moduli futuri
 
 Le tabelle seguenti appartengono alla roadmap progettuale, ma **non sono ancora da considerare integrate nel backend attuale**.
 
-## 5.1 `availability_slots`
-Slot di disponibilità dei professionisti.
-
-### Colonne principali
-- `id`
-- `professional_id`
-- `start_date_time`
-- `end_date_time`
-- `status`
-- `active`
-- `created_at`
-- `updated_at`
-
-### Foreign key
-- `professional_id` → `professional_profiles(id)`
-
-### Vincoli principali
-- `professional_id` `NOT NULL`
-- `start_date_time` `NOT NULL`
-- `end_date_time` `NOT NULL`
-- `status` `NOT NULL`
-- `active` `NOT NULL DEFAULT TRUE`
-
-### Note
-La regola “niente sovrapposizione slot” andrà gestita dalla business logic.
-
 ---
 
-## 5.2 `booking_requests`
-Richieste di prenotazione create dai clienti.
-
-### Colonne principali
-- `id`
-- `client_id`
-- `professional_id`
-- `status`
-- `note`
-- `active`
-- `created_at`
-- `updated_at`
-
-### Foreign key
-- `client_id` → `client_profiles(id)`
-- `professional_id` → `professional_profiles(id)`
-
-### Vincoli principali
-- `client_id` `NOT NULL`
-- `professional_id` `NOT NULL`
-- `status` `NOT NULL`
-- `active` `NOT NULL DEFAULT TRUE`
-
----
-
-## 5.3 `booking_request_items`
-Dettaglio slot collegati a una richiesta di prenotazione.
-
-### Colonne principali
-- `id`
-- `booking_request_id`
-- `availability_slot_id`
-- `created_at`
-
-### Foreign key
-- `booking_request_id` → `booking_requests(id)`
-- `availability_slot_id` → `availability_slots(id)`
-
-### Vincoli principali
-- `booking_request_id` `NOT NULL`
-- `availability_slot_id` `NOT NULL`
-
----
-
-## 5.4 `workout_plans`
+## 5.1 `workout_plans`
 Schede di allenamento create dai professionisti.
 
 ### Colonne principali
@@ -372,7 +411,7 @@ La regola della singola scheda attiva per coppia professionista-cliente andrà g
 
 ---
 
-## 5.5 `workout_weeks`
+## 5.2 `workout_weeks`
 
 ### Colonne principali
 - `id`
@@ -390,7 +429,7 @@ La regola della singola scheda attiva per coppia professionista-cliente andrà g
 
 ---
 
-## 5.6 `workout_days`
+## 5.3 `workout_days`
 
 ### Colonne principali
 - `id`
@@ -413,7 +452,7 @@ La regola della singola scheda attiva per coppia professionista-cliente andrà g
 
 ---
 
-## 5.7 `workout_exercises`
+## 5.4 `workout_exercises`
 
 ### Colonne principali
 - `id`
@@ -442,7 +481,7 @@ La regola della singola scheda attiva per coppia professionista-cliente andrà g
 
 ---
 
-## 5.8 `nutrition_plans`
+## 5.5 `nutrition_plans`
 Piani alimentari creati dai professionisti.
 
 ### Colonne principali
@@ -471,7 +510,7 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 
 ---
 
-## 5.9 `nutrition_weeks`
+## 5.6 `nutrition_weeks`
 
 ### Colonne principali
 - `id`
@@ -489,7 +528,7 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 
 ---
 
-## 5.10 `nutrition_days`
+## 5.7 `nutrition_days`
 
 ### Colonne principali
 - `id`
@@ -512,7 +551,7 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 
 ---
 
-## 5.11 `nutrition_entries`
+## 5.8 `nutrition_entries`
 
 ### Colonne principali
 - `id`
@@ -534,7 +573,7 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 
 ---
 
-## 5.12 `workout_feedbacks`
+## 5.9 `workout_feedbacks`
 
 ### Colonne principali
 - `id`
@@ -557,7 +596,7 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 
 ---
 
-## 5.13 `nutrition_feedbacks`
+## 5.10 `nutrition_feedbacks`
 
 ### Colonne principali
 - `id`
@@ -580,7 +619,7 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 
 ---
 
-## 5.14 `client_measurements`
+## 5.11 `client_measurements`
 
 ### Colonne principali
 - `id`
@@ -622,12 +661,12 @@ I seguenti campi enum devono essere salvati come stringhe leggibili:
 - `professional_profiles.operational_status`
 - `client_profiles.operational_status`
 - `client_profiles.gender`
+- `availability_slots.status`
+- `booking_requests.status`
 
 ## 6.2 Enum previsti per moduli futuri
 Quando verranno implementati i moduli futuri, andranno salvati come stringhe leggibili anche:
 
-- `availability_slots.status`
-- `booking_requests.status`
 - `workout_days.day_type`
 - `nutrition_days.day_type`
 
@@ -649,6 +688,15 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 ### Area sicurezza
 - `email_verification_tokens.user_id` → `users.id`
 
+### Area availability
+- `availability_slots.professional_id` → `professional_profiles(id)`
+
+### Area booking
+- `booking_requests.client_id` → `client_profiles(id)`
+- `booking_requests.professional_id` → `professional_profiles(id)`
+- `booking_request_items.booking_request_id` → `booking_requests(id)`
+- `booking_request_items.availability_slot_id` → `availability_slots(id)`
+
 ---
 
 ## 8. Foreign key future o non ancora integrate
@@ -656,13 +704,6 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 ### Tabelle già presenti nel DB ma non ancora integrate
 - `refresh_tokens.user_id` → `users.id`
 - `password_reset_tokens.user_id` → `users.id`
-
-### Area booking
-- `availability_slots.professional_id` → `professional_profiles.id`
-- `booking_requests.client_id` → `client_profiles.id`
-- `booking_requests.professional_id` → `professional_profiles.id`
-- `booking_request_items.booking_request_id` → `booking_requests.id`
-- `booking_request_items.availability_slot_id` → `availability_slots.id`
 
 ### Area workout
 - `workout_plans.professional_id` → `professional_profiles.id`
@@ -705,13 +746,14 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 ## 9.3 Da gestire a livello business/service
 - massimo 3 professionisti attivi per cliente
 - un solo collegamento attivo per coppia professionista-cliente
+- nessuna sovrapposizione slot per lo stesso professionista
+- uno slot non può essere confermato due volte
+- un booking può essere confermato, rifiutato o cancellato solo secondo le transizioni di stato consentite
 
 ## 9.4 Vincoli futuri previsti
 Quando i relativi moduli verranno implementati, andranno gestiti anche:
 - una sola scheda workout attiva per coppia professionista-cliente
 - un solo piano nutrizione attivo per coppia professionista-cliente
-- nessuna sovrapposizione slot per lo stesso professionista
-- uno slot non può essere confermato due volte
 
 ---
 
