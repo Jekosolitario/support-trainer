@@ -253,4 +253,43 @@ class BookingServiceIntegrationTest {
 
         assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
     }
+
+    @Test
+    @DisplayName("Cliente deve cancellare una richiesta booking pending")
+    void shouldCancelPendingBookingRequestByClient() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(17).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        CreateBookingRequest request = new CreateBookingRequest(
+                slot.getId(),
+                "Vorrei prenotare questo slot."
+        );
+
+        BookingRequestResponse pendingResponse = bookingService.createBookingRequest(request);
+
+        BookingRequestResponse cancelledResponse
+                = bookingService.cancelBookingRequest(pendingResponse.getId());
+
+        assertThat(cancelledResponse.getStatus()).isEqualTo("CANCELLED");
+        assertThat(cancelledResponse.getItems()).hasSize(1);
+        assertThat(cancelledResponse.getItems().get(0).getSlotStatus()).isEqualTo("AVAILABLE");
+
+        AvailabilitySlot updatedSlot = availabilitySlotRepository.findById(slot.getId())
+                .orElseThrow();
+
+        assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
+    }
 }
