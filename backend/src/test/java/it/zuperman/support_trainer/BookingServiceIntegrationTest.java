@@ -27,6 +27,7 @@ import it.zuperman.support_trainer.booking.service.BookingService;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
+import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
 import it.zuperman.support_trainer.common.enums.Gender;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
@@ -169,5 +170,46 @@ class BookingServiceIntegrationTest {
 
         assertThatThrownBy(() -> bookingService.createBookingRequest(request))
                 .isInstanceOf(AppException.class);
+    }
+
+    @Test
+    @DisplayName("Professionista deve confermare una richiesta booking e segnare lo slot come booked")
+    void shouldConfirmBookingRequestAndMarkSlotAsBooked() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(15).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        CreateBookingRequest request = new CreateBookingRequest(
+                slot.getId(),
+                "Vorrei prenotare questo slot."
+        );
+
+        BookingRequestResponse pendingResponse = bookingService.createBookingRequest(request);
+
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        BookingRequestResponse confirmedResponse
+                = bookingService.confirmBookingRequest(pendingResponse.getId());
+
+        assertThat(confirmedResponse.getStatus()).isEqualTo("CONFIRMED");
+        assertThat(confirmedResponse.getItems()).hasSize(1);
+        assertThat(confirmedResponse.getItems().get(0).getSlotStatus()).isEqualTo("BOOKED");
+
+        AvailabilitySlot updatedSlot = availabilitySlotRepository.findById(slot.getId())
+                .orElseThrow();
+
+        assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.BOOKED);
     }
 }
