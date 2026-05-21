@@ -292,4 +292,100 @@ class BookingServiceIntegrationTest {
 
         assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
     }
+
+    @Test
+    @DisplayName("Cliente deve cancellare una richiesta booking confermata e liberare lo slot")
+    void shouldCancelConfirmedBookingRequestByClientAndReleaseSlot() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(18).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        CreateBookingRequest request = new CreateBookingRequest(
+                slot.getId(),
+                "Vorrei prenotare questo slot."
+        );
+
+        BookingRequestResponse pendingResponse = bookingService.createBookingRequest(request);
+
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        BookingRequestResponse confirmedResponse
+                = bookingService.confirmBookingRequest(pendingResponse.getId());
+
+        assertThat(confirmedResponse.getStatus()).isEqualTo("CONFIRMED");
+        assertThat(confirmedResponse.getItems().get(0).getSlotStatus()).isEqualTo("BOOKED");
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        BookingRequestResponse cancelledResponse
+                = bookingService.cancelBookingRequest(confirmedResponse.getId());
+
+        assertThat(cancelledResponse.getStatus()).isEqualTo("CANCELLED");
+        assertThat(cancelledResponse.getItems()).hasSize(1);
+        assertThat(cancelledResponse.getItems().get(0).getSlotStatus()).isEqualTo("AVAILABLE");
+
+        AvailabilitySlot updatedSlot = availabilitySlotRepository.findById(slot.getId())
+                .orElseThrow();
+
+        assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("Professionista non deve cancellare una richiesta booking pending")
+    void shouldNotCancelPendingBookingRequestByProfessional() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(19).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        CreateBookingRequest request = new CreateBookingRequest(
+                slot.getId(),
+                "Vorrei prenotare questo slot."
+        );
+
+        BookingRequestResponse pendingResponse = bookingService.createBookingRequest(request);
+
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        assertThatThrownBy(() -> bookingService.cancelBookingRequest(pendingResponse.getId()))
+                .isInstanceOf(AppException.class)
+                .hasMessage("Una richiesta in attesa deve essere rifiutata dal professionista");
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        BookingRequestResponse detailResponse
+                = bookingService.getBookingRequestDetail(pendingResponse.getId());
+
+        assertThat(detailResponse.getStatus()).isEqualTo("PENDING");
+        assertThat(detailResponse.getItems()).hasSize(1);
+        assertThat(detailResponse.getItems().get(0).getSlotStatus()).isEqualTo("AVAILABLE");
+
+        AvailabilitySlot updatedSlot = availabilitySlotRepository.findById(slot.getId())
+                .orElseThrow();
+
+        assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
+    }
 }
