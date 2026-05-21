@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,7 @@ import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.Gender;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
+import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
@@ -143,5 +145,29 @@ class BookingServiceIntegrationTest {
                 );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
+    @Test
+    @DisplayName("Cliente non collegato non deve creare una richiesta booking")
+    void shouldNotCreateBookingRequestForUnlinkedClient() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(14).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        CreateBookingRequest request = new CreateBookingRequest(
+                slot.getId(),
+                "Vorrei prenotare questo slot."
+        );
+
+        assertThatThrownBy(() -> bookingService.createBookingRequest(request))
+                .isInstanceOf(AppException.class);
     }
 }
