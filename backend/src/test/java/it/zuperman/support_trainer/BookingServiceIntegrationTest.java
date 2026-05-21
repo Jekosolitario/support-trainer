@@ -388,4 +388,47 @@ class BookingServiceIntegrationTest {
 
         assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
     }
+
+    @Test
+    @DisplayName("Utente non coinvolto non deve vedere il dettaglio booking")
+    void shouldNotReturnBookingDetailForUninvolvedUser() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+        ClientProfile otherClient = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(20).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        CreateBookingRequest request = new CreateBookingRequest(
+                slot.getId(),
+                "Vorrei prenotare questo slot."
+        );
+
+        BookingRequestResponse bookingResponse
+                = bookingService.createBookingRequest(request);
+
+        authenticateAs(otherClient.getEmail(), "CLIENT");
+
+        assertThatThrownBy(() -> bookingService.getBookingRequestDetail(bookingResponse.getId()))
+                .isInstanceOf(AppException.class);
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        BookingRequestResponse detailResponse
+                = bookingService.getBookingRequestDetail(bookingResponse.getId());
+
+        assertThat(detailResponse.getStatus()).isEqualTo("PENDING");
+        assertThat(detailResponse.getClientId()).isEqualTo(client.getId());
+        assertThat(detailResponse.getProfessionalId()).isEqualTo(professional.getId());
+    }
 }
