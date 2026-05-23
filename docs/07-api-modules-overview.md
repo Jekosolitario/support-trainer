@@ -417,7 +417,6 @@ La business logic resta nei service e non nei repository.
 
 La base API attualmente implementata copre:
 
-```text
 registrazione e autenticazione
 -> profilo/account
 -> collegamento professionista-cliente

@@ -1,256 +1,476 @@
 # Functional Scope — Support Trainer
 
 ## 1. Obiettivo del documento
-Questo documento definisce in modo chiaro:
-- i tipi di utente del sistema
-- cosa può fare ogni utente
-- le regole funzionali principali
-- i confini della prima versione (v1)
+
+Questo documento definisce:
+
+- i tipi di utente del sistema;
+- cosa può fare ogni utente;
+- le regole funzionali principali;
+- le funzionalità già implementate;
+- le funzionalità ancora pianificate per completare la prima versione.
+
+La verifica tecnica degli endpoint realmente presenti resta demandata a:
+
+- `08-endpoint-map.md`
 
 ---
 
 ## 2. Tipi di utente
 
-### 2.1 Ruoli di accesso
-Il sistema prevede i seguenti ruoli principali:
-- **CLIENT**
-- **PROFESSIONAL**
+### 2.1 Ruoli di accesso implementati
 
-### 2.2 Specializzazione del professionista
-Un utente con ruolo **PROFESSIONAL** può avere una delle seguenti specializzazioni:
-- **PERSONAL_TRAINER**
-- **NUTRITIONIST**
+Il sistema prevede i seguenti ruoli:
+
+- `CLIENT`
+- `PROFESSIONAL`
+
+### 2.2 Specializzazioni del professionista implementate
+
+Un utente con ruolo `PROFESSIONAL` può avere una delle seguenti specializzazioni:
+
+- `PERSONAL_TRAINER`
+- `NUTRITIONIST`
 
 ### 2.3 Nota progettuale
-La separazione tra **ruolo** e **specializzazione** consente di:
-- gestire la sicurezza in modo più semplice
-- riutilizzare la stessa struttura base per più professionisti
-- differenziare le funzionalità business senza duplicare la logica di autenticazione
+
+La separazione tra ruolo e specializzazione consente di:
+
+- mantenere una gestione comune di autenticazione e account;
+- applicare regole business diverse in base al tipo di professionista;
+- estendere il progetto senza duplicare l’intero modello utenti.
 
 ---
 
-## 3. Regole di registrazione
+## 3. Stato funzionale attuale del backend
 
-### 3.1 Registrazione professionista
-Il professionista può registrarsi liberamente al sistema.
+### 3.1 Funzionalità implementate
 
-Dopo la registrazione deve però confermare il proprio indirizzo email tramite verifica account.
+Nel backend reale risultano implementate:
 
-Fino alla conferma dell’email, il professionista non può utilizzare le funzionalità operative principali, in particolare:
-- generare codici invito
-- collegare nuovi clienti
-- usare funzioni riservate dell’area professionista
+- registrazione professionista;
+- verifica email professionista;
+- login JWT;
+- registrazione cliente tramite codice invito;
+- validazione preventiva del codice invito;
+- creazione automatica del collegamento professionista-cliente dopo registrazione cliente valida;
+- lettura e aggiornamento del proprio profilo/account;
+- aggiornamento stato operativo utente;
+- lettura clienti collegati lato professionista;
+- lettura professionisti collegati lato cliente;
+- generazione e lettura codici invito lato professionista;
+- gestione disponibilità del personal trainer;
+- lettura availability lato cliente collegato;
+- creazione e gestione richieste booking;
+- conferma, rifiuto e cancellazione booking.
 
-### 3.1.1 Stato iniziale del professionista
-Dopo la registrazione, l’account professionista può trovarsi in uno stato iniziale di verifica, ad esempio:
-- **PENDING_VERIFICATION**
-- **ACTIVE**
+### 3.2 Funzionalità pianificate ma non ancora implementate
 
-Solo nello stato **ACTIVE** il professionista può utilizzare pienamente la piattaforma.
+Non risultano ancora implementate:
 
-### 3.2 Registrazione cliente
-Il cliente non può registrarsi liberamente.  
-Può completare la registrazione solo se possiede un **codice invito valido** generato da un professionista.
-
-### 3.3 Collegamento cliente-professionista
-Il collegamento tra cliente e professionista avviene **dopo** la registrazione completata con successo.  
-Questo evita di collegare al professionista un utente non ancora registrato correttamente.
-
-### 3.4 Regola di sicurezza sul collegamento
-Il sistema non deve permettere che un professionista si colleghi come cliente a sé stesso.
-
-Di conseguenza:
-- un professionista non può usare un proprio codice invito per creare un collegamento verso sé stesso
-- il collegamento deve essere bloccato se professionista e cliente coincidono logicamente come stesso account utente
-
----
-
-## 4. Relazioni tra utenti
-
-### 4.1 Cliente e professionisti
-Un cliente può essere collegato fino a **3 professionisti**.
-
-### 4.2 Tipologie di collegamento
-I professionisti collegati al cliente possono essere:
-- personal trainer
-- nutrizionisti
-
-### 4.3 Gestione del collegamento
-Ogni collegamento cliente-professionista deve permettere di distinguere chiaramente:
-- quale professionista ha creato contenuti
-- quali contenuti appartengono a quale professionista
-- quali funzionalità sono disponibili in base alla specializzazione del professionista
+- schede di allenamento;
+- piani alimentari;
+- feedback o segnalazioni sui contenuti;
+- misurazioni e storico progressi;
+- refresh token persistenti;
+- logout applicativo;
+- recupero e reset password;
+- upload immagine profilo;
+- frontend reale integrato con il backend;
+- preparazione completa al deploy.
 
 ---
 
-## 5. Ambito funzionale del personal trainer
+## 4. Regole di registrazione
 
-Il personal trainer deve poter:
+### 4.1 Registrazione professionista — Implementata
 
-- registrarsi al sistema
-- confermare il proprio account tramite email
-- accedere pienamente alle funzionalità solo dopo la verifica
-- generare codici invito per nuovi clienti
-- visualizzare i propri clienti collegati
-- impostare e modificare la propria disponibilità
-- ricevere richieste di prenotazione dai clienti
-- confermare o rifiutare le richieste di prenotazione
-- creare schede di allenamento
-- assegnare schede di allenamento ai clienti
-- visualizzare eventuali segnalazioni inviate dai clienti sulle schede
-- aggiornare il proprio stato
+Il professionista può registrarsi liberamente al sistema selezionando la propria specializzazione.
 
----
+Dopo la registrazione deve confermare il proprio indirizzo email.
 
-## 6. Ambito funzionale del nutrizionista
+Fino alla verifica email, il professionista non può utilizzare le funzionalità operative protette, tra cui:
 
-Il nutrizionista deve poter:
+- generare codici invito;
+- gestire disponibilità;
+- utilizzare i flussi professionali che richiedono account verificato.
 
-- registrarsi al sistema
-- confermare il proprio account tramite email
-- accedere pienamente alle funzionalità solo dopo la verifica
-- generare codici invito per nuovi clienti
-- visualizzare i propri clienti collegati
-- creare piani alimentari
-- assegnare piani alimentari ai clienti
-- visualizzare eventuali segnalazioni inviate dai clienti sui piani
-- aggiornare il proprio stato
+### 4.2 Registrazione cliente — Implementata
 
-### Nota
-Nella prima versione il nutrizionista **non gestisce prenotazioni tramite app**.  
-Gli appuntamenti con il nutrizionista vengono gestiti esternamente.
+Il cliente non può registrarsi liberamente.
 
----
+Può completare la registrazione solo se possiede un codice invito:
 
-## 7. Ambito funzionale del cliente
+- esistente;
+- attivo;
+- non utilizzato;
+- non scaduto.
 
-Il cliente deve poter:
+### 4.3 Collegamento cliente-professionista — Implementato
 
-- registrarsi solo tramite codice invito valido
-- accedere al sistema
-- visualizzare i professionisti a cui è collegato
-- visualizzare le schede di allenamento assegnate dal personal trainer
-- visualizzare i piani alimentari assegnati dal nutrizionista
-- aprire il dettaglio giornaliero della scheda o del piano
-- inviare una segnalazione riferita a uno specifico giorno
-- richiedere la prenotazione di una fascia oraria disponibile del personal trainer
-- visualizzare lo stato della propria richiesta di prenotazione
-- aggiornare il proprio stato personale
+Il collegamento tra cliente e professionista viene creato automaticamente dopo una registrazione cliente completata con successo tramite invito valido.
+
+Nel backend attuale la relazione è gestita tramite:
+
+- `ProfessionalClientLink`
+
+Non esiste ancora un modulo API autonomo dedicato alla gestione manuale dei collegamenti.
+
+### 4.4 Regole di sicurezza sul collegamento — Implementate
+
+Il sistema impedisce:
+
+- collegamenti attivi duplicati tra la stessa coppia cliente-professionista;
+- collegamento di un utente a sé stesso;
+- superamento del limite massimo di professionisti attivi collegati a un cliente.
 
 ---
 
-## 8. Regole sulle prenotazioni
+## 5. Relazioni tra utenti
 
-### 8.1 Ambito prenotazioni
-Le prenotazioni tramite app riguardano **solo il personal trainer**.
+### 5.1 Limite professionisti per cliente
 
-### 8.2 Flusso prenotazione
-Il flusso previsto è il seguente:
-1. il personal trainer imposta le proprie disponibilità
-2. il cliente visualizza gli slot disponibili
-3. il cliente invia una richiesta di prenotazione
-4. il personal trainer riceve la richiesta
-5. il personal trainer decide se confermare o rifiutare
+Un cliente può essere collegato fino a:
 
-### 8.3 Stati minimi della prenotazione
-Le richieste di prenotazione possono avere almeno questi stati:
-- **PENDING**
-- **CONFIRMED**
-- **REJECTED**
-- **CANCELLED** *(opzionale in v1, se implementato)*
+- `3` professionisti attivi.
 
----
+### 5.2 Tipologie di professionista
 
-## 9. Regole su schede e piani
+I professionisti collegabili possono essere:
 
-### 9.1 Schede di allenamento
-Le schede di allenamento sono create dal **personal trainer**.
+- personal trainer;
+- nutrizionisti.
 
-### 9.2 Piani alimentari
-I piani alimentari sono creati dal **nutrizionista**.
+### 5.3 Utilizzo attuale della relazione
 
-### 9.3 Visualizzazione lato cliente
-Il cliente può solo visualizzare i contenuti assegnati e inviare eventuali segnalazioni o richieste di modifica.
+La relazione cliente-professionista è già utilizzata per:
 
-### 9.4 Segnalazioni del cliente
-La segnalazione deve essere collegata:
-- al professionista corretto
-- al contenuto corretto
-- al giorno specifico selezionato dal cliente
+- lettura clienti lato professionista;
+- lettura professionisti lato cliente;
+- lettura disponibilità del personal trainer;
+- creazione booking.
+
+### 5.4 Utilizzo futuro della relazione
+
+Quando i relativi moduli saranno implementati, la relazione servirà anche per:
+
+- assegnazione schede workout;
+- assegnazione piani nutrizionali;
+- accesso a feedback;
+- accesso a misurazioni e progressi.
 
 ---
 
-## 10. Struttura funzionale iniziale dei contenuti
+## 6. Ambito funzionale del personal trainer
 
-### 10.1 Struttura generale
-Sia la scheda di allenamento sia il piano alimentare avranno una struttura mensile composta da:
-- settimana 1
-- settimana 2
-- settimana 3
-- settimana 4
+### 6.1 Funzionalità implementate
 
-### 10.2 Giorni
-Ogni settimana conterrà i giorni associati al programma.
+Il personal trainer può:
 
-### 10.3 Stato visivo del giorno
-I giorni potranno essere rappresentati visivamente, ad esempio:
-- **verde** = giorno libero
-- **rosso** = giorno con contenuto assegnato
+- registrarsi al sistema;
+- verificare il proprio account tramite email;
+- accedere al sistema;
+- generare codici invito;
+- visualizzare i clienti collegati;
+- visualizzare il dettaglio di un cliente collegato;
+- aggiornare il proprio profilo;
+- aggiornare il proprio stato operativo;
+- creare slot di disponibilità;
+- leggere i propri slot;
+- modificare slot disponibili;
+- bloccare e sbloccare slot;
+- ricevere richieste booking;
+- leggere il dettaglio delle richieste ricevute;
+- confermare o rifiutare richieste pending;
+- cancellare richieste confermate nei casi consentiti.
 
-### 10.4 Dettaglio del giorno
-Cliccando su un giorno con contenuto assegnato, si apre il dettaglio della giornata.
+### 6.2 Funzionalità pianificate
 
-Per la scheda di allenamento, il dettaglio può contenere campi come:
-- esercizio
-- serie e ripetizioni
-- intensità
-- recupero
-- tecniche aggiuntive
-- descrizione esercizio
-- carichi / ripetizioni registrate
-- note
+Il personal trainer non può ancora:
 
-Per il piano alimentare, la struttura sarà simile ma con campi specifici diversi, da definire in un documento successivo.
-
----
-
-## 11. Stati utente
-
-### 11.1 Stati del professionista
-Il professionista può assumere uno dei seguenti stati:
-- **DISPONIBILE**
-- **ASSENTE**
-- **FERIE**
-- **MALATTIA**
-
-### 11.2 Stati del cliente
-Il cliente può assumere uno dei seguenti stati:
-- **ATTIVO**
-- **INFORTUNATO**
-- **PAUSA**
+- creare schede di allenamento;
+- assegnare schede ai clienti;
+- ricevere feedback sulle schede;
+- gestire progressi o misurazioni del cliente.
 
 ---
 
-## 12. Confini della prima versione (v1)
+## 7. Ambito funzionale del nutrizionista
 
-La v1 include:
-- registrazione professionista
-- registrazione cliente con codice invito
-- collegamento cliente-professionista
-- disponibilità del personal trainer
-- richieste di prenotazione cliente -> personal trainer
-- conferma/rifiuto prenotazioni
-- creazione e visualizzazione schede di allenamento
-- creazione e visualizzazione piani alimentari
-- invio segnalazioni del cliente su giorno specifico
-- gestione stato utente
+### 7.1 Funzionalità implementate
 
-La v1 non include:
-- chat real time
-- notifiche push
-- pagamenti
-- dashboard statistiche avanzate
-- grafici complessi dei progressi
-- gestione appuntamenti del nutrizionista tramite app
+Il nutrizionista, in quanto professionista, può:
+
+- registrarsi al sistema;
+- verificare il proprio account tramite email;
+- accedere al sistema;
+- generare codici invito;
+- visualizzare i clienti collegati;
+- visualizzare il dettaglio di un cliente collegato;
+- aggiornare il proprio profilo;
+- aggiornare il proprio stato operativo.
+
+### 7.2 Funzionalità pianificate
+
+Il nutrizionista non può ancora:
+
+- creare piani alimentari;
+- assegnare piani alimentari ai clienti;
+- ricevere feedback sui piani.
+
+### 7.3 Prenotazioni
+
+Nell’ambito attuale del progetto, le prenotazioni tramite app riguardano solo il personal trainer.
+
+Il nutrizionista non gestisce slot availability o booking tramite app.
 
 ---
+
+## 8. Ambito funzionale del cliente
+
+### 8.1 Funzionalità implementate
+
+Il cliente può:
+
+- registrarsi tramite codice invito valido;
+- accedere al sistema;
+- leggere e aggiornare il proprio profilo;
+- aggiornare il proprio stato operativo;
+- visualizzare i professionisti collegati;
+- visualizzare il dettaglio di un professionista collegato;
+- visualizzare gli slot disponibili e futuri di un personal trainer collegato;
+- creare una richiesta booking su uno slot disponibile;
+- visualizzare le proprie richieste booking;
+- visualizzare il dettaglio delle proprie richieste;
+- cancellare richieste booking negli stati consentiti.
+
+### 8.2 Funzionalità pianificate
+
+Il cliente non può ancora:
+
+- visualizzare schede di allenamento;
+- visualizzare piani alimentari;
+- inviare feedback o segnalazioni sui contenuti;
+- inserire o consultare misurazioni fisiche.
+
+---
+
+## 9. Regole Availability — Implementate
+
+### 9.1 Ambito
+
+Gli slot availability riguardano solo professionisti con specializzazione:
+
+- `PERSONAL_TRAINER`
+
+### 9.2 Gestione lato professionista
+
+Il personal trainer può gestire solo i propri slot.
+
+Può:
+
+- creare slot;
+- leggere i propri slot;
+- aggiornare slot `AVAILABLE`;
+- bloccare slot `AVAILABLE`;
+- sbloccare slot `BLOCKED`.
+
+### 9.3 Regole temporali
+
+Uno slot:
+
+- deve avere un intervallo temporale valido;
+- deve iniziare nel futuro in creazione o aggiornamento;
+- non può sovrapporsi ad altri slot attivi dello stesso professionista.
+
+### 9.4 Lettura lato cliente
+
+Il cliente può visualizzare soltanto slot:
+
+- appartenenti a un personal trainer collegato;
+- attivi;
+- in stato `AVAILABLE`;
+- non scaduti.
+
+### 9.5 Stati slot implementati
+
+- `AVAILABLE`
+- `BLOCKED`
+- `BOOKED`
+
+---
+
+## 10. Regole Bookings — Implementate
+
+### 10.1 Ambito
+
+Le prenotazioni tramite app riguardano solo slot availability del personal trainer.
+
+### 10.2 Contratto attuale
+
+Nel backend attuale una richiesta booking viene creata a partire da:
+
+- un singolo `availabilitySlotId`.
+
+Il modello dati mantiene la possibilità di una futura evoluzione multi-slot, ma questa non è parte delle API attuali.
+
+### 10.3 Flusso implementato
+
+Il flusso operativo è:
+
+1. il personal trainer crea uno slot availability futuro;
+2. il cliente collegato visualizza lo slot disponibile;
+3. il cliente invia una richiesta booking;
+4. la richiesta nasce in stato `PENDING`;
+5. il personal trainer può confermare o rifiutare;
+6. cliente o professionista possono cancellare secondo le regole previste.
+
+### 10.4 Regole di prenotabilità
+
+Il cliente può creare una richiesta solo se:
+
+- è collegato al professionista proprietario dello slot;
+- lo slot esiste;
+- lo slot è attivo;
+- lo slot è `AVAILABLE`;
+- lo slot non è scaduto;
+- non esiste già una richiesta `PENDING` attiva sullo stesso slot.
+
+### 10.5 Nota del booking
+
+La richiesta può contenere una nota facoltativa.
+
+La nota:
+
+- viene normalizzata rimuovendo spazi iniziali e finali;
+- viene trattata come assente se vuota dopo la normalizzazione;
+- non può superare `1000` caratteri.
+
+### 10.6 Stati booking implementati
+
+- `PENDING`
+- `CONFIRMED`
+- `REJECTED`
+- `CANCELLED`
+
+### 10.7 Transizioni implementate
+
+| Azione | Attore autorizzato | Stato iniziale | Stato finale | Effetto slot |
+|---|---|---|---|---|
+| Conferma | professionista coinvolto | `PENDING` | `CONFIRMED` | `AVAILABLE -> BOOKED` |
+| Rifiuto | professionista coinvolto | `PENDING` | `REJECTED` | resta `AVAILABLE` |
+| Cancellazione | cliente coinvolto | `PENDING` | `CANCELLED` | resta `AVAILABLE` |
+| Cancellazione | cliente coinvolto | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
+| Cancellazione | professionista coinvolto | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
+
+### 10.8 Protezioni temporali
+
+Non è consentito:
+
+- creare booking su uno slot ormai scaduto;
+- confermare una richiesta pending se lo slot collegato è ormai scaduto.
+
+---
+
+## 11. Schede workout e piani alimentari — Pianificati, non implementati
+
+### 11.1 Schede di allenamento
+
+Le schede di allenamento saranno create dal personal trainer e assegnate al cliente collegato.
+
+### 11.2 Piani alimentari
+
+I piani alimentari saranno creati dal nutrizionista e assegnati al cliente collegato.
+
+### 11.3 Visualizzazione lato cliente
+
+Il cliente potrà visualizzare i contenuti assegnati e, se previsto, inviare feedback o richieste di modifica.
+
+### 11.4 Stato attuale
+
+Nessuna di queste funzionalità risulta ancora implementata nel backend reale.
+
+---
+
+## 12. Struttura funzionale futura dei contenuti
+
+La struttura di workout plan e nutrition plan resta da confermare durante i relativi sprint.
+
+L’ipotesi attuale prevede contenuti organizzati per:
+
+- piano;
+- settimane;
+- giorni;
+- dettaglio giornaliero.
+
+Questa struttura rappresenta una proposta funzionale futura e non un contratto già implementato.
+
+---
+
+## 13. Stati operativi utente — Implementati
+
+### 13.1 Stati del professionista
+
+Il professionista può assumere uno dei seguenti stati operativi:
+
+- `DISPONIBILE`
+- `ASSENTE`
+- `FERIE`
+- `MALATTIA`
+
+### 13.2 Stati del cliente
+
+Il cliente può assumere uno dei seguenti stati operativi:
+
+- `ATTIVO`
+- `INFORTUNATO`
+- `PAUSA`
+
+---
+
+## 14. Perimetro della prima versione
+
+### 14.1 Parte della v1 già implementata
+
+Risultano già implementati:
+
+- registrazione e autenticazione;
+- verifica email professionista;
+- inviti e registrazione cliente;
+- collegamento cliente-professionista;
+- profilo/account;
+- lettura relazioni cliente-professionista;
+- availability del personal trainer;
+- booking cliente-personal trainer;
+- gestione stato operativo utente.
+
+### 14.2 Parte della v1 ancora da implementare
+
+Per completare il perimetro funzionale originariamente previsto restano da sviluppare:
+
+- schede workout;
+- piani alimentari;
+- feedback o segnalazioni cliente;
+- eventuale gestione misurazioni/progressi;
+- frontend reale collegato al backend.
+
+### 14.3 Funzionalità escluse dal perimetro attuale
+
+Non fanno parte del perimetro attuale:
+
+- chat real time;
+- notifiche push;
+- pagamenti;
+- dashboard statistiche avanzate;
+- gestione appuntamenti del nutrizionista tramite app.
+
+---
+
+## 15. Prossima decisione funzionale
+
+Dopo la stabilizzazione tecnica e documentale del backend, il prossimo passo dovrà essere scelto tra:
+
+1. integrazione frontend reale sui moduli già disponibili;
+2. introduzione del modulo Workout Plans.
+
+La scelta dovrà essere effettuata solo dopo la chiusura completa dell’audit.
