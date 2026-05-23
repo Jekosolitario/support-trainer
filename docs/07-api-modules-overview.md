@@ -141,7 +141,7 @@ Il modulo **Professionals** consente al cliente autenticato di leggere i profess
 - accesso riservato al cliente;
 - lettura dettaglio consentita solo verso professionisti collegati;
 - lettura availability consentita solo verso professionisti collegati;
-- vengono esposti solo slot disponibili e non scaduti.
+- vengono esposti solo slot disponibili, non scaduti e privi di richieste booking `PENDING` attive.
 
 ### Nota architetturale
 
@@ -238,7 +238,9 @@ La lettura lato cliente è esposta tramite:
 - non sono consentiti slot sovrapposti;
 - gli slot possono essere bloccati e sbloccati secondo stato;
 - il cliente può leggere availability solo di professionisti collegati;
-- gli slot disponibili ma scaduti non vengono mostrati al cliente.
+- gli slot disponibili ma scaduti non vengono mostrati al cliente;
+- gli slot con una richiesta booking `PENDING` attiva non vengono mostrati al cliente come disponibilità prenotabili;
+- uno slot con booking `PENDING` attivo non può essere modificato o bloccato manualmente dal professionista.
 
 ### Stati slot gestiti
 
@@ -280,6 +282,10 @@ Il modello con `BookingRequestItem` resta estendibile a scenari multi-slot futur
 - la nota è facoltativa, normalizzata e limitata a `1000` caratteri;
 - il dettaglio booking è visibile solo agli utenti coinvolti;
 - un booking pending con slot ormai scaduto non può essere confermato.
+- una richiesta `PENDING` riserva logicamente lo slot;
+- finché una richiesta è `PENDING`, lo slot non viene più esposto come disponibilità prenotabile agli altri clienti;
+- finché una richiesta è `PENDING`, lo slot non può essere modificato o bloccato manualmente dal professionista;
+- i flussi critici di creazione e transizione booking sono protetti da lock pessimisti per evitare inconsistenze concorrenti.
 
 ### Stati booking gestiti
 
@@ -423,3 +429,10 @@ registrazione e autenticazione
 -> lettura relazioni
 -> disponibilità professionista
 -> richiesta e gestione prenotazione
+
+Il workflow Availability / Bookings è consolidato anche nei casi critici:
+
+- slot scaduti non esposti né prenotabili;
+- slot con booking `PENDING` non esposti come disponibili;
+- slot con booking `PENDING` non modificabili o bloccabili manualmente;
+- operazioni concorrenti protette nei punti sensibili del flusso.
