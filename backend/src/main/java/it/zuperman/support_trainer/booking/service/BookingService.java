@@ -1,6 +1,7 @@
 package it.zuperman.support_trainer.booking.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -137,10 +138,12 @@ public class BookingService {
         );
 
         validateBookingRequestIsPending(bookingRequest);
-        validateSlotsCanBeConfirmed(bookingRequest);
+
+        List<AvailabilitySlot> slotsToBook
+                = lockAndValidateSlotsCanBeConfirmed(bookingRequest);
 
         bookingRequest.setStatus(BookingRequestStatus.CONFIRMED);
-        markSlotsAsBooked(bookingRequest);
+        markSlotsAsBooked(slotsToBook);
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
         return BookingRequestResponse.fromEntity(savedBookingRequest);
@@ -223,9 +226,17 @@ public class BookingService {
         }
     }
 
-    private void validateSlotsCanBeConfirmed(BookingRequest bookingRequest) {
+    private List<AvailabilitySlot> lockAndValidateSlotsCanBeConfirmed(BookingRequest bookingRequest) {
+        List<AvailabilitySlot> slotsToBook = new ArrayList<>();
+
         for (BookingRequestItem item : bookingRequest.getItems()) {
-            AvailabilitySlot slot = item.getAvailabilitySlot();
+            AvailabilitySlot slot = availabilitySlotRepository
+                    .findActiveByIdForUpdate(item.getAvailabilitySlot().getId())
+                    .orElseThrow(() -> new AppException(
+                    HttpStatus.CONFLICT,
+                    "AVAILABILITY_SLOT_NOT_CONFIRMABLE",
+                    "Lo slot collegato non è più confermabile"
+            ));
 
             if (slot.getProfessional().getSpecialization() != ProfessionalSpecialization.PERSONAL_TRAINER) {
                 throw new AppException(
@@ -250,12 +261,15 @@ public class BookingService {
                         "Lo slot collegato è scaduto e non è più confermabile"
                 );
             }
+
+            slotsToBook.add(slot);
         }
+
+        return slotsToBook;
     }
 
-    private void markSlotsAsBooked(BookingRequest bookingRequest) {
-        for (BookingRequestItem item : bookingRequest.getItems()) {
-            AvailabilitySlot slot = item.getAvailabilitySlot();
+    private void markSlotsAsBooked(List<AvailabilitySlot> slotsToBook) {
+        for (AvailabilitySlot slot : slotsToBook) {
             slot.setStatus(AvailabilitySlotStatus.BOOKED);
             availabilitySlotRepository.save(slot);
         }
