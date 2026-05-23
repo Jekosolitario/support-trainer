@@ -168,7 +168,7 @@ public class BookingService {
     public BookingRequestResponse cancelBookingRequest(Long bookingRequestId) {
         User user = getAuthenticatedUser();
 
-        BookingRequest bookingRequest = bookingRequestRepository.findByIdAndActiveTrue(bookingRequestId)
+        BookingRequest bookingRequest = bookingRequestRepository.findActiveByIdForUpdate(bookingRequestId)
                 .orElseThrow(() -> new AppException(
                 HttpStatus.NOT_FOUND,
                 "BOOKING_REQUEST_NOT_FOUND",
@@ -203,7 +203,7 @@ public class BookingService {
             Long bookingRequestId,
             Long professionalId
     ) {
-        return bookingRequestRepository.findByIdAndProfessional_IdAndActiveTrue(
+        return bookingRequestRepository.findActiveByIdAndProfessionalIdForUpdate(
                 bookingRequestId,
                 professionalId
         ).orElseThrow(() -> new AppException(
