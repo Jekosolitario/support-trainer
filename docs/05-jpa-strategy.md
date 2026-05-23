@@ -473,6 +473,65 @@ JPA modella le relazioni, mentre il service layer controlla:
 - transizioni consentite del booking;
 - aggiornamento coerente dello stato slot dopo conferma o cancellazione.
 
+## 14.6 Gestione concorrenza implementata
+
+Il modulo Bookings utilizza lock pessimisti in scrittura per proteggere i flussi che potrebbero produrre inconsistenze in presenza di richieste simultanee.
+
+### Creazione booking
+
+Durante la creazione di una richiesta booking, lo slot selezionato viene caricato tramite repository con:
+
+- `@Lock(LockModeType.PESSIMISTIC_WRITE)`
+
+Il lock sullo slot resta attivo per la durata della transazione `@Transactional` del service.
+
+Questo consente di verificare in modo coerente:
+
+- disponibilità dello slot;
+- validità dello slot;
+- assenza di richieste `PENDING` già presenti sullo stesso slot.
+
+L’obiettivo è impedire che due richieste concorrenti possano essere entrambe create come `PENDING` sullo stesso slot.
+
+### Transizioni booking
+
+Le operazioni che cambiano lo stato di una richiesta booking caricano la richiesta tramite lock pessimista in scrittura.
+
+Sono protette:
+
+- conferma;
+- rifiuto;
+- cancellazione.
+
+Questa scelta impedisce che due operazioni simultanee possano leggere lo stesso stato iniziale e applicare transizioni incompatibili sulla medesima richiesta.
+
+### Conferma booking
+
+Durante la conferma, oltre alla richiesta booking vengono bloccati anche gli slot collegati.
+
+Il flusso è:
+
+1. lock della `BookingRequest`;
+2. lock degli `AvailabilitySlot` collegati;
+3. verifica che gli slot siano ancora validi, disponibili, futuri e appartenenti a un `PERSONAL_TRAINER`;
+4. aggiornamento booking a `CONFIRMED`;
+5. aggiornamento slot a `BOOKED`.
+
+Questa protezione impedisce conferme concorrenti incoerenti sullo stesso slot.
+
+### Repository coinvolti
+
+I repository interessati dalla strategia di lock sono:
+
+- `AvailabilitySlotRepository`;
+- `BookingRequestRepository`.
+
+### Nota architetturale
+
+I lock pessimisti proteggono l’integrità del flusso operativo in condizioni concorrenti.
+
+Le regole business restano comunque espresse e validate nel service layer; il lock non sostituisce le validazioni, ma ne rende affidabile l’esecuzione durante transazioni simultanee.
+
 ---
 
 ## 15. Strategia futura per WorkoutPlan e NutritionPlan — Non implementata
@@ -621,6 +680,10 @@ Le regole business già implementate comprendono:
 - assenza di richiesta `PENDING` duplicata sullo stesso slot;
 - transizioni booking consentite;
 - aggiornamento stato slot dopo conferma o cancellazione booking.
+- protezione dello slot tramite lock pessimista durante la creazione booking;
+- protezione della richiesta booking tramite lock pessimista durante conferma, rifiuto e cancellazione;
+- protezione dello slot tramite lock pessimista durante la conferma booking;
+- prevenzione di richieste o conferme concorrenti incoerenti sullo stesso slot.
 
 ## 20.3 Regole future
 
@@ -630,6 +693,42 @@ Le regole relative a workout, nutrition, feedback e measurements dovranno essere
 
 JPA modella struttura, relazioni e vincoli tecnici di base.  
 Il service layer protegge le regole operative reali del sistema.
+
+## 20.5 Lock pessimisti e confini transazionali
+
+### Strategia implementata
+
+Per i flussi Booking critici è utilizzato:
+
+- `LockModeType.PESSIMISTIC_WRITE`
+
+tramite annotazione repository:
+
+- `@Lock(...)`
+
+### Condizione necessaria
+
+I metodi service che utilizzano query con lock devono operare all’interno di una transazione attiva:
+
+- `@Transactional`
+
+Il lock rimane valido fino alla conclusione della transazione.
+
+### Motivazione
+
+La strategia è stata introdotta perché un semplice controllo applicativo sequenziale non protegge da due richieste HTTP elaborate contemporaneamente.
+
+Senza lock, potrebbero verificarsi scenari come:
+
+- due booking `PENDING` creati quasi simultaneamente sullo stesso slot;
+- due transizioni concorrenti sulla stessa richiesta;
+- due conferme concorrenti che leggono lo stesso slot come ancora `AVAILABLE`.
+
+### Ambito di utilizzo
+
+Il lock pessimistico è utilizzato soltanto nei flussi che modificano dati critici condivisi.
+
+Non è necessario nelle normali operazioni di sola lettura, dove restano utilizzati i metodi repository senza lock.
 
 ---
 
@@ -687,5 +786,9 @@ Per Support Trainer risultano implementate e confermate le seguenti scelte:
 - DTO separati dalle entity JPA;
 - regole business complesse gestite nel service layer;
 - moduli Availability e Bookings integrati nel modello persistente reale.
+- lock pessimisti `PESSIMISTIC_WRITE` per proteggere la creazione booking sullo stesso slot;
+- lock pessimisti sulla richiesta booking durante conferma, rifiuto e cancellazione;
+- lock pessimisti sugli slot durante la conferma booking;
+- confine transazionale nel service layer per mantenere validi i lock fino al completamento dell’operazione.
 
 ---
