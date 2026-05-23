@@ -477,6 +477,26 @@ JPA modella le relazioni, mentre il service layer controlla:
 
 Il modulo Bookings utilizza lock pessimisti in scrittura per proteggere i flussi che potrebbero produrre inconsistenze in presenza di richieste simultanee.
 
+### Creazione e aggiornamento availability
+
+Durante la creazione o l’aggiornamento di slot availability, il backend protegge il professionista proprietario tramite lock pessimista in scrittura.
+
+Il lock viene applicato a:
+
+- `ProfessionalProfile`
+
+tramite repository con:
+
+- `@Lock(LockModeType.PESSIMISTIC_WRITE)`
+
+Questa scelta è necessaria perché, durante la creazione di un nuovo slot, potrebbe non esistere ancora una riga `AvailabilitySlot` da bloccare.
+
+Il flusso consente di serializzare le operazioni dello stesso professionista e rendere affidabile il controllo:
+
+- assenza di sovrapposizioni temporali tra slot attivi.
+
+In questo modo due richieste concorrenti dello stesso professionista non possono entrambe superare il controllo overlap e salvare slot incompatibili.
+
 ### Creazione booking
 
 Durante la creazione di una richiesta booking, lo slot selezionato viene caricato tramite repository con:
@@ -519,12 +539,36 @@ Il flusso è:
 
 Questa protezione impedisce conferme concorrenti incoerenti sullo stesso slot.
 
+### Coordinamento Availability / Booking su richiesta pending
+
+Uno slot può restare in stato `AVAILABLE` mentre esiste una richiesta booking in stato `PENDING`.
+
+In questa situazione lo slot è considerato logicamente impegnato rispetto alle operazioni manuali del professionista.
+
+Durante:
+
+- aggiornamento dello slot;
+- blocco manuale dello slot;
+
+il backend:
+
+1. carica lo slot con lock pessimista in scrittura;
+2. verifica l’assenza di booking `PENDING` attivi collegati;
+3. consente l’operazione solo se non esistono richieste in attesa.
+
+Questa strategia impedisce che data, ora o disponibilità dello slot vengano alterate mentre un cliente attende una risposta alla propria richiesta.
+
 ### Repository coinvolti
 
 I repository interessati dalla strategia di lock sono:
 
-- `AvailabilitySlotRepository`;
-- `BookingRequestRepository`.
+- `ProfessionalProfileRepository`, per serializzare creazione e aggiornamento availability dello stesso professionista;
+- `AvailabilitySlotRepository`, per proteggere creazione booking, conferma booking e operazioni sul singolo slot;
+- `BookingRequestRepository`, per proteggere le transizioni di stato della richiesta booking.
+
+Il controllo dell’esistenza di booking `PENDING` collegati allo slot utilizza inoltre:
+
+- `BookingRequestItemRepository`.
 
 ### Nota architetturale
 
@@ -684,6 +728,11 @@ Le regole business già implementate comprendono:
 - protezione della richiesta booking tramite lock pessimista durante conferma, rifiuto e cancellazione;
 - protezione dello slot tramite lock pessimista durante la conferma booking;
 - prevenzione di richieste o conferme concorrenti incoerenti sullo stesso slot.
+- protezione del professionista tramite lock pessimista durante creazione e aggiornamento availability;
+- prevenzione di slot sovrapposti creati o aggiornati tramite richieste concorrenti;
+- blocco modifica di uno slot con booking `PENDING` attivo;
+- blocco del blocco manuale di uno slot con booking `PENDING` attivo;
+- coordinamento transazionale tra Availability e Bookings sulle operazioni concorrenti relative allo stesso slot.
 
 ## 20.3 Regole future
 
@@ -728,7 +777,29 @@ Senza lock, potrebbero verificarsi scenari come:
 
 Il lock pessimistico è utilizzato soltanto nei flussi che modificano dati critici condivisi.
 
-Non è necessario nelle normali operazioni di sola lettura, dove restano utilizzati i metodi repository senza lock.
+### Availability
+
+- lock del `ProfessionalProfile` durante creazione slot;
+- lock del `ProfessionalProfile` durante aggiornamento slot;
+- lock dello slot durante aggiornamento;
+- lock dello slot durante blocco manuale.
+
+### Bookings
+
+- lock dello slot durante creazione booking;
+- lock della richiesta durante conferma, rifiuto e cancellazione;
+- lock dello slot durante conferma booking.
+
+### Coordinamento tra moduli
+
+Quando uno slot possiede una richiesta booking `PENDING`, le operazioni Availability che potrebbero alterare la proposta fatta al cliente vengono bloccate.
+
+Non sono quindi consentiti:
+
+- aggiornamento dello slot;
+- blocco manuale dello slot.
+
+Le normali operazioni di sola lettura continuano a utilizzare metodi repository senza lock.
 
 ---
 
@@ -790,5 +861,9 @@ Per Support Trainer risultano implementate e confermate le seguenti scelte:
 - lock pessimisti sulla richiesta booking durante conferma, rifiuto e cancellazione;
 - lock pessimisti sugli slot durante la conferma booking;
 - confine transazionale nel service layer per mantenere validi i lock fino al completamento dell’operazione.
+- lock pessimista sul `ProfessionalProfile` per serializzare creazione e aggiornamento availability;
+- lock sul singolo slot durante update e block quando può esistere un booking pendente;
+- impossibilità di modificare o bloccare availability slot con richiesta booking `PENDING`;
+- coordinamento transazionale tra moduli Availability e Bookings sullo stesso slot.
 
 ---
