@@ -301,4 +301,40 @@ class AvailabilityServiceIntegrationTest {
         assertThat(response.get(0).getId()).isEqualTo(futureSlot.getId());
         assertThat(response.get(0).getId()).isNotEqualTo(expiredSlot.getId());
     }
+
+    @Test
+    @DisplayName("Nutrizionista non deve creare slot availability")
+    void shouldNotCreateAvailabilitySlotForNutritionist() {
+        String email = "nutritionist-" + UUID.randomUUID() + "@test.com";
+
+        ProfessionalProfile nutritionist = new ProfessionalProfile(
+                "Anna",
+                "Verdi",
+                email,
+                "password123",
+                ProfessionalSpecialization.NUTRITIONIST
+        );
+
+        nutritionist.setAccountStatus(AccountStatus.ACTIVE);
+        nutritionist.setEmailVerified(true);
+        nutritionist.setActive(true);
+
+        professionalProfileRepository.save(nutritionist);
+
+        authenticateAs(nutritionist.getEmail(), "PROFESSIONAL");
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(7).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        CreateAvailabilitySlotRequest request = new CreateAvailabilitySlotRequest(
+                startDateTime,
+                endDateTime
+        );
+
+        assertThatThrownBy(() -> availabilityService.createAvailabilitySlot(request))
+                .isInstanceOf(AppException.class)
+                .hasMessage("Il modulo availability è disponibile solo per i personal trainer");
+
+        assertThat(availabilitySlotRepository.findAll()).isEmpty();
+    }
 }

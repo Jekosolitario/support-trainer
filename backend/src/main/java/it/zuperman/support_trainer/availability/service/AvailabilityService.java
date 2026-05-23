@@ -48,6 +48,8 @@ public class AvailabilityService {
     @Transactional
     public AvailabilitySlotResponse createAvailabilitySlot(CreateAvailabilitySlotRequest request) {
         ProfessionalProfile professional = getAuthenticatedProfessional();
+        validateAvailabilitySpecialization(professional);
+
         validateTimeInterval(request.getStartDateTime(), request.getEndDateTime());
         validateSlotIsInFuture(request.getStartDateTime());
 
