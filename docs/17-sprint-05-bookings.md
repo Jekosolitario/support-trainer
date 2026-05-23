@@ -248,6 +248,8 @@ Il sistema non consente:
 - conferma di un booking `PENDING` quando lo slot collegato è ormai scaduto;
 - creazione booking su slot appartenente a un professionista `NUTRITIONIST`;
 - operazioni da parte di utenti non coinvolti nella prenotazione.
+- modifica di uno slot con richiesta booking `PENDING` attiva;
+- blocco manuale di uno slot con richiesta booking `PENDING` attiva.
 
 ### 8.2.1 Protezione da richieste concorrenti
 
@@ -261,6 +263,21 @@ Durante la transazione di creazione:
 - solo dopo viene salvata la nuova richiesta booking.
 
 Questa protezione impedisce che due richieste simultanee sullo stesso slot possano entrambe essere create come `PENDING`.
+
+### 8.2.2 Riserva logica dello slot durante una richiesta pending
+
+Una richiesta booking in stato `PENDING` non marca ancora lo slot come `BOOKED`, perché il professionista non ha ancora confermato la prenotazione.
+
+Tuttavia, durante lo stato `PENDING`, lo slot è considerato logicamente impegnato rispetto alle operazioni manuali del professionista.
+
+Finché esiste una richiesta `PENDING` attiva sullo slot, il professionista non può:
+
+- modificarne data e ora;
+- bloccarlo manualmente.
+
+Questa regola evita che il cliente invii una richiesta per uno slot che viene poi modificato o reso indisponibile mentre attende una risposta.
+
+Per modificare o bloccare lo slot, il professionista deve prima gestire la richiesta pendente, ad esempio rifiutandola.
 
 ---
 
@@ -351,6 +368,9 @@ Nel modulo Bookings risultano implementate le seguenti validazioni:
 - protezione pessimistica dello slot durante la creazione booking;
 - protezione pessimistica della richiesta durante conferma, rifiuto e cancellazione;
 - protezione pessimistica dello slot durante la conferma booking.
+- blocco della modifica di uno slot con richiesta booking `PENDING`;
+- blocco del blocco manuale di uno slot con richiesta booking `PENDING`;
+- coordinamento transazionale tra modulo Availability e modulo Bookings sulle operazioni che coinvolgono lo stesso slot.
 
 ---
 
@@ -414,6 +434,9 @@ Lo Sprint 05 risulta completato e successivamente rafforzato durante l’audit t
 - protezione da richieste booking concorrenti sullo stesso slot;
 - protezione da transizioni concorrenti sulla stessa richiesta;
 - protezione da conferme concorrenti sullo stesso slot.
+- riserva logica dello slot durante una richiesta booking `PENDING`;
+- blocco modifica data/ora dello slot finché esiste una richiesta pendente;
+- blocco del blocco manuale dello slot finché esiste una richiesta pendente.
 
 ### Test automatici aggiunti durante la stabilizzazione
 
@@ -431,6 +454,8 @@ Sono presenti test automatici per verificare:
 - blocco conferma booking pending con slot ormai scaduto;
 - blocco creazione booking su slot appartenente a un nutrizionista.
 - blocco creazione di una seconda richiesta `PENDING` sullo stesso slot.
+- blocco modifica di uno slot con booking `PENDING`;
+- blocco manuale di uno slot con booking `PENDING`.
 
 ---
 
