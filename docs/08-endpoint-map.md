@@ -138,7 +138,14 @@ Restituisce gli slot di disponibilità del professionista autenticato.
 
 ### 9.3 Elenco slot disponibili di un professionista
 **GET** `/api/v1/professionals/{professionalId}/availability`  
-Restituisce gli slot disponibili e attivi di un professionista.
+Restituisce al cliente collegato gli slot realmente prenotabili di un professionista.
+
+Vengono restituiti solo slot:
+
+- attivi;
+- in stato `AVAILABLE`;
+- con data iniziale futura;
+- senza una richiesta booking `PENDING` attiva collegata.
 
 ### 9.4 Aggiornamento slot disponibilità
 **PATCH** `/api/v1/availability/{slotId}`  
@@ -164,6 +171,8 @@ Le operazioni Availability applicano i seguenti controlli:
 - non sono ammessi slot sovrapposti per lo stesso professionista
 - solo slot `AVAILABLE` possono essere aggiornati o bloccati
 - solo slot `BLOCKED` possono essere sbloccati
+- la lettura lato cliente esclude gli slot `AVAILABLE` ormai scaduti;
+- la lettura lato cliente esclude gli slot che hanno già una richiesta booking `PENDING` attiva.
 
 ---
 
@@ -287,3 +296,4 @@ Per Support Trainer si confermano le seguenti scelte:
 - regole di ruolo Booking esplicitate in `SecurityConfig`
 - ownership delle risorse e transizioni di stato controllate nel service layer
 - Availability valida che gli slot creati o modificati inizino nel futuro
+- uno slot con booking `PENDING` attivo non viene più esposto come disponibilità prenotabile al cliente.
