@@ -143,7 +143,11 @@ Il professionista autenticato può gestire:
 
 ### 8.3 Regola temporale
 Ogni slot deve avere:
+
 - `startDateTime < endDateTime`
+- `startDateTime` nel futuro in fase di creazione o aggiornamento
+
+Non è consentito creare o aggiornare slot che iniziano nel passato.
 
 ### 8.4 Regola di non sovrapposizione
 Per lo stesso professionista non devono esistere slot attivi sovrapposti nello stesso intervallo temporale.
@@ -162,9 +166,16 @@ Il modulo availability non deve ancora:
 - gestire storico richieste
 
 ### 8.7 Lettura disponibilità di un professionista
-La lettura delle disponibilità di un professionista deve esporre solo gli slot coerenti con la finalità del modulo, quindi in prima battuta quelli effettivamente consultabili come disponibilità.
 
-Il dettaglio finale dei filtri e delle regole di visibilità andrà fissato durante l’implementazione dello sprint.
+La lettura delle disponibilità di un professionista espone al cliente solo gli slot consultabili come disponibilità.
+
+Regole implementate:
+
+- il cliente deve essere autenticato;
+- il cliente deve avere profilo attivo;
+- il professionista deve esistere ed essere attivo;
+- deve esistere un collegamento attivo tra cliente e professionista;
+- vengono esposti solo gli slot disponibili secondo la logica del modulo.
 
 ---
 
@@ -214,16 +225,24 @@ Nota: i nomi finali dei DTO e delle classi applicative vanno confermati quando s
 
 ---
 
-## 11. Validazioni minime attese
-Durante questo sprint vanno coperte almeno queste validazioni:
+## 11. Validazioni implementate
 
-- professionista autenticato valido
-- ruolo corretto
-- specializzazione corretta (`PERSONAL_TRAINER`)
-- intervallo temporale valido
-- assenza di sovrapposizioni per lo stesso professionista
-- slot esistente nei casi di update/block/unblock
-- ownership corretta dello slot in update/block/unblock
+Durante lo sprint e la successiva fase di stabilizzazione risultano implementate queste validazioni:
+
+- professionista autenticato valido;
+- account attivo;
+- email verificata per il professionista;
+- profilo professionista attivo;
+- specializzazione corretta (`PERSONAL_TRAINER`);
+- intervallo temporale valido;
+- data iniziale dello slot nel futuro;
+- assenza di sovrapposizioni per lo stesso professionista;
+- slot esistente nei casi di update/block/unblock;
+- ownership corretta dello slot in update/block/unblock;
+- update consentito solo su slot `AVAILABLE`;
+- block consentito solo su slot `AVAILABLE`;
+- unblock consentito solo su slot `BLOCKED`;
+- lettura cliente consentita solo verso professionisti collegati.
 
 ---
 
@@ -268,18 +287,18 @@ Alla fine di questo sprint il progetto deve avere:
 
 ## 15. Stato finale dello sprint
 
-Lo Sprint 04 risulta completato con il modulo `availability` funzionante.
+Lo Sprint 04 risulta completato con il modulo `availability` funzionante e successivamente consolidato durante l’audit tecnico del backend.
 
-Funzionalità implementate:
+### Funzionalità implementate
 
 - creazione slot disponibilità;
 - lettura degli slot del professionista autenticato;
-- lettura degli slot disponibili di un professionista;
+- lettura degli slot disponibili di un professionista da parte del cliente collegato;
 - aggiornamento parziale di uno slot;
 - blocco manuale di uno slot;
 - sblocco manuale di uno slot.
 
-Endpoint finali implementati:
+### Endpoint finali implementati
 
 - `POST /api/v1/availability`
 - `GET /api/v1/availability/my`
@@ -288,32 +307,47 @@ Endpoint finali implementati:
 - `PATCH /api/v1/availability/{slotId}/block`
 - `PATCH /api/v1/availability/{slotId}/unblock`
 
-Regole validate manualmente:
+### Regole implementate e verificate
 
-- solo professionisti possono accedere al modulo availability;
+- solo professionisti autenticati possono creare e gestire slot availability;
 - solo professionisti `PERSONAL_TRAINER` possono gestire slot;
+- il professionista deve avere account attivo, email verificata e profilo attivo;
 - il professionista può modificare solo i propri slot;
-- slot inesistenti o appartenenti ad altri professionisti restituiscono `404 NOT_FOUND`;
+- il cliente può leggere availability solo di professionisti a lui collegati;
 - gli slot non possono avere intervalli temporali non validi;
+- gli slot creati o aggiornati devono iniziare nel futuro;
 - gli slot non possono sovrapporsi ad altri slot attivi dello stesso professionista;
 - l’update è consentito solo su slot `AVAILABLE`;
-- `AVAILABLE → BLOCKED` è consentito;
-- `BLOCKED → AVAILABLE` è consentito;
-- blocco ripetuto, sblocco non valido e update su slot bloccato restituiscono `409 CONFLICT`;
-- body vuoto in update restituisce `400 BAD_REQUEST`.
+- `AVAILABLE -> BLOCKED` è consentito;
+- `BLOCKED -> AVAILABLE` è consentito;
+- slot inesistenti o non accessibili producono errore applicativo coerente;
+- body vuoto in update produce `400 BAD_REQUEST`.
 
-Stati slot gestiti nel modulo:
+### Stati slot gestiti
 
 - `AVAILABLE`
 - `BLOCKED`
-
-Stato previsto ma non ancora gestito operativamente:
-
 - `BOOKED`
 
-Lo stato `BOOKED` resta riservato al futuro modulo bookings.
+Lo stato `BOOKED`, inizialmente previsto per il modulo successivo, è ora utilizzato operativamente dal modulo Bookings completato nello Sprint 05.
+
+### Test automatici aggiunti durante la stabilizzazione
+
+Sono presenti test automatici per verificare:
+
+- creazione slot valido da parte del professionista;
+- blocco della creazione di slot sovrapposti;
+- lettura availability da parte del cliente collegato;
+- blocco della lettura da parte del cliente non collegato;
+- blocco e sblocco di uno slot;
+- impossibilità di aggiornare uno slot non disponibile.
 
 ---
 
-## 16. Prossimo step dopo questo sprint
-Una volta completato questo sprint, il passo successivo naturale sarà introdurre il modulo bookings, usando availability come base già affidabile per il flusso cliente → richiesta → risposta del professionista.
+## 16. Evoluzione successiva
+
+Dopo il completamento dello Sprint 04 è stato introdotto lo Sprint 05 dedicato al modulo Bookings.
+
+Il modulo Availability costituisce ora la base operativa del flusso:
+
+cliente collegato -> selezione slot disponibile -> richiesta booking -> conferma/rifiuto/cancellazione
