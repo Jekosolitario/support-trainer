@@ -323,6 +323,34 @@ Lo Sprint 04 risulta completato con il modulo `availability` funzionante e succe
 - `BLOCKED -> AVAILABLE` è consentito;
 - slot inesistenti o non accessibili producono errore applicativo coerente;
 - body vuoto in update produce `400 BAD_REQUEST`.
+- la creazione e l’aggiornamento di slot availability dello stesso professionista sono protetti da lock pessimista sul profilo professionale;
+- il controllo di sovrapposizione resta coerente anche in presenza di richieste concorrenti;
+- uno slot con una richiesta booking `PENDING` non può essere modificato;
+- uno slot con una richiesta booking `PENDING` non può essere bloccato;
+- prima di modificare o bloccare uno slot con richiesta pendente, il professionista deve gestire la richiesta tramite il flusso booking previsto.
+
+### Protezione da operazioni concorrenti
+
+Durante la creazione o l’aggiornamento di availability slot, il backend protegge il professionista proprietario tramite lock pessimista in scrittura.
+
+Il lock viene applicato al `ProfessionalProfile` perché, in fase di creazione di un nuovo slot, potrebbe non esistere ancora una riga slot da bloccare.
+
+Questa strategia garantisce che due operazioni simultanee dello stesso professionista non possano entrambe superare il controllo di sovrapposizione e salvare intervalli incompatibili.
+
+Le operazioni di modifica e blocco di uno slot utilizzano inoltre il lock sullo slot interessato, mantenendo coerente l’interazione con il modulo Bookings.
+
+### Integrazione con richieste booking pendenti
+
+Uno slot in stato `AVAILABLE` può avere una richiesta booking in stato `PENDING`.
+
+In questo caso, il professionista non può:
+
+- modificarne data e ora;
+- bloccarlo manualmente.
+
+Questa regola impedisce che la disponibilità proposta al cliente venga alterata mentre la richiesta è ancora in attesa di risposta.
+
+Per rendere nuovamente modificabile o bloccabile lo slot, il professionista deve prima gestire la richiesta pendente secondo il flusso previsto, ad esempio rifiutandola.
 
 ### Stati slot gestiti
 
@@ -344,6 +372,8 @@ Sono presenti test automatici per verificare:
 - esclusione degli slot `AVAILABLE` ormai scaduti dalla lettura cliente;
 - blocco e sblocco di uno slot;
 - impossibilità di aggiornare uno slot non disponibile.
+- impossibilità di modificare uno slot con booking `PENDING`;
+- impossibilità di bloccare uno slot con booking `PENDING`.
 
 ---
 
