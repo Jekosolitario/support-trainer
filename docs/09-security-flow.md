@@ -66,16 +66,22 @@ La specializzazione non è un ruolo Spring Security separato, ma un attributo bu
 - `NUTRITIONIST`
 
 ## 4.3 Regola pratica
+
 I ruoli servono per:
-- controllare l’accesso generale alle aree applicative
+
+- controllare l’accesso generale alle aree applicative.
 
 La specializzazione serve per:
-- distinguere il tipo di professionista a livello dominio/business
 
-### Esempio
-- un utente con `PROFESSIONAL` può accedere agli endpoint dell’area professionista
-- un utente con `CLIENT` può accedere agli endpoint dell’area cliente
-- la specializzazione esiste nel modello dati, ma al momento non ci sono endpoint protetti in modo diverso tra `PERSONAL_TRAINER` e `NUTRITIONIST`
+- applicare regole business specifiche sulle funzionalità professionali.
+
+### Esempi implementati
+
+- un utente con `PROFESSIONAL` può accedere agli endpoint dell’area professionista secondo `SecurityConfig`;
+- un utente con `CLIENT` può accedere agli endpoint dell’area cliente;
+- solo un professionista `PERSONAL_TRAINER` può creare e gestire slot availability;
+- uno slot appartenente a un professionista `NUTRITIONIST` non può essere prenotato;
+- un booking anomalo già esistente su slot di un `NUTRITIONIST` non può essere confermato.
 
 ---
 
@@ -414,29 +420,66 @@ Tutto il resto richiede autenticazione valida.
 
 Il service layer controlla invece:
 
-- account attivo
-- email verificata quando richiesta
-- profilo attivo
-- ownership della risorsa
-- relazione attiva professionista-cliente
-- stato dello slot
-- stato del booking
-- transizioni consentite
+- account attivo;
+- email verificata quando richiesta;
+- profilo attivo;
+- specializzazione del professionista per Availability e Bookings;
+- ownership della risorsa;
+- relazione attiva professionista-cliente;
+- stato e validità temporale dello slot;
+- stato del booking;
+- transizioni consentite;
+- blocco di booking e conferme su slot non coerenti con la specializzazione prevista.
 
 ---
 
-## 17. Protezione endpoint per specializzazione
+## 17. Protezione per specializzazione
 
 ## 17.1 Stato attuale
-La specializzazione del professionista esiste nel dominio, ma nel codice attuale:
-- non ci sono endpoint protetti in modo diverso per `PERSONAL_TRAINER` o `NUTRITIONIST`
-- non ci sono ancora controlli di autorizzazione basati sulla specializzazione
 
-## 17.2 Implicazione pratica
-Per ora la specializzazione è:
-- un dato di dominio
-- utile per il modello applicativo
-- non ancora usata per differenziare gli accessi agli endpoint
+La specializzazione del professionista non è gestita tramite authority Spring Security separate.
+
+Gli utenti professionisti utilizzano il ruolo:
+
+- `PROFESSIONAL`
+
+La distinzione tra:
+
+- `PERSONAL_TRAINER`
+- `NUTRITIONIST`
+
+viene applicata nel service layer come regola business.
+
+## 17.2 Controlli attualmente implementati
+
+### Availability
+
+Il modulo Availability è riservato ai professionisti con specializzazione:
+
+- `PERSONAL_TRAINER`
+
+Un professionista `NUTRITIONIST` non può:
+
+- creare slot availability;
+- utilizzare il flusso operativo availability riservato al personal trainer.
+
+### Bookings
+
+Il modulo Bookings opera esclusivamente su slot availability appartenenti a professionisti `PERSONAL_TRAINER`.
+
+Il sistema impedisce:
+
+- la creazione di booking su slot appartenenti a un `NUTRITIONIST`;
+- la conferma di booking anomali o storici collegati a slot appartenenti a un `NUTRITIONIST`.
+
+## 17.3 Motivazione architetturale
+
+`SecurityConfig` protegge l’area in base al ruolo generale dell’utente.
+
+Il service layer applica invece la regola più specifica:
+
+PROFESSIONAL + PERSONAL_TRAINER -> availability e booking consentiti
+PROFESSIONAL + NUTRITIONIST -> availability e booking tramite slot non consentiti
 
 ---
 
@@ -468,11 +511,12 @@ Un cliente può:
 
 Un professionista può:
 
-- vedere solo i clienti a lui collegati
-- creare, modificare, bloccare e sbloccare solo i propri slot availability
-- vedere solo i booking ricevuti dai propri clienti
-- confermare o rifiutare solo booking che riguardano i propri slot
-- cancellare booking confermati in cui è coinvolto
+- vedere solo i clienti a lui collegati;
+- se `PERSONAL_TRAINER`, creare, modificare, bloccare e sbloccare solo i propri slot availability;
+- se `PERSONAL_TRAINER`, ricevere e gestire booking relativi ai propri slot validi;
+- confermare o rifiutare solo booking che riguardano i propri slot autorizzati;
+- cancellare booking confermati in cui è coinvolto;
+- se `NUTRITIONIST`, non creare né confermare flussi booking basati su availability slot.
 
 ---
 
@@ -578,20 +622,25 @@ Questa scelta è coerente con:
 
 ## 23.2 Service layer gestisce
 
-- verifica email e stato account
-- profilo attivo
-- accesso reale alle risorse collegate
-- controllo del tipo utente richiesto
-- controlli business sui link professionista-cliente
-- blocco operativo per professionista non attivo o non verificato
-- validazione slot availability
-- blocco slot nel passato
-- assenza di sovrapposizioni availability
-- controllo ownership sugli slot
-- creazione booking solo su slot disponibili
-- creazione booking solo tra cliente e professionista collegati
-- transizioni di stato booking consentite
-- aggiornamento stato slot dopo conferma o cancellazione booking
+- verifica email e stato account;
+- profilo attivo;
+- accesso reale alle risorse collegate;
+- controllo del tipo utente richiesto;
+- controllo della specializzazione professionale;
+- controlli business sui link professionista-cliente;
+- blocco operativo per professionista non attivo o non verificato;
+- validazione slot availability;
+- blocco creazione e aggiornamento slot nel passato;
+- assenza di sovrapposizioni availability;
+- controllo ownership sugli slot;
+- esclusione slot scaduti dalla lettura cliente;
+- creazione booking solo su slot disponibili e futuri;
+- creazione booking solo tra cliente e professionista collegati;
+- blocco booking su slot appartenenti a nutrizionisti;
+- blocco conferma booking con slot scaduti;
+- blocco conferma booking su slot appartenenti a nutrizionisti;
+- transizioni di stato booking consentite;
+- aggiornamento stato slot dopo conferma o cancellazione booking.
 
 ---
 
@@ -612,7 +661,13 @@ Nel codice attuale le situazioni seguenti devono produrre errori chiari:
 - creazione slot availability nel passato
 - creazione slot availability sovrapposto
 - modifica di slot non disponibile
+- creazione availability da parte di un professionista `NUTRITIONIST`
+- esposizione al cliente di slot availability ormai scaduti
 - booking su slot non disponibile
+- booking su slot ormai scaduto
+- booking su slot appartenente a un professionista `NUTRITIONIST`
+- conferma booking pending con slot ormai scaduto
+- conferma booking su slot appartenente a un professionista `NUTRITIONIST`
 - booking tra cliente e professionista non collegati
 - accesso a booking da utente non coinvolto
 - transizione booking non consentita
@@ -639,3 +694,8 @@ Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti
 - ownership e transizioni booking restano controllate nel service layer
 - il cliente può vedere availability solo di professionisti collegati
 - il professionista può gestire solo i propri slot availability
+- Availability è riservata ai professionisti `PERSONAL_TRAINER`
+- Bookings tramite slot availability è riservato ai professionisti `PERSONAL_TRAINER`
+- un `NUTRITIONIST` non può creare slot availability
+- booking e conferme su slot di nutrizionisti vengono bloccati dal service layer
+- slot scaduti non vengono esposti al cliente e non possono essere prenotati o confermati
