@@ -41,21 +41,51 @@ Per campi con valori chiusi si consiglia:
 
 # 3. Entità e campi
 
+## 3.0 Stato di implementazione
+
+### Entità attualmente implementate nel backend
+
+- `User`
+- `ProfessionalProfile`
+- `ClientProfile`
+- `ProfessionalClientLink`
+- `InviteCode`
+- `EmailVerificationToken`
+- `AvailabilitySlot`
+- `BookingRequest`
+- `BookingRequestItem`
+
+### Entità pianificate ma non ancora implementate
+
+- `ClientMeasurement`
+- `WorkoutPlan`
+- `WorkoutWeek`
+- `WorkoutDay`
+- `WorkoutExercise`
+- `NutritionPlan`
+- `NutritionWeek`
+- `NutritionDay`
+- `NutritionEntry`
+- `WorkoutFeedback`
+- `NutritionFeedback`
+
+Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futuro e non componenti già presenti nel codice reale.
+
 ## 3.1 User (astratta)
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `firstName` | `String` | Sì | No | — | Nome utente |
-| `lastName` | `String` | Sì | No | — | Cognome utente |
-| `email` | `String` | Sì | No | — | Univoca, da salvare preferibilmente normalizzata |
-| `password` | `String` | Sì | No | — | Password hashata, mai in chiaro |
-| `profileImageUrl` | `String` | No | Sì | `null` | URL/path immagine profilo |
-| `role` | `Enum` | Sì | No | — | `CLIENT`, `PROFESSIONAL` |
-| `accountStatus` | `Enum` | Sì | No | `PENDING_VERIFICATION` | Stato account |
-| `emailVerified` | `Boolean` | Sì | No | `false` | Verifica email completata o no |
-| `createdAt` | `LocalDateTime` | Sì | No | auto | Timestamp creazione |
-| `updatedAt` | `LocalDateTime` | Sì | No | auto | Timestamp ultimo aggiornamento |
+| Campo             | Tipo            | Obbligatorio | Nullable | Default                | Note                                             |
+| ----------------- | --------------- | -----------: | -------: | ---------------------- | ------------------------------------------------ |
+| `id`              | `Long`          |           Sì |       No | —                      | Identificativo univoco                           |
+| `firstName`       | `String`        |           Sì |       No | —                      | Nome utente                                      |
+| `lastName`        | `String`        |           Sì |       No | —                      | Cognome utente                                   |
+| `email`           | `String`        |           Sì |       No | —                      | Univoca, da salvare preferibilmente normalizzata |
+| `password`        | `String`        |           Sì |       No | —                      | Password hashata, mai in chiaro                  |
+| `profileImageUrl` | `String`        |           No |       Sì | `null`                 | URL/path immagine profilo                        |
+| `role`            | `Enum`          |           Sì |       No | —                      | `CLIENT`, `PROFESSIONAL`                         |
+| `accountStatus`   | `Enum`          |           Sì |       No | `PENDING_VERIFICATION` | Stato account                                    |
+| `emailVerified`   | `Boolean`       |           Sì |       No | `false`                | Verifica email completata o no                   |
+| `createdAt`       | `LocalDateTime` |           Sì |       No | auto                   | Timestamp creazione                              |
+| `updatedAt`       | `LocalDateTime` |           Sì |       No | auto                   | Timestamp ultimo aggiornamento                   |
 
 ### Note
 - `email` deve essere **univoca**
@@ -66,17 +96,17 @@ Per campi con valori chiusi si consiglia:
 
 ## 3.2 ProfessionalProfile
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `specialization` | `Enum` | Sì | No | — | `PERSONAL_TRAINER`, `NUTRITIONIST` |
-| `operationalStatus` | `Enum` | Sì | No | `DISPONIBILE` | Stato operativo del professionista |
-| `phoneNumber` | `String` | No | Sì | `null` | Facoltativo |
-| `bio` | `String` / `Text` | No | Sì | `null` | Descrizione breve profilo |
-| `workplaceName` | `String` | No | Sì | `null` | Nome palestra/studio/attività |
-| `city` | `String` | No | Sì | `null` | Città principale di lavoro |
-| `instagramUrl` | `String` | No | Sì | `null` | Link profilo Instagram |
-| `websiteUrl` | `String` | No | Sì | `null` | Link sito web |
-| `active` | `Boolean` | Sì | No | `true` | Flag logico di attivazione |
+| Campo               | Tipo              | Obbligatorio | Nullable | Default       | Note                               |
+| ------------------- | ----------------- | -----------: | -------: | ------------- | ---------------------------------- |
+| `specialization`    | `Enum`            |           Sì |       No | —             | `PERSONAL_TRAINER`, `NUTRITIONIST` |
+| `operationalStatus` | `Enum`            |           Sì |       No | `DISPONIBILE` | Stato operativo del professionista |
+| `phoneNumber`       | `String`          |           No |       Sì | `null`        | Facoltativo                        |
+| `bio`               | `String` / `Text` |           No |       Sì | `null`        | Descrizione breve profilo          |
+| `workplaceName`     | `String`          |           No |       Sì | `null`        | Nome palestra/studio/attività      |
+| `city`              | `String`          |           No |       Sì | `null`        | Città principale di lavoro         |
+| `instagramUrl`      | `String`          |           No |       Sì | `null`        | Link profilo Instagram             |
+| `websiteUrl`        | `String`          |           No |       Sì | `null`        | Link sito web                      |
+| `active`            | `Boolean`         |           Sì |       No | `true`        | Flag logico di attivazione         |
 
 ### Note
 - `active` serve come flag logico interno
@@ -90,17 +120,17 @@ Per campi con valori chiusi si consiglia:
 
 ## 3.3 ClientProfile
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `operationalStatus` | `Enum` | Sì | No | `ATTIVO` | Stato operativo cliente |
-| `birthDate` | `LocalDate` | Sì | No | — | Data di nascita |
-| `heightCm` | `BigDecimal` | Sì | No | — | Altezza in cm |
-| `primaryGoal` | `String` | Sì | No | — | Obiettivo principale del cliente |
-| `gender` | `Enum` | Sì | No | — | Genere dichiarato |
-| `medicalNotes` | `String` / `Text` | No | Sì | `null` | Note mediche rilevanti |
-| `injuryNotes` | `String` / `Text` | No | Sì | `null` | Infortuni, limitazioni, recuperi |
-| `notes` | `String` / `Text` | No | Sì | `null` | Note generali cliente |
-| `active` | `Boolean` | Sì | No | `true` | Flag logico di attivazione |
+| Campo               | Tipo              | Obbligatorio | Nullable | Default  | Note                             |
+| ------------------- | ----------------- | -----------: | -------: | -------- | -------------------------------- |
+| `operationalStatus` | `Enum`            |           Sì |       No | `ATTIVO` | Stato operativo cliente          |
+| `birthDate`         | `LocalDate`       |           Sì |       No | —        | Data di nascita                  |
+| `heightCm`          | `BigDecimal`      |           Sì |       No | —        | Altezza in cm                    |
+| `primaryGoal`       | `String`          |           Sì |       No | —        | Obiettivo principale del cliente |
+| `gender`            | `Enum`            |           Sì |       No | —        | Genere dichiarato                |
+| `medicalNotes`      | `String` / `Text` |           No |       Sì | `null`   | Note mediche rilevanti           |
+| `injuryNotes`       | `String` / `Text` |           No |       Sì | `null`   | Infortuni, limitazioni, recuperi |
+| `notes`             | `String` / `Text` |           No |       Sì | `null`   | Note generali cliente            |
+| `active`            | `Boolean`         |           Sì |       No | `true`   | Flag logico di attivazione       |
 
 ### Note
 - `operationalStatus` valori iniziali:
@@ -118,21 +148,21 @@ Per campi con valori chiusi si consiglia:
 
 ## 3.4 ClientMeasurement
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `client` | `ClientProfile` | Sì | No | — | Cliente proprietario della misurazione |
-| `recordedAt` | `LocalDateTime` | Sì | No | auto | Data/ora registrazione |
-| `weightKg` | `BigDecimal` | Sì | No | — | Peso corporeo |
-| `bodyFatPercentage` | `BigDecimal` | No | Sì | `null` | Percentuale massa grassa |
-| `muscleMassKg` | `BigDecimal` | No | Sì | `null` | Massa muscolare stimata |
-| `waistCm` | `BigDecimal` | No | Sì | `null` | Circonferenza vita |
-| `chestCm` | `BigDecimal` | No | Sì | `null` | Circonferenza petto |
-| `hipsCm` | `BigDecimal` | No | Sì | `null` | Circonferenza fianchi |
-| `armCm` | `BigDecimal` | No | Sì | `null` | Circonferenza braccio |
-| `thighCm` | `BigDecimal` | No | Sì | `null` | Circonferenza coscia |
-| `shouldersCm` | `BigDecimal` | No | Sì | `null` | Circonferenza/spalle |
-| `notes` | `String` / `Text` | No | Sì | `null` | Note rilevazione |
+| Campo               | Tipo              | Obbligatorio | Nullable | Default | Note                                   |
+| ------------------- | ----------------- | -----------: | -------: | ------- | -------------------------------------- |
+| `id`                | `Long`            |           Sì |       No | —       | Identificativo univoco                 |
+| `client`            | `ClientProfile`   |           Sì |       No | —       | Cliente proprietario della misurazione |
+| `recordedAt`        | `LocalDateTime`   |           Sì |       No | auto    | Data/ora registrazione                 |
+| `weightKg`          | `BigDecimal`      |           Sì |       No | —       | Peso corporeo                          |
+| `bodyFatPercentage` | `BigDecimal`      |           No |       Sì | `null`  | Percentuale massa grassa               |
+| `muscleMassKg`      | `BigDecimal`      |           No |       Sì | `null`  | Massa muscolare stimata                |
+| `waistCm`           | `BigDecimal`      |           No |       Sì | `null`  | Circonferenza vita                     |
+| `chestCm`           | `BigDecimal`      |           No |       Sì | `null`  | Circonferenza petto                    |
+| `hipsCm`            | `BigDecimal`      |           No |       Sì | `null`  | Circonferenza fianchi                  |
+| `armCm`             | `BigDecimal`      |           No |       Sì | `null`  | Circonferenza braccio                  |
+| `thighCm`           | `BigDecimal`      |           No |       Sì | `null`  | Circonferenza coscia                   |
+| `shouldersCm`       | `BigDecimal`      |           No |       Sì | `null`  | Circonferenza/spalle                   |
+| `notes`             | `String` / `Text` |           No |       Sì | `null`  | Note rilevazione                       |
 
 ### Note
 - Questa entità va storicizzata, non sovrascritta
@@ -142,14 +172,14 @@ Per campi con valori chiusi si consiglia:
 
 ## 3.5 ProfessionalClientLink
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `professional` | `ProfessionalProfile` | Sì | No | — | Professionista collegato |
-| `client` | `ClientProfile` | Sì | No | — | Cliente collegato |
-| `createdAt` | `LocalDateTime` | Sì | No | auto | Data collegamento |
-| `updatedAt` | `LocalDateTime` | Sì | No | auto | Timestamp ultimo aggiornamento del collegamento
-| `active` | `Boolean` | Sì | No | `true` | Collegamento attivo/disattivato |
+| Campo          | Tipo                  | Obbligatorio | Nullable | Default | Note                                            |
+| -------------- | --------------------- | -----------: | -------: | ------- | ----------------------------------------------- |
+| `id`           | `Long`                |           Sì |       No | —       | Identificativo univoco                          |
+| `professional` | `ProfessionalProfile` |           Sì |       No | —       | Professionista collegato                        |
+| `client`       | `ClientProfile`       |           Sì |       No | —       | Cliente collegato                               |
+| `createdAt`    | `LocalDateTime`       |           Sì |       No | auto    | Data collegamento                               |
+| `updatedAt`    | `LocalDateTime`       |           Sì |       No | auto    | Timestamp ultimo aggiornamento del collegamento |
+| `active`       | `Boolean`             |           Sì |       No | `true`  | Collegamento attivo/disattivato                 |
 
 ### Note
 - Va previsto un vincolo logico per evitare duplicati dello stesso collegamento
@@ -159,17 +189,17 @@ Per campi con valori chiusi si consiglia:
 
 ## 3.6 InviteCode
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `code` | `String` | Sì | No | — | Codice invito univoco |
-| `professional` | `ProfessionalProfile` | Sì | No | — | Professionista che genera il codice |
-| `expiresAt` | `LocalDateTime` | Sì | No | — | Data/ora scadenza |
-| `used` | `Boolean` | Sì | No | `false` | Codice già usato o no |
-| `active` | `Boolean` | Sì | No | `true` | Flag logico di attivazione/disattivazione codice
-| `updatedAt` | `LocalDateTime` | Sì | No | auto | Timestamp ultimo aggiornamento
-| `usedAt` | `LocalDateTime` | No | Sì | `null` | Data/ora utilizzo |
-| `createdAt` | `LocalDateTime` | Sì | No | auto | Data creazione |
+| Campo          | Tipo                  | Obbligatorio | Nullable | Default | Note                                             |
+| -------------- | --------------------- | -----------: | -------: | ------- | ------------------------------------------------ |
+| `id`           | `Long`                |           Sì |       No | —       | Identificativo univoco                           |
+| `code`         | `String`              |           Sì |       No | —       | Codice invito univoco                            |
+| `professional` | `ProfessionalProfile` |           Sì |       No | —       | Professionista che genera il codice              |
+| `expiresAt`    | `LocalDateTime`       |           Sì |       No | —       | Data/ora scadenza                                |
+| `used`         | `Boolean`             |           Sì |       No | `false` | Codice già usato o no                            |
+| `active`       | `Boolean`             |           Sì |       No | `true`  | Flag logico di attivazione/disattivazione codice |
+| `updatedAt`    | `LocalDateTime`       |           Sì |       No | auto    | Timestamp ultimo aggiornamento                   |
+| `usedAt`       | `LocalDateTime`       |           No |       Sì | `null`  | Data/ora utilizzo                                |
+| `createdAt`    | `LocalDateTime`       |           Sì |       No | auto    | Data creazione                                   |
 
 ### Note
 - `code` deve essere **univoco**
@@ -181,75 +211,113 @@ Per campi con valori chiusi si consiglia:
 
 ---
 
-## 3.7 AvailabilitySlot
+## 3.6.1 EmailVerificationToken
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `professional` | `ProfessionalProfile` | Sì | No | — | Solo PT |
-| `startDateTime` | `LocalDateTime` | Sì | No | — | Inizio slot |
-| `endDateTime` | `LocalDateTime` | Sì | No | — | Fine slot |
-| `status` | `Enum` | Sì | No | `AVAILABLE` | Stato slot |
-| `createdAt` | `LocalDateTime` | Sì | No | auto | Data creazione |
+| Campo       | Tipo            | Obbligatorio | Nullable | Default | Note                               |
+| ----------- | --------------- | -----------: | -------: | ------- | ---------------------------------- |
+| `id`        | `Long`          |           Sì |       No | auto    | Identificativo univoco             |
+| `user`      | `User`          |           Sì |       No | —       | Utente destinatario della verifica |
+| `token`     | `String`        |           Sì |       No | —       | Token univoco di verifica email    |
+| `expiresAt` | `LocalDateTime` |           Sì |       No | —       | Data/ora scadenza token            |
+| `used`      | `Boolean`       |           Sì |       No | `false` | Token già utilizzato o no          |
+| `usedAt`    | `LocalDateTime` |           No |       Sì | `null`  | Data/ora utilizzo                  |
+| `createdAt` | `LocalDateTime` |           Sì |       No | auto    | Timestamp creazione                |
 
 ### Note
-- `status` valori iniziali:
+
+- `token` è univoco;
+- il token è utilizzabile solo se non usato e non scaduto;
+- questa entity non eredita da `BaseEntity`;
+- non contiene `updatedAt`.
+
+---
+
+## 3.7 AvailabilitySlot
+
+| Campo           | Tipo                  | Obbligatorio | Nullable | Default     | Note                                   |
+| --------------- | --------------------- | -----------: | -------: | ----------- | -------------------------------------- |
+| `id`            | `Long`                |           Sì |       No | auto        | Identificativo univoco                 |
+| `professional`  | `ProfessionalProfile` |           Sì |       No | —           | Professionista proprietario dello slot |
+| `startDateTime` | `LocalDateTime`       |           Sì |       No | —           | Inizio slot                            |
+| `endDateTime`   | `LocalDateTime`       |           Sì |       No | —           | Fine slot                              |
+| `status`        | `Enum`                |           Sì |       No | `AVAILABLE` | Stato slot                             |
+| `active`        | `Boolean`             |           Sì |       No | `true`      | Flag logico di attivazione             |
+| `createdAt`     | `LocalDateTime`       |           Sì |       No | auto        | Timestamp creazione                    |
+| `updatedAt`     | `LocalDateTime`       |           Sì |       No | auto        | Timestamp ultimo aggiornamento         |
+
+### Note
+
+- `status` valori implementati:
   - `AVAILABLE`
   - `BOOKED`
   - `BLOCKED`
-- `endDateTime` deve essere successivo a `startDateTime`
-- Questa entità è valida solo per `PERSONAL_TRAINER`
+- `endDateTime` deve essere successivo a `startDateTime`;
+- in creazione o aggiornamento, `startDateTime` deve essere nel futuro;
+- gli slot attivi dello stesso professionista non possono sovrapporsi;
+- la gestione degli slot è prevista per professionisti `PERSONAL_TRAINER`;
+- lo stato `BOOKED` viene utilizzato dal modulo Bookings.
 
 ---
 
 ## 3.8 BookingRequest
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `client` | `ClientProfile` | Sì | No | — | Cliente richiedente |
-| `professional` | `ProfessionalProfile` | Sì | No | — | PT destinatario |
-| `status` | `Enum` | Sì | No | `PENDING` | Stato richiesta |
-| `note` | `String` / `Text` | No | Sì | `null` | Nota cliente |
-| `createdAt` | `LocalDateTime` | Sì | No | auto | Data creazione |
-| `updatedAt` | `LocalDateTime` | Sì | No | auto | Data aggiornamento |
+| Campo          | Tipo                       | Obbligatorio | Nullable | Default     | Note                           |
+| -------------- | -------------------------- | -----------: | -------: | ----------- | ------------------------------ |
+| `id`           | `Long`                     |           Sì |       No | auto        | Identificativo univoco         |
+| `client`       | `ClientProfile`            |           Sì |       No | —           | Cliente richiedente            |
+| `professional` | `ProfessionalProfile`      |           Sì |       No | —           | Professionista destinatario    |
+| `status`       | `Enum`                     |           Sì |       No | `PENDING`   | Stato richiesta                |
+| `note`         | `String` / `Text`          |           No |       Sì | `null`      | Nota facoltativa del cliente   |
+| `active`       | `Boolean`                  |           Sì |       No | `true`      | Flag logico di attivazione     |
+| `items`        | `List<BookingRequestItem>` |           Sì |       No | lista vuota | Slot collegati alla richiesta  |
+| `createdAt`    | `LocalDateTime`            |           Sì |       No | auto        | Timestamp creazione            |
+| `updatedAt`    | `LocalDateTime`            |           Sì |       No | auto        | Timestamp ultimo aggiornamento |
 
 ### Note
-- `status` valori iniziali:
+
+- `status` valori implementati:
   - `PENDING`
   - `CONFIRMED`
   - `REJECTED`
   - `CANCELLED`
-- Una richiesta contiene uno o più `BookingRequestItem`
+- nel backend attuale una richiesta viene creata a partire da un singolo `availabilitySlotId`;
+- la `note`, se presente, viene normalizzata eliminando spazi iniziali e finali;
+- una `note` vuota dopo la normalizzazione viene trattata come assente;
+- la `note` non può superare `1000` caratteri;
+- la struttura con `items` mantiene il modello estendibile a scenari multi-slot futuri.
 
 ---
 
 ## 3.9 BookingRequestItem
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `bookingRequest` | `BookingRequest` | Sì | No | — | Richiesta principale |
-| `availabilitySlot` | `AvailabilitySlot` | Sì | No | — | Slot richiesto |
+| Campo              | Tipo               | Obbligatorio | Nullable | Default | Note                           |
+| ------------------ | ------------------ | -----------: | -------: | ------- | ------------------------------ |
+| `id`               | `Long`             |           Sì |       No | auto    | Identificativo univoco         |
+| `bookingRequest`   | `BookingRequest`   |           Sì |       No | —       | Richiesta principale           |
+| `availabilitySlot` | `AvailabilitySlot` |           Sì |       No | —       | Slot richiesto                 |
+| `createdAt`        | `LocalDateTime`    |           Sì |       No | auto    | Timestamp creazione            |
+| `updatedAt`        | `LocalDateTime`    |           Sì |       No | auto    | Timestamp ultimo aggiornamento |
 
 ### Note
-- Permette prenotazioni multi-slot in una singola richiesta
-- Ogni item punta a uno slot specifico
+
+- ogni item punta a uno slot specifico;
+- nel contratto API attuale ogni booking creato contiene un solo item;
+- il modello resta predisposto per un’eventuale evoluzione multi-slot futura.
 
 ---
 
 ## 3.10 WorkoutPlan
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `professional` | `ProfessionalProfile` | Sì | No | — | Solo PT |
-| `client` | `ClientProfile` | Sì | No | — | Cliente destinatario |
-| `title` | `String` | Sì | No | — | Titolo scheda |
-| `monthReference` | `LocalDate` | Sì | No | — | Primo giorno del mese di riferimento |
-| `createdAt` | `LocalDateTime` | Sì | No | auto | Data creazione |
-| `updatedAt` | `LocalDateTime` | Sì | No | auto | Data aggiornamento |
-| `active` | `Boolean` | Sì | No | `true` | Scheda attiva o archiviata |
+| Campo            | Tipo                  | Obbligatorio | Nullable | Default | Note                                 |
+| ---------------- | --------------------- | -----------: | -------: | ------- | ------------------------------------ |
+| `id`             | `Long`                |           Sì |       No | —       | Identificativo univoco               |
+| `professional`   | `ProfessionalProfile` |           Sì |       No | —       | Solo PT                              |
+| `client`         | `ClientProfile`       |           Sì |       No | —       | Cliente destinatario                 |
+| `title`          | `String`              |           Sì |       No | —       | Titolo scheda                        |
+| `monthReference` | `LocalDate`           |           Sì |       No | —       | Primo giorno del mese di riferimento |
+| `createdAt`      | `LocalDateTime`       |           Sì |       No | auto    | Data creazione                       |
+| `updatedAt`      | `LocalDateTime`       |           Sì |       No | auto    | Data aggiornamento                   |
+| `active`         | `Boolean`             |           Sì |       No | `true`  | Scheda attiva o archiviata           |
 
 ### Note
 - `monthReference` può rappresentare il primo giorno del mese, es. `2026-03-01`
@@ -258,11 +326,11 @@ Per campi con valori chiusi si consiglia:
 
 ## 3.11 WorkoutWeek
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `workoutPlan` | `WorkoutPlan` | Sì | No | — | Scheda proprietaria |
-| `weekNumber` | `Integer` | Sì | No | — | Da 1 a 4 |
+| Campo         | Tipo          | Obbligatorio | Nullable | Default | Note                   |
+| ------------- | ------------- | -----------: | -------: | ------- | ---------------------- |
+| `id`          | `Long`        |           Sì |       No | —       | Identificativo univoco |
+| `workoutPlan` | `WorkoutPlan` |           Sì |       No | —       | Scheda proprietaria    |
+| `weekNumber`  | `Integer`     |           Sì |       No | —       | Da 1 a 4               |
 
 ### Note
 - Per la v1 si assume struttura mensile in 4 settimane
@@ -271,14 +339,14 @@ Per campi con valori chiusi si consiglia:
 
 ## 3.12 WorkoutDay
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `workoutWeek` | `WorkoutWeek` | Sì | No | — | Settimana proprietaria |
-| `date` | `LocalDate` | Sì | No | — | Data reale del giorno |
-| `dayLabel` | `String` | Sì | No | — | Es. Lunedì, Martedì |
-| `dayType` | `Enum` | Sì | No | `REST` | Tipo giorno |
-| `notes` | `String` / `Text` | No | Sì | `null` | Note del giorno |
+| Campo         | Tipo              | Obbligatorio | Nullable | Default | Note                   |
+| ------------- | ----------------- | -----------: | -------: | ------- | ---------------------- |
+| `id`          | `Long`            |           Sì |       No | —       | Identificativo univoco |
+| `workoutWeek` | `WorkoutWeek`     |           Sì |       No | —       | Settimana proprietaria |
+| `date`        | `LocalDate`       |           Sì |       No | —       | Data reale del giorno  |
+| `dayLabel`    | `String`          |           Sì |       No | —       | Es. Lunedì, Martedì    |
+| `dayType`     | `Enum`            |           Sì |       No | `REST`  | Tipo giorno            |
+| `notes`       | `String` / `Text` |           No |       Sì | `null`  | Note del giorno        |
 
 ### Note
 - `dayType` valori iniziali:
@@ -289,20 +357,20 @@ Per campi con valori chiusi si consiglia:
 
 ## 3.13 WorkoutExercise
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `workoutDay` | `WorkoutDay` | Sì | No | — | Giorno di appartenenza |
-| `exerciseName` | `String` | Sì | No | — | Nome esercizio |
-| `sets` | `String` | Sì | No | — | Es. `4` o `4x` |
-| `reps` | `String` | Sì | No | — | Es. `10`, `8-10`, `max` |
-| `intensity` | `String` | No | Sì | `null` | Intensità o RPE |
-| `recoveryTime` | `String` | No | Sì | `null` | Recupero tra le serie |
-| `extraTechniques` | `String` / `Text` | No | Sì | `null` | Superset, drop set, rest pause ecc. |
-| `description` | `String` / `Text` | No | Sì | `null` | Spiegazioni esercizio |
-| `loggedLoad` | `String` | No | Sì | `null` | Carico registrato |
-| `loggedReps` | `String` | No | Sì | `null` | Ripetizioni registrate |
-| `notes` | `String` / `Text` | No | Sì | `null` | Note aggiuntive |
+| Campo             | Tipo              | Obbligatorio | Nullable | Default | Note                                |
+| ----------------- | ----------------- | -----------: | -------: | ------- | ----------------------------------- |
+| `id`              | `Long`            |           Sì |       No | —       | Identificativo univoco              |
+| `workoutDay`      | `WorkoutDay`      |           Sì |       No | —       | Giorno di appartenenza              |
+| `exerciseName`    | `String`          |           Sì |       No | —       | Nome esercizio                      |
+| `sets`            | `String`          |           Sì |       No | —       | Es. `4` o `4x`                      |
+| `reps`            | `String`          |           Sì |       No | —       | Es. `10`, `8-10`, `max`             |
+| `intensity`       | `String`          |           No |       Sì | `null`  | Intensità o RPE                     |
+| `recoveryTime`    | `String`          |           No |       Sì | `null`  | Recupero tra le serie               |
+| `extraTechniques` | `String` / `Text` |           No |       Sì | `null`  | Superset, drop set, rest pause ecc. |
+| `description`     | `String` / `Text` |           No |       Sì | `null`  | Spiegazioni esercizio               |
+| `loggedLoad`      | `String`          |           No |       Sì | `null`  | Carico registrato                   |
+| `loggedReps`      | `String`          |           No |       Sì | `null`  | Ripetizioni registrate              |
+| `notes`           | `String` / `Text` |           No |       Sì | `null`  | Note aggiuntive                     |
 
 ### Note
 - `sets` e `reps` come `String` danno più flessibilità nella v1
@@ -311,39 +379,39 @@ Per campi con valori chiusi si consiglia:
 
 ## 3.14 NutritionPlan
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `professional` | `ProfessionalProfile` | Sì | No | — | Solo nutrizionista |
-| `client` | `ClientProfile` | Sì | No | — | Cliente destinatario |
-| `title` | `String` | Sì | No | — | Titolo piano |
-| `monthReference` | `LocalDate` | Sì | No | — | Primo giorno del mese di riferimento |
-| `createdAt` | `LocalDateTime` | Sì | No | auto | Data creazione |
-| `updatedAt` | `LocalDateTime` | Sì | No | auto | Data aggiornamento |
-| `active` | `Boolean` | Sì | No | `true` | Piano attivo o archiviato |
+| Campo            | Tipo                  | Obbligatorio | Nullable | Default | Note                                 |
+| ---------------- | --------------------- | -----------: | -------: | ------- | ------------------------------------ |
+| `id`             | `Long`                |           Sì |       No | —       | Identificativo univoco               |
+| `professional`   | `ProfessionalProfile` |           Sì |       No | —       | Solo nutrizionista                   |
+| `client`         | `ClientProfile`       |           Sì |       No | —       | Cliente destinatario                 |
+| `title`          | `String`              |           Sì |       No | —       | Titolo piano                         |
+| `monthReference` | `LocalDate`           |           Sì |       No | —       | Primo giorno del mese di riferimento |
+| `createdAt`      | `LocalDateTime`       |           Sì |       No | auto    | Data creazione                       |
+| `updatedAt`      | `LocalDateTime`       |           Sì |       No | auto    | Data aggiornamento                   |
+| `active`         | `Boolean`             |           Sì |       No | `true`  | Piano attivo o archiviato            |
 
 ---
 
 ## 3.15 NutritionWeek
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `nutritionPlan` | `NutritionPlan` | Sì | No | — | Piano proprietario |
-| `weekNumber` | `Integer` | Sì | No | — | Da 1 a 4 |
+| Campo           | Tipo            | Obbligatorio | Nullable | Default | Note                   |
+| --------------- | --------------- | -----------: | -------: | ------- | ---------------------- |
+| `id`            | `Long`          |           Sì |       No | —       | Identificativo univoco |
+| `nutritionPlan` | `NutritionPlan` |           Sì |       No | —       | Piano proprietario     |
+| `weekNumber`    | `Integer`       |           Sì |       No | —       | Da 1 a 4               |
 
 ---
 
 ## 3.16 NutritionDay
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `nutritionWeek` | `NutritionWeek` | Sì | No | — | Settimana proprietaria |
-| `date` | `LocalDate` | Sì | No | — | Data reale del giorno |
-| `dayLabel` | `String` | Sì | No | — | Es. Lunedì |
-| `dayType` | `Enum` | Sì | No | `PLANNED` | Tipo giorno |
-| `notes` | `String` / `Text` | No | Sì | `null` | Note del giorno |
+| Campo           | Tipo              | Obbligatorio | Nullable | Default   | Note                   |
+| --------------- | ----------------- | -----------: | -------: | --------- | ---------------------- |
+| `id`            | `Long`            |           Sì |       No | —         | Identificativo univoco |
+| `nutritionWeek` | `NutritionWeek`   |           Sì |       No | —         | Settimana proprietaria |
+| `date`          | `LocalDate`       |           Sì |       No | —         | Data reale del giorno  |
+| `dayLabel`      | `String`          |           Sì |       No | —         | Es. Lunedì             |
+| `dayType`       | `Enum`            |           Sì |       No | `PLANNED` | Tipo giorno            |
+| `notes`         | `String` / `Text` |           No |       Sì | `null`    | Note del giorno        |
 
 ### Note
 - `dayType` valori iniziali:
@@ -354,14 +422,14 @@ Per campi con valori chiusi si consiglia:
 
 ## 3.17 NutritionEntry
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `nutritionDay` | `NutritionDay` | Sì | No | — | Giorno proprietario |
-| `mealType` | `String` | Sì | No | — | Colazione, pranzo, cena, snack ecc. |
-| `content` | `String` / `Text` | Sì | No | — | Descrizione contenuto pasto |
-| `quantity` | `String` | No | Sì | `null` | Quantità/grammi/porzioni |
-| `notes` | `String` / `Text` | No | Sì | `null` | Note aggiuntive |
+| Campo          | Tipo              | Obbligatorio | Nullable | Default | Note                                |
+| -------------- | ----------------- | -----------: | -------: | ------- | ----------------------------------- |
+| `id`           | `Long`            |           Sì |       No | —       | Identificativo univoco              |
+| `nutritionDay` | `NutritionDay`    |           Sì |       No | —       | Giorno proprietario                 |
+| `mealType`     | `String`          |           Sì |       No | —       | Colazione, pranzo, cena, snack ecc. |
+| `content`      | `String` / `Text` |           Sì |       No | —       | Descrizione contenuto pasto         |
+| `quantity`     | `String`          |           No |       Sì | `null`  | Quantità/grammi/porzioni            |
+| `notes`        | `String` / `Text` |           No |       Sì | `null`  | Note aggiuntive                     |
 
 ### Note
 - Per la v1 va bene una struttura flessibile e non troppo rigida
@@ -370,14 +438,14 @@ Per campi con valori chiusi si consiglia:
 
 ## 3.18 WorkoutFeedback
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `client` | `ClientProfile` | Sì | No | — | Cliente che invia |
-| `professional` | `ProfessionalProfile` | Sì | No | — | PT destinatario |
-| `workoutDay` | `WorkoutDay` | Sì | No | — | Giorno specifico della scheda |
-| `message` | `String` / `Text` | Sì | No | — | Messaggio del cliente |
-| `createdAt` | `LocalDateTime` | Sì | No | auto | Data invio |
+| Campo          | Tipo                  | Obbligatorio | Nullable | Default | Note                          |
+| -------------- | --------------------- | -----------: | -------: | ------- | ----------------------------- |
+| `id`           | `Long`                |           Sì |       No | —       | Identificativo univoco        |
+| `client`       | `ClientProfile`       |           Sì |       No | —       | Cliente che invia             |
+| `professional` | `ProfessionalProfile` |           Sì |       No | —       | PT destinatario               |
+| `workoutDay`   | `WorkoutDay`          |           Sì |       No | —       | Giorno specifico della scheda |
+| `message`      | `String` / `Text`     |           Sì |       No | —       | Messaggio del cliente         |
+| `createdAt`    | `LocalDateTime`       |           Sì |       No | auto    | Data invio                    |
 
 ### Note
 - Riferito solo a contenuti workout
@@ -386,14 +454,14 @@ Per campi con valori chiusi si consiglia:
 
 ## 3.19 NutritionFeedback
 
-| Campo | Tipo | Obbligatorio | Nullable | Default | Note |
-|---|---|---:|---:|---|---|
-| `id` | `Long` | Sì | No | — | Identificativo univoco |
-| `client` | `ClientProfile` | Sì | No | — | Cliente che invia |
-| `professional` | `ProfessionalProfile` | Sì | No | — | Nutrizionista destinatario |
-| `nutritionDay` | `NutritionDay` | Sì | No | — | Giorno specifico del piano |
-| `message` | `String` / `Text` | Sì | No | — | Messaggio del cliente |
-| `createdAt` | `LocalDateTime` | Sì | No | auto | Data invio |
+| Campo          | Tipo                  | Obbligatorio | Nullable | Default | Note                       |
+| -------------- | --------------------- | -----------: | -------: | ------- | -------------------------- |
+| `id`           | `Long`                |           Sì |       No | —       | Identificativo univoco     |
+| `client`       | `ClientProfile`       |           Sì |       No | —       | Cliente che invia          |
+| `professional` | `ProfessionalProfile` |           Sì |       No | —       | Nutrizionista destinatario |
+| `nutritionDay` | `NutritionDay`        |           Sì |       No | —       | Giorno specifico del piano |
+| `message`      | `String` / `Text`     |           Sì |       No | —       | Messaggio del cliente      |
+| `createdAt`    | `LocalDateTime`       |           Sì |       No | auto    | Data invio                 |
 
 ### Note
 - Riferito solo a contenuti nutrizione
@@ -452,22 +520,11 @@ Per campi con valori chiusi si consiglia:
 
 ---
 
-## 4.1.0 EmailVerificationToken
-- `id` → Long
-- `user` → User
-- `token` → String
-- `expiresAt` → LocalDateTime
-- `used` → Boolean
-- `usedAt` → LocalDateTime
-- `createdAt` → LocalDateTime
-
----
-
 # 5. Note di progettazione utili
 
 - `email`, `code` dovranno avere vincolo di unicità
 - `ProfessionalClientLink` dovrà evitare duplicati tra stesso professionista e stesso cliente
-- `BookingRequest` + `BookingRequestItem` è la struttura giusta per richieste multi-giorno
+- `BookingRequest` + `BookingRequestItem` supporta il flusso single-slot attuale e mantiene il modello estendibile per richieste multi-slot future
 - `ClientMeasurement` deve restare storica
 - `profileImageUrl` è meglio come URL/path e non come file binario nel database
 - `sets`, `reps`, `quantity` come `String` nella v1 ti danno più flessibilità e meno attrito
