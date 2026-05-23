@@ -12,6 +12,29 @@ Lo scopo è chiarire:
 
 ---
 
+## 1.1 Stato di implementazione delle relazioni
+
+### Relazioni attualmente implementate nel backend
+
+- ereditarietà tra `User`, `ProfessionalProfile` e `ClientProfile`;
+- relazione professionista-cliente tramite `ProfessionalClientLink`;
+- relazione professionista-codici invito tramite `InviteCode`;
+- relazione personal trainer-disponibilità tramite `AvailabilitySlot`;
+- relazione cliente-professionista-prenotazione tramite `BookingRequest`;
+- relazione richiesta-slot tramite `BookingRequestItem`.
+
+### Relazioni pianificate ma non ancora implementate
+
+- cliente-misurazioni fisiche;
+- personal trainer-schede workout;
+- nutrizionista-piani alimentari;
+- cliente-feedback workout;
+- cliente-feedback nutrizione.
+
+Le sezioni relative ai moduli pianificati descrivono regole di dominio future e non componenti già presenti nel codice reale.
+
+---
+
 ## 2. Regole generali di conservazione dati
 
 ### 2.1 Nessuna eliminazione fisica dei dati principali
@@ -29,13 +52,23 @@ Questa scelta permette di:
 - preservare relazioni, contenuti e tracciabilità
 - rendere il progetto più realistico e professionale
 
-### 2.3 Entità coinvolte principalmente
-Questa regola vale soprattutto per:
-- `ProfessionalProfile`
-- `ClientProfile`
-- `ProfessionalClientLink`
-- `WorkoutPlan`
-- `NutritionPlan`
+### 2.3 Entità coinvolte attualmente
+
+Nel backend attuale questa regola riguarda principalmente:
+
+- `ProfessionalProfile`;
+- `ClientProfile`;
+- `ProfessionalClientLink`;
+- `InviteCode`;
+- `AvailabilitySlot`;
+- `BookingRequest`.
+
+Per i moduli futuri, la stessa logica potrà essere applicata anche a:
+
+- `WorkoutPlan`;
+- `NutritionPlan`;
+- `ClientMeasurement`;
+- feedback e altri dati storici del cliente.
 
 ---
 
@@ -117,76 +150,165 @@ può generare codici invito.
 
 ## 6. Relazione tra personal trainer e disponibilità
 
-### 6.1 Ambito della relazione
-Le disponibilità (`AvailabilitySlot`) sono previste solo per professionisti con specializzazione:
+### 6.1 Stato di implementazione
+
+La relazione tra personal trainer e disponibilità è implementata nel backend tramite l’entità `AvailabilitySlot`.
+
+### 6.2 Ambito della relazione
+
+Le disponibilità sono gestite solo per professionisti con specializzazione:
+
 - `PERSONAL_TRAINER`
 
-### 6.2 Cardinalità logica
+### 6.3 Cardinalità logica
+
 Un personal trainer può avere:
-- molti `AvailabilitySlot`
+
+- molti `AvailabilitySlot`.
 
 Ogni `AvailabilitySlot` appartiene a:
-- un solo personal trainer
 
-### 6.3 Regola temporale
-Ogni slot deve avere:
-- `startDateTime < endDateTime`
+- un solo personal trainer.
 
-### 6.4 Regola di non sovrapposizione
+### 6.4 Regole temporali implementate
+
+Ogni slot deve rispettare queste regole:
+
+- `startDateTime < endDateTime`;
+- in creazione o aggiornamento, `startDateTime` deve essere nel futuro.
+
+### 6.5 Regola di non sovrapposizione
+
 Per lo stesso personal trainer non devono esistere slot attivi sovrapposti nello stesso intervallo temporale.
 
-### 6.5 Stato dello slot
+### 6.6 Stati dello slot
+
 Uno slot può trovarsi in uno dei seguenti stati:
-- `AVAILABLE`
-- `BOOKED`
-- `BLOCKED`
+
+- `AVAILABLE`;
+- `BOOKED`;
+- `BLOCKED`.
+
+### 6.7 Ownership e gestione
+
+Il personal trainer autenticato può:
+
+- creare i propri slot;
+- leggere i propri slot;
+- aggiornare solo i propri slot `AVAILABLE`;
+- bloccare solo i propri slot `AVAILABLE`;
+- sbloccare solo i propri slot `BLOCKED`.
+
+### 6.8 Lettura lato cliente
+
+Un cliente può leggere gli slot disponibili di un professionista solo se:
+
+- il cliente è attivo;
+- il professionista è attivo;
+- esiste un collegamento attivo tra cliente e professionista.
 
 ---
 
 ## 7. Relazione tra cliente, richiesta di prenotazione e slot
 
-### 7.1 Cardinalità logica
+### 7.1 Stato di implementazione
+
+La relazione cliente-professionista-prenotazione è implementata tramite:
+
+- `BookingRequest`;
+- `BookingRequestItem`;
+- `AvailabilitySlot`.
+
+### 7.2 Cardinalità logica
+
 Un cliente può creare:
-- molte `BookingRequest`
+
+- molte `BookingRequest`.
 
 Un personal trainer può ricevere:
-- molte `BookingRequest`
+
+- molte `BookingRequest`.
 
 Ogni `BookingRequest` appartiene a:
-- un solo cliente
-- un solo personal trainer
 
-### 7.2 Relazione con i dettagli della richiesta
-Una `BookingRequest` può contenere:
-- uno o più `BookingRequestItem`
+- un solo cliente;
+- un solo personal trainer.
+
+### 7.3 Relazione con lo slot
+
+Nel contratto API attuale una `BookingRequest` viene creata a partire da:
+
+- un singolo `availabilitySlotId`.
+
+Ogni richiesta creata tramite API contiene quindi:
+
+- un singolo `BookingRequestItem`.
 
 Ogni `BookingRequestItem` punta a:
-- un solo `AvailabilitySlot`
 
-### 7.3 Prenotazioni multi-giorno
-La struttura `BookingRequest` + `BookingRequestItem` consente al cliente di:
-- inviare una sola richiesta
-- includere più date e più slot
-- coprire anche periodi distribuiti su più giorni
+- un solo `AvailabilitySlot`.
 
-### 7.4 Regola di coerenza professionista-slot
-Tutti gli slot contenuti nei `BookingRequestItem` devono appartenere:
-- allo stesso personal trainer indicato nella `BookingRequest`
+### 7.4 Evoluzione multi-slot
 
-### 7.5 Conferma della richiesta
-Quando una `BookingRequest` viene confermata:
-- tutti gli slot collegati diventano `BOOKED`
+La struttura `BookingRequest` + `BookingRequestItem` mantiene il modello predisposto per future richieste contenenti più slot.
 
-### 7.6 Rifiuto della richiesta
-Quando una `BookingRequest` viene rifiutata:
-- gli slot collegati restano o tornano `AVAILABLE`, se non impegnati da altre logiche di blocco
+La gestione multi-slot non è però attualmente implementata nelle API del backend.
 
-### 7.7 Regola di integrità
-Uno slot già `BOOKED` non deve poter essere riutilizzato in una nuova richiesta confermata.
+### 7.5 Regola di collegamento cliente-professionista
+
+Un cliente può creare una richiesta booking solo verso uno slot appartenente a un professionista con cui esiste un collegamento attivo.
+
+### 7.6 Regola di prenotabilità dello slot
+
+Una nuova richiesta può essere creata solo se lo slot:
+
+- esiste;
+- è attivo;
+- appartiene al professionista collegato;
+- si trova in stato `AVAILABLE`;
+- non ha già una richiesta `PENDING` attiva associata.
+
+### 7.7 Stati booking implementati
+
+Una `BookingRequest` può trovarsi in uno dei seguenti stati:
+
+- `PENDING`;
+- `CONFIRMED`;
+- `REJECTED`;
+- `CANCELLED`.
+
+### 7.8 Transizioni implementate
+
+| Azione | Attore autorizzato | Stato iniziale | Stato finale | Effetto sullo slot |
+|---|---|---|---|---|
+| confirm | professionista coinvolto | `PENDING` | `CONFIRMED` | `AVAILABLE -> BOOKED` |
+| reject | professionista coinvolto | `PENDING` | `REJECTED` | resta `AVAILABLE` |
+| cancel | cliente coinvolto | `PENDING` | `CANCELLED` | resta `AVAILABLE` |
+| cancel | cliente coinvolto | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
+| cancel | professionista coinvolto | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
+
+### 7.9 Ownership e visibilità
+
+Il cliente può:
+
+- leggere solo le proprie richieste;
+- leggere il dettaglio solo delle richieste in cui è coinvolto;
+- cancellare solo richieste proprie negli stati consentiti.
+
+Il professionista può:
+
+- leggere solo le richieste ricevute;
+- leggere il dettaglio solo delle richieste riferite ai propri slot;
+- confermare o rifiutare solo richieste riferite ai propri slot;
+- cancellare solo richieste confermate in cui è coinvolto.
+
+### 7.10 Integrità dello slot
+
+Uno slot già `BOOKED` non può essere confermato nuovamente tramite un’altra richiesta.
 
 ---
 
-## 8. Relazione tra cliente e misurazioni fisiche
+## 8. Relazione tra cliente e misurazioni fisiche — Pianificata, non implementata
 
 ### 8.1 Cardinalità logica
 Un cliente può avere:
@@ -218,7 +340,7 @@ Per questo motivo:
 
 ---
 
-## 9. Relazione tra personal trainer e schede di allenamento
+## 9. Relazione tra personal trainer e schede di allenamento — Pianificata, non implementata
 
 ### 9.1 Cardinalità logica
 Un personal trainer può creare:
@@ -270,7 +392,7 @@ L’eventuale evidenziazione dei dati modificati rispetto alla versione preceden
 
 ---
 
-## 10. Relazione tra nutrizionista e piani alimentari
+## 10. Relazione tra nutrizionista e piani alimentari — Pianificata, non implementata
 
 ### 10.1 Cardinalità logica
 Un nutrizionista può creare:
@@ -314,7 +436,7 @@ Quando il piano viene aggiornato in modo sostanziale:
 
 ---
 
-## 11. Relazione tra cliente e feedback workout
+## 11. Relazione tra cliente e feedback workout — Pianificata, non implementata
 
 ### 11.1 Cardinalità logica
 Un cliente può inviare:
@@ -335,7 +457,7 @@ Il `WorkoutDay` associato al feedback deve appartenere a:
 
 ---
 
-## 12. Relazione tra cliente e feedback nutrizione
+## 12. Relazione tra cliente e feedback nutrizione — Pianificata, non implementata
 
 ### 12.1 Cardinalità logica
 Un cliente può inviare:
@@ -358,66 +480,97 @@ Il `NutritionDay` associato al feedback deve appartenere a:
 
 ## 13. Regole di ownership logica
 
-### 13.1 Entità “contenitore”
-Le entità principali che fanno da contenitore logico sono:
-- `WorkoutPlan`
-- `NutritionPlan`
-- `BookingRequest`
+### 13.1 Ownership attualmente implementata
 
-### 13.2 Entità dipendenti
-Le entità dipendenti dal contenitore sono:
+#### Area availability
 
-#### Area workout
-- `WorkoutWeek`
-- `WorkoutDay`
-- `WorkoutExercise`
-
-#### Area nutrition
-- `NutritionWeek`
-- `NutritionDay`
-- `NutritionEntry`
+- un `AvailabilitySlot` appartiene a un solo `ProfessionalProfile`;
+- solo il professionista proprietario può modificarlo, bloccarlo o sbloccarlo.
 
 #### Area booking
-- `BookingRequestItem`
+
+- una `BookingRequest` appartiene a un solo `ClientProfile` e a un solo `ProfessionalProfile`;
+- un `BookingRequestItem` dipende logicamente dalla propria `BookingRequest`;
+- il dettaglio booking è accessibile solo agli utenti coinvolti;
+- conferma e rifiuto competono al professionista coinvolto;
+- cancellazione compete al cliente coinvolto o, se già confermata, anche al professionista coinvolto.
+
+### 13.2 Ownership pianificata per moduli futuri
+
+#### Area workout
+
+- `WorkoutWeek`;
+- `WorkoutDay`;
+- `WorkoutExercise`;
+
+dipenderanno logicamente da `WorkoutPlan`.
+
+#### Area nutrition
+
+- `NutritionWeek`;
+- `NutritionDay`;
+- `NutritionEntry`;
+
+dipenderanno logicamente da `NutritionPlan`.
 
 ### 13.3 Regola generale
+
 Le entità dipendenti:
-- non hanno senso senza il proprio contenitore
-- dipendono logicamente dalla sua esistenza
-- devono essere trattate come parte della struttura interna del contenitore
+
+- non hanno senso senza il proprio contenitore;
+- devono essere accessibili solo attraverso risorse autorizzate;
+- devono rispettare l’ownership logica della risorsa principale.
 
 ---
 
 ## 14. Regole di archivio e storico
 
-### 14.1 Dati da storicizzare
-Devono essere mantenuti nello storico almeno:
-- collegamenti professionista-cliente disattivati
-- codici invito usati/scaduti
-- schede workout non più attive
-- piani alimentari non più attivi
-- misurazioni fisiche
-- richieste di prenotazione
+### 14.1 Dati attualmente storicizzati o mantenuti logicamente
 
-### 14.2 Benefici dello storico
-La storicizzazione consente:
-- analisi successive
-- maggiore tracciabilità
-- confronto tra versioni
-- comportamento più professionale del sistema
+Nel backend attuale devono essere mantenuti nello storico almeno:
+
+- collegamenti professionista-cliente disattivati;
+- codici invito usati, scaduti o disattivati;
+- slot availability mantenuti tramite stato e flag logico;
+- richieste booking concluse, rifiutate o cancellate.
+
+### 14.2 Dati futuri da storicizzare
+
+Quando i relativi moduli verranno implementati, dovranno essere mantenuti nello storico anche:
+
+- schede workout non più attive;
+- piani alimentari non più attivi;
+- misurazioni fisiche;
+- feedback inviati dal cliente.
 
 ---
 
 ## 15. Regole logiche di unicità e coerenza
 
-Il sistema deve garantire almeno le seguenti regole:
+### 15.1 Regole attualmente implementate
 
-- una `email` utente è univoca
-- un `InviteCode.code` è univoco
-- non possono esistere due collegamenti attivi uguali tra stesso professionista e stesso cliente
-- un cliente non può avere più di 3 professionisti attivi
-- uno slot non può essere confermato due volte
-- una scheda workout attiva è unica per coppia PT-cliente
-- un piano nutrizione attivo è unico per coppia nutrizionista-cliente
+Il backend attuale garantisce o controlla tramite persistence/service layer:
+
+- una `email` utente univoca;
+- un `InviteCode.code` univoco;
+- un solo collegamento attivo per coppia professionista-cliente;
+- massimo 3 professionisti attivi per cliente;
+- impossibilità di auto-collegamento professionista-cliente;
+- slot availability con intervallo temporale valido;
+- slot creati o aggiornati solo con data iniziale futura;
+- assenza di sovrapposizioni tra slot attivi dello stesso professionista;
+- booking creabile solo tra cliente e professionista collegati;
+- booking creabile solo su slot disponibile;
+- assenza di richiesta `PENDING` duplicata sullo stesso slot;
+- rispetto delle transizioni consentite della prenotazione;
+- impossibilità di confermare nuovamente uno slot già `BOOKED`.
+
+### 15.2 Regole pianificate per moduli futuri
+
+Quando i relativi moduli verranno implementati, dovranno essere valutate anche:
+
+- una sola scheda workout attiva per coppia personal trainer-cliente;
+- un solo piano nutrizione attivo per coppia nutrizionista-cliente;
+- vincoli di ownership su misurazioni e feedback.
 
 ---
