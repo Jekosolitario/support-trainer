@@ -130,53 +130,92 @@ Lo Sprint 05 introduce il primo flusso operativo completo in cui due attori dist
 
 ---
 
-## 8. Regole business principali dello sprint
+## 8. Regole business implementate
 
 ### 8.1 Relazione cliente-professionista
-Una richiesta di prenotazione deve essere consentita solo se il cliente è collegato in modo valido al professionista proprietario dello slot.
+
+Una richiesta di prenotazione può essere creata solo se:
+
+- il cliente autenticato esiste ed è attivo;
+- il professionista proprietario dello slot esiste ed è attivo;
+- esiste un collegamento attivo tra cliente e professionista.
+
+Un cliente non collegato non può creare booking su slot di quel professionista.
 
 ### 8.2 Prenotabilità dello slot
-Uno slot deve essere prenotabile solo se è coerente con la finalità del modulo bookings.
 
-In particolare lo sprint dovrà fissare in modo esplicito almeno:
-- quali stati slot sono prenotabili
-- quali slot non possono più ricevere richieste
-- come si comporta il sistema quando una richiesta viene confermata, rifiutata o cancellata
+Nel backend attuale una richiesta booking viene creata a partire da un singolo `availabilitySlotId`.
 
-### 8.3 Ownership e visibilità
-Il cliente autenticato può vedere solo le proprie prenotazioni.
+Uno slot può ricevere una nuova richiesta solo se:
 
-Il professionista autenticato può vedere solo le prenotazioni che riguardano slot di sua proprietà.
+- esiste;
+- appartiene al professionista collegato al cliente;
+- è attivo;
+- è in stato `AVAILABLE`;
+- non esiste già una richiesta `PENDING` attiva sullo stesso slot.
 
-### 8.4 Ciclo di vita della prenotazione
-La richiesta di prenotazione deve avere uno stato coerente con il dominio.
+### 8.3 Nota della richiesta
 
-La documentazione esistente ipotizza almeno questi stati:
+La richiesta booking può contenere una `note` facoltativa.
+
+Regole implementate durante la stabilizzazione:
+
+- la nota non può superare `1000` caratteri;
+- gli spazi iniziali e finali vengono rimossi;
+- una nota vuota dopo la normalizzazione viene trattata come assente.
+
+### 8.4 Ownership e visibilità
+
+Il cliente autenticato può:
+
+- leggere solo le proprie richieste;
+- leggere il dettaglio solo dei booking in cui è coinvolto;
+- cancellare solo booking propri negli stati consentiti.
+
+Il professionista autenticato può:
+
+- leggere solo le richieste ricevute;
+- leggere il dettaglio solo dei booking relativi ai propri slot;
+- confermare o rifiutare solo booking relativi ai propri slot;
+- cancellare solo booking confermati in cui è coinvolto.
+
+### 8.5 Stati della prenotazione
+
+Gli stati implementati sono:
+
 - `PENDING`
 - `CONFIRMED`
 - `REJECTED`
 - `CANCELLED`
 
-Il contratto finale degli stati va confermato nello sprint in base allo stato reale del codice creato.
+### 8.6 Transizioni consentite
 
-### 8.5 Coerenza tra prenotazione e slot
-Quando una richiesta cambia stato, anche lo slot collegato deve essere aggiornato secondo regole esplicite e coerenti.
+| Azione | Attore autorizzato | Stato iniziale | Stato finale | Effetto sullo slot |
+|---|---|---|---|---|
+| confirm | professionista proprietario | `PENDING` | `CONFIRMED` | `AVAILABLE -> BOOKED` |
+| reject | professionista proprietario | `PENDING` | `REJECTED` | resta `AVAILABLE` |
+| cancel | cliente proprietario | `PENDING` | `CANCELLED` | resta `AVAILABLE` |
+| cancel | cliente proprietario | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
+| cancel | professionista proprietario | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
 
-Questa è una regola centrale dello sprint.
+### 8.7 Transizioni bloccate
 
-### 8.6 Idempotenza e transizioni valide
-Conferma, rifiuto e cancellazione devono essere consentite solo quando la transizione di stato è valida.
+Il sistema non consente:
 
-Il sistema non deve permettere:
-- doppia conferma
-- conferma dopo cancellazione
-- rifiuto dopo conferma, se non previsto
-- cancellazione incoerente con lo stato corrente
+- doppia conferma;
+- doppio rifiuto;
+- doppia cancellazione;
+- conferma di booking non `PENDING`;
+- rifiuto di booking non `PENDING`;
+- cancellazione di booking `REJECTED`;
+- cancellazione professionista di booking `PENDING`, che deve essere gestita tramite rifiuto;
+- operazioni da parte di utenti non coinvolti nella prenotazione.
 
 ---
 
-## 9. Endpoint obiettivo dello sprint
-Gli endpoint pianificati coerenti con questo sprint sono:
+## 9. Endpoint implementati
+
+Gli endpoint reali del modulo Bookings sono:
 
 - **POST** `/api/v1/bookings`
 - **GET** `/api/v1/bookings/client`
@@ -186,139 +225,111 @@ Gli endpoint pianificati coerenti con questo sprint sono:
 - **PATCH** `/api/v1/bookings/{bookingRequestId}/reject`
 - **PATCH** `/api/v1/bookings/{bookingRequestId}/cancel`
 
-### Query param ipotizzati da confermare nello sprint
-- `status=PENDING|CONFIRMED|REJECTED|CANCELLED`
-- `active=true|false`
-- `from=...`
-- `to=...`
+### Regole di autorizzazione esplicite
 
-Nota: il contratto definitivo di payload, filtri e naming va confermato quando inizieranno le chat operative dei blocchi.
+- `POST /api/v1/bookings` → solo `CLIENT`
+- `GET /api/v1/bookings/client` → solo `CLIENT`
+- `GET /api/v1/bookings/professional` → solo `PROFESSIONAL`
+- `PATCH /api/v1/bookings/{bookingRequestId}/confirm` → solo `PROFESSIONAL`
+- `PATCH /api/v1/bookings/{bookingRequestId}/reject` → solo `PROFESSIONAL`
+- `GET /api/v1/bookings/{bookingRequestId}` → utente autenticato, con controllo ownership nel service
+- `PATCH /api/v1/bookings/{bookingRequestId}/cancel` → utente autenticato, con controllo ownership e transizione nel service
+
+### Filtri non ancora implementati
+
+Nel backend attuale non risultano implementati filtri tramite query parameter per:
+
+- stato booking;
+- intervallo temporale;
+- flag `active`.
+
+Eventuali filtri dovranno essere introdotti in uno sprint futuro, solo se necessari al frontend.
 
 ---
 
-## 10. Entità e componenti attesi
-In coerenza con la roadmap documentale già esistente, questo sprint porterà con alta probabilità all’introduzione di:
+## 10. Entità e componenti implementati
+
+Il modulo Bookings è composto da:
 
 ### Dominio
+
 - `BookingRequest`
 - `BookingRequestItem`
-- enum di stato prenotazione
+- `BookingRequestStatus`
 
 ### Persistence
-- repository dedicati per bookings
+
+- `BookingRequestRepository`
+- `BookingRequestItemRepository`
 
 ### API layer
-- request DTO per creazione richiesta
-- response DTO per lista/dettaglio prenotazioni
-- controller dedicato
-- service dedicato
 
-Nota: i nomi finali di DTO, service methods e package applicativi vanno fissati usando come fonte di verità i file reali che nasceranno durante lo sprint.
+- `CreateBookingRequest`
+- `BookingRequestResponse`
+- `BookingRequestItemResponse`
+- `BookingController`
+- `BookingService`
 
----
+### Relazione con Availability
 
-## 11. Validazioni minime attese
-Durante questo sprint vanno coperte almeno queste validazioni:
+Ogni richiesta creata tramite API contiene attualmente un solo `BookingRequestItem`, collegato allo slot indicato da `availabilitySlotId`.
 
-- cliente autenticato valido
-- professionista proprietario dello slot valido
-- collegamento cliente-professionista attivo e coerente
-- slot esistente
-- slot prenotabile
-- transizione di stato valida
-- visibilità coerente tra cliente e professionista
-- prenotazione esistente nei casi di dettaglio/confirm/reject/cancel
+Il modello dati resta predisposto per una futura evoluzione multi-slot, ma tale comportamento non è parte dell’API attuale.
 
 ---
 
-## 12. Error handling atteso
-Lo sprint deve mantenere lo stile già presente nel progetto:
+## 11. Validazioni implementate
 
-- eccezioni applicative coerenti
-- codici errore leggibili
-- messaggi chiari lato API
-- comportamenti consistenti tra security layer e service layer
+Nel modulo Bookings risultano implementate le seguenti validazioni:
 
-I casi minimi da coprire saranno almeno:
-- slot non trovato
-- prenotazione non trovata
-- accesso negato
-- richiesta non valida
-- stato non valido per l’operazione richiesta
-- relazione cliente-professionista non valida
+- cliente autenticato valido e attivo in fase di creazione richiesta;
+- professionista proprietario dello slot valido;
+- collegamento attivo cliente-professionista;
+- slot esistente;
+- slot attivo e disponibile;
+- assenza di altra richiesta `PENDING` attiva sullo stesso slot;
+- nota facoltativa, normalizzata e limitata a `1000` caratteri;
+- booking esistente nei flussi di dettaglio, conferma, rifiuto e cancellazione;
+- ownership corretta della richiesta;
+- ruolo coerente con l’operazione richiesta;
+- transizione di stato consentita;
+- sincronizzazione coerente tra stato booking e stato slot.
+
+---
+
+## 12. Error handling implementato
+
+Il modulo mantiene lo stile applicativo già adottato nel backend:
+
+- eccezioni applicative centralizzate;
+- codici errore leggibili;
+- messaggi chiari lato API;
+- distinzione tra problemi di autenticazione, autorizzazione e regole business.
+
+I casi gestiti comprendono:
+
+- slot non trovato;
+- booking non trovato;
+- cliente non autorizzato;
+- professionista non autorizzato;
+- relazione cliente-professionista assente;
+- slot non disponibile;
+- richiesta pending già presente sullo slot;
+- transizione booking non consentita;
+- accesso al dettaglio da utente non coinvolto;
+- cancellazione professionista di una richiesta ancora `PENDING`.
 
 ---
 
 ## 13. Output finale dello sprint
-Al termine dello sprint il progetto dovrà avere:
 
-- modulo bookings strutturato e coerente
-- primo workflow completo cliente ↔ professionista sulle prenotazioni
-- stati slot sincronizzati con le decisioni sulla prenotazione
-- endpoint bookings testati con Postman
-- build e test automatici ancora verdi
-- documentazione aggiornata allo stato reale
+Lo Sprint 05 ha introdotto il primo workflow completo di prenotazione del progetto:
 
----
-
-## 14. Stato finale Sprint 05
-
-Lo Sprint 05 è stato completato con l’implementazione del modulo Bookings.
-
-Endpoint implementati:
-
-- `POST /api/v1/bookings`
-- `GET /api/v1/bookings/client`
-- `GET /api/v1/bookings/professional`
-- `GET /api/v1/bookings/{bookingRequestId}`
-- `PATCH /api/v1/bookings/{bookingRequestId}/confirm`
-- `PATCH /api/v1/bookings/{bookingRequestId}/reject`
-- `PATCH /api/v1/bookings/{bookingRequestId}/cancel`
-
-### Transizioni confermate
-
-| Azione | Attore autorizzato | Stato iniziale | Stato finale | Stato slot |
-|---|---|---|---|---|
-| confirm | professionista proprietario | `PENDING` | `CONFIRMED` | `AVAILABLE → BOOKED` |
-| reject | professionista proprietario | `PENDING` | `REJECTED` | resta `AVAILABLE` |
-| cancel | cliente proprietario | `PENDING` | `CANCELLED` | resta `AVAILABLE` |
-| cancel | cliente proprietario | `CONFIRMED` | `CANCELLED` | `BOOKED → AVAILABLE` |
-| cancel | professionista proprietario | `CONFIRMED` | `CANCELLED` | `BOOKED → AVAILABLE` |
-
-### Regole di coerenza confermate
-
-Il sistema blocca:
-
-- doppia conferma
-- doppio rifiuto
-- doppia cancellazione
-- conferma di booking non `PENDING`
-- rifiuto di booking non `PENDING`
-- cancellazione di booking già `REJECTED`
-- accesso a booking non appartenenti all’utente autenticato
-- conferma/rifiuto da parte di cliente
-- conferma/rifiuto da parte di professionista non proprietario
-
-### Stato finale
-
-Il ciclo di vita della prenotazione è ora completo:
-
-`PENDING → CONFIRMED / REJECTED / CANCELLED`
-
-e la coerenza tra `BookingRequest` e `AvailabilitySlot` è stata verificata tramite test manuali Postman.
-
----
-
-## 15. Nota di metodo
-Questo sprint va affrontato in più blocchi separati.
-
-Ordine corretto consigliato:
-1. dominio + persistenza
-2. creazione richiesta + letture principali
-3. dettaglio + decisioni del professionista
-4. cancellazione + rifinitura sicurezza/coerenza + aggiornamento documentazione
-
-Questo ordine riduce il rischio di caos e mantiene il progetto coerente con la roadmap già esistente.
+cliente collegato
+-> selezione slot disponibile
+-> richiesta booking PENDING
+-> conferma / rifiuto / cancellazione
+-> aggiornamento coerente dello slot
 
 ---
 
