@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
+import it.zuperman.support_trainer.common.enums.BookingRequestStatus;
 import jakarta.persistence.LockModeType;
 
 public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySlot, Long> {
@@ -30,11 +31,24 @@ public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySl
 
     List<AvailabilitySlot> findAllByProfessional_IdAndActiveTrueOrderByStartDateTimeAsc(Long professionalId);
 
-    List<AvailabilitySlot> findAllByProfessional_IdAndActiveTrueAndStatusAndStartDateTimeAfterOrderByStartDateTimeAsc(
-            Long professionalId,
-            AvailabilitySlotStatus status,
-            LocalDateTime startDateTime
-    );
+    @Query("SELECT slot FROM AvailabilitySlot slot "
+        + "WHERE slot.professional.id = :professionalId "
+        + "AND slot.active = true "
+        + "AND slot.status = :status "
+        + "AND slot.startDateTime > :startDateTime "
+        + "AND NOT EXISTS ("
+        + "    SELECT item.id FROM BookingRequestItem item "
+        + "    WHERE item.availabilitySlot.id = slot.id "
+        + "    AND item.bookingRequest.active = true "
+        + "    AND item.bookingRequest.status = :pendingStatus"
+        + ") "
+        + "ORDER BY slot.startDateTime ASC")
+List<AvailabilitySlot> findAvailableSlotsVisibleToClient(
+        @Param("professionalId") Long professionalId,
+        @Param("status") AvailabilitySlotStatus status,
+        @Param("startDateTime") LocalDateTime startDateTime,
+        @Param("pendingStatus") BookingRequestStatus pendingStatus
+);
 
     Optional<AvailabilitySlot> findByIdAndProfessional_IdAndActiveTrue(Long slotId, Long professionalId);
 

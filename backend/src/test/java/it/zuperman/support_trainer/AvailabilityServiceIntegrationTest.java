@@ -407,4 +407,40 @@ class AvailabilityServiceIntegrationTest {
                 .isInstanceOf(AppException.class)
                 .hasMessage("Uno slot con una richiesta di prenotazione in attesa non può essere modificato o bloccato");
     }
+
+    @Test
+    @DisplayName("Cliente collegato non deve vedere uno slot con booking pending")
+    void shouldNotReturnAvailableSlotWithPendingBookingForLinkedClient() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile requestingClient = createActiveClient();
+        ClientProfile otherClient = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, requestingClient)
+        );
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, otherClient)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(28).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(requestingClient.getEmail(), "CLIENT");
+
+        bookingService.createBookingRequest(
+                new CreateBookingRequest(slot.getId(), "Vorrei prenotare questo slot.")
+        );
+
+        authenticateAs(otherClient.getEmail(), "CLIENT");
+
+        List<AvailabilitySlotResponse> response
+                = availabilityService.getAvailableSlotsByProfessional(professional.getId());
+
+        assertThat(response).isEmpty();
+    }
 }
