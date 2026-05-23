@@ -239,9 +239,12 @@ La lettura lato cliente restituisce solo slot:
 
 - attivi;
 - in stato `AVAILABLE`;
-- con `startDateTime` nel futuro.
+- con `startDateTime` nel futuro;
+- senza una richiesta booking `PENDING` attiva collegata.
 
 Gli slot rimasti `AVAILABLE` ma ormai scaduti non vengono esposti al cliente.
+
+Gli slot formalmente `AVAILABLE` ma già interessati da una richiesta booking `PENDING` non vengono più mostrati come disponibilità prenotabili.
 
 ### 6.9 Coordinamento con booking pending
 
@@ -255,6 +258,14 @@ Di conseguenza, non sono consentiti:
 - blocco manuale dello slot.
 
 Le operazioni di aggiornamento e blocco caricano lo slot con lock pessimista in scrittura e verificano l’assenza di richieste pendenti prima di applicare modifiche.
+
+La presenza di una richiesta `PENDING` attiva incide anche sulla lettura lato cliente.
+
+Uno slot interessato da una richiesta pendente:
+
+- non può essere modificato;
+- non può essere bloccato manualmente;
+- non viene restituito tra le disponibilità prenotabili agli altri clienti.
 
 ---
 
@@ -311,7 +322,8 @@ Finché esiste una richiesta `PENDING` attiva sullo slot:
 
 - non può essere creata una seconda richiesta `PENDING` sullo stesso slot;
 - il professionista non può modificare lo slot;
-- il professionista non può bloccare manualmente lo slot.
+- il professionista non può bloccare manualmente lo slot;
+- lo slot non viene esposto al cliente come disponibilità prenotabile.
 
 ### 7.5 Nota della richiesta
 
@@ -631,6 +643,7 @@ Il service layer gestisce le regole business reali, tra cui:
 - protezione da doppia creazione concorrente di booking `PENDING`;
 - protezione da transizioni concorrenti della stessa richiesta booking;
 - protezione da conferme concorrenti sullo stesso slot.
+- esclusione dalla lettura availability lato cliente degli slot con booking `PENDING` attivo;
 
 ### 15.3 Database
 
@@ -728,6 +741,7 @@ Per Support Trainer risultano attualmente confermate le seguenti regole:
 - il controllo di sovrapposizione availability è protetto da lock pessimista sul professionista;
 - uno slot con booking `PENDING` è logicamente riservato rispetto a modifica e blocco manuale;
 - Availability e Bookings coordinano le operazioni concorrenti sullo stesso slot tramite lock pessimisti e validazioni nel service layer.
+- uno slot con booking `PENDING` attivo non viene esposto al cliente come disponibilità prenotabile;
 
 Restano pianificate, ma non ancora implementate, le regole relative a:
 

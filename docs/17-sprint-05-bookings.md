@@ -160,6 +160,36 @@ Uno slot appartenente a un professionista `NUTRITIONIST` non è prenotabile tram
 
 Uno slot rimasto `AVAILABLE` ma ormai scaduto non è prenotabile.
 
+### 8.2.1 Protezione da richieste concorrenti
+
+La creazione di una richiesta booking protegge lo slot selezionato tramite lock pessimista in scrittura.
+
+Durante la transazione di creazione:
+
+- lo slot viene caricato con `PESSIMISTIC_WRITE`;
+- viene verificato che sia ancora prenotabile;
+- viene verificata l’assenza di una richiesta `PENDING` attiva sullo stesso slot;
+- solo dopo viene salvata la nuova richiesta booking.
+
+Questa protezione impedisce che due richieste simultanee sullo stesso slot possano entrambe essere create come `PENDING`.
+
+### 8.2.2 Riserva logica dello slot durante una richiesta pending
+
+Una richiesta booking in stato `PENDING` non marca ancora lo slot come `BOOKED`, perché il professionista non ha ancora confermato la prenotazione.
+
+Tuttavia, durante lo stato `PENDING`, lo slot è considerato logicamente impegnato.
+
+Finché esiste una richiesta `PENDING` attiva sullo slot:
+
+- non può essere creata una seconda richiesta `PENDING`;
+- il professionista non può modificarne data e ora;
+- il professionista non può bloccarlo manualmente;
+- lo slot non viene più esposto ai clienti come disponibilità prenotabile.
+
+Questa regola evita che altri clienti visualizzino o tentino di prenotare uno slot già interessato da una richiesta in attesa.
+
+Per modificare o bloccare lo slot, il professionista deve prima gestire la richiesta pendente, ad esempio rifiutandola.
+
 ### 8.3 Nota della richiesta
 
 La richiesta booking può contenere una `note` facoltativa.
@@ -176,7 +206,8 @@ Il cliente autenticato può:
 
 - leggere solo le proprie richieste;
 - leggere il dettaglio solo dei booking in cui è coinvolto;
-- cancellare solo booking propri negli stati consentiti.
+- cancellare solo booking propri negli stati consentiti;
+- visualizzare come disponibilità soltanto slot realmente prenotabili e senza booking `PENDING` attivo.
 
 Il professionista autenticato può:
 
@@ -189,20 +220,20 @@ Il professionista autenticato può:
 
 Gli stati implementati sono:
 
-- `PENDING`
-- `CONFIRMED`
-- `REJECTED`
-- `CANCELLED`
+- `PENDING`;
+- `CONFIRMED`;
+- `REJECTED`;
+- `CANCELLED`.
 
 ### 8.6 Transizioni consentite
 
-| Azione  | Attore autorizzato          | Stato iniziale | Stato finale | Effetto sullo slot    |
-| ------- | --------------------------- | -------------- | ------------ | --------------------- |
-| confirm | professionista proprietario | `PENDING`      | `CONFIRMED`  | `AVAILABLE -> BOOKED` |
-| reject  | professionista proprietario | `PENDING`      | `REJECTED`   | resta `AVAILABLE`     |
-| cancel  | cliente proprietario        | `PENDING`      | `CANCELLED`  | resta `AVAILABLE`     |
-| cancel  | cliente proprietario        | `CONFIRMED`    | `CANCELLED`  | `BOOKED -> AVAILABLE` |
-| cancel  | professionista proprietario | `CONFIRMED`    | `CANCELLED`  | `BOOKED -> AVAILABLE` |
+| Azione | Attore autorizzato | Stato iniziale | Stato finale | Effetto sullo slot |
+|---|---|---|---|---|
+| confirm | professionista proprietario | `PENDING` | `CONFIRMED` | `AVAILABLE -> BOOKED` |
+| reject | professionista proprietario | `PENDING` | `REJECTED` | resta `AVAILABLE` |
+| cancel | cliente proprietario | `PENDING` | `CANCELLED` | resta `AVAILABLE` |
+| cancel | cliente proprietario | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
+| cancel | professionista proprietario | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
 
 ### 8.6.1 Protezione delle transizioni concorrenti
 
@@ -223,8 +254,8 @@ Durante la conferma di una richiesta booking, il sistema protegge anche lo slot 
 Il flusso di conferma avviene nel seguente ordine:
 
 1. viene bloccata la richiesta booking;
-2. vengono bloccati gli slot collegati;
-3. viene verificato che ogni slot sia ancora:
+2. viene bloccato lo slot collegato;
+3. viene verificato che lo slot sia ancora:
    - attivo;
    - appartenente a un `PERSONAL_TRAINER`;
    - in stato `AVAILABLE`;
@@ -233,7 +264,7 @@ Il flusso di conferma avviene nel seguente ordine:
 
 Questa protezione impedisce che due conferme concorrenti possano utilizzare lo stesso slot come disponibile.
 
-### 8.7 Transizioni bloccate
+### 8.7 Operazioni bloccate
 
 Il sistema non consente:
 
@@ -247,37 +278,12 @@ Il sistema non consente:
 - creazione booking su slot ormai scaduto;
 - conferma di un booking `PENDING` quando lo slot collegato è ormai scaduto;
 - creazione booking su slot appartenente a un professionista `NUTRITIONIST`;
-- operazioni da parte di utenti non coinvolti nella prenotazione.
+- conferma booking su slot appartenente a un professionista `NUTRITIONIST`;
+- seconda richiesta `PENDING` attiva sullo stesso slot;
+- esposizione lato cliente di uno slot con richiesta `PENDING` attiva;
 - modifica di uno slot con richiesta booking `PENDING` attiva;
-- blocco manuale di uno slot con richiesta booking `PENDING` attiva.
-
-### 8.2.1 Protezione da richieste concorrenti
-
-La creazione di una richiesta booking protegge lo slot selezionato tramite lock pessimista in scrittura.
-
-Durante la transazione di creazione:
-
-- lo slot viene caricato con `PESSIMISTIC_WRITE`;
-- viene verificato che sia ancora prenotabile;
-- viene verificata l’assenza di una richiesta `PENDING` attiva sullo stesso slot;
-- solo dopo viene salvata la nuova richiesta booking.
-
-Questa protezione impedisce che due richieste simultanee sullo stesso slot possano entrambe essere create come `PENDING`.
-
-### 8.2.2 Riserva logica dello slot durante una richiesta pending
-
-Una richiesta booking in stato `PENDING` non marca ancora lo slot come `BOOKED`, perché il professionista non ha ancora confermato la prenotazione.
-
-Tuttavia, durante lo stato `PENDING`, lo slot è considerato logicamente impegnato rispetto alle operazioni manuali del professionista.
-
-Finché esiste una richiesta `PENDING` attiva sullo slot, il professionista non può:
-
-- modificarne data e ora;
-- bloccarlo manualmente.
-
-Questa regola evita che il cliente invii una richiesta per uno slot che viene poi modificato o reso indisponibile mentre attende una risposta.
-
-Per modificare o bloccare lo slot, il professionista deve prima gestire la richiesta pendente, ad esempio rifiutandola.
+- blocco manuale di uno slot con richiesta booking `PENDING` attiva;
+- operazioni da parte di utenti non coinvolti nella prenotazione.
 
 ---
 
@@ -371,6 +377,7 @@ Nel modulo Bookings risultano implementate le seguenti validazioni:
 - blocco della modifica di uno slot con richiesta booking `PENDING`;
 - blocco del blocco manuale di uno slot con richiesta booking `PENDING`;
 - coordinamento transazionale tra modulo Availability e modulo Bookings sulle operazioni che coinvolgono lo stesso slot.
+- esclusione dalla lettura availability lato cliente degli slot con richiesta `PENDING` attiva;
 
 ---
 
@@ -437,6 +444,7 @@ Lo Sprint 05 risulta completato e successivamente rafforzato durante l’audit t
 - riserva logica dello slot durante una richiesta booking `PENDING`;
 - blocco modifica data/ora dello slot finché esiste una richiesta pendente;
 - blocco del blocco manuale dello slot finché esiste una richiesta pendente.
+- esclusione degli slot con booking `PENDING` dalle disponibilità visibili al cliente;
 
 ### Test automatici aggiunti durante la stabilizzazione
 
@@ -456,6 +464,7 @@ Sono presenti test automatici per verificare:
 - blocco creazione di una seconda richiesta `PENDING` sullo stesso slot.
 - blocco modifica di uno slot con booking `PENDING`;
 - blocco manuale di uno slot con booking `PENDING`.
+- esclusione dalla lettura cliente di uno slot con booking `PENDING` attivo.
 
 ---
 

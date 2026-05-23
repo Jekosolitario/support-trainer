@@ -182,10 +182,11 @@ public class AvailabilityService {
         validateAvailabilitySpecialization(professional);
 
         return availabilitySlotRepository
-                .findAllByProfessional_IdAndActiveTrueAndStatusAndStartDateTimeAfterOrderByStartDateTimeAsc(
+                .findAvailableSlotsVisibleToClient(
                         professionalId,
                         AvailabilitySlotStatus.AVAILABLE,
-                        LocalDateTime.now()
+                        LocalDateTime.now(),
+                        BookingRequestStatus.PENDING
                 )
                 .stream()
                 .map(AvailabilitySlotResponse::fromEntity)

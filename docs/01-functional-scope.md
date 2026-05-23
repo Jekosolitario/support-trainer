@@ -238,7 +238,7 @@ Il cliente può:
 - aggiornare il proprio stato operativo;
 - visualizzare i professionisti collegati;
 - visualizzare il dettaglio di un professionista collegato;
-- visualizzare gli slot disponibili e futuri di un personal trainer collegato;
+- visualizzare gli slot disponibili, futuri e privi di richieste booking `PENDING` attive di un personal trainer collegato;
 - creare una richiesta booking su uno slot disponibile;
 - visualizzare le proprie richieste booking;
 - visualizzare il dettaglio delle proprie richieste;
@@ -290,7 +290,10 @@ Il cliente può visualizzare soltanto slot:
 - appartenenti a un personal trainer collegato;
 - attivi;
 - in stato `AVAILABLE`;
-- non scaduti.
+- non scaduti;
+- senza una richiesta booking `PENDING` attiva collegata.
+
+Uno slot con richiesta booking `PENDING` resta formalmente `AVAILABLE` fino alla decisione del professionista, ma non viene più mostrato ad altri clienti come disponibilità prenotabile.
 
 ### 9.5 Stati slot implementati
 
@@ -322,8 +325,9 @@ Il flusso operativo è:
 2. il cliente collegato visualizza lo slot disponibile;
 3. il cliente invia una richiesta booking;
 4. la richiesta nasce in stato `PENDING`;
-5. il personal trainer può confermare o rifiutare;
-6. cliente o professionista possono cancellare secondo le regole previste.
+5. durante lo stato `PENDING`, lo slot non viene più esposto come prenotabile e non può essere modificato o bloccato manualmente;
+6. il personal trainer può confermare o rifiutare;
+7. cliente o professionista possono cancellare secondo le regole previste.
 
 ### 10.4 Regole di prenotabilità
 
@@ -335,6 +339,8 @@ Il cliente può creare una richiesta solo se:
 - lo slot è `AVAILABLE`;
 - lo slot non è scaduto;
 - non esiste già una richiesta `PENDING` attiva sullo stesso slot.
+
+Quando una richiesta `PENDING` viene creata correttamente, lo slot interessato viene considerato logicamente riservato e non viene più mostrato nelle disponibilità consultabili dagli altri clienti.
 
 ### 10.5 Nota del booking
 

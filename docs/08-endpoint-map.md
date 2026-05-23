@@ -138,7 +138,14 @@ Restituisce gli slot di disponibilità del professionista autenticato.
 
 ### 9.3 Elenco slot disponibili di un professionista
 **GET** `/api/v1/professionals/{professionalId}/availability`  
-Restituisce gli slot disponibili e attivi di un professionista.
+Restituisce al cliente collegato gli slot realmente prenotabili di un professionista.
+
+Vengono restituiti solo slot:
+
+- attivi;
+- in stato `AVAILABLE`;
+- con data iniziale futura;
+- senza una richiesta booking `PENDING` attiva collegata.
 
 ### 9.4 Aggiornamento slot disponibilità
 **PATCH** `/api/v1/availability/{slotId}`  

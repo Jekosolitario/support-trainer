@@ -328,6 +328,7 @@ Lo Sprint 04 risulta completato con il modulo `availability` funzionante e succe
 - uno slot con una richiesta booking `PENDING` non può essere modificato;
 - uno slot con una richiesta booking `PENDING` non può essere bloccato;
 - prima di modificare o bloccare uno slot con richiesta pendente, il professionista deve gestire la richiesta tramite il flusso booking previsto.
+- uno slot con richiesta booking `PENDING` attiva non viene esposto al cliente come disponibilità prenotabile;
 
 ### Protezione da operazioni concorrenti
 
@@ -360,6 +361,15 @@ Per rendere nuovamente modificabile o bloccabile lo slot, il professionista deve
 
 Lo stato `BOOKED`, inizialmente previsto per il modulo successivo, è ora utilizzato operativamente dal modulo Bookings completato nello Sprint 05.
 
+Inoltre, uno slot con richiesta booking `PENDING` attiva non viene più restituito nella lettura availability lato cliente.
+
+La lista delle disponibilità consultabili espone quindi solo slot realmente prenotabili:
+
+- attivi;
+- in stato `AVAILABLE`;
+- futuri;
+- senza richieste booking `PENDING` attive collegate.
+
 ### Test automatici aggiunti durante la stabilizzazione
 
 Sono presenti test automatici per verificare:
@@ -374,6 +384,7 @@ Sono presenti test automatici per verificare:
 - impossibilità di aggiornare uno slot non disponibile.
 - impossibilità di modificare uno slot con booking `PENDING`;
 - impossibilità di bloccare uno slot con booking `PENDING`.
+- esclusione dalla lettura cliente di uno slot con booking `PENDING` attivo.
 
 ---
 
