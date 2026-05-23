@@ -227,6 +227,14 @@ public class BookingService {
         for (BookingRequestItem item : bookingRequest.getItems()) {
             AvailabilitySlot slot = item.getAvailabilitySlot();
 
+            if (slot.getProfessional().getSpecialization() != ProfessionalSpecialization.PERSONAL_TRAINER) {
+                throw new AppException(
+                        HttpStatus.CONFLICT,
+                        "AVAILABILITY_SLOT_NOT_CONFIRMABLE",
+                        "Lo slot collegato non è confermabile per questo professionista"
+                );
+            }
+
             if (slot.getStatus() != AvailabilitySlotStatus.AVAILABLE) {
                 throw new AppException(
                         HttpStatus.CONFLICT,

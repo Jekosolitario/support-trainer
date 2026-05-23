@@ -23,6 +23,10 @@ import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
 import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
 import it.zuperman.support_trainer.booking.dto.response.BookingRequestResponse;
+import it.zuperman.support_trainer.booking.entity.BookingRequest;
+import it.zuperman.support_trainer.booking.entity.BookingRequestItem;
+import it.zuperman.support_trainer.booking.repository.BookingRequestItemRepository;
+import it.zuperman.support_trainer.booking.repository.BookingRequestRepository;
 import it.zuperman.support_trainer.booking.service.BookingService;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
@@ -55,6 +59,12 @@ class BookingServiceIntegrationTest {
 
     @Autowired
     private AvailabilitySlotRepository availabilitySlotRepository;
+
+    @Autowired
+    private BookingRequestRepository bookingRequestRepository;
+
+    @Autowired
+    private BookingRequestItemRepository bookingRequestItemRepository;
 
     @AfterEach
     void tearDown() {
@@ -543,5 +553,52 @@ class BookingServiceIntegrationTest {
                 .hasMessage("Lo slot collegato è scaduto e non è più confermabile");
 
         assertThat(slot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("Professionista non deve confermare booking pending su slot appartenente a un nutrizionista")
+    void shouldNotConfirmPendingBookingRequestForNutritionistSlot() {
+        String email = "nutritionist-" + UUID.randomUUID() + "@test.com";
+
+        ProfessionalProfile nutritionist = new ProfessionalProfile(
+                "Anna",
+                "Verdi",
+                email,
+                "password123",
+                ProfessionalSpecialization.NUTRITIONIST
+        );
+
+        nutritionist.setAccountStatus(AccountStatus.ACTIVE);
+        nutritionist.setEmailVerified(true);
+        nutritionist.setActive(true);
+
+        professionalProfileRepository.save(nutritionist);
+
+        ClientProfile client = createActiveClient();
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(24).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot invalidSlot = availabilitySlotRepository.save(
+                new AvailabilitySlot(nutritionist, startDateTime, endDateTime)
+        );
+
+        BookingRequest bookingRequest = bookingRequestRepository.save(
+                new BookingRequest(client, nutritionist, "Richiesta anomala preesistente.")
+        );
+
+        BookingRequestItem bookingRequestItem = bookingRequestItemRepository.save(
+                new BookingRequestItem(bookingRequest, invalidSlot)
+        );
+
+        bookingRequest.getItems().add(bookingRequestItem);
+
+        authenticateAs(nutritionist.getEmail(), "PROFESSIONAL");
+
+        assertThatThrownBy(() -> bookingService.confirmBookingRequest(bookingRequest.getId()))
+                .isInstanceOf(AppException.class)
+                .hasMessage("Lo slot collegato non è confermabile per questo professionista");
+
+        assertThat(invalidSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
     }
 }
