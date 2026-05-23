@@ -196,13 +196,42 @@ Gli stati implementati sono:
 
 ### 8.6 Transizioni consentite
 
-| Azione | Attore autorizzato | Stato iniziale | Stato finale | Effetto sullo slot |
-|---|---|---|---|---|
-| confirm | professionista proprietario | `PENDING` | `CONFIRMED` | `AVAILABLE -> BOOKED` |
-| reject | professionista proprietario | `PENDING` | `REJECTED` | resta `AVAILABLE` |
-| cancel | cliente proprietario | `PENDING` | `CANCELLED` | resta `AVAILABLE` |
-| cancel | cliente proprietario | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
-| cancel | professionista proprietario | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
+| Azione  | Attore autorizzato          | Stato iniziale | Stato finale | Effetto sullo slot    |
+| ------- | --------------------------- | -------------- | ------------ | --------------------- |
+| confirm | professionista proprietario | `PENDING`      | `CONFIRMED`  | `AVAILABLE -> BOOKED` |
+| reject  | professionista proprietario | `PENDING`      | `REJECTED`   | resta `AVAILABLE`     |
+| cancel  | cliente proprietario        | `PENDING`      | `CANCELLED`  | resta `AVAILABLE`     |
+| cancel  | cliente proprietario        | `CONFIRMED`    | `CANCELLED`  | `BOOKED -> AVAILABLE` |
+| cancel  | professionista proprietario | `CONFIRMED`    | `CANCELLED`  | `BOOKED -> AVAILABLE` |
+
+### 8.6.1 Protezione delle transizioni concorrenti
+
+Le operazioni che modificano lo stato di una richiesta booking proteggono la richiesta tramite lock pessimista in scrittura.
+
+Sono protette in questo modo le operazioni di:
+
+- conferma;
+- rifiuto;
+- cancellazione.
+
+Questa scelta impedisce che due operazioni simultanee possano partire dallo stesso stato iniziale e produrre transizioni incoerenti sulla stessa richiesta.
+
+### 8.6.2 Protezione dello slot durante la conferma
+
+Durante la conferma di una richiesta booking, il sistema protegge anche lo slot collegato tramite lock pessimista in scrittura.
+
+Il flusso di conferma avviene nel seguente ordine:
+
+1. viene bloccata la richiesta booking;
+2. vengono bloccati gli slot collegati;
+3. viene verificato che ogni slot sia ancora:
+   - attivo;
+   - appartenente a un `PERSONAL_TRAINER`;
+   - in stato `AVAILABLE`;
+   - non scaduto;
+4. solo dopo il booking passa a `CONFIRMED` e lo slot passa a `BOOKED`.
+
+Questa protezione impedisce che due conferme concorrenti possano utilizzare lo stesso slot come disponibile.
 
 ### 8.7 Transizioni bloccate
 
@@ -219,6 +248,19 @@ Il sistema non consente:
 - conferma di un booking `PENDING` quando lo slot collegato è ormai scaduto;
 - creazione booking su slot appartenente a un professionista `NUTRITIONIST`;
 - operazioni da parte di utenti non coinvolti nella prenotazione.
+
+### 8.2.1 Protezione da richieste concorrenti
+
+La creazione di una richiesta booking protegge lo slot selezionato tramite lock pessimista in scrittura.
+
+Durante la transazione di creazione:
+
+- lo slot viene caricato con `PESSIMISTIC_WRITE`;
+- viene verificato che sia ancora prenotabile;
+- viene verificata l’assenza di una richiesta `PENDING` attiva sullo stesso slot;
+- solo dopo viene salvata la nuova richiesta booking.
+
+Questa protezione impedisce che due richieste simultanee sullo stesso slot possano entrambe essere create come `PENDING`.
 
 ---
 
@@ -306,6 +348,9 @@ Nel modulo Bookings risultano implementate le seguenti validazioni:
 - transizione di stato consentita;
 - conferma consentita solo se lo slot collegato è ancora disponibile e non scaduto;
 - sincronizzazione coerente tra stato booking e stato slot.
+- protezione pessimistica dello slot durante la creazione booking;
+- protezione pessimistica della richiesta durante conferma, rifiuto e cancellazione;
+- protezione pessimistica dello slot durante la conferma booking.
 
 ---
 
@@ -366,6 +411,9 @@ Lo Sprint 05 risulta completato e successivamente rafforzato durante l’audit t
 - blocco booking su slot scaduti;
 - blocco conferma booking con slot scaduti;
 - blocco booking su slot appartenenti a nutrizionisti.
+- protezione da richieste booking concorrenti sullo stesso slot;
+- protezione da transizioni concorrenti sulla stessa richiesta;
+- protezione da conferme concorrenti sullo stesso slot.
 
 ### Test automatici aggiunti durante la stabilizzazione
 
@@ -382,6 +430,7 @@ Sono presenti test automatici per verificare:
 - blocco creazione booking su slot scaduto;
 - blocco conferma booking pending con slot ormai scaduto;
 - blocco creazione booking su slot appartenente a un nutrizionista.
+- blocco creazione di una seconda richiesta `PENDING` sullo stesso slot.
 
 ---
 
