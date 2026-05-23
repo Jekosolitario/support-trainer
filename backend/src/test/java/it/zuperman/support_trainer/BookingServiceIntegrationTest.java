@@ -462,6 +462,50 @@ class BookingServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("Cliente non deve creare booking su slot appartenente a un nutrizionista")
+    void shouldNotCreateBookingRequestForNutritionistSlot() {
+        String email = "nutritionist-" + UUID.randomUUID() + "@test.com";
+
+        ProfessionalProfile nutritionist = new ProfessionalProfile(
+                "Anna",
+                "Verdi",
+                email,
+                "password123",
+                ProfessionalSpecialization.NUTRITIONIST
+        );
+
+        nutritionist.setAccountStatus(AccountStatus.ACTIVE);
+        nutritionist.setEmailVerified(true);
+        nutritionist.setActive(true);
+
+        professionalProfileRepository.save(nutritionist);
+
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(nutritionist, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(23).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot invalidSlot = availabilitySlotRepository.save(
+                new AvailabilitySlot(nutritionist, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        CreateBookingRequest request = new CreateBookingRequest(
+                invalidSlot.getId(),
+                "Vorrei prenotare questo slot."
+        );
+
+        assertThatThrownBy(() -> bookingService.createBookingRequest(request))
+                .isInstanceOf(AppException.class)
+                .hasMessage("Lo slot selezionato non è prenotabile per questo professionista");
+    }
+
+    @Test
     @DisplayName("Professionista non deve confermare un booking pending con slot ormai scaduto")
     void shouldNotConfirmPendingBookingRequestWhenSlotIsExpired() {
         ProfessionalProfile professional = createActivePersonalTrainer();

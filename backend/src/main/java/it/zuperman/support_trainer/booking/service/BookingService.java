@@ -22,6 +22,7 @@ import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
 import it.zuperman.support_trainer.common.enums.BookingRequestStatus;
+import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
@@ -64,6 +65,7 @@ public class BookingService {
         ProfessionalProfile professional = slot.getProfessional();
 
         validateReadableProfessional(professional);
+        validateBookableProfessionalSpecialization(professional);
         validateProfessionalAccess(client.getId(), professional.getId());
         validateBookableSlot(slot);
         validateNoPendingBookingOnSlot(slot.getId());
@@ -350,6 +352,16 @@ public class BookingService {
                     HttpStatus.NOT_FOUND,
                     "PROFESSIONAL_NOT_FOUND",
                     "Professionista non trovato"
+            );
+        }
+    }
+
+    private void validateBookableProfessionalSpecialization(ProfessionalProfile professional) {
+        if (professional.getSpecialization() != ProfessionalSpecialization.PERSONAL_TRAINER) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "AVAILABILITY_SLOT_NOT_BOOKABLE",
+                    "Lo slot selezionato non è prenotabile per questo professionista"
             );
         }
     }
