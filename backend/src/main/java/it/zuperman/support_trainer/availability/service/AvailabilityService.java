@@ -14,10 +14,12 @@ import it.zuperman.support_trainer.availability.dto.request.UpdateAvailabilitySl
 import it.zuperman.support_trainer.availability.dto.response.AvailabilitySlotResponse;
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
+import it.zuperman.support_trainer.booking.repository.BookingRequestItemRepository;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
+import it.zuperman.support_trainer.common.enums.BookingRequestStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
@@ -32,17 +34,20 @@ public class AvailabilityService {
     private final UserRepository userRepository;
     private final ProfessionalProfileRepository professionalProfileRepository;
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
+    private final BookingRequestItemRepository bookingRequestItemRepository;
 
     public AvailabilityService(
             AvailabilitySlotRepository availabilitySlotRepository,
             UserRepository userRepository,
             ProfessionalProfileRepository professionalProfileRepository,
-            ProfessionalClientLinkRepository professionalClientLinkRepository
+            ProfessionalClientLinkRepository professionalClientLinkRepository,
+            BookingRequestItemRepository bookingRequestItemRepository
     ) {
         this.availabilitySlotRepository = availabilitySlotRepository;
         this.userRepository = userRepository;
         this.professionalProfileRepository = professionalProfileRepository;
         this.professionalClientLinkRepository = professionalClientLinkRepository;
+        this.bookingRequestItemRepository = bookingRequestItemRepository;
     }
 
     @Transactional
@@ -90,9 +95,10 @@ public class AvailabilityService {
 
         professional = lockProfessionalForAvailabilityChange(professional.getId());
 
-        AvailabilitySlot slot = getOwnedActiveSlot(slotId, professional.getId());
+        AvailabilitySlot slot = getOwnedActiveSlotForUpdate(slotId, professional.getId());
 
         validateSlotCanBeUpdated(slot);
+        validateNoPendingBookingOnSlot(slot.getId());
         validateUpdateRequestNotEmpty(request);
 
         LocalDateTime newStartDateTime = request.getStartDateTime() != null
@@ -125,7 +131,7 @@ public class AvailabilityService {
         ProfessionalProfile professional = getAuthenticatedProfessional();
         validateAvailabilitySpecialization(professional);
 
-        AvailabilitySlot slot = getOwnedActiveSlot(slotId, professional.getId());
+        AvailabilitySlot slot = getOwnedActiveSlotForUpdate(slotId, professional.getId());
 
         if (slot.getStatus() != AvailabilitySlotStatus.AVAILABLE) {
             throw new AppException(
@@ -134,6 +140,8 @@ public class AvailabilityService {
                     "Solo uno slot disponibile può essere bloccato"
             );
         }
+
+        validateNoPendingBookingOnSlot(slot.getId());
 
         slot.setStatus(AvailabilitySlotStatus.BLOCKED);
 
@@ -274,6 +282,41 @@ public class AvailabilityService {
                 "AVAILABILITY_SLOT_NOT_FOUND",
                 "Slot disponibilità non trovato"
         ));
+    }
+
+    private AvailabilitySlot getOwnedActiveSlotForUpdate(Long slotId, Long professionalId) {
+        AvailabilitySlot slot = availabilitySlotRepository.findActiveByIdForUpdate(slotId)
+                .orElseThrow(() -> new AppException(
+                HttpStatus.NOT_FOUND,
+                "AVAILABILITY_SLOT_NOT_FOUND",
+                "Slot disponibilità non trovato"
+        ));
+
+        if (!slot.getProfessional().getId().equals(professionalId)) {
+            throw new AppException(
+                    HttpStatus.NOT_FOUND,
+                    "AVAILABILITY_SLOT_NOT_FOUND",
+                    "Slot disponibilità non trovato"
+            );
+        }
+
+        return slot;
+    }
+
+    private void validateNoPendingBookingOnSlot(Long slotId) {
+        boolean hasPendingBooking = bookingRequestItemRepository
+                .existsByAvailabilitySlot_IdAndBookingRequest_StatusAndBookingRequest_ActiveTrue(
+                        slotId,
+                        BookingRequestStatus.PENDING
+                );
+
+        if (hasPendingBooking) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "AVAILABILITY_SLOT_HAS_PENDING_BOOKING",
+                    "Uno slot con una richiesta di prenotazione in attesa non può essere modificato o bloccato"
+            );
+        }
     }
 
     private void validateSlotCanBeUpdated(AvailabilitySlot slot) {

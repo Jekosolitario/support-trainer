@@ -25,6 +25,8 @@ import it.zuperman.support_trainer.availability.dto.response.AvailabilitySlotRes
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
 import it.zuperman.support_trainer.availability.service.AvailabilityService;
+import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
+import it.zuperman.support_trainer.booking.service.BookingService;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
@@ -56,6 +58,9 @@ class AvailabilityServiceIntegrationTest {
 
     @Autowired
     private ProfessionalClientLinkRepository professionalClientLinkRepository;
+
+    @Autowired
+    private BookingService bookingService;
 
     @AfterEach
     void tearDown() {
@@ -336,5 +341,70 @@ class AvailabilityServiceIntegrationTest {
                 .hasMessage("Il modulo availability è disponibile solo per i personal trainer");
 
         assertThat(availabilitySlotRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Professionista non deve modificare uno slot con booking pending")
+    void shouldNotUpdateAvailabilitySlotWithPendingBooking() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(26).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        bookingService.createBookingRequest(
+                new CreateBookingRequest(slot.getId(), "Vorrei prenotare questo slot.")
+        );
+
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
+                startDateTime.plusDays(1),
+                endDateTime.plusDays(1)
+        );
+
+        assertThatThrownBy(() -> availabilityService.updateAvailabilitySlot(slot.getId(), updateRequest))
+                .isInstanceOf(AppException.class)
+                .hasMessage("Uno slot con una richiesta di prenotazione in attesa non può essere modificato o bloccato");
+    }
+
+    @Test
+    @DisplayName("Professionista non deve bloccare uno slot con booking pending")
+    void shouldNotBlockAvailabilitySlotWithPendingBooking() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(27).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        bookingService.createBookingRequest(
+                new CreateBookingRequest(slot.getId(), "Vorrei prenotare questo slot.")
+        );
+
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        assertThatThrownBy(() -> availabilityService.blockAvailabilitySlot(slot.getId()))
+                .isInstanceOf(AppException.class)
+                .hasMessage("Uno slot con una richiesta di prenotazione in attesa non può essere modificato o bloccato");
     }
 }
