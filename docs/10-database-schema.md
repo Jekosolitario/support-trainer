@@ -248,6 +248,16 @@ Slot di disponibilità dei professionisti.
 
 La regola “niente sovrapposizione slot” è gestita dalla business logic nel service layer.
 
+Regole applicative attualmente implementate:
+
+- gli slot availability possono essere creati e gestiti solo da professionisti `PERSONAL_TRAINER`;
+- uno slot creato o aggiornato deve iniziare nel futuro;
+- gli slot attivi dello stesso professionista non possono sovrapporsi;
+- la creazione e l’aggiornamento degli slot dello stesso professionista sono protetti da lock pessimista sul `ProfessionalProfile`;
+- uno slot con richiesta booking `PENDING` attiva non può essere modificato;
+- uno slot con richiesta booking `PENDING` attiva non può essere bloccato manualmente;
+- gli slot `AVAILABLE` ormai scaduti non vengono esposti nella lettura cliente.
+
 ---
 
 ## 3.8 `booking_requests`
@@ -290,6 +300,17 @@ Nel codice attuale la richiesta booking viene creata a partire da un singolo `av
 
 La presenza della tabella `booking_request_items` mantiene il modello estendibile a più slot in futuro, ma l’API attuale lavora su una richiesta single-slot.
 
+Regole applicative attualmente implementate:
+
+- un booking può essere creato solo tra cliente e professionista collegati;
+- il professionista coinvolto deve essere un `PERSONAL_TRAINER`;
+- lo slot deve essere attivo, `AVAILABLE` e non scaduto;
+- sullo stesso slot non può esistere una seconda richiesta `PENDING` attiva;
+- la `note` è facoltativa, normalizzata e limitata a `1000` caratteri;
+- un booking `PENDING` riserva logicamente lo slot rispetto a modifica e blocco manuale;
+- la conferma è consentita solo se lo slot è ancora disponibile, futuro e coerente con la specializzazione prevista;
+- le transizioni di stato della richiesta sono protette da lock pessimista.
+
 ---
 
 ## 3.9 `booking_request_items`
@@ -317,6 +338,12 @@ Dettaglio degli slot collegati a una richiesta booking.
 ### Note
 
 Nel backend attuale ogni booking creato tramite API contiene un solo item.
+
+La tabella collega la richiesta allo slot availability selezionato e consente al service layer di:
+
+- verificare l’assenza di richieste `PENDING` attive sullo stesso slot;
+- impedire modifica o blocco manuale dello slot mentre una richiesta è in attesa;
+- aggiornare coerentemente lo stato dello slot durante conferma o cancellazione booking.
 
 ---
 
@@ -744,16 +771,52 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 - `password_reset_tokens.token`
 
 ## 9.3 Da gestire a livello business/service
-- massimo 3 professionisti attivi per cliente
-- un solo collegamento attivo per coppia professionista-cliente
-- nessuna sovrapposizione slot per lo stesso professionista
-- uno slot non può essere confermato due volte
-- un booking può essere confermato, rifiutato o cancellato solo secondo le transizioni di stato consentite
+
+### Area utenti e collegamenti
+
+- massimo 3 professionisti attivi per cliente;
+- un solo collegamento attivo per coppia professionista-cliente;
+- divieto di auto-collegamento.
+
+### Area availability
+
+- gestione slot riservata ai professionisti `PERSONAL_TRAINER`;
+- intervallo temporale valido;
+- creazione e aggiornamento solo per slot con data iniziale futura;
+- nessuna sovrapposizione tra slot attivi dello stesso professionista;
+- esclusione degli slot scaduti dalla lettura cliente;
+- impossibilità di modificare uno slot con booking `PENDING` attivo;
+- impossibilità di bloccare manualmente uno slot con booking `PENDING` attivo.
+
+### Area booking
+
+- booking consentito solo tra cliente e professionista collegati;
+- booking consentito solo su slot appartenenti a un `PERSONAL_TRAINER`;
+- booking consentito solo su slot attivi, disponibili e futuri;
+- una sola richiesta `PENDING` attiva per slot;
+- nota facoltativa, normalizzata e limitata a `1000` caratteri;
+- transizioni booking consentite:
+  - `PENDING -> CONFIRMED`;
+  - `PENDING -> REJECTED`;
+  - `PENDING -> CANCELLED`;
+  - `CONFIRMED -> CANCELLED`;
+- conferma booking consentita solo se lo slot è ancora valido e prenotabile;
+- sincronizzazione coerente tra stato booking e stato slot.
+
+### Protezione da concorrenza
+
+- lock pessimista sul professionista durante creazione e aggiornamento availability;
+- lock pessimista sullo slot durante creazione booking;
+- lock pessimista sulla richiesta durante conferma, rifiuto e cancellazione;
+- lock pessimista sullo slot durante conferma booking;
+- lock pessimista sullo slot durante modifica o blocco manuale in presenza potenziale di richieste booking.
 
 ## 9.4 Vincoli futuri previsti
-Quando i relativi moduli verranno implementati, andranno gestiti anche:
-- una sola scheda workout attiva per coppia professionista-cliente
-- un solo piano nutrizione attivo per coppia professionista-cliente
+
+- una sola scheda workout attiva per coppia personal trainer-cliente;
+- un solo piano nutrizione attivo per coppia nutrizionista-cliente;
+- regole di ownership per misurazioni e feedback;
+- eventuali vincoli aggiuntivi per versionamento di workout plan e nutrition plan.
 
 ---
 
