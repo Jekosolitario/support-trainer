@@ -150,9 +150,15 @@ Uno slot può ricevere una nuova richiesta solo se:
 
 - esiste;
 - appartiene al professionista collegato al cliente;
+- appartiene a un professionista con specializzazione `PERSONAL_TRAINER`;
 - è attivo;
 - è in stato `AVAILABLE`;
+- ha `startDateTime` nel futuro;
 - non esiste già una richiesta `PENDING` attiva sullo stesso slot.
+
+Uno slot appartenente a un professionista `NUTRITIONIST` non è prenotabile tramite il modulo Bookings, anche qualora fosse già presente nel database per dati storici o anomali.
+
+Uno slot rimasto `AVAILABLE` ma ormai scaduto non è prenotabile.
 
 ### 8.3 Nota della richiesta
 
@@ -209,6 +215,9 @@ Il sistema non consente:
 - rifiuto di booking non `PENDING`;
 - cancellazione di booking `REJECTED`;
 - cancellazione professionista di booking `PENDING`, che deve essere gestita tramite rifiuto;
+- creazione booking su slot ormai scaduto;
+- conferma di un booking `PENDING` quando lo slot collegato è ormai scaduto;
+- creazione booking su slot appartenente a un professionista `NUTRITIONIST`;
 - operazioni da parte di utenti non coinvolti nella prenotazione.
 
 ---
@@ -283,16 +292,19 @@ Il modello dati resta predisposto per una futura evoluzione multi-slot, ma tale 
 Nel modulo Bookings risultano implementate le seguenti validazioni:
 
 - cliente autenticato valido e attivo in fase di creazione richiesta;
-- professionista proprietario dello slot valido;
+- professionista proprietario dello slot valido e attivo;
+- professionista proprietario dello slot con specializzazione `PERSONAL_TRAINER`;
 - collegamento attivo cliente-professionista;
 - slot esistente;
 - slot attivo e disponibile;
+- slot con data iniziale futura in fase di prenotazione;
 - assenza di altra richiesta `PENDING` attiva sullo stesso slot;
 - nota facoltativa, normalizzata e limitata a `1000` caratteri;
 - booking esistente nei flussi di dettaglio, conferma, rifiuto e cancellazione;
 - ownership corretta della richiesta;
 - ruolo coerente con l’operazione richiesta;
 - transizione di stato consentita;
+- conferma consentita solo se lo slot collegato è ancora disponibile e non scaduto;
 - sincronizzazione coerente tra stato booking e stato slot.
 
 ---
@@ -314,8 +326,11 @@ I casi gestiti comprendono:
 - professionista non autorizzato;
 - relazione cliente-professionista assente;
 - slot non disponibile;
+- slot scaduto non prenotabile;
+- slot appartenente a un nutrizionista non prenotabile;
 - richiesta pending già presente sullo slot;
 - transizione booking non consentita;
+- conferma booking pending con slot ormai scaduto;
 - accesso al dettaglio da utente non coinvolto;
 - cancellazione professionista di una richiesta ancora `PENDING`.
 
@@ -330,6 +345,57 @@ cliente collegato
 -> richiesta booking PENDING
 -> conferma / rifiuto / cancellazione
 -> aggiornamento coerente dello slot
+
+---
+
+## 14. Stato finale consolidato dopo audit
+
+Lo Sprint 05 risulta completato e successivamente rafforzato durante l’audit tecnico del backend.
+
+### Funzionalità implementate
+
+- creazione richiesta booking single-slot;
+- lista richieste lato cliente;
+- lista richieste lato professionista;
+- dettaglio richiesta accessibile solo agli utenti coinvolti;
+- conferma richiesta pending;
+- rifiuto richiesta pending;
+- cancellazione richiesta secondo ruolo e stato;
+- sincronizzazione tra stato booking e stato availability slot;
+- normalizzazione e limite della nota;
+- blocco booking su slot scaduti;
+- blocco conferma booking con slot scaduti;
+- blocco booking su slot appartenenti a nutrizionisti.
+
+### Test automatici aggiunti durante la stabilizzazione
+
+Sono presenti test automatici per verificare:
+
+- creazione booking da cliente collegato su slot disponibile;
+- blocco creazione booking da cliente non collegato;
+- conferma booking e passaggio slot a `BOOKED`;
+- rifiuto booking pending con slot ancora `AVAILABLE`;
+- cancellazione booking pending lato cliente;
+- cancellazione booking confirmed lato cliente con slot nuovamente `AVAILABLE`;
+- blocco cancellazione booking pending lato professionista;
+- blocco lettura dettaglio booking da utente non coinvolto;
+- blocco creazione booking su slot scaduto;
+- blocco conferma booking pending con slot ormai scaduto;
+- blocco creazione booking su slot appartenente a un nutrizionista.
+
+---
+
+## 15. Evoluzione successiva
+
+Il modulo Bookings è ora coerente con:
+
+- ruoli applicativi;
+- relazione cliente-professionista;
+- specializzazione del professionista;
+- stato e validità temporale degli slot;
+- transizioni di stato della prenotazione.
+
+La futura miglioria prioritaria del modulo resta la possibilità per il professionista di inserire un motivo testuale in fase di rifiuto della richiesta.
 
 ---
 
