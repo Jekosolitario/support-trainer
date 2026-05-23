@@ -152,6 +152,19 @@ Blocca uno slot disponibile appartenente al professionista autenticato.
 **PATCH** `/api/v1/availability/{slotId}/unblock`  
 Sblocca uno slot bloccato appartenente al professionista autenticato.
 
+### 9.7 Regole attualmente implementate
+
+Le operazioni Availability applicano i seguenti controlli:
+
+- solo il professionista autenticato può creare e gestire i propri slot
+- il professionista deve avere account attivo, email verificata e profilo attivo
+- un cliente può leggere gli slot disponibili solo di un professionista a lui collegato
+- l’intervallo temporale deve essere valido
+- uno slot creato o aggiornato deve iniziare nel futuro
+- non sono ammessi slot sovrapposti per lo stesso professionista
+- solo slot `AVAILABLE` possono essere aggiornati o bloccati
+- solo slot `BLOCKED` possono essere sbloccati
+
 ---
 
 ## 10. Modulo Bookings
@@ -159,6 +172,14 @@ Sblocca uno slot bloccato appartenente al professionista autenticato.
 ### 10.1 Creazione richiesta prenotazione
 **POST** `/api/v1/bookings`  
 Permette al cliente autenticato di creare una richiesta di prenotazione su uno slot disponibile di un professionista collegato.
+
+Regole attuali:
+
+- la richiesta viene creata a partire da un singolo `availabilitySlotId`
+- la `note` è facoltativa
+- la `note`, se presente, viene normalizzata rimuovendo gli spazi iniziali e finali
+- una `note` vuota dopo la normalizzazione viene salvata come assente
+- la `note` non può superare `1000` caratteri
 
 ### 10.2 Elenco prenotazioni del cliente autenticato
 **GET** `/api/v1/bookings/client`  
@@ -226,7 +247,16 @@ Tutti gli altri endpoint richiedono autenticazione valida tramite JWT.
 - `/api/v1/me/**` → utente autenticato
 - `/api/v1/invites/**` → solo `PROFESSIONAL`, con controlli business aggiuntivi lato service
 - `/api/v1/availability/**` → solo `PROFESSIONAL`, con controlli business aggiuntivi lato service
-- `/api/v1/bookings/**` → utente autenticato, con controlli business aggiuntivi lato service
+
+### Booking
+
+- `POST /api/v1/bookings` → solo `CLIENT`
+- `GET /api/v1/bookings/client` → solo `CLIENT`
+- `GET /api/v1/bookings/professional` → solo `PROFESSIONAL`
+- `PATCH /api/v1/bookings/{bookingRequestId}/confirm` → solo `PROFESSIONAL`
+- `PATCH /api/v1/bookings/{bookingRequestId}/reject` → solo `PROFESSIONAL`
+- `GET /api/v1/bookings/{bookingRequestId}` → utente autenticato, con controllo accesso nel service
+- `PATCH /api/v1/bookings/{bookingRequestId}/cancel` → utente autenticato, con controllo accesso e transizione nel service
 
 ---
 
@@ -252,3 +282,8 @@ Per Support Trainer si confermano le seguenti scelte:
 - inviti già esposti come modulo reale
 - endpoint futuri mantenuti fuori da questa mappa, in documento separato
 - modulo availability implementato con creazione, lettura, update, block e unblock degli slot
+- modulo bookings implementato con creazione, lettura, conferma, rifiuto e cancellazione delle richieste
+- creazione booking attualmente basata su un singolo slot
+- regole di ruolo Booking esplicitate in `SecurityConfig`
+- ownership delle risorse e transizioni di stato controllate nel service layer
+- Availability valida che gli slot creati o modificati inizino nel futuro
