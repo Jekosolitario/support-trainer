@@ -232,6 +232,14 @@ public class BookingService {
                         "Lo slot collegato non è più confermabile"
                 );
             }
+
+            if (!slot.getStartDateTime().isAfter(LocalDateTime.now())) {
+                throw new AppException(
+                        HttpStatus.CONFLICT,
+                        "AVAILABILITY_SLOT_NOT_CONFIRMABLE",
+                        "Lo slot collegato è scaduto e non è più confermabile"
+                );
+            }
         }
     }
 

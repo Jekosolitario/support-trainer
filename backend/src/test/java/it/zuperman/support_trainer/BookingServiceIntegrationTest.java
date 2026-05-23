@@ -460,4 +460,44 @@ class BookingServiceIntegrationTest {
                 .isInstanceOf(AppException.class)
                 .hasMessage("Lo slot selezionato è scaduto e non è prenotabile");
     }
+
+    @Test
+    @DisplayName("Professionista non deve confermare un booking pending con slot ormai scaduto")
+    void shouldNotConfirmPendingBookingRequestWhenSlotIsExpired() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime futureStartDateTime = LocalDateTime.now().plusDays(22).withNano(0);
+        LocalDateTime futureEndDateTime = futureStartDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, futureStartDateTime, futureEndDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        CreateBookingRequest request = new CreateBookingRequest(
+                slot.getId(),
+                "Vorrei prenotare questo slot."
+        );
+
+        BookingRequestResponse pendingResponse
+                = bookingService.createBookingRequest(request);
+
+        slot.setStartDateTime(LocalDateTime.now().minusHours(2).withNano(0));
+        slot.setEndDateTime(LocalDateTime.now().minusHours(1).withNano(0));
+        availabilitySlotRepository.save(slot);
+
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        assertThatThrownBy(() -> bookingService.confirmBookingRequest(pendingResponse.getId()))
+                .isInstanceOf(AppException.class)
+                .hasMessage("Lo slot collegato è scaduto e non è più confermabile");
+
+        assertThat(slot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
+    }
 }
