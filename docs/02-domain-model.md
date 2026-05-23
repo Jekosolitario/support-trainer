@@ -191,38 +191,47 @@ Rappresenta il codice invito generato da un professionista per permettere la reg
 ## 3.7 AvailabilitySlot
 Rappresenta una fascia di disponibilità del personal trainer.
 
-### Campi iniziali
+### Campi attualmente implementati
 - `id`
 - `professional`
 - `startDateTime`
 - `endDateTime`
 - `status`
+- `active`
 - `createdAt`
+- `updatedAt`
 
 ### Note
 Questa entità è utilizzata solo per i professionisti con specializzazione:
 - `PERSONAL_TRAINER`
 
-### Esempi stato slot
+### Stati slot implementati
 - `AVAILABLE`
 - `BOOKED`
 - `BLOCKED`
+
+### Regole principali implementate
+- lo slot appartiene a un solo professionista;
+- lo slot deve iniziare nel futuro in fase di creazione o aggiornamento;
+- gli slot attivi dello stesso professionista non possono sovrapporsi;
+- lo stato `BOOKED` viene gestito dal flusso Booking.
 
 ---
 
 ## 3.8 BookingRequest
 Rappresenta una richiesta di prenotazione inviata da un cliente verso un personal trainer.
 
-### Campi iniziali
+### Campi attualmente implementati
 - `id`
 - `client`
 - `professional`
 - `status`
 - `note`
+- `active`
 - `createdAt`
 - `updatedAt`
 
-### Esempi stato richiesta
+### Stati richiesta implementati
 - `PENDING`
 - `CONFIRMED`
 - `REJECTED`
@@ -230,25 +239,30 @@ Rappresenta una richiesta di prenotazione inviata da un cliente verso un persona
 
 ### Note
 Una richiesta di prenotazione appartiene a:
-- un solo cliente
-- un solo personal trainer
+- un solo cliente;
+- un solo personal trainer.
+
+Nel backend attuale la richiesta viene creata a partire da un singolo `availabilitySlotId`.
+
+La richiesta viene mantenuta nello storico tramite stato e flag `active`, senza eliminazione fisica nel normale ciclo operativo.
 
 ---
 
 ## 3.9 BookingRequestItem
-Rappresenta il dettaglio di una richiesta di prenotazione composta da uno o più slot.
+Rappresenta il dettaglio dello slot collegato a una richiesta di prenotazione.
 
-### Campi iniziali
+### Campi attualmente implementati
 - `id`
 - `bookingRequest`
 - `availabilitySlot`
+- `createdAt`
+- `updatedAt`
 
-### Motivazione
-Questa entità permette di gestire una singola richiesta contenente:
-- uno slot singolo
-- più slot distribuiti su più giorni
+### Stato attuale dell’implementazione
+Nel backend attuale ogni richiesta creata tramite API contiene un solo `BookingRequestItem`, collegato allo slot indicato da `availabilitySlotId`.
 
-In questo modo il cliente può inviare una richiesta unica che copre più date.
+### Evoluzione possibile
+La presenza di questa entità mantiene il modello estendibile a una futura gestione multi-slot, ma tale comportamento non è attualmente implementato nel contratto API.
 
 ---
 
@@ -409,6 +423,36 @@ Questa decisione verrà definita meglio in una fase successiva.
 
 ---
 
+## 3.19 Stato di implementazione del dominio
+
+### Entità attualmente implementate nel backend
+
+- `User`
+- `ProfessionalProfile`
+- `ClientProfile`
+- `ProfessionalClientLink`
+- `InviteCode`
+- `AvailabilitySlot`
+- `BookingRequest`
+- `BookingRequestItem`
+
+### Entità pianificate ma non ancora implementate
+
+- `ClientMeasurement`
+- `WorkoutPlan`
+- `WorkoutWeek`
+- `WorkoutDay`
+- `WorkoutExercise`
+- `NutritionPlan`
+- `NutritionWeek`
+- `NutritionDay`
+- `NutritionEntry`
+- `ClientFeedback`
+
+Le entità pianificate restano valide come ipotesi di dominio futuro, ma non rappresentano componenti già presenti nel codice reale.
+
+---
+
 ## 4. Relazioni principali
 
 ### 4.1 Gerarchia utenti
@@ -431,10 +475,11 @@ Questa decisione verrà definita meglio in una fase successiva.
 - un `ProfessionalProfile` di tipo `PERSONAL_TRAINER` può avere molti `AvailabilitySlot`
 
 ### 4.6 Prenotazioni
-- un `ClientProfile` può creare molte `BookingRequest`
-- un `ProfessionalProfile` di tipo `PERSONAL_TRAINER` può ricevere molte `BookingRequest`
-- una `BookingRequest` può contenere molti `BookingRequestItem`
-- ogni `BookingRequestItem` punta a un solo `AvailabilitySlot`
+- un `ClientProfile` può creare molte `BookingRequest`;
+- un `ProfessionalProfile` di tipo `PERSONAL_TRAINER` può ricevere molte `BookingRequest`;
+- una `BookingRequest` contiene attualmente un singolo `BookingRequestItem` nel flusso esposto dalle API;
+- ogni `BookingRequestItem` punta a un solo `AvailabilitySlot`;
+- il modello dati resta predisposto per una futura evoluzione multi-slot.
 
 ### 4.7 Schede di allenamento
 - un `ProfessionalProfile` di tipo `PERSONAL_TRAINER` può creare molte `WorkoutPlan`
@@ -464,7 +509,10 @@ Questa decisione verrà definita meglio in una fase successiva.
 - un cliente può essere collegato a massimo 3 professionisti
 - un professionista non può collegarsi a sé stesso come cliente
 - le prenotazioni tramite app riguardano solo i personal trainer
-- una richiesta di prenotazione può includere uno o più slot
+- un cliente può creare booking solo verso professionisti a lui collegati
+- uno slot confermato tramite booking passa allo stato `BOOKED`
+- nel backend attuale una richiesta di prenotazione viene creata su un singolo slot
+- il modello `BookingRequestItem` resta predisposto per una futura gestione multi-slot
 - workout plan e nutrition plan restano separati
 - le misurazioni fisiche del cliente devono essere storicizzate in una entità dedicata
 
