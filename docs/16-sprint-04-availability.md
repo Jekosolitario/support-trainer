@@ -310,7 +310,8 @@ Lo Sprint 04 risulta completato con il modulo `availability` funzionante e succe
 ### Regole implementate e verificate
 
 - solo professionisti autenticati possono creare e gestire slot availability;
-- solo professionisti `PERSONAL_TRAINER` possono gestire slot;
+- solo professionisti `PERSONAL_TRAINER` possono creare e gestire slot availability;
+- un professionista `NUTRITIONIST` non può creare slot availability;
 - il professionista deve avere account attivo, email verificata e profilo attivo;
 - il professionista può modificare solo i propri slot;
 - il cliente può leggere availability solo di professionisti a lui collegati;
@@ -335,10 +336,12 @@ Lo stato `BOOKED`, inizialmente previsto per il modulo successivo, è ora utiliz
 
 Sono presenti test automatici per verificare:
 
-- creazione slot valido da parte del professionista;
+- creazione slot valido da parte di un personal trainer;
+- blocco della creazione slot da parte di un nutrizionista;
 - blocco della creazione di slot sovrapposti;
 - lettura availability da parte del cliente collegato;
 - blocco della lettura da parte del cliente non collegato;
+- esclusione degli slot `AVAILABLE` ormai scaduti dalla lettura cliente;
 - blocco e sblocco di uno slot;
 - impossibilità di aggiornare uno slot non disponibile.
 
