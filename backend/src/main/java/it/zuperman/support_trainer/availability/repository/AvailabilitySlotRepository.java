@@ -26,9 +26,10 @@ public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySl
 
     List<AvailabilitySlot> findAllByProfessional_IdAndActiveTrueOrderByStartDateTimeAsc(Long professionalId);
 
-    List<AvailabilitySlot> findAllByProfessional_IdAndActiveTrueAndStatusOrderByStartDateTimeAsc(
+    List<AvailabilitySlot> findAllByProfessional_IdAndActiveTrueAndStatusAndStartDateTimeAfterOrderByStartDateTimeAsc(
             Long professionalId,
-            AvailabilitySlotStatus status
+            AvailabilitySlotStatus status,
+            LocalDateTime startDateTime
     );
 
     Optional<AvailabilitySlot> findByIdAndProfessional_IdAndActiveTrue(Long slotId, Long professionalId);

@@ -168,9 +168,10 @@ public class AvailabilityService {
         validateAvailabilitySpecialization(professional);
 
         return availabilitySlotRepository
-                .findAllByProfessional_IdAndActiveTrueAndStatusOrderByStartDateTimeAsc(
+                .findAllByProfessional_IdAndActiveTrueAndStatusAndStartDateTimeAfterOrderByStartDateTimeAsc(
                         professionalId,
-                        AvailabilitySlotStatus.AVAILABLE
+                        AvailabilitySlotStatus.AVAILABLE,
+                        LocalDateTime.now()
                 )
                 .stream()
                 .map(AvailabilitySlotResponse::fromEntity)

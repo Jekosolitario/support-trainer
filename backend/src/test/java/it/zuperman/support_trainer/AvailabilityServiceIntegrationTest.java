@@ -265,4 +265,40 @@ class AvailabilityServiceIntegrationTest {
         assertThatThrownBy(() -> availabilityService.updateAvailabilitySlot(slot.getId(), updateRequest))
                 .isInstanceOf(AppException.class);
     }
+
+    @Test
+    @DisplayName("Cliente collegato non deve vedere slot availability scaduti")
+    void shouldNotReturnExpiredAvailableSlotsForLinkedClient() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        AvailabilitySlot expiredSlot = availabilitySlotRepository.save(
+                new AvailabilitySlot(
+                        professional,
+                        LocalDateTime.now().minusHours(2).withNano(0),
+                        LocalDateTime.now().minusHours(1).withNano(0)
+                )
+        );
+
+        AvailabilitySlot futureSlot = availabilitySlotRepository.save(
+                new AvailabilitySlot(
+                        professional,
+                        LocalDateTime.now().plusDays(21).withNano(0),
+                        LocalDateTime.now().plusDays(21).plusHours(1).withNano(0)
+                )
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        List<AvailabilitySlotResponse> response
+                = availabilityService.getAvailableSlotsByProfessional(professional.getId());
+
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).getId()).isEqualTo(futureSlot.getId());
+        assertThat(response.get(0).getId()).isNotEqualTo(expiredSlot.getId());
+    }
 }
