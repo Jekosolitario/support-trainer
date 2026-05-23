@@ -431,4 +431,33 @@ class BookingServiceIntegrationTest {
         assertThat(detailResponse.getClientId()).isEqualTo(client.getId());
         assertThat(detailResponse.getProfessionalId()).isEqualTo(professional.getId());
     }
+
+    @Test
+    @DisplayName("Cliente non deve creare booking su uno slot ormai passato")
+    void shouldNotCreateBookingRequestForPastAvailabilitySlot() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().minusHours(2).withNano(0);
+        LocalDateTime endDateTime = LocalDateTime.now().minusHours(1).withNano(0);
+
+        AvailabilitySlot expiredSlot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        CreateBookingRequest request = new CreateBookingRequest(
+                expiredSlot.getId(),
+                "Vorrei prenotare questo slot."
+        );
+
+        assertThatThrownBy(() -> bookingService.createBookingRequest(request))
+                .isInstanceOf(AppException.class)
+                .hasMessage("Lo slot selezionato è scaduto e non è prenotabile");
+    }
 }

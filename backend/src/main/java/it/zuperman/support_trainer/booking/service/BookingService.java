@@ -1,5 +1,6 @@
 package it.zuperman.support_trainer.booking.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -305,6 +306,14 @@ public class BookingService {
                     HttpStatus.CONFLICT,
                     "AVAILABILITY_SLOT_NOT_BOOKABLE",
                     "Lo slot selezionato non è prenotabile"
+            );
+        }
+
+        if (!slot.getStartDateTime().isAfter(LocalDateTime.now())) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "AVAILABILITY_SLOT_NOT_BOOKABLE",
+                    "Lo slot selezionato è scaduto e non è prenotabile"
             );
         }
     }
