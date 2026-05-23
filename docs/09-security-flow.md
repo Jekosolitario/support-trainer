@@ -430,6 +430,8 @@ Il service layer controlla invece:
 - stato del booking;
 - transizioni consentite;
 - blocco di booking e conferme su slot non coerenti con la specializzazione prevista.
+- assenza di modifiche o blocchi manuali su slot con booking `PENDING` attivo;
+- protezione delle operazioni critiche Availability/Bookings in presenza di richieste concorrenti.
 
 ---
 
@@ -537,6 +539,23 @@ Se il collegamento non esiste o l’utente non è autorizzato:
 
 ---
 
+## 18.4 Riserva logica dello slot con booking pending
+
+Una richiesta booking in stato `PENDING` non rende ancora lo slot definitivamente prenotato, perché la conferma del professionista non è ancora avvenuta.
+
+Tuttavia, lo slot viene considerato logicamente impegnato rispetto alle operazioni che potrebbero alterare la richiesta già inviata dal cliente.
+
+Finché esiste una richiesta booking `PENDING` attiva sullo slot, il professionista non può:
+
+- modificarne data o orario;
+- bloccarlo manualmente.
+
+Questa regola impedisce che il cliente attenda una risposta su una disponibilità che nel frattempo viene modificata o resa indisponibile.
+
+Il professionista deve prima gestire la richiesta pendente tramite il flusso Booking previsto, ad esempio rifiutandola.
+
+---
+
 ## 19. Password security
 
 ## 19.1 Stato attuale della validazione
@@ -641,6 +660,13 @@ Questa scelta è coerente con:
 - blocco conferma booking su slot appartenenti a nutrizionisti;
 - transizioni di stato booking consentite;
 - aggiornamento stato slot dopo conferma o cancellazione booking.
+- riserva logica dello slot quando esiste un booking `PENDING`;
+- blocco modifica slot con booking `PENDING` attivo;
+- blocco del blocco manuale slot con booking `PENDING` attivo;
+- protezione da creazione concorrente di booking sullo stesso slot;
+- protezione da transizioni concorrenti della stessa richiesta booking;
+- protezione da conferme concorrenti sullo stesso slot;
+- protezione da overlap availability in operazioni concorrenti dello stesso professionista.
 
 ---
 
@@ -671,6 +697,8 @@ Nel codice attuale le situazioni seguenti devono produrre errori chiari:
 - booking tra cliente e professionista non collegati
 - accesso a booking da utente non coinvolto
 - transizione booking non consentita
+- modifica di slot con richiesta booking `PENDING` attiva;
+- blocco manuale di slot con richiesta booking `PENDING` attiva;
 
 ---
 
@@ -699,3 +727,6 @@ Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti
 - un `NUTRITIONIST` non può creare slot availability
 - booking e conferme su slot di nutrizionisti vengono bloccati dal service layer
 - slot scaduti non vengono esposti al cliente e non possono essere prenotati o confermati
+- uno slot con booking `PENDING` attivo è logicamente riservato rispetto a modifica e blocco manuale;
+- il professionista deve gestire la richiesta pendente prima di alterare lo slot;
+- i flussi critici Availability e Bookings proteggono la coerenza dei dati anche in presenza di operazioni concorrenti.
