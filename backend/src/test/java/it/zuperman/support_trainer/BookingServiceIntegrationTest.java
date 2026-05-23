@@ -601,4 +601,40 @@ class BookingServiceIntegrationTest {
 
         assertThat(invalidSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
     }
+
+    @Test
+    @DisplayName("Cliente non deve creare una seconda richiesta pending sullo stesso slot")
+    void shouldNotCreateSecondPendingBookingRequestForSameSlot() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(25).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        CreateBookingRequest firstRequest = new CreateBookingRequest(
+                slot.getId(),
+                "Prima richiesta."
+        );
+
+        bookingService.createBookingRequest(firstRequest);
+
+        CreateBookingRequest secondRequest = new CreateBookingRequest(
+                slot.getId(),
+                "Seconda richiesta."
+        );
+
+        assertThatThrownBy(() -> bookingService.createBookingRequest(secondRequest))
+                .isInstanceOf(AppException.class)
+                .hasMessage("Esiste già una richiesta di prenotazione in attesa per questo slot");
+    }
 }

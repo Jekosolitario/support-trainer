@@ -55,7 +55,7 @@ public class BookingService {
     public BookingRequestResponse createBookingRequest(CreateBookingRequest request) {
         ClientProfile client = getAuthenticatedClient();
 
-        AvailabilitySlot slot = availabilitySlotRepository.findByIdAndActiveTrue(request.getAvailabilitySlotId())
+        AvailabilitySlot slot = availabilitySlotRepository.findActiveByIdForUpdate(request.getAvailabilitySlotId())
                 .orElseThrow(() -> new AppException(
                 HttpStatus.NOT_FOUND,
                 "AVAILABILITY_SLOT_NOT_FOUND",
