@@ -144,72 +144,204 @@ può collegare clienti tramite invito valido.
 
 ---
 
-## 6. Validazioni AvailabilitySlot
+## 6. Validazioni AvailabilitySlot — Implementate
 
-### 6.1 Specializzazione corretta
-Gli slot di disponibilità possono essere creati solo da un professionista con specializzazione:
-- `PERSONAL_TRAINER`
+### 6.1 Soggetto autorizzato
+
+Gli slot di disponibilità possono essere creati e gestiti solo da un professionista:
+
+- autenticato;
+- con `accountStatus = ACTIVE`;
+- con email verificata;
+- con profilo `active = true`;
+- con specializzazione `PERSONAL_TRAINER`.
 
 ### 6.2 Intervallo temporale valido
+
 Per ogni slot:
-- `startDateTime` deve essere precedente a `endDateTime`
+
+- `startDateTime` è obbligatorio in creazione;
+- `endDateTime` è obbligatorio in creazione;
+- `startDateTime` deve essere precedente a `endDateTime`;
+- in creazione o aggiornamento, `startDateTime` deve essere nel futuro.
+
+Non è consentito creare o aggiornare uno slot già scaduto.
 
 ### 6.3 Nessuna sovrapposizione
-Per lo stesso personal trainer non devono esistere slot attivi sovrapposti nello stesso intervallo temporale.
 
-### 6.4 Stato iniziale slot
-Alla creazione, salvo casi particolari:
-- `status = AVAILABLE`
+Per lo stesso professionista non devono esistere slot attivi sovrapposti nello stesso intervallo temporale.
 
-### 6.5 Coerenza professionista
-Il professionista che crea lo slot deve:
-- esistere
-- essere attivo
-- avere ruolo e specializzazione coerenti
+Nel caso di aggiornamento, il controllo overlap esclude lo slot che si sta modificando.
+
+### 6.4 Stato iniziale
+
+Alla creazione uno slot nasce con:
+
+- `status = AVAILABLE`;
+- `active = true`.
+
+### 6.5 Ownership
+
+Il professionista può:
+
+- leggere i propri slot;
+- aggiornare solo i propri slot attivi;
+- bloccare solo i propri slot attivi;
+- sbloccare solo i propri slot attivi.
+
+### 6.6 Aggiornamento slot
+
+Uno slot può essere aggiornato solo se:
+
+- esiste;
+- appartiene al professionista autenticato;
+- è attivo;
+- è in stato `AVAILABLE`;
+- il body contiene almeno un campo modificabile;
+- il nuovo intervallo temporale è valido;
+- il nuovo inizio è nel futuro;
+- il nuovo intervallo non crea sovrapposizioni.
+
+### 6.7 Blocco e sblocco
+
+Sono consentite solo le transizioni:
+
+- `AVAILABLE -> BLOCKED`;
+- `BLOCKED -> AVAILABLE`.
+
+Non è consentito bloccare o sbloccare uno slot `BOOKED`.
+
+### 6.8 Lettura disponibilità lato cliente
+
+Un cliente può leggere gli slot disponibili di un professionista solo se:
+
+- è autenticato;
+- ha profilo attivo;
+- il professionista esiste ed è attivo;
+- esiste un collegamento attivo cliente-professionista.
+
+La lettura lato cliente restituisce solo slot:
+
+- attivi;
+- in stato `AVAILABLE`;
+- con `startDateTime` nel futuro.
+
+Gli slot rimasti `AVAILABLE` ma ormai scaduti non vengono esposti al cliente.
 
 ---
 
-## 7. Validazioni BookingRequest
+## 7. Validazioni BookingRequest — Implementate
 
-### 7.1 Cliente collegato al PT
-Il cliente può inviare una richiesta di prenotazione solo verso un personal trainer:
-- a cui è collegato attivamente
+### 7.1 Soggetto autorizzato alla creazione
 
-### 7.2 Coerenza della richiesta
-Ogni `BookingRequest` deve riferirsi a:
-- un solo cliente
-- un solo personal trainer
+Una richiesta booking può essere creata solo da un cliente:
 
-### 7.3 Validazione degli slot richiesti
-Tutti gli slot richiesti devono:
-- esistere
-- essere `AVAILABLE`
-- appartenere allo stesso personal trainer della richiesta
-- non essere scaduti logicamente
-- non essere già confermati da altre richieste
+- autenticato;
+- con account attivo;
+- con profilo attivo.
 
-### 7.4 Richiesta con almeno uno slot
-Una `BookingRequest` deve contenere:
-- almeno un `BookingRequestItem`
+### 7.2 Collegamento cliente-professionista
 
-### 7.5 Stato iniziale richiesta
+Il cliente può inviare una richiesta solo verso uno slot appartenente a un professionista:
+
+- esistente;
+- attivo;
+- collegato attivamente al cliente.
+
+### 7.3 Contratto attuale della richiesta
+
+Nel backend attuale una richiesta booking viene creata a partire da:
+
+- un singolo `availabilitySlotId`.
+
+Di conseguenza, ogni booking creato tramite API contiene attualmente:
+
+- un solo `BookingRequestItem`.
+
+La struttura dati resta predisposta a una futura evoluzione multi-slot, ma tale comportamento non è implementato nell’API attuale.
+
+### 7.4 Prenotabilità dello slot
+
+Per creare una richiesta, lo slot selezionato deve:
+
+- esistere;
+- essere attivo;
+- appartenere al professionista collegato;
+- essere in stato `AVAILABLE`;
+- avere `startDateTime` nel futuro;
+- non avere già una richiesta `PENDING` attiva associata.
+
+Uno slot `AVAILABLE` ma ormai scaduto non è prenotabile.
+
+### 7.5 Nota della richiesta
+
+La `note` è facoltativa.
+
+Se presente:
+
+- non può superare `1000` caratteri;
+- viene normalizzata tramite rimozione degli spazi iniziali e finali;
+- se dopo la normalizzazione è vuota, viene trattata come assente.
+
+### 7.6 Stato iniziale
+
 Alla creazione:
-- `status = PENDING`
 
-### 7.6 Conferma richiesta
-Quando la richiesta viene confermata:
-- tutti gli slot collegati diventano `BOOKED`
+- `status = PENDING`;
+- `active = true`.
 
-### 7.7 Rifiuto richiesta
-Quando la richiesta viene rifiutata:
-- gli slot restano o tornano `AVAILABLE`, se non bloccati da altre logiche
+### 7.7 Conferma richiesta
 
-### 7.8 Integrità finale
-Uno slot già `BOOKED` non può essere confermato di nuovo in una richiesta diversa.
+Una richiesta può essere confermata solo:
 
+- dal professionista coinvolto;
+- se si trova in stato `PENDING`;
+- se lo slot collegato è ancora `AVAILABLE`;
+- se lo slot collegato non è scaduto.
+
+Alla conferma:
+
+- booking `PENDING -> CONFIRMED`;
+- slot `AVAILABLE -> BOOKED`.
+
+Un booking pending con slot ormai scaduto non può essere confermato.
+
+### 7.8 Rifiuto richiesta
+
+Una richiesta può essere rifiutata solo:
+
+- dal professionista coinvolto;
+- se si trova in stato `PENDING`.
+
+Al rifiuto:
+
+- booking `PENDING -> REJECTED`;
+- lo slot resta `AVAILABLE`.
+
+### 7.9 Cancellazione richiesta
+
+Il cliente coinvolto può cancellare:
+
+- booking `PENDING`, lasciando lo slot `AVAILABLE`;
+- booking `CONFIRMED`, riportando lo slot a `AVAILABLE`.
+
+Il professionista coinvolto può cancellare:
+
+- solo booking `CONFIRMED`, riportando lo slot a `AVAILABLE`.
+
+Il professionista non può cancellare una richiesta `PENDING`: deve rifiutarla.
+
+### 7.10 Ownership e dettaglio
+
+Il dettaglio di una richiesta può essere letto solo:
+
+- dal cliente coinvolto;
+- dal professionista coinvolto.
+
+Un utente estraneo alla richiesta non può visualizzarla né modificarne lo stato.
 ---
 
-## 8. Validazioni WorkoutPlan
+## 8. Validazioni WorkoutPlan — Pianificate, non implementate
 
 ### 8.1 Soggetto autorizzato
 Una scheda workout può essere creata solo da un professionista con specializzazione:
@@ -244,7 +376,7 @@ Una scheda workout valida deve avere almeno:
 
 ---
 
-## 9. Validazioni NutritionPlan
+## 9. Validazioni NutritionPlan — Pianificate, non implementate
 
 ### 9.1 Soggetto autorizzato
 Un piano alimentare può essere creato solo da un professionista con specializzazione:
@@ -275,7 +407,7 @@ Il piano alimentare deve avere una struttura coerente e collegamenti validi tra:
 
 ---
 
-## 10. Validazioni WorkoutFeedback
+## 10. Validazioni WorkoutFeedback — Pianificate, non implementate
 
 ### 10.1 Utente autorizzato
 Il feedback workout può essere inviato solo da:
@@ -300,7 +432,7 @@ Il campo `message` deve essere:
 
 ---
 
-## 11. Validazioni NutritionFeedback
+## 11. Validazioni NutritionFeedback — Pianificate, non implementate
 
 ### 11.1 Utente autorizzato
 Il feedback nutrizione può essere inviato solo da:
@@ -325,7 +457,7 @@ Il campo `message` deve essere:
 
 ---
 
-## 12. Validazioni ClientMeasurement
+## 12. Validazioni ClientMeasurement — Pianificate, non implementate
 
 ### 12.1 Cliente valido
 Ogni misurazione deve riferirsi a:
@@ -392,132 +524,161 @@ Un utente non può eseguire azioni operative riservate se:
 - il profilo applicativo è `active = false`
 
 ### 14.3 Coerenza specializzazione/funzionalità
-Le operazioni devono essere coerenti con la specializzazione del professionista:
-- solo `PERSONAL_TRAINER` per workout e prenotazioni
-- solo `NUTRITIONIST` per piani alimentari
+
+Le operazioni devono essere coerenti con la specializzazione del professionista.
+
+### Regole attualmente implementate
+
+- solo `PERSONAL_TRAINER` può gestire availability;
+- i booking operano su slot availability e quindi riguardano professionisti `PERSONAL_TRAINER`.
+
+### Regole pianificate
+
+- solo `PERSONAL_TRAINER` potrà gestire schede workout;
+- solo `NUTRITIONIST` potrà gestire piani alimentari.
 
 ---
 
 ## 15. Dove applicare le validazioni
 
 ### 15.1 DTO / Bean Validation
-Qui vanno bene:
-- obbligatorietà campi
-- formato email
-- pattern password
-- not blank
-- range base
-- controlli semplici
 
-### 15.2 Service Layer
-Qui devono stare le regole di business, ad esempio:
-- massimo 3 professionisti
-- validità codice invito
-- no self-link
-- no duplicati attivi
-- slot non sovrapposti
-- coerenza richiesta-slot-professionista
-- unicità scheda/piano attivo per coppia
-- validità feedback rispetto ai contenuti assegnati
+Nel backend attuale il livello DTO gestisce controlli strutturali come:
+
+- obbligatorietà dei campi;
+- formato email;
+- lunghezze massime;
+- pattern password;
+- date obbligatorie;
+- valori numerici minimi;
+- lunghezza massima della nota booking.
+
+Esempi:
+
+- registrazione professionista;
+- registrazione cliente;
+- creazione slot availability;
+- creazione booking.
+
+### 15.2 Service layer
+
+Il service layer gestisce le regole business reali, tra cui:
+
+- email già registrata;
+- verifica e consumo codice invito;
+- massimo 3 professionisti attivi per cliente;
+- divieto di self-link;
+- assenza di link attivi duplicati;
+- stato attivo e verifica email del professionista;
+- specializzazione valida per availability;
+- intervalli temporali availability validi;
+- creazione e aggiornamento slot solo nel futuro;
+- assenza di sovrapposizioni slot;
+- ownership sugli slot;
+- lettura cliente solo per professionisti collegati;
+- esclusione degli slot scaduti dalla lettura cliente;
+- booking solo su slot disponibili e futuri;
+- assenza di booking `PENDING` duplicati sullo stesso slot;
+- normalizzazione della nota booking;
+- transizioni booking consentite;
+- blocco conferma booking con slot scaduto;
+- aggiornamento coerente dello stato slot.
 
 ### 15.3 Database
-A livello database vanno previsti almeno:
-- vincoli di unicità
-- nullabilità coerente
-- foreign key corrette
+
+A livello database sono richiesti almeno:
+
+- vincoli di unicità;
+- nullabilità coerente;
+- foreign key corrette;
+- struttura persistente coerente con entity e relazioni implementate.
+
+### 15.4 Regole future
+
+Le validazioni relative a:
+
+- workout;
+- nutrition;
+- feedback;
+- measurements;
+
+restano pianificate e dovranno essere confermate solo durante i rispettivi sprint.
 
 ---
 
-## Modulo Availability
+## 16. Errori applicativi rilevanti
 
-### 16 Creazione slot disponibilità
+Le seguenti situazioni sono gestite o devono essere gestite tramite errori applicativi chiari.
 
-Regole applicate alla creazione di uno slot:
+### Area autenticazione e registrazione
 
-- l’utente autenticato deve essere un professionista;
-- il professionista deve avere account attivo;
-- l’email del professionista deve essere verificata;
-- il professionista deve avere specializzazione `PERSONAL_TRAINER`;
-- `startDateTime` è obbligatorio;
-- `endDateTime` è obbligatorio;
-- `endDateTime` deve essere successivo a `startDateTime`;
-- lo slot non deve sovrapporsi ad altri slot attivi dello stesso professionista;
-- lo slot viene creato con stato iniziale `AVAILABLE`;
-- lo slot viene creato con `active = true`.
+- email già registrata;
+- credenziali non valide;
+- account non attivo;
+- email professionista non verificata;
+- token verifica email inesistente, scaduto o già usato.
 
-### 16.1 Aggiornamento slot disponibilità
+### Area invite e collegamenti
 
-Regole applicate all’aggiornamento parziale di uno slot:
+- codice invito inesistente;
+- codice invito inattivo;
+- codice invito già usato;
+- codice invito scaduto;
+- professionista non abilitato al collegamento;
+- tentativo di self-link;
+- collegamento attivo duplicato;
+- superamento del limite massimo di professionisti attivi per cliente.
 
-- lo slot deve appartenere al professionista autenticato;
-- lo slot deve essere attivo;
-- lo slot deve essere in stato `AVAILABLE`;
-- il body non può essere vuoto;
-- è possibile aggiornare solo `startDateTime` e/o `endDateTime`;
-- `endDateTime` deve essere successivo a `startDateTime`;
-- il nuovo intervallo non deve sovrapporsi ad altri slot attivi dello stesso professionista;
-- il controllo overlap esclude lo slot corrente.
+### Area availability
 
-### 16.2 Blocco slot disponibilità
+- professionista non autorizzato;
+- specializzazione non consentita;
+- intervallo temporale non valido;
+- creazione o aggiornamento slot nel passato;
+- sovrapposizione slot;
+- modifica di slot non disponibile;
+- blocco o sblocco in stato non consentito;
+- accesso cliente a professionista non collegato.
 
-Regole applicate al blocco di uno slot:
+### Area booking
 
-- lo slot deve appartenere al professionista autenticato;
-- lo slot deve essere attivo;
-- lo slot deve essere in stato `AVAILABLE`;
-- uno slot `BLOCKED` o `BOOKED` non può essere bloccato nuovamente;
-- la transizione consentita è solo `AVAILABLE → BLOCKED`.
-
-### 16.3 Sblocco slot disponibilità
-
-Regole applicate allo sblocco di uno slot:
-
-- lo slot deve appartenere al professionista autenticato;
-- lo slot deve essere attivo;
-- lo slot deve essere in stato `BLOCKED`;
-- uno slot `AVAILABLE` o `BOOKED` non può essere sbloccato;
-- la transizione consentita è solo `BLOCKED → AVAILABLE`.
-
-### 16.4 Regole di ownership
-
-Gli slot disponibilità sono gestiti solo dal professionista proprietario.
-
-Se uno slot non esiste, non è attivo oppure appartiene a un altro professionista, il sistema restituisce errore `404 NOT_FOUND` con codice:
+- cliente non autorizzato;
+- booking verso professionista non collegato;
+- slot non trovato;
+- slot non disponibile;
+- slot scaduto non prenotabile;
+- booking pending duplicato sullo stesso slot;
+- dettaglio richiesto da utente non coinvolto;
+- conferma booking con slot scaduto;
+- transizione di stato non consentita;
+- cancellazione professionista di booking ancora `PENDING`.
 
 ---
 
-## 17 Regole da trasformare in eccezioni applicative
-Le seguenti situazioni devono produrre errori applicativi chiari:
+## 17. Decisioni confermate
 
-- email già registrata
-- password non conforme
-- codice invito inesistente
-- codice invito scaduto
-- codice invito già usato
-- tentativo di quarto professionista per lo stesso cliente
-- tentativo di self-link
-- tentativo di creare slot sovrapposti
-- tentativo di prenotare slot non disponibili
-- tentativo di creare scheda/piano senza collegamento valido
-- tentativo di inviare feedback su contenuti non appartenenti al cliente
+Per Support Trainer risultano attualmente confermate le seguenti regole:
 
----
+- password utenti con requisiti forti;
+- professionista inizialmente in attesa di verifica email;
+- cliente registrabile solo tramite codice invito valido;
+- massimo 3 professionisti attivi per cliente;
+- divieto di self-link;
+- assenza di collegamenti attivi duplicati;
+- availability riservata ai `PERSONAL_TRAINER`;
+- slot availability creati o aggiornati solo nel futuro;
+- slot availability non sovrapposti;
+- cliente autorizzato a leggere availability solo di professionisti collegati;
+- slot scaduti esclusi dalle disponibilità consultabili;
+- booking creato attualmente su un singolo slot;
+- booking consentito solo tra cliente e professionista collegati;
+- booking non creabile né confermabile su slot scaduti;
+- stati booking gestiti: `PENDING`, `CONFIRMED`, `REJECTED`, `CANCELLED`;
+- ownership e transizioni booking controllate nel service layer.
 
-## 17.1 Decisioni confermate
-Per Support Trainer si confermano le seguenti regole:
+Restano pianificate, ma non ancora implementate, le regole relative a:
 
-- password utenti con requisiti forti
-- professionista inizialmente `PENDING_VERIFICATION`
-- cliente registrabile solo tramite codice invito valido
-- registrazione cliente valida solo entro la scadenza del codice
-- massimo 3 professionisti attivi per cliente
-- no self-link
-- prenotazioni solo con PT collegato
-- slot validi, disponibili e non sovrapposti
-- una scheda workout attiva per coppia PT-cliente
-- più schede workout possibili per lo stesso cliente solo se di PT diversi
-- un solo piano nutrizione attivo per coppia nutrizionista-cliente
-- feedback consentiti solo su contenuti realmente assegnati
-- misurazioni inseribili solo da soggetti autorizzati e mantenute nello storico
-
----
+- workout plans;
+- nutrition plans;
+- feedback;
+- measurements.
