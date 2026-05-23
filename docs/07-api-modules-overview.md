@@ -1,294 +1,426 @@
 # API Modules Overview — Support Trainer
 
 ## 1. Obiettivo del documento
-Questo documento definisce i principali moduli API del backend di Support Trainer.
 
-Lo scopo è:
-- suddividere il backend in aree funzionali chiare
-- capire quali responsabilità avrà ogni gruppo di endpoint
-- evitare confusione tra controller, service e logica di business
-- preparare la base per la mappa dettagliata degli endpoint
+Questo documento descrive l’organizzazione funzionale delle API backend di Support Trainer, distinguendo chiaramente tra:
+
+- moduli già implementati nel codice reale;
+- componenti di dominio presenti ma non esposti come API dedicate;
+- moduli pianificati ma non ancora implementati.
+
+La mappa dettagliata degli endpoint reali è mantenuta nel documento:
+
+- `08-endpoint-map.md`
 
 ---
 
 ## 2. Principio di organizzazione
-Le API del progetto saranno organizzate per **moduli funzionali**, non per pagine frontend.
 
-Questo approccio è utile perché:
-- rende il backend più ordinato
-- separa meglio le responsabilità
-- facilita manutenzione e crescita del progetto
-- riflette un’impostazione più professionale
+Le API del progetto sono organizzate per moduli funzionali, non per pagine frontend.
+
+Questo approccio consente di:
+
+- separare responsabilità e regole business;
+- mantenere controller e service ordinati;
+- favorire l’evoluzione progressiva del backend;
+- collegare il futuro frontend a contratti API chiari.
 
 ---
 
-## 3. Moduli principali previsti
+## 3. Moduli API attualmente implementati
 
-Per la v1, il backend sarà suddiviso nei seguenti moduli:
+Nel backend reale risultano implementati i seguenti moduli API:
 
 - **Auth**
-- **Profile / Account**
-- **Professionals**
+- **Profile / Account (`Me`)**
 - **Clients**
+- **Professionals**
 - **Invites**
-- **Links**
 - **Availability**
 - **Bookings**
+
+Sono inoltre presenti e utilizzati:
+
+- security JWT;
+- gestione centralizzata degli errori;
+- relazione professionista-cliente tramite `ProfessionalClientLink`.
+
+---
+
+## 4. Modulo Auth — Implementato
+
+### Responsabilità attuali
+
+Il modulo **Auth** gestisce:
+
+- registrazione professionista;
+- registrazione cliente tramite codice invito;
+- validazione preventiva del codice invito per registrazione cliente;
+- verifica email professionista;
+- login.
+
+### Endpoint implementati
+
+- `POST /api/v1/auth/register/professional`
+- `POST /api/v1/auth/register/client`
+- `POST /api/v1/auth/register/client/validate-invite`
+- `GET /api/v1/auth/verify-email`
+- `POST /api/v1/auth/login`
+
+### Cosa non gestisce ancora
+
+Non risultano ancora implementati:
+
+- refresh token;
+- logout applicativo;
+- forgot password;
+- reset password.
+
+---
+
+## 5. Modulo Profile / Account (`Me`) — Implementato
+
+### Responsabilità attuali
+
+Il modulo **Me** gestisce le operazioni dell’utente autenticato sul proprio profilo e account:
+
+- lettura profilo personale;
+- lettura dati account;
+- aggiornamento dati del profilo;
+- aggiornamento stato operativo.
+
+### Endpoint implementati
+
+- `GET /api/v1/me/profile`
+- `GET /api/v1/me/account`
+- `PATCH /api/v1/me/profile`
+- `PATCH /api/v1/me/profile/operational-status`
+
+### Funzionalità non ancora implementate
+
+Non risultano ancora implementati:
+
+- upload immagine profilo;
+- cambio password da area autenticata.
+
+---
+
+## 6. Modulo Clients — Implementato
+
+### Responsabilità attuali
+
+Il modulo **Clients** consente al professionista autenticato di leggere i clienti collegati.
+
+### Endpoint implementati
+
+- `GET /api/v1/clients/my`
+- `GET /api/v1/clients/{clientId}`
+
+### Regole principali
+
+- accesso riservato al professionista;
+- lettura consentita solo per clienti collegati;
+- controllo della relazione attiva nel service layer.
+
+---
+
+## 7. Modulo Professionals — Implementato
+
+### Responsabilità attuali
+
+Il modulo **Professionals** consente al cliente autenticato di leggere i professionisti collegati e le disponibilità consultabili.
+
+### Endpoint implementati
+
+- `GET /api/v1/professionals/my`
+- `GET /api/v1/professionals/{professionalId}`
+- `GET /api/v1/professionals/{professionalId}/availability`
+
+### Regole principali
+
+- accesso riservato al cliente;
+- lettura dettaglio consentita solo verso professionisti collegati;
+- lettura availability consentita solo verso professionisti collegati;
+- vengono esposti solo slot disponibili e non scaduti.
+
+### Nota architetturale
+
+La lettura pubblicata tramite:
+
+- `GET /api/v1/professionals/{professionalId}/availability`
+
+appartiene funzionalmente all’area Availability, anche se il path API è esposto nell’area Professionals.
+
+---
+
+## 8. Modulo Invites — Implementato
+
+### Responsabilità attuali
+
+Il modulo **Invites** gestisce:
+
+- generazione di codici invito da parte del professionista;
+- elenco dei codici invito generati.
+
+### Endpoint implementati
+
+- `POST /api/v1/invites`
+- `GET /api/v1/invites`
+
+### Regole principali
+
+- accesso riservato al professionista;
+- il professionista deve rispettare le condizioni applicative richieste;
+- il codice viene utilizzato dal flusso di registrazione cliente.
+
+### Estensioni future possibili
+
+Non risultano ancora implementati endpoint dedicati per:
+
+- dettaglio singolo invito;
+- disattivazione manuale di un invito non usato.
+
+---
+
+## 9. Relazione professionista-cliente (`ProfessionalClientLink`) — Presente nel dominio, senza API dedicate
+
+### Stato reale
+
+La relazione tra professionista e cliente è implementata tramite:
+
+- `ProfessionalClientLink`.
+
+La relazione viene utilizzata per:
+
+- collegare cliente e professionista dopo una registrazione cliente valida;
+- autorizzare la lettura clienti/professionisti;
+- autorizzare la lettura availability;
+- autorizzare la creazione booking.
+
+### Precisazione importante
+
+Nel backend attuale non esiste un modulo API autonomo `Links` con controller dedicato.
+
+Non risultano ancora implementati endpoint come:
+
+- elenco link;
+- dettaglio link;
+- disattivazione link.
+
+Queste API potranno essere valutate in futuro solo se richieste dal flusso applicativo reale.
+
+---
+
+## 10. Modulo Availability — Implementato
+
+### Responsabilità attuali
+
+Il modulo **Availability** gestisce gli slot di disponibilità dei professionisti `PERSONAL_TRAINER`.
+
+### Endpoint implementati
+
+- `POST /api/v1/availability`
+- `GET /api/v1/availability/my`
+- `PATCH /api/v1/availability/{slotId}`
+- `PATCH /api/v1/availability/{slotId}/block`
+- `PATCH /api/v1/availability/{slotId}/unblock`
+
+La lettura lato cliente è esposta tramite:
+
+- `GET /api/v1/professionals/{professionalId}/availability`
+
+### Regole principali implementate
+
+- solo il professionista autorizzato può creare e gestire i propri slot;
+- il professionista deve avere account attivo, email verificata e profilo attivo;
+- gli slot devono avere intervallo temporale valido;
+- gli slot creati o aggiornati devono iniziare nel futuro;
+- non sono consentiti slot sovrapposti;
+- gli slot possono essere bloccati e sbloccati secondo stato;
+- il cliente può leggere availability solo di professionisti collegati;
+- gli slot disponibili ma scaduti non vengono mostrati al cliente.
+
+### Stati slot gestiti
+
+- `AVAILABLE`
+- `BLOCKED`
+- `BOOKED`
+
+---
+
+## 11. Modulo Bookings — Implementato
+
+### Responsabilità attuali
+
+Il modulo **Bookings** gestisce il ciclo di prenotazione tra cliente collegato e professionista.
+
+### Endpoint implementati
+
+- `POST /api/v1/bookings`
+- `GET /api/v1/bookings/client`
+- `GET /api/v1/bookings/professional`
+- `GET /api/v1/bookings/{bookingRequestId}`
+- `PATCH /api/v1/bookings/{bookingRequestId}/confirm`
+- `PATCH /api/v1/bookings/{bookingRequestId}/reject`
+- `PATCH /api/v1/bookings/{bookingRequestId}/cancel`
+
+### Contratto attuale
+
+Nel backend attuale una richiesta booking viene creata a partire da:
+
+- un singolo `availabilitySlotId`.
+
+Il modello con `BookingRequestItem` resta estendibile a scenari multi-slot futuri, ma l’API attuale opera su un solo slot per richiesta.
+
+### Regole principali implementate
+
+- il cliente può prenotare solo slot di professionisti collegati;
+- lo slot deve essere attivo, disponibile e non scaduto;
+- non può esistere una richiesta `PENDING` duplicata sullo stesso slot;
+- la nota è facoltativa, normalizzata e limitata a `1000` caratteri;
+- il dettaglio booking è visibile solo agli utenti coinvolti;
+- un booking pending con slot ormai scaduto non può essere confermato.
+
+### Stati booking gestiti
+
+- `PENDING`
+- `CONFIRMED`
+- `REJECTED`
+- `CANCELLED`
+
+### Transizioni principali
+
+| Azione | Attore | Stato booking | Effetto sullo slot |
+|---|---|---|---|
+| confirm | professionista coinvolto | `PENDING -> CONFIRMED` | `AVAILABLE -> BOOKED` |
+| reject | professionista coinvolto | `PENDING -> REJECTED` | resta `AVAILABLE` |
+| cancel | cliente coinvolto | `PENDING -> CANCELLED` | resta `AVAILABLE` |
+| cancel | cliente coinvolto | `CONFIRMED -> CANCELLED` | `BOOKED -> AVAILABLE` |
+| cancel | professionista coinvolto | `CONFIRMED -> CANCELLED` | `BOOKED -> AVAILABLE` |
+
+---
+
+## 12. Moduli pianificati ma non ancora implementati
+
+I seguenti moduli non risultano presenti nel backend reale:
+
 - **Workout Plans**
 - **Nutrition Plans**
 - **Feedback**
 - **Measurements**
 
----
+### 12.1 Workout Plans
 
-## 4. Modulo Auth
+Modulo futuro dedicato alle schede di allenamento create dai professionisti `PERSONAL_TRAINER`.
 
-### Responsabilità principali
-Il modulo **Auth** gestisce:
-- registrazione professionista
-- registrazione cliente con codice invito
-- login
-- verifica email professionista
-- eventuali controlli iniziali di autenticazione
+### 12.2 Nutrition Plans
 
-### Cosa non deve gestire
-Non deve occuparsi di:
-- logica completa del profilo
-- gestione clienti/professionisti
-- business logic di prenotazioni, schede o piani
+Modulo futuro dedicato ai piani alimentari creati dai professionisti `NUTRITIONIST`.
 
-### Obiettivo del modulo
-Gestire l’accesso al sistema e il ciclo iniziale di attivazione account.
+### 12.3 Feedback
+
+Modulo futuro dedicato ai feedback del cliente su workout e nutrition.
+
+### 12.4 Measurements
+
+Modulo futuro dedicato allo storico delle misurazioni fisiche del cliente.
 
 ---
 
-## 5. Modulo Profile / Account
+## 13. Funzionalità tecniche future
 
-### Responsabilità principali
-Il modulo **Profile / Account** gestisce i dati del profilo dell’utente autenticato, ad esempio:
-- visualizzazione del proprio profilo
-- aggiornamento dati personali
-- aggiornamento foto profilo
-- aggiornamento stato operativo
-- eventuali modifiche base dell’account
+Oltre ai moduli business non ancora implementati, restano da valutare o sviluppare:
 
-### Obiettivo del modulo
-Separare chiaramente la gestione del **proprio profilo** dalle operazioni su altri utenti.
-
----
-
-## 6. Modulo Professionals
-
-### Responsabilità principali
-Il modulo **Professionals** gestisce informazioni e operazioni legate ai professionisti, ad esempio:
-- recupero dati professionista
-- visualizzazione professionisti collegati a un cliente
-- eventuali dettagli pubblici/professionali
-
-### Obiettivo del modulo
-Fornire una gestione dedicata del lato professionista senza mischiarla con autenticazione o prenotazioni.
+- refresh token persistenti;
+- logout;
+- forgot password;
+- reset password;
+- upload immagine profilo;
+- cambio password autenticato;
+- API dedicate per gestione link;
+- integrazione frontend reale;
+- preparazione deploy.
 
 ---
 
-## 7. Modulo Clients
+## 14. Moduli esclusi dal perimetro attuale
 
-### Responsabilità principali
-Il modulo **Clients** gestisce informazioni e operazioni legate ai clienti, ad esempio:
-- visualizzazione dati cliente
-- elenco clienti di un professionista
-- recupero dettagli cliente
+Non fanno parte del backend attualmente implementato:
 
-### Obiettivo del modulo
-Separare la gestione anagrafica e funzionale dei clienti dalle altre aree del sistema.
+- admin avanzato;
+- notifiche;
+- promemoria;
+- pagamenti;
+- chat real time;
+- statistiche avanzate.
 
----
-
-## 8. Modulo Invites
-
-### Responsabilità principali
-Il modulo **Invites** gestisce:
-- generazione codici invito
-- elenco codici generati
-- stato dei codici
-- stato dei codici
-- futura estensione per invalidazione logica di codici non ancora usati
-
-### Obiettivo del modulo
-Gestire il meccanismo di accesso controllato dei clienti.
+Queste aree potranno essere considerate solo in fasi successive.
 
 ---
 
-## 9. Modulo Links
+## 15. Ruolo dei controller
 
-### Responsabilità principali
-Il modulo **Links** gestisce i collegamenti tra:
-- professionisti
-- clienti
+I controller implementati espongono gli endpoint HTTP e delegano la logica ai service.
 
-Ad esempio:
-- creare il collegamento finale dopo registrazione valida
-- visualizzare collegamenti attivi
-- disattivare un collegamento
-- controllare relazione attiva tra cliente e professionista
+### Controller presenti nel backend reale
 
-### Obiettivo del modulo
-Rendere esplicita la gestione della relazione molti-a-molti tramite `ProfessionalClientLink`.
+- `AuthController`
+- `MeController`
+- `ClientController`
+- `ProfessionalController`
+- `InviteController`
+- `AvailabilityController`
+- `BookingController`
 
----
+### Regola architetturale
 
-## 10. Modulo Availability
-
-### Responsabilità principali
-Il modulo **Availability** gestisce:
-- creazione slot di disponibilità del PT
-- aggiornamento slot
-- visualizzazione slot disponibili
-- blocco o disattivazione slot quando necessario
-
-### Ambito
-Questo modulo riguarda solo professionisti con specializzazione:
-- `PERSONAL_TRAINER`
-
-### Obiettivo del modulo
-Gestire in modo ordinato la disponibilità prenotabile del PT.
-
----
-
-## 11. Modulo Bookings
-
-### Responsabilità principali
-Il modulo **Bookings** gestisce:
-- creazione richieste di prenotazione
-- visualizzazione richieste
-- conferma richiesta
-- rifiuto richiesta
-- storico prenotazioni
-
-### Obiettivo del modulo
-Gestire il flusso cliente → richiesta → risposta del PT, separandolo dalla pura disponibilità.
-
----
-
-## 12. Modulo Workout Plans
-
-### Responsabilità principali
-Il modulo **Workout Plans** gestisce:
-- creazione scheda workout
-- aggiornamento tramite nuova versione
-- visualizzazione schede attive e storiche
-- dettaglio settimane, giorni ed esercizi
-
-### Ambito
-Questo modulo riguarda solo professionisti con specializzazione:
-- `PERSONAL_TRAINER`
-
-### Obiettivo del modulo
-Gestire tutta l’area allenamento senza mischiarla con nutrizione o feedback.
-
----
-
-## 13. Modulo Nutrition Plans
-
-### Responsabilità principali
-Il modulo **Nutrition Plans** gestisce:
-- creazione piano alimentare
-- aggiornamento tramite nuova versione
-- visualizzazione piano attivo e storico
-- dettaglio settimane, giorni e contenuti alimentari
-
-### Ambito
-Questo modulo riguarda solo professionisti con specializzazione:
-- `NUTRITIONIST`
-
-### Obiettivo del modulo
-Gestire separatamente tutta la parte nutrizione.
-
----
-
-## 14. Modulo Feedback
-
-### Responsabilità principali
-Il modulo **Feedback** gestisce:
-- invio feedback workout
-- invio feedback nutrizione
-- visualizzazione feedback ricevuti
-- eventuale storico feedback inviati
-
-### Obiettivo del modulo
-Consentire al cliente di segnalare problemi o richieste su contenuti specifici assegnati.
-
----
-
-## 15. Modulo Measurements
-
-### Responsabilità principali
-Il modulo **Measurements** gestisce:
-- inserimento misurazioni cliente
-- visualizzazione storico misurazioni
-- eventuale filtro per data
-- eventuale inserimento da parte del cliente o del professionista autorizzato
-
-### Obiettivo del modulo
-Gestire il monitoraggio fisico del cliente in modo storico e strutturato.
-
----
-
-## 16. Moduli esclusi dalla v1
-
-Nella prima versione non sono previsti moduli dedicati per:
-
-- **Admin**
-- **Notifiche**
-- **Promemoria**
-- **Pagamenti**
-- **Chat real time**
-- **Statistiche avanzate**
-
-### Nota
-Queste aree potranno essere aggiunte in una fase successiva, ma non fanno parte del perimetro iniziale del backend.
-
----
-
-## 17. Ruolo dei controller
-Ogni modulo potrà avere uno o più controller dedicati.
-
-### Regola consigliata
 I controller devono:
-- ricevere request DTO
-- delegare al service
-- restituire response DTO
-- non contenere business logic complessa
 
-### Obiettivo
-Tenere il controller leggero e focalizzato sull’orchestrazione HTTP.
+- ricevere request DTO;
+- delegare ai service;
+- restituire response DTO;
+- evitare business logic complessa.
 
 ---
 
-## 18. Ruolo dei service
+## 16. Ruolo dei service
+
 I service rappresentano il punto centrale della business logic.
 
-### Devono gestire
-- validazioni di business
-- controlli di autorizzazione logica
-- coerenza tra entità
-- coordinamento tra repository
-- creazione/aggiornamento di dati complessi
+Nel backend attuale gestiscono:
 
-### Non devono diventare
-- contenitori caotici di logica senza separazione
-- sostituti dei controller
-- sostituti dei mapper
+- validazioni applicative;
+- autorizzazione logica;
+- ownership delle risorse;
+- relazione cliente-professionista;
+- coerenza degli stati;
+- coordinamento tra repository;
+- sincronizzazione Availability / Bookings.
 
 ---
 
-## 19. Ruolo dei repository
-I repository devono occuparsi di:
-- accesso ai dati
-- query semplici o mirate
-- ricerca per chiavi, stati, collegamenti, intervalli temporali
+## 17. Ruolo dei repository
 
-### Regola importante
-Nei repository non deve finire la business logic vera.  
-La logica resta nei service.
+I repository gestiscono:
+
+- accesso ai dati;
+- ricerca per identificativi;
+- query su stati e relazioni;
+- query temporali per availability;
+- controlli di esistenza utili alla business logic.
+
+La business logic resta nei service e non nei repository.
 
 ---
+
+## 18. Stato complessivo
+
+La base API attualmente implementata copre:
+
+```text
+registrazione e autenticazione
+-> profilo/account
+-> collegamento professionista-cliente
+-> lettura relazioni
+-> disponibilità professionista
+-> richiesta e gestione prenotazione
