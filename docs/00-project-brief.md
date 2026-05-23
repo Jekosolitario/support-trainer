@@ -6,9 +6,18 @@
 ---
 
 ## 2. Descrizione breve
-Support Trainer è una web app pensata per professionisti del benessere, come personal trainer e nutrizionisti, che hanno bisogno di gestire i propri clienti in modo più ordinato ed efficiente.
 
-L’app permette ai professionisti di organizzare disponibilità, richieste di appuntamento e schede personalizzate, mentre i clienti possono prenotare sessioni, consultare i propri programmi e seguire più facilmente il percorso assegnato.
+Support Trainer è una web app pensata per professionisti del benessere, in particolare personal trainer e nutrizionisti, che hanno bisogno di gestire i propri clienti in modo ordinato ed efficiente.
+
+Il backend attualmente implementato consente già di:
+
+- registrare professionisti e clienti tramite un flusso controllato;
+- collegare clienti e professionisti tramite codice invito;
+- gestire profilo e stato operativo degli utenti;
+- gestire disponibilità del personal trainer;
+- creare e governare richieste di prenotazione tra cliente e personal trainer.
+
+L’evoluzione futura del prodotto prevede anche schede di allenamento, piani alimentari, feedback e monitoraggio progressi.
 
 ---
 
@@ -28,6 +37,37 @@ Questo progetto nasce con i seguenti obiettivi:
 - documentare ogni fase dello sviluppo in modo ordinato
 - capire meglio il flusso reale di un progetto full stack
 - arrivare, se possibile, a una versione pubblicabile online
+
+---
+
+## 3.1 Stato reale del progetto
+
+### Backend implementato
+
+Nel backend risultano completati:
+
+- autenticazione JWT;
+- registrazione professionista;
+- verifica email professionista;
+- codice invito;
+- registrazione cliente tramite invito valido;
+- collegamento automatico professionista-cliente;
+- profilo/account utente;
+- lettura clienti e professionisti collegati;
+- modulo Availability;
+- modulo Bookings.
+
+### Workflow operativo già disponibile
+
+Il backend supporta oggi il seguente flusso completo:
+
+professionista registrato e verificato
+-> invito cliente
+-> registrazione cliente collegato
+-> creazione slot availability
+-> lettura slot disponibile da parte del cliente
+-> richiesta booking
+-> conferma / rifiuto / cancellazione
 
 ---
 
@@ -67,56 +107,92 @@ L’app sarà usata in ambito lavorativo e personale, soprattutto per:
 ---
 
 ## 6. Obiettivi principali
-L’app dovrà permettere di:
 
-1. consentire al professionista di impostare la propria disponibilità lavorativa
-2. permettere al cliente di inviare richieste di prenotazione sugli slot disponibili
-3. permettere al professionista di confermare o rifiutare le richieste ricevute
-4. consentire al professionista di invitare nuovi clienti tramite codice temporaneo
-5. bloccare la registrazione del cliente se non possiede un codice valido
-6. permettere al professionista di creare e assegnare schede personalizzate
-7. consentire al cliente di visualizzare la propria scheda mensile suddivisa in 4 settimane
-8. permettere al cliente di aprire il dettaglio dell’allenamento del singolo giorno
-9. permettere a cliente e professionista di gestire il proprio stato generale quando necessario
-10. permettere al professionista di gestire il collegamento con i propri clienti
+## 6.1 Obiettivi già raggiunti nel backend
+
+L’app consente già di:
+
+1. registrare professionisti con verifica email;
+2. registrare clienti esclusivamente tramite codice invito valido;
+3. creare automaticamente il collegamento tra cliente e professionista;
+4. leggere e aggiornare il proprio profilo/account;
+5. leggere clienti e professionisti collegati;
+6. permettere al personal trainer di impostare la propria disponibilità lavorativa;
+7. permettere al cliente collegato di consultare slot disponibili e non scaduti;
+8. permettere al cliente di inviare richieste di prenotazione su un singolo slot disponibile;
+9. permettere al professionista di confermare o rifiutare le richieste ricevute;
+10. permettere cancellazioni booking secondo le transizioni consentite;
+11. mantenere coerente lo stato degli slot rispetto al ciclo booking.
+
+## 6.2 Obiettivi ancora da raggiungere
+
+Restano da sviluppare:
+
+1. gestione delle schede di allenamento;
+2. gestione dei piani alimentari;
+3. feedback del cliente;
+4. monitoraggio progressi e misurazioni;
+5. eventuali API dedicate alla gestione manuale dei collegamenti;
+6. frontend reale integrato con il backend;
+7. completamento delle funzionalità tecniche necessarie al deploy.
 
 ---
 
-## 7. MVP (prima versione minima funzionante)
-Per la prima versione funzionante, le funzionalità essenziali saranno:
+## 7. MVP — Stato di avanzamento
 
-- [ ] registrazione e login dei professionisti
-- [ ] creazione cliente tramite codice di invito temporaneo
-- [ ] registrazione cliente consentita solo con codice valido
-- [ ] collegamento tra cliente e professionista
-- [ ] gestione disponibilità del professionista
-- [ ] invio richiesta di prenotazione da parte del cliente
-- [ ] conferma o rifiuto della richiesta da parte del professionista
-- [ ] creazione di una scheda di allenamento mensile
-- [ ] visualizzazione della scheda da parte del cliente
-- [ ] dettaglio giornaliero dell’allenamento con struttura tabellare
+## 7.1 Funzionalità backend completate
 
-### Struttura iniziale della scheda
-La scheda mensile sarà organizzata in:
-- settimana 1
-- settimana 2
-- settimana 3
-- settimana 4
+- [x] registrazione e login dei professionisti;
+- [x] verifica email del professionista;
+- [x] creazione cliente tramite codice invito temporaneo;
+- [x] registrazione cliente consentita solo con codice valido;
+- [x] collegamento tra cliente e professionista;
+- [x] gestione profilo/account;
+- [x] lettura relazioni cliente-professionista;
+- [x] gestione disponibilità del personal trainer;
+- [x] lettura disponibilità da parte del cliente collegato;
+- [x] invio richiesta prenotazione da parte del cliente;
+- [x] conferma o rifiuto richiesta da parte del professionista;
+- [x] cancellazione richiesta booking secondo le regole previste;
+- [x] test automatici principali per Availability e Bookings.
 
-Ogni settimana conterrà i giorni relativi al programma.
-I giorni potranno essere distinti visivamente, ad esempio:
-- verde = giorno libero
-- rosso = giorno di allenamento
+## 7.2 Funzionalità ancora da implementare per completare la v1 applicativa
 
-Aprendo il giorno di allenamento, il cliente visualizzerà una tabella con dati come:
-- esercizio
-- serie e ripetizioni
-- intensità
-- recupero
-- tecniche aggiuntive
-- descrizione esercizio
-- carichi / ripetizioni registrate
-- note
+- [ ] integrazione frontend reale con il backend;
+- [ ] creazione di una scheda di allenamento;
+- [ ] visualizzazione della scheda da parte del cliente;
+- [ ] dettaglio giornaliero dell’allenamento;
+- [ ] eventuale gestione feedback;
+- [ ] eventuale gestione misurazioni e progressi;
+- [ ] completamento delle funzionalità tecniche necessarie al deploy.
+
+## 7.3 Nota sul perimetro attuale
+
+Il backend possiede già un primo flusso operativo completo basato su disponibilità e prenotazioni.
+
+Le schede workout e le funzionalità di contenuto personalizzato restano parte dell’evoluzione successiva del prodotto e non risultano ancora implementate.
+
+### Ipotesi futura per la scheda workout
+
+La futura scheda mensile potrà essere organizzata in:
+
+- settimana 1;
+- settimana 2;
+- settimana 3;
+- settimana 4.
+
+Ogni settimana potrà contenere i giorni relativi al programma, con dettaglio giornaliero composto da informazioni come:
+
+- esercizio;
+- serie e ripetizioni;
+- intensità;
+- recupero;
+- tecniche aggiuntive;
+- descrizione esercizio;
+- carichi o ripetizioni registrate;
+- note.
+
+Questa struttura resta una proposta funzionale futura, da confermare nello sprint dedicato al modulo Workout.
 
 ---
 
@@ -158,24 +234,64 @@ Per evitare di rendere la prima versione troppo complessa, queste funzionalità 
 
 ---
 
-## 10. Architettura iniziale prevista
-Il frontend sarà separato dal backend.
+## 10. Architettura del progetto
 
-Il frontend invierà richieste HTTP alle API REST esposte dal backend.  
-Il backend gestirà autenticazione, logica applicativa, validazione, accesso al database e regole di business.  
-I dati verranno salvati in MySQL e restituiti al frontend in formato JSON.
+Il progetto adotta un’architettura con frontend separato dal backend.
+
+### Backend attuale
+
+Il backend è realizzato con:
+
+- Java;
+- Spring Boot;
+- Spring Security;
+- JWT;
+- Spring Data JPA / Hibernate;
+- MySQL.
+
+Il backend gestisce:
+
+- autenticazione;
+- autorizzazione;
+- logica applicativa;
+- validazioni;
+- accesso ai dati;
+- regole business;
+- API REST in formato JSON.
+
+### Frontend
+
+Il frontend è previsto con:
+
+- HTML;
+- CSS;
+- JavaScript Vanilla.
+
+Nell’audit attuale non sono stati analizzati file frontend integrati al backend: il lavoro verificato riguarda codice backend, configurazione, test e documentazione.
 
 ---
 
 ## 11. Risultato finale desiderato
-Il progetto finale dovrebbe essere:
 
-- un’app completa nelle sue funzionalità principali
-- funzionante in locale
-- testabile da utenti reali
-- strutturata in modo ordinato
-- ben documentata
-- possibilmente pubblicata online in una prima versione usable
+Il progetto finale dovrà essere:
+
+- completo nelle funzionalità scelte per la prima versione;
+- funzionante in locale;
+- dotato di backend e frontend realmente integrati;
+- testabile da utenti reali;
+- strutturato in modo ordinato;
+- coperto da test sui flussi principali;
+- documentato in modo coerente con il codice reale;
+- possibilmente pubblicato online in una prima versione utilizzabile.
+
+### Risultato già raggiunto
+
+Il backend possiede già una base concreta e funzionante per:
+
+- autenticazione e gestione utenti;
+- relazioni cliente-professionista;
+- disponibilità;
+- prenotazioni.
 
 ---
 
@@ -190,7 +306,10 @@ Attraverso questo progetto voglio:
 
 ---
 
-## 13. Note iniziali
+## 13. Note iniziali e contesto storico
+Questa sezione conserva il contesto da cui è nato il progetto.  
+Diversi dubbi iniziali sono già stati affrontati attraverso la realizzazione del backend fino ai moduli Availability e Bookings.
+
 ### Idea generale
 Realizzare una piattaforma gestionale per professionisti del benessere e i loro clienti, con particolare attenzione a organizzazione, chiarezza e usabilità.
 
