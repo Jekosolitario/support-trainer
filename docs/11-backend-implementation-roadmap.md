@@ -449,6 +449,36 @@ Ripulire il backend prima dell’integrazione forte col frontend e del deploy.
 
 ---
 
+## FASE 16 — Stabilizzazione backend Availability / Bookings
+
+### Obiettivo
+
+Consolidare il primo workflow operativo completo del progetto prima dell’introduzione di nuovi moduli business.
+
+### Stato attuale
+
+Completata, in attesa della validazione conclusiva sugli allegati finali.
+
+### Attività completate
+
+- hardening delle regole Availability;
+- hardening delle regole Bookings;
+- protezione da slot scaduti;
+- protezione per specializzazione professionale;
+- protezione da operazioni concorrenti tramite lock pessimisti;
+- gestione coerente di slot con booking `PENDING`;
+- ampliamento test automatici;
+- riallineamento documentazione.
+
+### Definition of Done
+
+- build backend completata correttamente;
+- test automatici completati correttamente;
+- documentazione allineata al codice finale;
+- audit conclusivo senza incongruenze bloccanti residue.
+
+---
+
 ## 5. Ordine reale consigliato delle milestone
 Per ragionare in blocchi sostenibili:
 
@@ -502,13 +532,28 @@ In base all’avanzamento reale fin qui raggiunto, risultano completate:
 
 Risultano inoltre aggiunti test automatici di copertura per i flussi principali di Availability e Bookings.
 
-Il prossimo blocco naturale non è più l’aggiunta immediata di un nuovo modulo business, ma una fase di consolidamento:
+Dopo il completamento di Availability e Bookings è stata eseguita una fase di consolidamento backend e documentale.
 
-- hardening backend
-- pulizia documentazione
-- rafforzamento test
-- riallineamento roadmap
-- preparazione del progetto alla prossima grande scelta architetturale
+### Stabilizzazione completata
+
+Durante la stabilizzazione sono stati completati:
+
+- correzione dei controlli di accesso Availability;
+- validazione slot availability futuri;
+- esclusione degli slot scaduti dalla lettura cliente;
+- blocco booking e conferma booking su slot scaduti;
+- limite e normalizzazione della nota booking;
+- regole Booking rese esplicite in `SecurityConfig`;
+- controllo specializzazione `PERSONAL_TRAINER` per Availability e Bookings;
+- blocco booking e conferma booking su slot appartenenti a `NUTRITIONIST`;
+- test automatici principali per Availability e Bookings;
+- lock pessimisti per proteggere creazione e transizioni Booking concorrenti;
+- lock pessimisti per proteggere Availability da overlap concorrenti;
+- riserva logica dello slot quando esiste un booking `PENDING`;
+- blocco update/block dello slot con richiesta booking pendente;
+- riallineamento della documentazione tecnica allo stato reale del backend.
+
+Il backend può ora essere considerato consolidato fino al workflow operativo Availability/Bookings, salvo eventuali problemi che emergano dalla validazione finale dei file aggiornati.
 
 Dopo questa fase, le due strade più sensate saranno:
 
@@ -567,8 +612,8 @@ L’ordine consigliato definitivo aggiornato è:
 8. relazioni clienti/professionisti read — completato
 9. availability — completato
 10. bookings — completato
-11. stabilizzazione backend, test e documentazione — in corso
-12. frontend integration oppure workout module
+11. stabilizzazione backend, test e documentazione — completata, in attesa di validazione finale degli allegati
+12. frontend integration oppure workout module — da decidere dopo validazione finale
 13. nutrition module
 14. feedback
 15. measurements
