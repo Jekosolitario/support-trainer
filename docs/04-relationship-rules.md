@@ -207,6 +207,19 @@ Un cliente può leggere gli slot disponibili di un professionista solo se:
 - il professionista è attivo;
 - esiste un collegamento attivo tra cliente e professionista.
 
+### 6.9 Slot con richiesta booking pendente
+
+Uno slot può rimanere in stato `AVAILABLE` mentre esiste una richiesta booking in stato `PENDING`, perché la prenotazione non è ancora stata confermata.
+
+Tuttavia, durante questa fase lo slot è considerato logicamente riservato rispetto alle operazioni manuali del professionista.
+
+Finché esiste una richiesta booking `PENDING` attiva collegata allo slot, il personal trainer non può:
+
+- modificare data o orario dello slot;
+- bloccare manualmente lo slot.
+
+Il professionista deve prima gestire la richiesta pendente tramite il flusso Booking previsto, ad esempio rifiutandola.
+
 ---
 
 ## 7. Relazione tra cliente, richiesta di prenotazione e slot
@@ -305,6 +318,20 @@ Il professionista può:
 ### 7.10 Integrità dello slot
 
 Uno slot già `BOOKED` non può essere confermato nuovamente tramite un’altra richiesta.
+
+### 7.11 Riserva logica dello slot durante `PENDING`
+
+La creazione di una `BookingRequest` in stato `PENDING` non modifica immediatamente lo stato dello slot in `BOOKED`.
+
+Lo slot resta formalmente `AVAILABLE` fino alla conferma del professionista, ma non è più liberamente modificabile dal professionista mentre il cliente attende risposta.
+
+Durante lo stato `PENDING`:
+
+- non può essere creata una seconda richiesta `PENDING` attiva sullo stesso slot;
+- lo slot non può essere modificato;
+- lo slot non può essere bloccato manualmente.
+
+Questa regola garantisce coerenza tra la disponibilità selezionata dal cliente e la successiva decisione del professionista.
 
 ---
 
@@ -494,6 +521,8 @@ Il `NutritionDay` associato al feedback deve appartenere a:
 - il dettaglio booking è accessibile solo agli utenti coinvolti;
 - conferma e rifiuto competono al professionista coinvolto;
 - cancellazione compete al cliente coinvolto o, se già confermata, anche al professionista coinvolto.
+- una richiesta `PENDING` riserva logicamente lo slot rispetto a modifica e blocco manuale;
+- il professionista non può alterare uno slot oggetto di richiesta pendente prima di aver gestito tale richiesta.
 
 ### 13.2 Ownership pianificata per moduli futuri
 
@@ -564,6 +593,9 @@ Il backend attuale garantisce o controlla tramite persistence/service layer:
 - assenza di richiesta `PENDING` duplicata sullo stesso slot;
 - rispetto delle transizioni consentite della prenotazione;
 - impossibilità di confermare nuovamente uno slot già `BOOKED`.
+- impossibilità di modificare uno slot con richiesta booking `PENDING` attiva;
+- impossibilità di bloccare manualmente uno slot con richiesta booking `PENDING` attiva;
+- protezione delle operazioni concorrenti critiche su availability e booking per mantenere coerenti slot e richieste.
 
 ### 15.2 Regole pianificate per moduli futuri
 
