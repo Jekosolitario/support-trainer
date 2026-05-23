@@ -50,6 +50,8 @@ public class AvailabilityService {
         ProfessionalProfile professional = getAuthenticatedProfessional();
         validateAvailabilitySpecialization(professional);
 
+        professional = lockProfessionalForAvailabilityChange(professional.getId());
+
         validateTimeInterval(request.getStartDateTime(), request.getEndDateTime());
         validateSlotIsInFuture(request.getStartDateTime());
 
@@ -85,6 +87,8 @@ public class AvailabilityService {
     public AvailabilitySlotResponse updateAvailabilitySlot(Long slotId, UpdateAvailabilitySlotRequest request) {
         ProfessionalProfile professional = getAuthenticatedProfessional();
         validateAvailabilitySpecialization(professional);
+
+        professional = lockProfessionalForAvailabilityChange(professional.getId());
 
         AvailabilitySlot slot = getOwnedActiveSlot(slotId, professional.getId());
 
@@ -178,6 +182,15 @@ public class AvailabilityService {
                 .stream()
                 .map(AvailabilitySlotResponse::fromEntity)
                 .toList();
+    }
+
+    private ProfessionalProfile lockProfessionalForAvailabilityChange(Long professionalId) {
+        return professionalProfileRepository.findByIdForUpdate(professionalId)
+                .orElseThrow(() -> new AppException(
+                HttpStatus.NOT_FOUND,
+                "PROFESSIONAL_NOT_FOUND",
+                "Professionista non trovato"
+        ));
     }
 
     private void validateAvailabilitySpecialization(ProfessionalProfile professional) {
