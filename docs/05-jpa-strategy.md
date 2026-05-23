@@ -71,20 +71,34 @@ Scelta consigliata:
 - `@Id`
 - `@GeneratedValue(strategy = GenerationType.IDENTITY)`
 
-## 4.2 Base comune consigliata
-È consigliabile introdurre una classe base tecnica astratta per i campi comuni, ad esempio:
+## 4.2 Base comune implementata
+
+Nel backend è presente una classe tecnica astratta:
+
+- `BaseEntity`
+
+Questa classe contiene i campi comuni:
 
 - `id`
 - `createdAt`
 - `updatedAt`
 
-Questa base tecnica può essere separata dalla gerarchia business `User`.
+### Mapping implementato
 
-### Esempio concettuale
-Si possono avere due livelli distinti:
+- `id` → `@Id` + `@GeneratedValue(strategy = GenerationType.IDENTITY)`
+- `createdAt` → `@CreationTimestamp`
+- `updatedAt` → `@UpdateTimestamp`
 
-- `BaseEntity` o `AbstractEntity` → campi tecnici comuni
-- `User` → campi business comuni degli utenti
+La gerarchia business `User` estende `BaseEntity`, mentre le altre entity principali utilizzano direttamente `BaseEntity` dove appropriato.
+
+### Entity che estendono `BaseEntity`
+
+- `User`
+- `ProfessionalClientLink`
+- `InviteCode`
+- `AvailabilitySlot`
+- `BookingRequest`
+- `BookingRequestItem`
 
 ## 4.3 Costruttori
 Per le entity JPA:
@@ -95,26 +109,36 @@ Per le entity JPA:
 
 ## 5. Gestione timestamp
 
-## 5.1 Strategia scelta
-I campi temporali automatici saranno gestiti con callback JPA:
+## 5.1 Strategia implementata
 
-- `@PrePersist`
-- `@PreUpdate`
+I campi temporali automatici comuni sono gestiti nella classe `BaseEntity` tramite annotazioni Hibernate:
 
-## 5.2 Campi previsti
-Dove necessario:
+- `@CreationTimestamp`
+- `@UpdateTimestamp`
+
+## 5.2 Campi implementati
+
+Le entity che estendono `BaseEntity` ricevono:
+
 - `createdAt`
 - `updatedAt`
 
-## 5.3 Regola
-- `createdAt` viene valorizzato alla creazione
-- `updatedAt` viene aggiornato a ogni modifica
+## 5.3 Regola applicativa
 
-## 5.4 Motivazione
-Questa soluzione è adatta alla v1 perché:
-- è semplice
-- non richiede auditing Spring avanzato
-- è facile da capire e mantenere
+- `createdAt` viene valorizzato automaticamente alla creazione del record;
+- `updatedAt` viene valorizzato automaticamente alla creazione e aggiornato alle successive modifiche.
+
+## 5.4 Eccezione presente
+
+`EmailVerificationToken` non estende `BaseEntity` e contiene solo:
+
+- `createdAt`
+
+senza campo `updatedAt`.
+
+## 5.5 Nota di coerenza
+
+Nel backend reale non risultano utilizzate callback JPA `@PrePersist` o `@PreUpdate` per la gestione standard dei timestamp.
 
 ---
 
@@ -131,18 +155,23 @@ Questa scelta è preferibile perché:
 - evita problemi se in futuro cambia l’ordine degli enum
 - è più sicura rispetto a `ORDINAL`
 
-## 6.3 Enum previsti
-Esempi:
+## 6.3 Enum attualmente implementati
+
 - `Role`
 - `AccountStatus`
 - `ProfessionalSpecialization`
 - `ProfessionalOperationalStatus`
 - `ClientOperationalStatus`
+- `Gender`
 - `AvailabilitySlotStatus`
 - `BookingRequestStatus`
+
+## 6.4 Enum pianificati per moduli futuri
+
 - `WorkoutDayType`
 - `NutritionDayType`
-- `Gender`
+
+Gli enum futuri non rappresentano componenti già presenti nel backend attuale.
 
 ---
 
@@ -160,13 +189,24 @@ Invece:
 - il record resta nel database
 - viene marcato come non attivo
 
-## 7.3 Entità coinvolte principalmente
-Soft delete particolarmente utile per:
+## 7.3 Entity attualmente dotate di flag `active`
+
+Nel backend reale il campo `active` è presente in:
+
 - `ProfessionalProfile`
 - `ClientProfile`
 - `ProfessionalClientLink`
-- `WorkoutPlan`
-- `NutritionPlan`
+- `InviteCode`
+- `AvailabilitySlot`
+- `BookingRequest`
+
+Non è presente in:
+
+- `User`
+- `BookingRequestItem`
+- `EmailVerificationToken`
+
+Per i moduli futuri, la strategia di attivazione/disattivazione logica dovrà essere confermata al momento dell’implementazione.
 
 ## 7.4 Strategia query
 Le query applicative dovranno filtrare i record attivi quando necessario.
@@ -240,69 +280,82 @@ Poiché si useranno DTO per esporre i dati via API:
 ## 10.1 Regola generale
 La parte che possiede la foreign key è il lato owner della relazione.
 
-## 10.2 Regole pratiche per questo progetto
+## 10.2 Relazioni attualmente implementate
 
-### Relazioni figlio → padre
-Nelle relazioni come:
-- `WorkoutWeek -> WorkoutPlan`
-- `WorkoutDay -> WorkoutWeek`
-- `WorkoutExercise -> WorkoutDay`
-- `NutritionWeek -> NutritionPlan`
-- `NutritionDay -> NutritionWeek`
-- `NutritionEntry -> NutritionDay`
+### Relazioni con lato owner `@ManyToOne`
+
+Nel backend reale il lato che possiede la foreign key è rappresentato da:
+
+- `ProfessionalClientLink -> ProfessionalProfile`
+- `ProfessionalClientLink -> ClientProfile`
+- `InviteCode -> ProfessionalProfile`
+- `AvailabilitySlot -> ProfessionalProfile`
+- `BookingRequest -> ClientProfile`
+- `BookingRequest -> ProfessionalProfile`
 - `BookingRequestItem -> BookingRequest`
+- `BookingRequestItem -> AvailabilitySlot`
 
-il lato owner sarà normalmente:
-- il lato figlio con `@ManyToOne`
+Tutte queste relazioni sono mappate con:
 
-### Relazioni contenitore
-Il lato contenitore con `@OneToMany(mappedBy = ...)` sarà usato quando serve navigare facilmente dal padre ai figli.
+- `@ManyToOne(fetch = FetchType.LAZY, optional = false)`
+- `@JoinColumn(..., nullable = false)`
+
+### Relazione contenitore implementata
+
+`BookingRequest` contiene:
+
+- `List<BookingRequestItem> items`
+
+mappata con:
+
+- `@OneToMany(mappedBy = "bookingRequest")`
+- `cascade = CascadeType.ALL`
+- `orphanRemoval = true`
+
+### Relazioni pianificate
+
+Le relazioni relative a workout, nutrition, feedback e measurements restano ipotesi future e dovranno essere definite durante i rispettivi sprint.
 
 ---
 
 ## 11. Cascade e orphan removal
 
-## 11.1 Strategia prudente
-Non usare `CascadeType.ALL` ovunque in automatico.  
-Va applicato solo dove la dipendenza logica è forte e reale.
+## 11.1 Strategia generale
 
-## 11.2 Dove ha senso usarlo
-Ha senso valutarlo per strutture contenitore/figli fortemente dipendenti, ad esempio:
+`CascadeType.ALL` e `orphanRemoval = true` devono essere usati solo quando il figlio dipende realmente dal contenitore.
+
+## 11.2 Mapping attualmente implementato
+
+Nel backend reale questa strategia è utilizzata in:
+
+### Area booking
+
+- `BookingRequest -> BookingRequestItem`
+
+La collection `items` di `BookingRequest` è configurata con:
+
+- `cascade = CascadeType.ALL`
+- `orphanRemoval = true`
+
+Questa scelta è coerente perché un `BookingRequestItem` non ha significato autonomo senza la relativa richiesta booking.
+
+## 11.3 Mapping futuri da valutare
+
+Per i moduli futuri la stessa strategia potrà essere valutata per:
 
 ### Area workout
+
 - `WorkoutPlan -> WorkoutWeek`
 - `WorkoutWeek -> WorkoutDay`
 - `WorkoutDay -> WorkoutExercise`
 
 ### Area nutrition
+
 - `NutritionPlan -> NutritionWeek`
 - `NutritionWeek -> NutritionDay`
 - `NutritionDay -> NutritionEntry`
 
-### Area booking
-- `BookingRequest -> BookingRequestItem`
-
-## 11.3 Dove essere più cauti
-Essere più prudenti su relazioni come:
-- `ProfessionalProfile <-> ClientProfile`
-- `InviteCode -> ProfessionalProfile`
-- `ClientMeasurement -> ClientProfile`
-- `BookingRequest -> ClientProfile`
-- `BookingRequest -> ProfessionalProfile`
-
-## 11.4 orphanRemoval
-`orphanRemoval = true` ha senso soprattutto nelle strutture interne dove il figlio:
-- non ha significato fuori dal padre
-- deve sparire se rimosso dalla collezione del contenitore
-
-Esempi tipici:
-- `WorkoutExercise`
-- `WorkoutDay`
-- `WorkoutWeek`
-- `NutritionEntry`
-- `NutritionDay`
-- `NutritionWeek`
-- `BookingRequestItem`
+Questi mapping non risultano ancora implementati nel backend reale.
 
 ---
 
@@ -356,31 +409,73 @@ Queste regole vanno presidiate nel service layer.
 
 ## 14. Strategia per BookingRequest e AvailabilitySlot
 
-## 14.1 Modello scelto
-La prenotazione è modellata in due livelli:
+## 14.1 Stato di implementazione
 
+I moduli Availability e Bookings risultano implementati nel backend reale.
+
+Le entity coinvolte sono:
+
+- `AvailabilitySlot`
 - `BookingRequest`
 - `BookingRequestItem`
 
-Ogni item punta a uno `AvailabilitySlot`.
+## 14.2 Mapping Availability
 
-## 14.2 Motivazione
-Questo permette:
-- richieste multi-giorno
-- più slot in un’unica richiesta
-- struttura più flessibile e ordinata
+`AvailabilitySlot` appartiene a un solo professionista tramite:
 
-## 14.3 Regole da non delegare a JPA
-JPA non garantisce da sola:
-- assenza di sovrapposizioni logiche
-- coerenza tra PT della richiesta e PT degli slot
-- booking unico dello slot
+- `@ManyToOne(fetch = FetchType.LAZY, optional = false)`
+- foreign key `professional_id`
 
-Queste regole devono stare nella business logic.
+Contiene inoltre:
+
+- stato salvato come enum stringa;
+- flag `active`;
+- timestamp ereditati da `BaseEntity`.
+
+## 14.3 Mapping Booking
+
+`BookingRequest` appartiene a:
+
+- un solo cliente;
+- un solo professionista.
+
+Contiene una collection:
+
+- `List<BookingRequestItem> items`
+
+Ogni `BookingRequestItem` punta a:
+
+- una sola `BookingRequest`;
+- un solo `AvailabilitySlot`.
+
+## 14.4 Contratto API attuale
+
+Nel backend attuale una richiesta booking viene creata a partire da:
+
+- un singolo `availabilitySlotId`.
+
+Di conseguenza, il flusso API attuale crea:
+
+- una `BookingRequest`;
+- un solo `BookingRequestItem`.
+
+La struttura dati resta estendibile per un eventuale scenario multi-slot futuro, ma tale funzionalità non è attualmente implementata.
+
+## 14.5 Regole gestite nel service layer
+
+JPA modella le relazioni, mentre il service layer controlla:
+
+- slot nel futuro;
+- assenza di sovrapposizioni availability;
+- relazione attiva cliente-professionista;
+- slot disponibile prima della richiesta;
+- assenza di booking `PENDING` duplicato sullo stesso slot;
+- transizioni consentite del booking;
+- aggiornamento coerente dello stato slot dopo conferma o cancellazione.
 
 ---
 
-## 15. Strategia per WorkoutPlan e NutritionPlan
+## 15. Strategia futura per WorkoutPlan e NutritionPlan — Non implementata
 
 ## 15.1 Modellazione gerarchica
 Le due aree saranno modellate con strutture ad albero:
@@ -410,7 +505,7 @@ Qui ha senso una gestione più strutturata di:
 
 ---
 
-## 16. Strategia per ClientMeasurement
+## 16. Strategia futura per ClientMeasurement — Non implementata
 
 ## 16.1 Relazione
 - un cliente può avere molte misurazioni
@@ -499,25 +594,42 @@ Non bisogna usare le entity come response dirette del controller.
 
 ## 20. Validazioni: confine tra entity e service
 
-## 20.1 In entity
-Nelle entity ha senso mettere vincoli base come:
-- non null
-- unicità
-- forma generale del dato
+## 20.1 Vincoli strutturali presenti nel mapping
 
-## 20.2 Nel service
-Le regole più importanti di business vanno nel service layer, per esempio:
-- cliente massimo 3 professionisti
-- divieto di self-link
-- slot non sovrapposti
-- booking coerente col professionista
-- un solo piano attivo per coppia
-- un solo workout plan attivo per coppia
-- codice invito scaduto/non valido
+Nel mapping JPA attuale sono presenti vincoli strutturali come:
 
-## 20.3 Principio
-JPA modella la struttura.  
-La business logic protegge le regole vere del sistema.
+- campi obbligatori con `nullable = false`;
+- `users.email` univoca;
+- `invite_codes.code` univoco;
+- enum salvati come stringa;
+- foreign key obbligatorie nelle relazioni implementate.
+
+## 20.2 Regole gestite nel service layer
+
+Le regole business già implementate comprendono:
+
+- massimo 3 professionisti attivi per cliente;
+- divieto di auto-collegamento;
+- controllo collegamento attivo cliente-professionista;
+- controllo account/profilo attivo;
+- email verificata dove richiesta;
+- slot availability con intervallo valido;
+- slot availability nel futuro;
+- assenza di sovrapposizioni slot;
+- booking coerente con professionista collegato;
+- booking solo su slot disponibile;
+- assenza di richiesta `PENDING` duplicata sullo stesso slot;
+- transizioni booking consentite;
+- aggiornamento stato slot dopo conferma o cancellazione booking.
+
+## 20.3 Regole future
+
+Le regole relative a workout, nutrition, feedback e measurements dovranno essere definite e implementate nei rispettivi sprint futuri.
+
+## 20.4 Principio
+
+JPA modella struttura, relazioni e vincoli tecnici di base.  
+Il service layer protegge le regole operative reali del sistema.
 
 ---
 
@@ -561,14 +673,19 @@ Definire vincoli univoci almeno per:
 
 ## 22. Decisioni tecniche confermate
 
-Per Support Trainer si confermano le seguenti scelte:
+Per Support Trainer risultano implementate e confermate le seguenti scelte:
 
-- ereditarietà utenti con `JOINED`
-- enum salvati come `EnumType.STRING`
-- soft delete logico con campo `active`
-- timestamp automatici via `@PrePersist` e `@PreUpdate`
-- relazioni bidirezionali solo dove davvero utili
-- entity intermedia esplicita per il legame professionista-cliente
-- DTO separati dalle entity JPA
+- ereditarietà utenti con `InheritanceType.JOINED`;
+- classe tecnica comune `BaseEntity`;
+- identificativi `Long` generati con `GenerationType.IDENTITY`;
+- timestamp automatici tramite `@CreationTimestamp` e `@UpdateTimestamp`;
+- enum salvati come `EnumType.STRING`;
+- flag `active` sulle entity che richiedono gestione logica dello stato;
+- relazioni `@ManyToOne` caricate in modalità `LAZY` nei moduli implementati;
+- entity intermedia esplicita `ProfessionalClientLink` per il legame professionista-cliente;
+- relazione `BookingRequest -> BookingRequestItem` con cascade e orphan removal;
+- DTO separati dalle entity JPA;
+- regole business complesse gestite nel service layer;
+- moduli Availability e Bookings integrati nel modello persistente reale.
 
 ---
