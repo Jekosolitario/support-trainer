@@ -210,8 +210,15 @@ Uno slot può essere aggiornato solo se:
 - il nuovo inizio è nel futuro;
 - il nuovo intervallo non crea sovrapposizioni.
 - non deve esistere una richiesta booking `PENDING` attiva collegata allo slot.
+- lo slot non deve essere già stato coinvolto in alcuna richiesta booking, anche se successivamente rifiutata o cancellata.
 
 Se lo slot possiede una richiesta booking `PENDING`, la data e l’orario proposti al cliente non possono essere modificati finché la richiesta non viene gestita.
+
+Uno slot già collegato ad almeno una richiesta booking non può più essere ripianificato modificandone data o ora.
+
+Questa regola protegge l’integrità storica delle prenotazioni: il booking deve continuare a riferirsi all’intervallo temporale originariamente scelto dal cliente.
+
+Per rendere disponibile un nuovo giorno o orario, il professionista deve creare un nuovo slot availability.
 
 ### 6.7 Blocco e sblocco
 
@@ -266,6 +273,25 @@ Uno slot interessato da una richiesta pendente:
 - non può essere modificato;
 - non può essere bloccato manualmente;
 - non viene restituito tra le disponibilità prenotabili agli altri clienti.
+
+### 6.10 Integrità storica dello slot
+
+Uno slot già utilizzato in una richiesta booking mantiene immutabile il proprio intervallo temporale.
+
+La regola vale quando la richiesta collegata è:
+
+- `PENDING`;
+- `CONFIRMED`;
+- `REJECTED`;
+- `CANCELLED`.
+
+In particolare:
+
+- con booking `PENDING`, lo slot non può essere modificato né bloccato manualmente;
+- dopo un booking rifiutato o cancellato, lo slot può eventualmente ricevere nuove richieste sullo stesso intervallo;
+- dopo qualsiasi richiesta booking, lo slot non può essere ripianificato modificandone data o ora.
+
+La finalità è evitare che lo storico di una richiesta mostri un intervallo differente da quello selezionato dal cliente al momento della prenotazione.
 
 ---
 
@@ -324,6 +350,19 @@ Finché esiste una richiesta `PENDING` attiva sullo slot:
 - il professionista non può modificare lo slot;
 - il professionista non può bloccare manualmente lo slot;
 - lo slot non viene esposto al cliente come disponibilità prenotabile.
+
+### 7.4.2 Integrità temporale dello storico booking
+
+Quando una richiesta booking viene creata, lo slot selezionato entra nello storico della richiesta.
+
+Anche dopo una transizione verso:
+
+- `REJECTED`;
+- `CANCELLED`;
+
+lo slot non può essere ripianificato modificandone l’intervallo temporale.
+
+Lo slot può essere riutilizzato per una nuova richiesta soltanto mantenendo invariati giorno e orario originari e rispettando tutte le altre regole di prenotabilità.
 
 ### 7.5 Nota della richiesta
 
@@ -644,6 +683,8 @@ Il service layer gestisce le regole business reali, tra cui:
 - protezione da transizioni concorrenti della stessa richiesta booking;
 - protezione da conferme concorrenti sullo stesso slot.
 - esclusione dalla lettura availability lato cliente degli slot con booking `PENDING` attivo;
+- blocco della ripianificazione di slot già coinvolti in richieste booking;
+- tutela dell’integrità temporale dello storico delle prenotazioni;
 
 ### 15.3 Database
 
@@ -702,6 +743,7 @@ Le seguenti situazioni sono gestite o devono essere gestite tramite errori appli
 - accesso cliente a professionista non collegato.
 - modifica di slot con richiesta booking `PENDING` attiva;
 - blocco manuale di slot con richiesta booking `PENDING` attiva.
+- ripianificazione tramite modifica data/ora di uno slot già coinvolto in una richiesta booking.
 
 ### Area booking
 
@@ -742,6 +784,9 @@ Per Support Trainer risultano attualmente confermate le seguenti regole:
 - uno slot con booking `PENDING` è logicamente riservato rispetto a modifica e blocco manuale;
 - Availability e Bookings coordinano le operazioni concorrenti sullo stesso slot tramite lock pessimisti e validazioni nel service layer.
 - uno slot con booking `PENDING` attivo non viene esposto al cliente come disponibilità prenotabile;
+- uno slot già coinvolto in una richiesta booking non può essere ripianificato modificandone data o ora;
+- per proporre una nuova disponibilità temporale dopo uno storico booking, il professionista deve creare un nuovo slot;
+- la regola protegge la coerenza storica delle richieste già create.
 
 Restano pianificate, ma non ancora implementate, le regole relative a:
 
