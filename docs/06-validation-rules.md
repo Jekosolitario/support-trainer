@@ -593,12 +593,24 @@ I campi facoltativi possono essere null, ma se valorizzati devono essere trattat
 - controllo lunghezza massima, se definita
 
 ### 13.3 URL facoltativi
-Campi come:
-- `instagramUrl`
-- `websiteUrl`
-- `profileImageUrl`
 
-se presenti devono avere formato coerente con URL valido o path gestito dall’applicazione.
+I campi URL attualmente gestiti nel profilo professionista sono:
+
+- `instagramUrl`;
+- `websiteUrl`.
+
+Nel `PATCH /api/v1/me/profile` seguono queste regole:
+
+| Valore ricevuto | Comportamento |
+|---|---|
+| campo omesso oppure `null` | il valore già salvato non viene modificato |
+| valore che inizia con `http://` oppure `https://` | l’URL viene accettato e salvato |
+| stringa vuota oppure composta solo da spazi | l’URL già salvato viene rimosso e memorizzato come `null` |
+| valore senza protocollo valido | la richiesta viene rifiutata per errore di validazione |
+
+La rimozione tramite stringa vuota permette al frontend di offrire un form profilo completo, nel quale il professionista può eliminare un link precedentemente inserito.
+
+Il campo `profileImageUrl` non rientra ancora in un flusso frontend/API dedicato di upload o aggiornamento immagine profilo; tale funzionalità resta futura.
 
 ---
 
@@ -643,6 +655,8 @@ Nel backend attuale il livello DTO gestisce controlli strutturali come:
 - date obbligatorie;
 - valori numerici minimi;
 - lunghezza massima della nota booking.
+- formato URL dei campi `instagramUrl` e `websiteUrl` del profilo professionista;
+- accettazione di valori vuoti per consentire la rimozione degli URL già salvati.
 
 Esempi:
 
@@ -685,6 +699,7 @@ Il service layer gestisce le regole business reali, tra cui:
 - esclusione dalla lettura availability lato cliente degli slot con booking `PENDING` attivo;
 - blocco della ripianificazione di slot già coinvolti in richieste booking;
 - tutela dell’integrità temporale dello storico delle prenotazioni;
+- normalizzazione dei valori vuoti di `instagramUrl` e `websiteUrl` in `null` durante l’aggiornamento profilo.
 
 ### 15.3 Database
 
@@ -787,6 +802,9 @@ Per Support Trainer risultano attualmente confermate le seguenti regole:
 - uno slot già coinvolto in una richiesta booking non può essere ripianificato modificandone data o ora;
 - per proporre una nuova disponibilità temporale dopo uno storico booking, il professionista deve creare un nuovo slot;
 - la regola protegge la coerenza storica delle richieste già create.
+- gli URL `instagramUrl` e `websiteUrl` del professionista sono facoltativi, ma se valorizzati devono iniziare con `http://` o `https://`;
+- il professionista può rimuovere un URL già salvato inviando una stringa vuota nel form di aggiornamento profilo;
+- il frontend dovrà distinguere tra campo non modificato (`null`/omesso) e richiesta esplicita di rimozione (`""`).
 
 Restano pianificate, ma non ancora implementate, le regole relative a:
 
