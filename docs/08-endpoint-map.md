@@ -151,6 +151,19 @@ Vengono restituiti solo slot:
 **PATCH** `/api/v1/availability/{slotId}`  
 Aggiorna parzialmente data/ora di uno slot appartenente al professionista autenticato.
 
+L’aggiornamento è consentito solo se:
+
+- lo slot appartiene al professionista autenticato;
+- lo slot è `AVAILABLE`;
+- il nuovo intervallo è valido e futuro;
+- il nuovo intervallo non genera sovrapposizioni;
+- non esiste una richiesta booking `PENDING` attiva collegata allo slot;
+- lo slot non è mai stato coinvolto in una richiesta booking.
+
+Uno slot già collegato ad almeno una richiesta booking non può essere ripianificato modificandone data o ora, anche se la richiesta è stata successivamente rifiutata o cancellata.
+
+Per proporre una disponibilità in un nuovo intervallo temporale, il professionista deve creare un nuovo slot.
+
 ### 9.5 Blocco slot disponibilità
 **PATCH** `/api/v1/availability/{slotId}/block`  
 Blocca uno slot disponibile appartenente al professionista autenticato.
@@ -173,6 +186,9 @@ Le operazioni Availability applicano i seguenti controlli:
 - solo slot `BLOCKED` possono essere sbloccati
 - la lettura lato cliente esclude gli slot `AVAILABLE` ormai scaduti;
 - la lettura lato cliente esclude gli slot che hanno già una richiesta booking `PENDING` attiva.
+- uno slot già coinvolto in una richiesta booking non può essere ripianificato modificandone data o ora;
+- la regola di immutabilità temporale preserva lo storico della richiesta originaria;
+- dopo un booking rifiutato o cancellato, lo slot può essere nuovamente prenotabile solo sullo stesso intervallo temporale originario.
 
 ---
 
@@ -189,6 +205,12 @@ Regole attuali:
 - la `note`, se presente, viene normalizzata rimuovendo gli spazi iniziali e finali
 - una `note` vuota dopo la normalizzazione viene salvata come assente
 - la `note` non può superare `1000` caratteri
+
+### Integrità storica dello slot
+
+Quando uno slot viene utilizzato in una richiesta booking, il relativo intervallo temporale diventa parte dello storico della richiesta.
+
+Anche in caso di booking successivamente `REJECTED` o `CANCELLED`, lo slot non può essere modificato in data o ora. Può eventualmente ricevere nuove richieste sul medesimo intervallo, se ancora prenotabile.
 
 ### 10.2 Elenco prenotazioni del cliente autenticato
 **GET** `/api/v1/bookings/client`  
@@ -297,3 +319,6 @@ Per Support Trainer si confermano le seguenti scelte:
 - ownership delle risorse e transizioni di stato controllate nel service layer
 - Availability valida che gli slot creati o modificati inizino nel futuro
 - uno slot con booking `PENDING` attivo non viene più esposto come disponibilità prenotabile al cliente.
+- uno slot già coinvolto in una richiesta booking mantiene immutabile il proprio intervallo temporale;
+- la ripianificazione richiede la creazione di un nuovo slot availability;
+- questa regola impedisce che lo storico booking mostri date diverse da quelle originariamente selezionate dal cliente.
