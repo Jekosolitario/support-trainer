@@ -207,6 +207,34 @@ Un cliente può leggere gli slot disponibili di un professionista solo se:
 - il professionista è attivo;
 - esiste un collegamento attivo tra cliente e professionista.
 
+La lettura lato cliente espone solo slot:
+
+- attivi;
+- in stato `AVAILABLE`;
+- con data iniziale futura;
+- privi di richieste booking `PENDING` attive collegate.
+
+Uno slot formalmente `AVAILABLE` ma già interessato da una richiesta `PENDING` non viene più mostrato agli altri clienti come disponibilità prenotabile.
+
+### 6.9 Slot con richiesta booking pendente
+
+### 6.10 Integrità storica dello slot dopo una richiesta booking
+
+Quando uno slot viene collegato ad almeno una richiesta booking, il relativo intervallo temporale entra nello storico della prenotazione.
+
+Anche se la richiesta viene successivamente:
+
+- rifiutata;
+- cancellata;
+
+lo slot non può più essere ripianificato modificandone data o ora.
+
+Lo slot può eventualmente ricevere nuove richieste sullo stesso intervallo temporale, se resta coerente con tutte le altre regole applicative.
+
+Per proporre una nuova disponibilità in un giorno o orario differente, il personal trainer deve creare un nuovo `AvailabilitySlot`.
+
+Questa regola impedisce che lo storico di una richiesta mostri date diverse da quelle originariamente selezionate dal cliente.
+
 ---
 
 ## 7. Relazione tra cliente, richiesta di prenotazione e slot
@@ -305,6 +333,28 @@ Il professionista può:
 ### 7.10 Integrità dello slot
 
 Uno slot già `BOOKED` non può essere confermato nuovamente tramite un’altra richiesta.
+
+### 7.11 Riserva logica dello slot durante `PENDING`
+
+Durante lo stato `PENDING`:
+
+- non può essere creata una seconda richiesta `PENDING` attiva sullo stesso slot;
+- lo slot non può essere modificato;
+- lo slot non può essere bloccato manualmente.
+- lo slot non viene esposto al cliente come disponibilità prenotabile.
+
+### 7.12 Immutabilità temporale dello slot nello storico booking
+
+Uno slot già collegato a una `BookingRequest` mantiene immutabile il proprio intervallo temporale.
+
+La regola vale indipendentemente dallo stato raggiunto dalla richiesta:
+
+- `PENDING`;
+- `CONFIRMED`;
+- `REJECTED`;
+- `CANCELLED`.
+
+Dopo una richiesta rifiutata o cancellata, lo slot può eventualmente essere nuovamente prenotato sullo stesso intervallo temporale, ma non può essere ripianificato modificandone data o ora.
 
 ---
 
@@ -486,6 +536,7 @@ Il `NutritionDay` associato al feedback deve appartenere a:
 
 - un `AvailabilitySlot` appartiene a un solo `ProfessionalProfile`;
 - solo il professionista proprietario può modificarlo, bloccarlo o sbloccarlo.
+- uno slot già coinvolto in una richiesta booking non può essere ripianificato modificandone l’intervallo temporale.
 
 #### Area booking
 
@@ -494,6 +545,7 @@ Il `NutritionDay` associato al feedback deve appartenere a:
 - il dettaglio booking è accessibile solo agli utenti coinvolti;
 - conferma e rifiuto competono al professionista coinvolto;
 - cancellazione compete al cliente coinvolto o, se già confermata, anche al professionista coinvolto.
+- una richiesta booking preserva il riferimento temporale originario dello slot anche dopo rifiuto o cancellazione.
 
 ### 13.2 Ownership pianificata per moduli futuri
 
@@ -531,7 +583,7 @@ Nel backend attuale devono essere mantenuti nello storico almeno:
 
 - collegamenti professionista-cliente disattivati;
 - codici invito usati, scaduti o disattivati;
-- slot availability mantenuti tramite stato e flag logico;
+- slot availability mantenuti tramite stato e flag logico, con intervallo temporale immutabile dopo il primo coinvolgimento in una richiesta booking;
 - richieste booking concluse, rifiutate o cancellate.
 
 ### 14.2 Dati futuri da storicizzare
@@ -564,6 +616,9 @@ Il backend attuale garantisce o controlla tramite persistence/service layer:
 - assenza di richiesta `PENDING` duplicata sullo stesso slot;
 - rispetto delle transizioni consentite della prenotazione;
 - impossibilità di confermare nuovamente uno slot già `BOOKED`.
+- esclusione dalla lettura cliente degli slot con richiesta booking `PENDING` attiva;
+- impossibilità di ripianificare uno slot già coinvolto in una richiesta booking;
+- obbligo di creare un nuovo slot per proporre un nuovo intervallo temporale dopo uno storico booking.
 
 ### 15.2 Regole pianificate per moduli futuri
 
