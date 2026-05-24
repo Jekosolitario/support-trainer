@@ -327,7 +327,56 @@ Questa è la seconda grande milestone del progetto.
 
 ---
 
-## FASE 10 — Workout module
+## FASE 10 — Stabilizzazione backend Availability / Bookings
+
+### Obiettivo
+
+Consolidare il primo workflow operativo completo del progetto prima dell’introduzione di nuovi moduli business o dell’integrazione frontend reale.
+
+### Stato attuale
+
+Completata, in attesa della validazione conclusiva sugli allegati finali aggiornati.
+
+### Attività completate
+
+- correzione dei controlli di accesso Availability;
+- validazione slot availability futuri;
+- esclusione degli slot scaduti dalla lettura cliente;
+- esclusione degli slot con booking `PENDING` dalle disponibilità mostrate al cliente;
+- blocco booking e conferma booking su slot scaduti;
+- limite e normalizzazione della nota booking;
+- regole Booking rese esplicite in `SecurityConfig`;
+- controllo specializzazione `PERSONAL_TRAINER` per Availability e Bookings;
+- blocco booking e conferma booking su slot appartenenti a `NUTRITIONIST`;
+- lock pessimisti per proteggere la creazione Booking sullo stesso slot;
+- lock pessimisti per proteggere le transizioni concorrenti della richiesta Booking;
+- lock pessimisti sugli slot durante la conferma Booking;
+- lock pessimisti sul professionista per proteggere Availability da overlap concorrenti;
+- riserva logica dello slot quando esiste un booking `PENDING`;
+- blocco update e block dello slot con richiesta booking `PENDING`;
+- protezione dell’integrità storica Booking tramite blocco della ripianificazione temporale di slot già utilizzati in una richiesta;
+- ampliamento test automatici principali per Availability e Bookings;
+- riallineamento della documentazione tecnica allo stato reale del backend.
+
+### Regole consolidate più importanti
+
+- gli slot Availability sono gestiti solo da professionisti `PERSONAL_TRAINER`;
+- il cliente vede solo slot futuri, disponibili e realmente prenotabili;
+- uno slot con booking `PENDING` non viene più mostrato come disponibile;
+- uno slot con booking `PENDING` non può essere modificato o bloccato manualmente;
+- uno slot già coinvolto in un booking non può cambiare data o ora;
+- per proporre un nuovo intervallo temporale dopo uno storico Booking deve essere creato un nuovo slot.
+
+### Definition of Done
+
+- build backend completata correttamente;
+- test automatici completati correttamente;
+- documentazione allineata al codice finale;
+- audit conclusivo senza incongruenze bloccanti residue.
+
+---
+
+## FASE 11 — Workout module
 ### Obiettivo
 Implementare l’area schede di allenamento.
 
@@ -350,7 +399,7 @@ Implementare l’area schede di allenamento.
 
 ---
 
-## FASE 11 — Nutrition module
+## FASE 12 — Nutrition module
 ### Obiettivo
 Implementare l’area piani alimentari.
 
@@ -373,7 +422,7 @@ Implementare l’area piani alimentari.
 
 ---
 
-## FASE 12 — Feedback
+## FASE 13 — Feedback
 ### Obiettivo
 Permettere al cliente di segnalare problemi o richieste su contenuti assegnati.
 
@@ -389,7 +438,7 @@ Permettere al cliente di segnalare problemi o richieste su contenuti assegnati.
 
 ---
 
-## FASE 13 — Measurements
+## FASE 14 — Measurements
 ### Obiettivo
 Implementare lo storico misurazioni cliente.
 
@@ -409,7 +458,7 @@ Implementare lo storico misurazioni cliente.
 
 ---
 
-## FASE 14 — Password reset
+## FASE 15 — Password reset
 ### Obiettivo
 Aggiungere il recupero password in modo coerente con il sistema auth.
 
@@ -427,7 +476,7 @@ Aggiungere il recupero password in modo coerente con il sistema auth.
 
 ---
 
-## FASE 15 — Hardening e pulizia
+## FASE 16 — Hardening e pulizia
 ### Obiettivo
 Ripulire il backend prima dell’integrazione forte col frontend e del deploy.
 
@@ -499,6 +548,8 @@ Per ragionare in blocchi sostenibili:
 ### Milestone 3
 - availability
 - bookings
+- stabilizzazione del workflow Availability / Bookings
+- tutela concorrenza, visibilità slot e storico prenotazioni
 
 ### Milestone 4
 - workout
@@ -529,6 +580,7 @@ In base all’avanzamento reale fin qui raggiunto, risultano completate:
 - FASE 7 — Modulo clienti e professionisti in lettura
 - FASE 8 — Availability
 - FASE 9 — Bookings
+- FASE 10 — Stabilizzazione backend Availability / Bookings
 
 Risultano inoltre aggiunti test automatici di copertura per i flussi principali di Availability e Bookings.
 
@@ -612,10 +664,10 @@ L’ordine consigliato definitivo aggiornato è:
 8. relazioni clienti/professionisti read — completato
 9. availability — completato
 10. bookings — completato
-11. stabilizzazione backend, test e documentazione — completata, in attesa di validazione finale degli allegati
-12. frontend integration oppure workout module — da decidere dopo validazione finale
+11. stabilizzazione backend Availability / Bookings, test e documentazione — completata, in attesa di validazione conclusiva aggiornata
+12. frontend integration oppure workout module — da decidere dopo validazione conclusiva
 13. nutrition module
 14. feedback
 15. measurements
 16. password reset
-17. pulizia finale e preparazione deploy
+17. hardening finale e preparazione deploy

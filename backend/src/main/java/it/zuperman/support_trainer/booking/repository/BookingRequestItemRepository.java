@@ -11,6 +11,8 @@ public interface BookingRequestItemRepository extends JpaRepository<BookingReque
 
     List<BookingRequestItem> findAllByBookingRequest_Id(Long bookingRequestId);
 
+    boolean existsByAvailabilitySlot_Id(Long availabilitySlotId);
+
     boolean existsByAvailabilitySlot_IdAndBookingRequest_StatusAndBookingRequest_ActiveTrue(
             Long availabilitySlotId,
             BookingRequestStatus status

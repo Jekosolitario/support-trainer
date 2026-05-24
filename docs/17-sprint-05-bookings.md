@@ -190,6 +190,23 @@ Questa regola evita che altri clienti visualizzino o tentino di prenotare uno sl
 
 Per modificare o bloccare lo slot, il professionista deve prima gestire la richiesta pendente, ad esempio rifiutandola.
 
+### 8.2.3 Integrità storica dello slot dopo una richiesta booking
+
+Quando uno slot viene collegato a una richiesta booking, il relativo intervallo temporale diventa parte dello storico della prenotazione.
+
+Anche se la richiesta viene successivamente:
+
+- rifiutata;
+- cancellata;
+
+lo slot non può più essere ripianificato modificandone data o ora.
+
+Lo slot può eventualmente ricevere nuove richieste sullo stesso intervallo temporale, se rispetta ancora tutte le regole di prenotabilità previste.
+
+Per proporre una nuova disponibilità in un giorno o orario diverso, il professionista deve creare un nuovo slot availability.
+
+Questa regola impedisce che lo storico di una richiesta già creata mostri date diverse da quelle originariamente selezionate dal cliente.
+
 ### 8.3 Nota della richiesta
 
 La richiesta booking può contenere una `note` facoltativa.
@@ -284,6 +301,7 @@ Il sistema non consente:
 - modifica di uno slot con richiesta booking `PENDING` attiva;
 - blocco manuale di uno slot con richiesta booking `PENDING` attiva;
 - operazioni da parte di utenti non coinvolti nella prenotazione.
+- ripianificazione tramite modifica data/ora di uno slot già coinvolto in una richiesta booking, anche se la richiesta è stata rifiutata o cancellata.
 
 ---
 
@@ -378,6 +396,7 @@ Nel modulo Bookings risultano implementate le seguenti validazioni:
 - blocco del blocco manuale di uno slot con richiesta booking `PENDING`;
 - coordinamento transazionale tra modulo Availability e modulo Bookings sulle operazioni che coinvolgono lo stesso slot.
 - esclusione dalla lettura availability lato cliente degli slot con richiesta `PENDING` attiva;
+- blocco della ripianificazione di uno slot già coinvolto in almeno una richiesta booking, a tutela dello storico delle prenotazioni.
 
 ---
 
@@ -445,6 +464,7 @@ Lo Sprint 05 risulta completato e successivamente rafforzato durante l’audit t
 - blocco modifica data/ora dello slot finché esiste una richiesta pendente;
 - blocco del blocco manuale dello slot finché esiste una richiesta pendente.
 - esclusione degli slot con booking `PENDING` dalle disponibilità visibili al cliente;
+- protezione dell’integrità storica delle richieste tramite blocco della ripianificazione di slot già utilizzati in booking;
 
 ### Test automatici aggiunti durante la stabilizzazione
 
@@ -465,6 +485,7 @@ Sono presenti test automatici per verificare:
 - blocco modifica di uno slot con booking `PENDING`;
 - blocco manuale di uno slot con booking `PENDING`.
 - esclusione dalla lettura cliente di uno slot con booking `PENDING` attivo.
+- blocco della ripianificazione di uno slot già coinvolto in un booking rifiutato.
 
 ---
 

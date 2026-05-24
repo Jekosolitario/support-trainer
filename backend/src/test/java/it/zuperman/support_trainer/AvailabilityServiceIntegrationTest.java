@@ -443,4 +443,41 @@ class AvailabilityServiceIntegrationTest {
 
         assertThat(response).isEmpty();
     }
+
+    @Test
+    @DisplayName("Professionista non deve ripianificare uno slot già coinvolto in un booking rifiutato")
+    void shouldNotUpdateAvailabilitySlotAfterRejectedBookingHistory() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(29).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, endDateTime)
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        var pendingBooking = bookingService.createBookingRequest(
+                new CreateBookingRequest(slot.getId(), "Vorrei prenotare questo slot.")
+        );
+
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        bookingService.rejectBookingRequest(pendingBooking.getId());
+
+        UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
+                startDateTime.plusDays(1),
+                endDateTime.plusDays(1)
+        );
+
+        assertThatThrownBy(() -> availabilityService.updateAvailabilitySlot(slot.getId(), updateRequest))
+                .isInstanceOf(AppException.class)
+                .hasMessage("Uno slot già coinvolto in una richiesta di prenotazione non può essere ripianificato");
+    }
 }
