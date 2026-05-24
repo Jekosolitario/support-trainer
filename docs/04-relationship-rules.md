@@ -158,17 +158,13 @@ La relazione tra personal trainer e disponibilità è implementata nel backend t
 
 Le disponibilità sono gestite solo per professionisti con specializzazione:
 
-- `PERSONAL_TRAINER`
+- `PERSONAL_TRAINER`.
 
 ### 6.3 Cardinalità logica
 
-Un personal trainer può avere:
+Un personal trainer può avere molti `AvailabilitySlot`.
 
-- molti `AvailabilitySlot`.
-
-Ogni `AvailabilitySlot` appartiene a:
-
-- un solo personal trainer.
+Ogni `AvailabilitySlot` appartiene a un solo personal trainer.
 
 ### 6.4 Regole temporali implementate
 
@@ -180,6 +176,8 @@ Ogni slot deve rispettare queste regole:
 ### 6.5 Regola di non sovrapposizione
 
 Per lo stesso personal trainer non devono esistere slot attivi sovrapposti nello stesso intervallo temporale.
+
+La creazione e l’aggiornamento degli slot sono protetti da lock pessimista sul professionista, così il controllo resta coerente anche in presenza di richieste concorrenti.
 
 ### 6.6 Stati dello slot
 
@@ -195,8 +193,8 @@ Il personal trainer autenticato può:
 
 - creare i propri slot;
 - leggere i propri slot;
-- aggiornare solo i propri slot `AVAILABLE`;
-- bloccare solo i propri slot `AVAILABLE`;
+- aggiornare solo i propri slot `AVAILABLE`, se non già coinvolti in richieste booking;
+- bloccare solo i propri slot `AVAILABLE`, se non esiste una richiesta booking `PENDING`;
 - sbloccare solo i propri slot `BLOCKED`.
 
 ### 6.8 Lettura lato cliente
@@ -207,18 +205,6 @@ Un cliente può leggere gli slot disponibili di un professionista solo se:
 - il professionista è attivo;
 - esiste un collegamento attivo tra cliente e professionista.
 
-### 6.9 Slot con richiesta booking pendente
-
-Uno slot può rimanere in stato `AVAILABLE` mentre esiste una richiesta booking in stato `PENDING`, perché la prenotazione non è ancora stata confermata.
-
-Tuttavia, durante questa fase lo slot è considerato logicamente riservato rispetto alle operazioni manuali del professionista.
-
-Finché esiste una richiesta booking `PENDING` attiva collegata allo slot, il personal trainer non può:
-
-- modificare data o orario dello slot;
-- bloccare manualmente lo slot.
-
-Il professionista deve prima gestire la richiesta pendente tramite il flusso Booking previsto, ad esempio rifiutandola.
 La lettura lato cliente espone solo slot:
 
 - attivi;
@@ -226,20 +212,24 @@ La lettura lato cliente espone solo slot:
 - con data iniziale futura;
 - privi di richieste booking `PENDING` attive collegate.
 
-Uno slot formalmente `AVAILABLE` ma già interessato da una richiesta `PENDING` non viene più mostrato agli altri clienti come disponibilità prenotabile.
+Uno slot formalmente `AVAILABLE` ma già interessato da una richiesta `PENDING` non viene mostrato agli altri clienti come disponibilità prenotabile.
 
 ### 6.9 Slot con richiesta booking pendente
+
+Uno slot può rimanere in stato `AVAILABLE` mentre esiste una richiesta booking in stato `PENDING`, perché la prenotazione non è ancora stata confermata.
+
+Durante questa fase lo slot è considerato logicamente riservato. Finché esiste una richiesta `PENDING` attiva collegata allo slot, il personal trainer non può:
+
+- modificare data o orario dello slot;
+- bloccare manualmente lo slot.
+
+Il professionista deve prima gestire la richiesta pendente tramite il flusso Booking previsto, ad esempio rifiutandola.
 
 ### 6.10 Integrità storica dello slot dopo una richiesta booking
 
 Quando uno slot viene collegato ad almeno una richiesta booking, il relativo intervallo temporale entra nello storico della prenotazione.
 
-Anche se la richiesta viene successivamente:
-
-- rifiutata;
-- cancellata;
-
-lo slot non può più essere ripianificato modificandone data o ora.
+Anche se la richiesta viene successivamente rifiutata o cancellata, lo slot non può più essere ripianificato modificandone data o ora.
 
 Lo slot può eventualmente ricevere nuove richieste sullo stesso intervallo temporale, se resta coerente con tutte le altre regole applicative.
 
@@ -553,7 +543,7 @@ Il `NutritionDay` associato al feedback deve appartenere a:
 #### Area availability
 
 - un `AvailabilitySlot` appartiene a un solo `ProfessionalProfile`;
-- solo il professionista proprietario può modificarlo, bloccarlo o sbloccarlo.
+- solo il professionista proprietario può modificarlo, bloccarlo o sbloccarlo;
 - uno slot già coinvolto in una richiesta booking non può essere ripianificato modificandone l’intervallo temporale.
 
 #### Area booking
@@ -562,9 +552,8 @@ Il `NutritionDay` associato al feedback deve appartenere a:
 - un `BookingRequestItem` dipende logicamente dalla propria `BookingRequest`;
 - il dettaglio booking è accessibile solo agli utenti coinvolti;
 - conferma e rifiuto competono al professionista coinvolto;
-- cancellazione compete al cliente coinvolto o, se già confermata, anche al professionista coinvolto.
-- una richiesta `PENDING` riserva logicamente lo slot rispetto a modifica e blocco manuale;
-- il professionista non può alterare uno slot oggetto di richiesta pendente prima di aver gestito tale richiesta.
+- cancellazione compete al cliente coinvolto o, se già confermata, anche al professionista coinvolto;
+- una richiesta `PENDING` riserva logicamente lo slot rispetto a nuova prenotazione, modifica e blocco manuale;
 - una richiesta booking preserva il riferimento temporale originario dello slot anche dopo rifiuto o cancellazione.
 
 ### 13.2 Ownership pianificata per moduli futuri
@@ -628,20 +617,18 @@ Il backend attuale garantisce o controlla tramite persistence/service layer:
 - un solo collegamento attivo per coppia professionista-cliente;
 - massimo 3 professionisti attivi per cliente;
 - impossibilità di auto-collegamento professionista-cliente;
-- slot availability con intervallo temporale valido;
-- slot creati o aggiornati solo con data iniziale futura;
+- availability gestita solo da professionisti `PERSONAL_TRAINER`;
+- slot availability con intervallo temporale valido e futuro in creazione/aggiornamento;
 - assenza di sovrapposizioni tra slot attivi dello stesso professionista;
-- booking creabile solo tra cliente e professionista collegati;
-- booking creabile solo su slot disponibile;
+- esclusione dalla lettura cliente degli slot scaduti o con richiesta booking `PENDING` attiva;
+- impossibilità di modificare o bloccare manualmente uno slot con richiesta booking `PENDING` attiva;
+- impossibilità di ripianificare uno slot già coinvolto in una richiesta booking;
+- booking creabile solo tra cliente e professionista collegati, su slot di un `PERSONAL_TRAINER`;
+- booking creabile solo su slot attivo, disponibile e futuro;
 - assenza di richiesta `PENDING` duplicata sullo stesso slot;
 - rispetto delle transizioni consentite della prenotazione;
-- impossibilità di confermare nuovamente uno slot già `BOOKED`.
-- impossibilità di modificare uno slot con richiesta booking `PENDING` attiva;
-- impossibilità di bloccare manualmente uno slot con richiesta booking `PENDING` attiva;
-- protezione delle operazioni concorrenti critiche su availability e booking per mantenere coerenti slot e richieste.
-- esclusione dalla lettura cliente degli slot con richiesta booking `PENDING` attiva;
-- impossibilità di ripianificare uno slot già coinvolto in una richiesta booking;
-- obbligo di creare un nuovo slot per proporre un nuovo intervallo temporale dopo uno storico booking.
+- impossibilità di confermare nuovamente uno slot già `BOOKED`;
+- protezione tramite lock pessimisti delle operazioni concorrenti critiche su availability e booking.
 
 ### 15.2 Regole pianificate per moduli futuri
 
@@ -650,5 +637,3 @@ Quando i relativi moduli verranno implementati, dovranno essere valutate anche:
 - una sola scheda workout attiva per coppia personal trainer-cliente;
 - un solo piano nutrizione attivo per coppia nutrizionista-cliente;
 - vincoli di ownership su misurazioni e feedback.
-
----

@@ -300,7 +300,7 @@ Il sistema non consente:
 - esposizione lato cliente di uno slot con richiesta `PENDING` attiva;
 - modifica di uno slot con richiesta booking `PENDING` attiva;
 - blocco manuale di uno slot con richiesta booking `PENDING` attiva;
-- operazioni da parte di utenti non coinvolti nella prenotazione.
+- operazioni da parte di utenti non coinvolti nella prenotazione;
 - ripianificazione tramite modifica data/ora di uno slot già coinvolto in una richiesta booking, anche se la richiesta è stata rifiutata o cancellata.
 
 ---
@@ -375,28 +375,22 @@ Il modello dati resta predisposto per una futura evoluzione multi-slot, ma tale 
 Nel modulo Bookings risultano implementate le seguenti validazioni:
 
 - cliente autenticato valido e attivo in fase di creazione richiesta;
-- professionista proprietario dello slot valido e attivo;
-- professionista proprietario dello slot con specializzazione `PERSONAL_TRAINER`;
+- professionista proprietario dello slot valido, attivo e con specializzazione `PERSONAL_TRAINER`;
 - collegamento attivo cliente-professionista;
-- slot esistente;
-- slot attivo e disponibile;
-- slot con data iniziale futura in fase di prenotazione;
+- slot esistente, attivo, disponibile e futuro;
 - assenza di altra richiesta `PENDING` attiva sullo stesso slot;
 - nota facoltativa, normalizzata e limitata a `1000` caratteri;
 - booking esistente nei flussi di dettaglio, conferma, rifiuto e cancellazione;
-- ownership corretta della richiesta;
-- ruolo coerente con l’operazione richiesta;
+- ownership e ruolo coerenti con l’operazione richiesta;
 - transizione di stato consentita;
-- conferma consentita solo se lo slot collegato è ancora disponibile e non scaduto;
-- sincronizzazione coerente tra stato booking e stato slot.
+- conferma consentita solo se lo slot collegato è ancora disponibile, futuro e riferito a un `PERSONAL_TRAINER`;
+- sincronizzazione coerente tra stato booking e stato slot;
 - protezione pessimistica dello slot durante la creazione booking;
 - protezione pessimistica della richiesta durante conferma, rifiuto e cancellazione;
-- protezione pessimistica dello slot durante la conferma booking.
-- blocco della modifica di uno slot con richiesta booking `PENDING`;
-- blocco del blocco manuale di uno slot con richiesta booking `PENDING`;
-- coordinamento transazionale tra modulo Availability e modulo Bookings sulle operazioni che coinvolgono lo stesso slot.
-- esclusione dalla lettura availability lato cliente degli slot con richiesta `PENDING` attiva;
-- blocco della ripianificazione di uno slot già coinvolto in almeno una richiesta booking, a tutela dello storico delle prenotazioni.
+- protezione pessimistica dello slot durante la conferma booking;
+- blocco della modifica o del blocco manuale di uno slot con richiesta booking `PENDING`;
+- esclusione dalla lettura cliente degli slot con richiesta `PENDING` attiva;
+- blocco della ripianificazione di uno slot già coinvolto in almeno una richiesta booking.
 
 ---
 
@@ -413,13 +407,11 @@ I casi gestiti comprendono:
 
 - slot non trovato;
 - booking non trovato;
-- cliente non autorizzato;
-- professionista non autorizzato;
+- cliente o professionista non autorizzato;
 - relazione cliente-professionista assente;
-- slot non disponibile;
-- slot scaduto non prenotabile;
-- slot appartenente a un nutrizionista non prenotabile;
-- richiesta pending già presente sullo slot;
+- slot non disponibile o scaduto;
+- slot appartenente a un nutrizionista non prenotabile o non confermabile;
+- richiesta `PENDING` già presente sullo slot;
 - transizione booking non consentita;
 - conferma booking pending con slot ormai scaduto;
 - accesso al dettaglio da utente non coinvolto;
@@ -431,11 +423,13 @@ I casi gestiti comprendono:
 
 Lo Sprint 05 ha introdotto il primo workflow completo di prenotazione del progetto:
 
+```text
 cliente collegato
 -> selezione slot disponibile
 -> richiesta booking PENDING
 -> conferma / rifiuto / cancellazione
 -> aggiornamento coerente dello slot
+```
 
 ---
 
@@ -446,25 +440,18 @@ Lo Sprint 05 risulta completato e successivamente rafforzato durante l’audit t
 ### Funzionalità implementate
 
 - creazione richiesta booking single-slot;
-- lista richieste lato cliente;
-- lista richieste lato professionista;
+- lista richieste lato cliente e lato professionista;
 - dettaglio richiesta accessibile solo agli utenti coinvolti;
-- conferma richiesta pending;
-- rifiuto richiesta pending;
-- cancellazione richiesta secondo ruolo e stato;
+- conferma, rifiuto e cancellazione richiesta secondo ruolo e stato;
 - sincronizzazione tra stato booking e stato availability slot;
 - normalizzazione e limite della nota;
-- blocco booking su slot scaduti;
-- blocco conferma booking con slot scaduti;
-- blocco booking su slot appartenenti a nutrizionisti.
-- protezione da richieste booking concorrenti sullo stesso slot;
+- blocco booking e conferma su slot scaduti o appartenenti a nutrizionisti;
+- protezione da richieste e conferme concorrenti sullo stesso slot;
 - protezione da transizioni concorrenti sulla stessa richiesta;
-- protezione da conferme concorrenti sullo stesso slot.
 - riserva logica dello slot durante una richiesta booking `PENDING`;
-- blocco modifica data/ora dello slot finché esiste una richiesta pendente;
-- blocco del blocco manuale dello slot finché esiste una richiesta pendente.
+- blocco modifica/blocco manuale dello slot finché esiste una richiesta pendente;
 - esclusione degli slot con booking `PENDING` dalle disponibilità visibili al cliente;
-- protezione dell’integrità storica delle richieste tramite blocco della ripianificazione di slot già utilizzati in booking;
+- protezione dell’integrità storica tramite blocco della ripianificazione di slot già utilizzati in booking.
 
 ### Test automatici aggiunti durante la stabilizzazione
 
@@ -480,12 +467,13 @@ Sono presenti test automatici per verificare:
 - blocco lettura dettaglio booking da utente non coinvolto;
 - blocco creazione booking su slot scaduto;
 - blocco conferma booking pending con slot ormai scaduto;
-- blocco creazione booking su slot appartenente a un nutrizionista.
-- blocco creazione di una seconda richiesta `PENDING` sullo stesso slot.
-- blocco modifica di uno slot con booking `PENDING`;
-- blocco manuale di uno slot con booking `PENDING`.
-- esclusione dalla lettura cliente di uno slot con booking `PENDING` attivo.
+- blocco creazione e conferma booking su slot appartenente a un nutrizionista;
+- blocco creazione di una seconda richiesta `PENDING` sullo stesso slot;
+- blocco modifica o blocco manuale di uno slot con booking `PENDING`;
+- esclusione dalla lettura cliente di uno slot con booking `PENDING` attivo;
 - blocco della ripianificazione di uno slot già coinvolto in un booking rifiutato.
+
+Le protezioni da concorrenza tramite lock sono implementate; non risultano coperte da un test parallelo multi-transazione dedicato.
 
 ---
 
@@ -497,7 +485,9 @@ Il modulo Bookings è ora coerente con:
 - relazione cliente-professionista;
 - specializzazione del professionista;
 - stato e validità temporale degli slot;
-- transizioni di stato della prenotazione.
+- transizioni di stato della prenotazione;
+- visibilità delle disponibilità lato cliente;
+- integrità storica dell’intervallo temporale richiesto.
 
 La futura miglioria prioritaria del modulo resta la possibilità per il professionista di inserire un motivo testuale in fase di rifiuto della richiesta.
 

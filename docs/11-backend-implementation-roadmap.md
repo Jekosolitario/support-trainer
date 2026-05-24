@@ -476,7 +476,7 @@ Aggiungere il recupero password in modo coerente con il sistema auth.
 
 ---
 
-## FASE 16 — Hardening e pulizia
+## FASE 16 — Hardening finale e preparazione integrazione/deploy
 ### Obiettivo
 Ripulire il backend prima dell’integrazione forte col frontend e del deploy.
 
@@ -497,34 +497,6 @@ Ripulire il backend prima dell’integrazione forte col frontend e del deploy.
 - pronto per integrazione frontend seria
 
 ---
-
-## FASE 16 — Stabilizzazione backend Availability / Bookings
-
-### Obiettivo
-
-Consolidare il primo workflow operativo completo del progetto prima dell’introduzione di nuovi moduli business.
-
-### Stato attuale
-
-Completata, in attesa della validazione conclusiva sugli allegati finali.
-
-### Attività completate
-
-- hardening delle regole Availability;
-- hardening delle regole Bookings;
-- protezione da slot scaduti;
-- protezione per specializzazione professionale;
-- protezione da operazioni concorrenti tramite lock pessimisti;
-- gestione coerente di slot con booking `PENDING`;
-- ampliamento test automatici;
-- riallineamento documentazione.
-
-### Definition of Done
-
-- build backend completata correttamente;
-- test automatici completati correttamente;
-- documentazione allineata al codice finale;
-- audit conclusivo senza incongruenze bloccanti residue.
 
 ---
 
@@ -603,6 +575,9 @@ Durante la stabilizzazione sono stati completati:
 - lock pessimisti per proteggere Availability da overlap concorrenti;
 - riserva logica dello slot quando esiste un booking `PENDING`;
 - blocco update/block dello slot con richiesta booking pendente;
+- esclusione degli slot con booking `PENDING` dalla lettura disponibilità lato cliente;
+- tutela dello storico Booking tramite immutabilità temporale degli slot già coinvolti in richieste;
+- obbligo di creare un nuovo slot per proporre un intervallo diverso dopo uno storico Booking;
 - riallineamento della documentazione tecnica allo stato reale del backend.
 
 Il backend può ora essere considerato consolidato fino al workflow operativo Availability/Bookings, salvo eventuali problemi che emergano dalla validazione finale dei file aggiornati.

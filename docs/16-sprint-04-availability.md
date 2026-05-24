@@ -158,8 +158,8 @@ Uno slot può trovarsi in uno dei seguenti stati:
 - `BOOKED`
 - `BLOCKED`
 
-### 8.6 Separazione da bookings
-Il modulo availability non deve ancora:
+### 8.6 Separazione da bookings nello sprint originario
+Durante lo Sprint 04 originale il modulo availability non doveva ancora:
 - creare richieste di prenotazione
 - confermare prenotazioni
 - rifiutare prenotazioni
@@ -167,15 +167,14 @@ Il modulo availability non deve ancora:
 
 ### 8.7 Lettura disponibilità di un professionista
 
-La lettura delle disponibilità di un professionista espone al cliente solo gli slot consultabili come disponibilità.
+La lettura delle disponibilità di un professionista espone al cliente solo gli slot realmente prenotabili.
 
 Regole implementate:
 
-- il cliente deve essere autenticato;
-- il cliente deve avere profilo attivo;
+- il cliente deve essere autenticato e avere profilo attivo;
 - il professionista deve esistere ed essere attivo;
 - deve esistere un collegamento attivo tra cliente e professionista;
-- vengono esposti solo gli slot disponibili secondo la logica del modulo.
+- vengono esposti solo slot attivi, `AVAILABLE`, futuri e senza richieste booking `PENDING` attive.
 
 ---
 
@@ -242,7 +241,10 @@ Durante lo sprint e la successiva fase di stabilizzazione risultano implementate
 - update consentito solo su slot `AVAILABLE`;
 - block consentito solo su slot `AVAILABLE`;
 - unblock consentito solo su slot `BLOCKED`;
-- lettura cliente consentita solo verso professionisti collegati.
+- lettura cliente consentita solo verso professionisti collegati;
+- esclusione degli slot scaduti o con booking `PENDING` dalla lettura cliente;
+- blocco di update/block quando esiste un booking `PENDING` attivo;
+- immutabilità temporale degli slot già coinvolti in una richiesta booking.
 
 ---
 
@@ -293,7 +295,7 @@ Lo Sprint 04 risulta completato con il modulo `availability` funzionante e succe
 
 - creazione slot disponibilità;
 - lettura degli slot del professionista autenticato;
-- lettura degli slot disponibili di un professionista da parte del cliente collegato;
+- lettura degli slot realmente prenotabili da parte del cliente collegato;
 - aggiornamento parziale di uno slot;
 - blocco manuale di uno slot;
 - sblocco manuale di uno slot.
@@ -309,29 +311,18 @@ Lo Sprint 04 risulta completato con il modulo `availability` funzionante e succe
 
 ### Regole implementate e verificate
 
-- solo professionisti autenticati possono creare e gestire slot availability;
-- solo professionisti `PERSONAL_TRAINER` possono creare e gestire slot availability;
+- solo professionisti autenticati con specializzazione `PERSONAL_TRAINER` possono creare e gestire slot availability;
 - un professionista `NUTRITIONIST` non può creare slot availability;
 - il professionista deve avere account attivo, email verificata e profilo attivo;
-- il professionista può modificare solo i propri slot;
+- il professionista può gestire solo i propri slot;
 - il cliente può leggere availability solo di professionisti a lui collegati;
-- gli slot non possono avere intervalli temporali non validi;
-- gli slot creati o aggiornati devono iniziare nel futuro;
-- gli slot non possono sovrapporsi ad altri slot attivi dello stesso professionista;
-- l’update è consentito solo su slot `AVAILABLE`;
-- `AVAILABLE -> BLOCKED` è consentito;
-- `BLOCKED -> AVAILABLE` è consentito;
-- slot inesistenti o non accessibili producono errore applicativo coerente;
-- body vuoto in update produce `400 BAD_REQUEST`.
-- la creazione e l’aggiornamento di slot availability dello stesso professionista sono protetti da lock pessimista sul profilo professionale;
-- il controllo di sovrapposizione resta coerente anche in presenza di richieste concorrenti;
-- uno slot con una richiesta booking `PENDING` non può essere modificato;
-- uno slot con una richiesta booking `PENDING` non può essere bloccato;
-- prima di modificare o bloccare uno slot con richiesta pendente, il professionista deve gestire la richiesta tramite il flusso booking previsto.
-- uno slot con richiesta booking `PENDING` attiva non viene esposto al cliente come disponibilità prenotabile;
-- uno slot già coinvolto in almeno una richiesta booking non può essere ripianificato modificandone data o ora;
-- la regola vale anche se la richiesta precedente è stata rifiutata o cancellata;
-- per proporre un nuovo intervallo temporale dopo uno storico booking, il professionista deve creare un nuovo slot.
+- gli slot creati o aggiornati devono avere intervalli validi, futuri e non sovrapposti;
+- update e block sono consentiti solo su slot `AVAILABLE`;
+- unblock è consentito solo su slot `BLOCKED`;
+- body vuoto in update produce `400 BAD_REQUEST`;
+- uno slot con richiesta booking `PENDING` non può essere modificato o bloccato;
+- slot scaduti o con richiesta booking `PENDING` non vengono esposti come disponibilità al cliente;
+- uno slot già coinvolto in almeno una richiesta booking non può essere ripianificato modificandone data o ora.
 
 ### Protezione da operazioni concorrenti
 
@@ -339,37 +330,23 @@ Durante la creazione o l’aggiornamento di availability slot, il backend proteg
 
 Il lock viene applicato al `ProfessionalProfile` perché, in fase di creazione di un nuovo slot, potrebbe non esistere ancora una riga slot da bloccare.
 
-Questa strategia garantisce che due operazioni simultanee dello stesso professionista non possano entrambe superare il controllo di sovrapposizione e salvare intervalli incompatibili.
-
-Le operazioni di modifica e blocco di uno slot utilizzano inoltre il lock sullo slot interessato, mantenendo coerente l’interazione con il modulo Bookings.
+Le operazioni di modifica e blocco utilizzano inoltre il lock sullo slot interessato, mantenendo coerente l’interazione con il modulo Bookings.
 
 ### Integrazione con richieste booking pendenti
 
 Uno slot in stato `AVAILABLE` può avere una richiesta booking in stato `PENDING`.
 
-In questo caso, il professionista non può:
+In questo caso, lo slot è logicamente riservato: non viene esposto al cliente come disponibilità prenotabile e il professionista non può modificarlo o bloccarlo manualmente.
 
-- modificarne data e ora;
-- bloccarlo manualmente.
-
-Questa regola impedisce che la disponibilità proposta al cliente venga alterata mentre la richiesta è ancora in attesa di risposta.
-
-Per rendere nuovamente modificabile o bloccabile lo slot, il professionista deve prima gestire la richiesta pendente secondo il flusso previsto, ad esempio rifiutandola.
+Per modificare o bloccare lo slot, il professionista deve prima gestire la richiesta pendente secondo il flusso Booking previsto, ad esempio rifiutandola.
 
 ### Integrità storica degli slot già utilizzati in Booking
 
-Uno slot può essere collegato a una richiesta booking anche quando la richiesta viene successivamente:
+Dopo il primo collegamento a una richiesta booking, data e ora dello slot non possono più essere modificate, anche se la richiesta viene successivamente rifiutata o cancellata.
 
-- rifiutata;
-- cancellata.
+Lo slot può restare disponibile per nuove richieste sullo stesso intervallo temporale, purché rispetti le altre regole applicative.
 
-In questi casi lo slot può restare disponibile per nuove richieste sullo stesso intervallo temporale, purché rispetti tutte le regole applicative previste.
-
-Tuttavia, lo slot non può più essere ripianificato modificandone data o ora.
-
-Questa regola protegge lo storico delle richieste già create: una richiesta passata deve continuare a riferirsi all’intervallo temporale originariamente selezionato dal cliente.
-
-Per offrire una disponibilità in un nuovo giorno o orario, il professionista deve creare un nuovo slot availability.
+Per offrire una disponibilità in un giorno o orario diverso, il professionista deve creare un nuovo slot availability.
 
 ### Stati slot gestiti
 
@@ -378,15 +355,6 @@ Per offrire una disponibilità in un nuovo giorno o orario, il professionista de
 - `BOOKED`
 
 Lo stato `BOOKED`, inizialmente previsto per il modulo successivo, è ora utilizzato operativamente dal modulo Bookings completato nello Sprint 05.
-
-Inoltre, uno slot con richiesta booking `PENDING` attiva non viene più restituito nella lettura availability lato cliente.
-
-La lista delle disponibilità consultabili espone quindi solo slot realmente prenotabili:
-
-- attivi;
-- in stato `AVAILABLE`;
-- futuri;
-- senza richieste booking `PENDING` attive collegate.
 
 ### Test automatici aggiunti durante la stabilizzazione
 
@@ -397,13 +365,12 @@ Sono presenti test automatici per verificare:
 - blocco della creazione di slot sovrapposti;
 - lettura availability da parte del cliente collegato;
 - blocco della lettura da parte del cliente non collegato;
-- esclusione degli slot `AVAILABLE` ormai scaduti dalla lettura cliente;
+- esclusione degli slot scaduti dalla lettura cliente;
+- esclusione dalla lettura cliente di uno slot con booking `PENDING` attivo;
 - blocco e sblocco di uno slot;
-- impossibilità di aggiornare uno slot non disponibile.
-- impossibilità di modificare uno slot con booking `PENDING`;
-- impossibilità di bloccare uno slot con booking `PENDING`.
-- esclusione dalla lettura cliente di uno slot con booking `PENDING` attivo.
-- impossibilità di ripianificare uno slot già coinvolto in un booking rifiutato, a tutela dello storico della richiesta.
+- impossibilità di aggiornare uno slot non disponibile;
+- impossibilità di modificare o bloccare uno slot con booking `PENDING`;
+- impossibilità di ripianificare uno slot già coinvolto in un booking rifiutato.
 
 ---
 

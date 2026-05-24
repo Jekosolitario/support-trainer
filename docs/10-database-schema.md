@@ -246,32 +246,22 @@ Slot di disponibilità dei professionisti.
 
 ### Note
 
-La regola “niente sovrapposizione slot” è gestita dalla business logic nel service layer.
-
 Regole applicative attualmente implementate:
 
-- gli slot availability possono essere creati e gestiti solo da professionisti `PERSONAL_TRAINER`;
-- uno slot creato o aggiornato deve iniziare nel futuro;
-- gli slot attivi dello stesso professionista non possono sovrapporsi;
-- la creazione e l’aggiornamento degli slot dello stesso professionista sono protetti da lock pessimista sul `ProfessionalProfile`;
-- uno slot con richiesta booking `PENDING` attiva non può essere modificato;
-- uno slot con richiesta booking `PENDING` attiva non può essere bloccato manualmente;
-- gli slot `AVAILABLE` ormai scaduti non vengono esposti nella lettura cliente.
-- uno slot con richiesta booking `PENDING` attiva non viene esposto al cliente come disponibilità prenotabile;
-- uno slot già coinvolto in almeno una richiesta booking non può essere ripianificato modificandone data o ora;
-- dopo uno storico booking, per proporre un nuovo intervallo temporale il professionista deve creare un nuovo slot availability.
+- gestione riservata ai professionisti `PERSONAL_TRAINER`;
+- intervallo valido e data iniziale futura in creazione o aggiornamento;
+- assenza di sovrapposizioni tra slot attivi dello stesso professionista;
+- protezione da overlap concorrenti tramite lock pessimista sul `ProfessionalProfile`;
+- esclusione dalla lettura cliente degli slot scaduti o con richiesta booking `PENDING` attiva;
+- divieto di modifica o blocco manuale dello slot con richiesta booking `PENDING` attiva;
+- immutabilità di data e ora dopo il primo coinvolgimento dello slot in una richiesta booking;
+- creazione di un nuovo slot per proporre un intervallo temporale diverso dopo uno storico booking.
 
 ---
 
 ## 3.8 `booking_requests`
 
 Richieste di prenotazione create dai clienti.
-
-### Note
-
-- una richiesta `PENDING` impedisce che lo slot venga esposto agli altri clienti come disponibilità prenotabile;
-- l’intervallo temporale dello slot collegato resta immutabile dopo la creazione di una richiesta, anche in caso di successivo rifiuto o cancellazione;
-- lo storico del booking mantiene così il riferimento temporale originariamente selezionato dal cliente.
 
 ### Colonne principali
 
@@ -311,28 +301,21 @@ La presenza della tabella `booking_request_items` mantiene il modello estendibil
 
 Regole applicative attualmente implementate:
 
-- un booking può essere creato solo tra cliente e professionista collegati;
-- il professionista coinvolto deve essere un `PERSONAL_TRAINER`;
-- lo slot deve essere attivo, `AVAILABLE` e non scaduto;
-- sullo stesso slot non può esistere una seconda richiesta `PENDING` attiva;
-- la `note` è facoltativa, normalizzata e limitata a `1000` caratteri;
-- un booking `PENDING` riserva logicamente lo slot rispetto a modifica e blocco manuale;
-- la conferma è consentita solo se lo slot è ancora disponibile, futuro e coerente con la specializzazione prevista;
-- le transizioni di stato della richiesta sono protette da lock pessimista.
+- booking consentito solo tra cliente e professionista collegati;
+- professionista proprietario dello slot necessariamente `PERSONAL_TRAINER`;
+- slot attivo, `AVAILABLE` e non scaduto;
+- assenza di una seconda richiesta `PENDING` attiva sullo stesso slot;
+- `note` facoltativa, normalizzata e limitata a `1000` caratteri;
+- booking `PENDING` che riserva logicamente lo slot rispetto a esposizione cliente, modifica e blocco manuale;
+- conferma consentita solo se lo slot è ancora disponibile, futuro e coerente con la specializzazione prevista;
+- protezione delle transizioni tramite lock pessimista;
+- conservazione dell’intervallo temporale originario dello slot anche dopo `REJECTED` o `CANCELLED`.
 
 ---
 
 ## 3.9 `booking_request_items`
 
 Dettaglio degli slot collegati a una richiesta booking.
-
-La tabella collega la richiesta allo slot availability selezionato e consente al service layer di:
-
-- verificare l’assenza di richieste `PENDING` attive sullo stesso slot;
-- escludere dalla lettura cliente gli slot con richiesta `PENDING` attiva;
-- impedire modifica o blocco manuale dello slot mentre una richiesta è in attesa;
-- impedire la ripianificazione temporale di uno slot già coinvolto in una richiesta booking;
-- aggiornare coerentemente lo stato dello slot durante conferma o cancellazione booking.
 
 ### Colonne principali
 
@@ -359,7 +342,9 @@ Nel backend attuale ogni booking creato tramite API contiene un solo item.
 La tabella collega la richiesta allo slot availability selezionato e consente al service layer di:
 
 - verificare l’assenza di richieste `PENDING` attive sullo stesso slot;
+- escludere dalla lettura cliente gli slot con richiesta `PENDING` attiva;
 - impedire modifica o blocco manuale dello slot mentre una richiesta è in attesa;
+- impedire la ripianificazione temporale di uno slot già coinvolto in una richiesta booking;
 - aggiornare coerentemente lo stato dello slot durante conferma o cancellazione booking.
 
 ---
@@ -420,7 +405,7 @@ Questa tabella può già essere presente nel database, ma il flusso di forgot/re
 
 ---
 
-## 5 Schema pianificato per moduli futuri
+## 5. Schema pianificato per moduli futuri
 
 Le tabelle seguenti appartengono alla roadmap progettuale, ma **non sono ancora da considerare integrate nel backend attuale**.
 
@@ -798,12 +783,12 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 ### Area availability
 
 - gestione slot riservata ai professionisti `PERSONAL_TRAINER`;
-- intervallo temporale valido;
-- creazione e aggiornamento solo per slot con data iniziale futura;
+- intervallo temporale valido e data iniziale futura in creazione o aggiornamento;
 - nessuna sovrapposizione tra slot attivi dello stesso professionista;
-- esclusione degli slot scaduti dalla lettura cliente;
-- impossibilità di modificare uno slot con booking `PENDING` attivo;
-- impossibilità di bloccare manualmente uno slot con booking `PENDING` attivo.
+- esclusione dalla lettura cliente degli slot scaduti o con booking `PENDING` attivo;
+- impossibilità di modificare o bloccare manualmente uno slot con booking `PENDING` attivo;
+- immutabilità dell’intervallo temporale di uno slot già coinvolto in una richiesta booking;
+- obbligo di creare un nuovo slot per proporre un intervallo diverso dopo uno storico booking.
 
 ### Area booking
 
@@ -818,7 +803,8 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
   - `PENDING -> CANCELLED`;
   - `CONFIRMED -> CANCELLED`;
 - conferma booking consentita solo se lo slot è ancora valido e prenotabile;
-- sincronizzazione coerente tra stato booking e stato slot.
+- sincronizzazione coerente tra stato booking e stato slot;
+- preservazione dell’intervallo temporale originario dello slot nello storico del booking.
 
 ### Protezione da concorrenza
 
@@ -828,16 +814,7 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 - lock pessimista sullo slot durante conferma booking;
 - lock pessimista sullo slot durante modifica o blocco manuale in presenza potenziale di richieste booking.
 
-### Area availability
-
-- esclusione dalla lettura cliente degli slot con booking `PENDING` attivo;
-- immutabilità dell’intervallo temporale di uno slot già coinvolto in una richiesta booking;
-- obbligo di creare un nuovo slot per proporre un intervallo diverso dopo uno storico booking.
-
-### Area booking
-
-- una richiesta `PENDING` riserva logicamente lo slot e lo rimuove dalle disponibilità consultabili lato cliente;
-- lo storico booking conserva l’intervallo temporale originario dello slot anche dopo `REJECTED` o `CANCELLED`.
+---
 
 ## 9.4 Vincoli futuri previsti
 
@@ -887,15 +864,16 @@ Questo documento va sempre letto distinguendo tra:
 ---
 
 ## 11. Decisioni confermate
+
 Per Support Trainer si confermano le seguenti scelte:
 
-- naming SQL in snake_case
-- tabelle plurali
-- PK `BIGINT AUTO_INCREMENT`
-- immagine profilo salvata come URL/path
-- vincoli logici più complessi gestiti a livello business/service
-- separazione chiara tra schema attuale e schema futuro
-- tabelle token documentate distinguendo tra uso reale e preparazione tecnica
-- slot con booking `PENDING` esclusi dalle disponibilità mostrate al cliente;
+- naming SQL in snake_case;
+- tabelle plurali;
+- PK `BIGINT AUTO_INCREMENT`;
+- immagine profilo salvata come URL/path;
+- vincoli logici complessi gestiti a livello business/service;
+- separazione chiara tra schema attuale e schema futuro;
+- tabelle token documentate distinguendo tra uso reale e preparazione tecnica;
+- slot scaduti o con booking `PENDING` esclusi dalle disponibilità mostrate al cliente;
 - intervallo temporale degli slot immutabile dopo il primo coinvolgimento in una richiesta booking;
 - ripianificazione gestita tramite creazione di un nuovo slot, non modifica dello slot storico.
