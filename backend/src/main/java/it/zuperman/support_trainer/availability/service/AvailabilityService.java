@@ -99,6 +99,7 @@ public class AvailabilityService {
 
         validateSlotCanBeUpdated(slot);
         validateNoPendingBookingOnSlot(slot.getId());
+        validateSlotHasNoBookingHistoryForReschedule(slot.getId());
         validateUpdateRequestNotEmpty(request);
 
         LocalDateTime newStartDateTime = request.getStartDateTime() != null
@@ -316,6 +317,19 @@ public class AvailabilityService {
                     HttpStatus.CONFLICT,
                     "AVAILABILITY_SLOT_HAS_PENDING_BOOKING",
                     "Uno slot con una richiesta di prenotazione in attesa non può essere modificato o bloccato"
+            );
+        }
+    }
+
+    private void validateSlotHasNoBookingHistoryForReschedule(Long slotId) {
+        boolean hasBookingHistory = bookingRequestItemRepository
+                .existsByAvailabilitySlot_Id(slotId);
+
+        if (hasBookingHistory) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "AVAILABILITY_SLOT_HAS_BOOKING_HISTORY",
+                    "Uno slot già coinvolto in una richiesta di prenotazione non può essere ripianificato"
             );
         }
     }
