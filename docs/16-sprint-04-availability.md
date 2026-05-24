@@ -329,6 +329,9 @@ Lo Sprint 04 risulta completato con il modulo `availability` funzionante e succe
 - uno slot con una richiesta booking `PENDING` non può essere bloccato;
 - prima di modificare o bloccare uno slot con richiesta pendente, il professionista deve gestire la richiesta tramite il flusso booking previsto.
 - uno slot con richiesta booking `PENDING` attiva non viene esposto al cliente come disponibilità prenotabile;
+- uno slot già coinvolto in almeno una richiesta booking non può essere ripianificato modificandone data o ora;
+- la regola vale anche se la richiesta precedente è stata rifiutata o cancellata;
+- per proporre un nuovo intervallo temporale dopo uno storico booking, il professionista deve creare un nuovo slot.
 
 ### Protezione da operazioni concorrenti
 
@@ -352,6 +355,21 @@ In questo caso, il professionista non può:
 Questa regola impedisce che la disponibilità proposta al cliente venga alterata mentre la richiesta è ancora in attesa di risposta.
 
 Per rendere nuovamente modificabile o bloccabile lo slot, il professionista deve prima gestire la richiesta pendente secondo il flusso previsto, ad esempio rifiutandola.
+
+### Integrità storica degli slot già utilizzati in Booking
+
+Uno slot può essere collegato a una richiesta booking anche quando la richiesta viene successivamente:
+
+- rifiutata;
+- cancellata.
+
+In questi casi lo slot può restare disponibile per nuove richieste sullo stesso intervallo temporale, purché rispetti tutte le regole applicative previste.
+
+Tuttavia, lo slot non può più essere ripianificato modificandone data o ora.
+
+Questa regola protegge lo storico delle richieste già create: una richiesta passata deve continuare a riferirsi all’intervallo temporale originariamente selezionato dal cliente.
+
+Per offrire una disponibilità in un nuovo giorno o orario, il professionista deve creare un nuovo slot availability.
 
 ### Stati slot gestiti
 
@@ -385,6 +403,7 @@ Sono presenti test automatici per verificare:
 - impossibilità di modificare uno slot con booking `PENDING`;
 - impossibilità di bloccare uno slot con booking `PENDING`.
 - esclusione dalla lettura cliente di uno slot con booking `PENDING` attivo.
+- impossibilità di ripianificare uno slot già coinvolto in un booking rifiutato, a tutela dello storico della richiesta.
 
 ---
 
