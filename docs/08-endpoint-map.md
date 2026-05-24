@@ -82,7 +82,29 @@ Restituisce i dati account essenziali dell’utente autenticato.
 
 ### 5.3 Aggiornamento dati profilo base
 **PATCH** `/api/v1/me/profile`  
-Aggiorna i dati modificabili del proprio profilo.
+Aggiorna i dati modificabili del profilo dell’utente autenticato.
+
+### Regole URL profilo professionista
+
+Per i campi facoltativi:
+
+- `instagramUrl`;
+- `websiteUrl`;
+
+il comportamento implementato è:
+
+| Valore inviato | Risultato |
+|---|---|
+| campo omesso oppure `null` | il valore esistente non viene modificato |
+| valore che inizia con `http://` oppure `https://` | il valore viene validato e salvato |
+| stringa vuota oppure composta solo da spazi | il valore esistente viene rimosso e salvato come `null` |
+| valore senza protocollo valido | la richiesta viene rifiutata per errore di validazione |
+
+Questa regola permette al frontend di distinguere tra:
+
+- link non modificato;
+- link aggiornato;
+- link rimosso esplicitamente dall’utente.
 
 ### 5.4 Aggiornamento stato operativo
 **PATCH** `/api/v1/me/profile/operational-status`  
@@ -322,3 +344,6 @@ Per Support Trainer si confermano le seguenti scelte:
 - uno slot già coinvolto in una richiesta booking mantiene immutabile il proprio intervallo temporale;
 - la ripianificazione richiede la creazione di un nuovo slot availability;
 - questa regola impedisce che lo storico booking mostri date diverse da quelle originariamente selezionate dal cliente.
+- `instagramUrl` e `websiteUrl` del profilo professionista, se valorizzati, devono iniziare con `http://` oppure `https://`;
+- nel `PATCH /api/v1/me/profile`, l’invio di un valore vuoto per `instagramUrl` o `websiteUrl` rimuove il link precedentemente salvato;
+- il frontend dovrà gestire separatamente valore invariato, nuovo URL e rimozione esplicita del link.
