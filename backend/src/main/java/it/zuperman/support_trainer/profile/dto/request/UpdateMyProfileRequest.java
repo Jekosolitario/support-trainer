@@ -33,14 +33,14 @@ public class UpdateMyProfileRequest {
 
     @Size(max = 255, message = "L'URL Instagram non può superare 255 caratteri")
     @Pattern(
-            regexp = "^(https?://).+",
+            regexp = "^(\\s*|https?://.+)$",
             message = "L'URL Instagram deve iniziare con http:// o https://"
     )
     private String instagramUrl;
 
     @Size(max = 255, message = "L'URL del sito web non può superare 255 caratteri")
     @Pattern(
-            regexp = "^(https?://).+",
+            regexp = "^(\\s*|https?://.+)$",
             message = "L'URL del sito web deve iniziare con http:// o https://"
     )
     private String websiteUrl;

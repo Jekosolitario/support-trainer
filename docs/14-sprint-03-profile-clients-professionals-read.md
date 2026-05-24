@@ -334,21 +334,36 @@ Il dettaglio deve essere leggibile solo se:
 
 ---
 
-## 16. Validazioni minime da implementare
+## 16. Validazioni implementate e consolidate
 
 ### Profile update
-- limiti di lunghezza sui campi testuali
-- `birthDate` nel passato
-- `heightCm` maggiore di zero
-- `heightCm` con massimo 3 cifre intere e 2 decimali
-- `operationalStatus` obbligatorio nel relativo endpoint
 
-### Nota importante
-Nel codice attuale i campi URL del profilo:
-- `instagramUrl`
-- `websiteUrl`
+Risultano implementate le seguenti validazioni:
 
-hanno validazione di lunghezza, ma non hanno ancora una validazione formale del formato URL.
+- limiti di lunghezza sui campi testuali;
+- `birthDate` nel passato;
+- `heightCm` maggiore di zero;
+- `heightCm` con massimo 3 cifre intere e 2 decimali;
+- `operationalStatus` obbligatorio nel relativo endpoint;
+- validazione formale dei campi URL del profilo professionista.
+
+### URL profilo professionista
+
+I campi:
+
+- `instagramUrl`;
+- `websiteUrl`;
+
+sono facoltativi e seguono queste regole nel `PATCH /api/v1/me/profile`:
+
+| Valore inviato | Comportamento |
+|---|---|
+| campo omesso oppure `null` | il valore esistente non viene modificato |
+| URL che inizia con `http://` oppure `https://` | il valore viene validato e salvato |
+| stringa vuota oppure composta solo da spazi | il valore esistente viene rimosso e salvato come `null` |
+| URL senza protocollo valido | la richiesta viene rifiutata per errore di validazione |
+
+La rimozione esplicita tramite valore vuoto è stata introdotta durante la fase di riallineamento precedente alla progettazione frontend, così da permettere al form profilo di eliminare correttamente un link già salvato.
 
 ### Clients / Professionals read
 - utente autenticato valido
@@ -441,11 +456,26 @@ Lo sprint è completato solo se:
 - l’utente autenticato può leggere i propri dati account
 - l’utente autenticato può aggiornare il proprio profilo base
 - l’utente autenticato può aggiornare il proprio stato operativo
+- il professionista può valorizzare `instagramUrl` e `websiteUrl` solo con URL che iniziano con `http://` o `https://`
+- il professionista può rimuovere `instagramUrl` e `websiteUrl` inviando un valore vuoto nel form profilo
 - il professionista può vedere solo i propri clienti collegati
 - il cliente può vedere solo i propri professionisti collegati
 - i dettagli sono visibili solo se la relazione è valida
 - gli accessi non autorizzati vengono bloccati correttamente
 - i test principali sono stati eseguiti con successo
+
+---
+
+## 20.1 Consolidamento successivo all’audit frontend
+
+Durante la preparazione della progettazione frontend è stato chiarito il contratto dei campi URL del profilo professionista.
+
+Sono stati aggiunti test automatici per verificare:
+
+- rimozione di `instagramUrl` e `websiteUrl` tramite valori vuoti;
+- rifiuto di URL privi di protocollo `http://` o `https://`.
+
+Questa integrazione non modifica lo scope funzionale dello Sprint 03, ma rende completo e utilizzabile dal frontend il comportamento del form profilo.
 
 ---
 
