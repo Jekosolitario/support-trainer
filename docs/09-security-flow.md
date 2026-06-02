@@ -45,7 +45,8 @@ L’utente, dopo login valido, ottiene un accesso temporaneo senza usare session
 ## 3.3 Vantaggi
 Questa scelta è adatta perché:
 - è coerente con un backend REST separato dal frontend
-- si integra bene con frontend HTML/CSS/JS separato
+- si integra bene con un frontend web React + TypeScript + Vite separato dal backend;
+- resta compatibile, a livello di API REST e autenticazione JWT, con una possibile futura app mobile React Native + Expo da valutare dopo la stabilizzazione della web app.
 - permette un controllo chiaro sugli endpoint
 - si adatta bene a un’applicazione scalabile e testabile
 
