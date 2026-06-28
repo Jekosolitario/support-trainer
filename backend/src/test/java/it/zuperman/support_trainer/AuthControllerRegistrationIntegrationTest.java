@@ -2,6 +2,7 @@ package it.zuperman.support_trainer;
 
 import java.time.LocalDateTime;
 
+import com.jayway.jsonpath.JsonPath;
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,13 +10,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
+import it.zuperman.support_trainer.auth.token.EmailVerificationToken;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
@@ -48,6 +54,9 @@ class AuthControllerRegistrationIntegrationTest {
 
     @Autowired
     private ProfessionalClientLinkRepository professionalClientLinkRepository;
+
+    @Autowired
+    private EmailVerificationTokenRepository emailVerificationTokenRepository;
 
     @Test
     @DisplayName("Non deve registrare due professionisti con la stessa email")
@@ -161,5 +170,103 @@ class AuthControllerRegistrationIntegrationTest {
         InviteCode usedInviteCode = inviteCodeRepository.findByCode(inviteCodeValue).orElseThrow();
         assertThat(usedInviteCode.getUsed()).isTrue();
         assertThat(usedInviteCode.getUsedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Non deve registrare un secondo cliente con un invito già usato")
+    void shouldRejectSecondClientRegistrationWithUsedInviteCode() throws Exception {
+        String professionalEmail = "professional.used.invite@example.com";
+        String password = "Password123!";
+        String professionalRegistrationRequestBody = """
+                {
+                  "firstName": "Matteo",
+                  "lastName": "Riva",
+                  "email": "%s",
+                  "password": "%s",
+                  "specialization": "PERSONAL_TRAINER"
+                }
+                """.formatted(professionalEmail, password);
+
+        mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(professionalRegistrationRequestBody))
+                .andExpect(status().isCreated());
+
+        ProfessionalProfile savedProfessional = professionalProfileRepository
+                .findByEmail(professionalEmail)
+                .orElseThrow();
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
+                .stream()
+                .filter(token -> token.getUser().getId().equals(savedProfessional.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        mockMvc.perform(get("/api/v1/auth/verify-email")
+                        .param("token", verificationToken.getToken()))
+                .andExpect(status().isOk());
+
+        String professionalLoginRequestBody = """
+                {
+                  "email": "%s",
+                  "password": "%s"
+                }
+                """.formatted(professionalEmail, password);
+
+        MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(professionalLoginRequestBody))
+                .andExpect(status().isOk())
+                .andReturn();
+        String professionalToken = JsonPath.read(
+                loginResult.getResponse().getContentAsString(),
+                "$.accessToken"
+        );
+
+        MvcResult inviteResult = mockMvc.perform(post("/api/v1/invites")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + professionalToken))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String inviteCode = JsonPath.read(
+                inviteResult.getResponse().getContentAsString(),
+                "$.code"
+        );
+
+        String firstClientRequestBody = """
+                {
+                  "firstName": "Alice",
+                  "lastName": "Fontana",
+                  "email": "alice.fontana.used.invite@example.com",
+                  "password": "Password123!",
+                  "birthDate": "1995-03-20",
+                  "heightCm": 165.00,
+                  "primaryGoal": "Migliorare la forma fisica",
+                  "gender": "FEMALE",
+                  "inviteCode": "%s"
+                }
+                """.formatted(inviteCode);
+
+        mockMvc.perform(post("/api/v1/auth/register/client")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(firstClientRequestBody))
+                .andExpect(status().isCreated());
+
+        String secondClientRequestBody = """
+                {
+                  "firstName": "Davide",
+                  "lastName": "Greco",
+                  "email": "davide.greco.used.invite@example.com",
+                  "password": "Password123!",
+                  "birthDate": "1993-09-12",
+                  "heightCm": 180.00,
+                  "primaryGoal": "Aumentare la forza",
+                  "gender": "MALE",
+                  "inviteCode": "%s"
+                }
+                """.formatted(inviteCode);
+
+        mockMvc.perform(post("/api/v1/auth/register/client")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(secondClientRequestBody))
+                .andExpect(status().isBadRequest());
     }
 }
