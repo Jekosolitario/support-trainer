@@ -49,4 +49,28 @@ class AuthControllerRegistrationIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value("EMAIL_ALREADY_REGISTERED"));
     }
+
+    @Test
+    @DisplayName("Non deve registrare un cliente con codice invito inesistente")
+    void shouldRejectClientRegistrationWithMissingInviteCode() throws Exception {
+        String requestBody = """
+                {
+                  "firstName": "Laura",
+                  "lastName": "Conti",
+                  "email": "laura.conti.invite.notfound@example.com",
+                  "password": "Password123!",
+                  "birthDate": "1995-01-01",
+                  "heightCm": 170.00,
+                  "primaryGoal": "Migliorare la forma fisica",
+                  "gender": "FEMALE",
+                  "inviteCode": "INVITE-NOT-EXISTING"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register/client")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_NOT_FOUND"));
+    }
 }
