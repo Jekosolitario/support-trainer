@@ -126,4 +126,38 @@ class AuthControllerLoginIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value("AUTHENTICATION_ERROR"));
     }
+
+    @Test
+    @DisplayName("Professionista non verificato non deve effettuare il login")
+    void shouldRejectLoginBeforeEmailVerification() throws Exception {
+        String email = "giulia.romano@example.com";
+        String password = "Password123!";
+        String registrationRequestBody = """
+                {
+                  "firstName": "Giulia",
+                  "lastName": "Romano",
+                  "email": "%s",
+                  "password": "%s",
+                  "specialization": "PERSONAL_TRAINER"
+                }
+                """.formatted(email, password);
+
+        mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registrationRequestBody))
+                .andExpect(status().isCreated());
+
+        String loginRequestBody = """
+                {
+                  "email": "%s",
+                  "password": "%s"
+                }
+                """.formatted(email, password);
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginRequestBody))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_NOT_ACTIVE"));
+    }
 }
