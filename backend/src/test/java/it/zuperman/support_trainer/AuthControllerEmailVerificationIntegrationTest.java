@@ -12,6 +12,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
@@ -80,5 +81,14 @@ class AuthControllerEmailVerificationIntegrationTest {
         assertThat(verifiedUser.getAccountStatus()).isEqualTo(AccountStatus.ACTIVE);
         assertThat(usedToken.getUsed()).isTrue();
         assertThat(usedToken.getUsedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Deve restituire not found per un token di verifica inesistente")
+    void shouldReturnNotFoundForMissingEmailVerificationToken() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/verify-email")
+                        .param("token", "inesistente"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EMAIL_VERIFICATION_TOKEN_NOT_FOUND"));
     }
 }
