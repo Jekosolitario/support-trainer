@@ -91,4 +91,39 @@ class AuthControllerEmailVerificationIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("EMAIL_VERIFICATION_TOKEN_NOT_FOUND"));
     }
+
+    @Test
+    @DisplayName("Non deve consentire il riutilizzo di un token di verifica")
+    void shouldRejectAlreadyUsedEmailVerificationToken() throws Exception {
+        String requestBody = """
+                {
+                  "firstName": "Luigi",
+                  "lastName": "Verdi",
+                  "email": "luigi.verdi@example.com",
+                  "password": "Password123!",
+                  "specialization": "PERSONAL_TRAINER"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated());
+
+        User savedUser = userRepository.findByEmail("luigi.verdi@example.com").orElseThrow();
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
+                .stream()
+                .filter(token -> token.getUser().getId().equals(savedUser.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        mockMvc.perform(get("/api/v1/auth/verify-email")
+                        .param("token", verificationToken.getToken()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/auth/verify-email")
+                        .param("token", verificationToken.getToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("EMAIL_VERIFICATION_TOKEN_ALREADY_USED"));
+    }
 }
