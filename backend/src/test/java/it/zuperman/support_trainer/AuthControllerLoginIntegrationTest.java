@@ -81,4 +81,49 @@ class AuthControllerLoginIntegrationTest {
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.refreshToken").isNotEmpty());
     }
+
+    @Test
+    @DisplayName("Professionista verificato non deve effettuare il login con password errata")
+    void shouldRejectLoginWithIncorrectPassword() throws Exception {
+        String email = "paolo.bianchi@example.com";
+        String password = "Password123!";
+        String registrationRequestBody = """
+                {
+                  "firstName": "Paolo",
+                  "lastName": "Bianchi",
+                  "email": "%s",
+                  "password": "%s",
+                  "specialization": "PERSONAL_TRAINER"
+                }
+                """.formatted(email, password);
+
+        mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registrationRequestBody))
+                .andExpect(status().isCreated());
+
+        User savedUser = userRepository.findByEmail(email).orElseThrow();
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
+                .stream()
+                .filter(token -> token.getUser().getId().equals(savedUser.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        mockMvc.perform(get("/api/v1/auth/verify-email")
+                        .param("token", verificationToken.getToken()))
+                .andExpect(status().isOk());
+
+        String loginRequestBody = """
+                {
+                  "email": "%s",
+                  "password": "WrongPassword123!"
+                }
+                """.formatted(email);
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginRequestBody))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("AUTHENTICATION_ERROR"));
+    }
 }
