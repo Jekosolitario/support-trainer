@@ -1,5 +1,7 @@
 package it.zuperman.support_trainer;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -125,5 +127,40 @@ class AuthControllerEmailVerificationIntegrationTest {
                         .param("token", verificationToken.getToken()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("EMAIL_VERIFICATION_TOKEN_ALREADY_USED"));
+    }
+
+    @Test
+    @DisplayName("Non deve verificare l'email con un token scaduto")
+    void shouldRejectExpiredEmailVerificationToken() throws Exception {
+        String requestBody = """
+                {
+                  "firstName": "Sara",
+                  "lastName": "Galli",
+                  "email": "sara.galli.expired.token@example.com",
+                  "password": "Password123!",
+                  "specialization": "PERSONAL_TRAINER"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated());
+
+        User savedUser = userRepository.findByEmail("sara.galli.expired.token@example.com").orElseThrow();
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
+                .stream()
+                .filter(token -> token.getUser().getId().equals(savedUser.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(verificationToken.getUsed()).isFalse();
+        verificationToken.setExpiresAt(LocalDateTime.now().minusDays(1));
+        emailVerificationTokenRepository.saveAndFlush(verificationToken);
+
+        mockMvc.perform(get("/api/v1/auth/verify-email")
+                        .param("token", verificationToken.getToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("EMAIL_VERIFICATION_TOKEN_EXPIRED"));
     }
 }
