@@ -1,6 +1,9 @@
 package it.zuperman.support_trainer;
 
+import java.util.List;
+
 import com.jayway.jsonpath.JsonPath;
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,6 +89,39 @@ class InviteControllerAuthorizationIntegrationTest {
         mockMvc.perform(get("/api/v1/invites")
                         .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Professionista autenticato deve vedere solo i propri inviti")
+    void shouldReturnOnlyAuthenticatedProfessionalInvites() throws Exception {
+        String professionalAToken = registerVerifyAndLoginProfessional(
+                "professional.a.invite.ownership@example.com",
+                "Alessandro",
+                "Villa"
+        );
+        String professionalBToken = registerVerifyAndLoginProfessional(
+                "professional.b.invite.ownership@example.com",
+                "Beatrice",
+                "Leone"
+        );
+
+        String professionalAInviteCode = createInvite(professionalAToken);
+        String professionalBInviteCode = createInvite(professionalBToken);
+
+        MvcResult result = mockMvc.perform(get("/api/v1/invites")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalAToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        List<String> returnedInviteCodes = JsonPath.read(
+                result.getResponse().getContentAsString(),
+                "$[*].code"
+        );
+
+        assertThat(returnedInviteCodes)
+                .hasSize(1)
+                .contains(professionalAInviteCode)
+                .doesNotContain(professionalBInviteCode);
     }
 
     private String registerVerifyAndLoginProfessional(
