@@ -159,6 +159,81 @@ class AuthControllerInviteValidationIntegrationTest {
                 .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_NOT_ACTIVE"));
     }
 
+    @Test
+    @DisplayName("Deve rifiutare l'invito di un professionista inattivo")
+    void shouldRejectInviteOwnedByInactiveProfessional() throws Exception {
+        String inviteCodeValue = "INACTIVE-PROFESSIONAL-INVITE";
+        InviteCode inviteCode = createValidInvite(
+                inviteCodeValue,
+                "inactive.professional.invite.validation@example.com"
+        );
+        ProfessionalProfile professional = inviteCode.getProfessional();
+        professional.setActive(false);
+        professionalProfileRepository.saveAndFlush(professional);
+
+        String requestBody = """
+                {
+                  "code": "%s"
+                }
+                """.formatted(inviteCodeValue);
+
+        mockMvc.perform(post(VALIDATE_INVITE_ENDPOINT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_NOT_ACTIVE"));
+    }
+
+    @Test
+    @DisplayName("Deve rifiutare l'invito di un professionista non verificato")
+    void shouldRejectInviteOwnedByUnverifiedProfessional() throws Exception {
+        String inviteCodeValue = "UNVERIFIED-PROFESSIONAL-INVITE";
+        InviteCode inviteCode = createValidInvite(
+                inviteCodeValue,
+                "unverified.professional.invite.validation@example.com"
+        );
+        ProfessionalProfile professional = inviteCode.getProfessional();
+        professional.setEmailVerified(false);
+        professionalProfileRepository.saveAndFlush(professional);
+
+        String requestBody = """
+                {
+                  "code": "%s"
+                }
+                """.formatted(inviteCodeValue);
+
+        mockMvc.perform(post(VALIDATE_INVITE_ENDPOINT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_NOT_ACTIVE"));
+    }
+
+    @Test
+    @DisplayName("Deve rifiutare l'invito di un professionista con account non attivo")
+    void shouldRejectInviteOwnedByProfessionalWithInactiveAccount() throws Exception {
+        String inviteCodeValue = "INACTIVE-ACCOUNT-PROFESSIONAL-INVITE";
+        InviteCode inviteCode = createValidInvite(
+                inviteCodeValue,
+                "inactive.account.professional.invite.validation@example.com"
+        );
+        ProfessionalProfile professional = inviteCode.getProfessional();
+        professional.setAccountStatus(AccountStatus.PENDING_VERIFICATION);
+        professionalProfileRepository.saveAndFlush(professional);
+
+        String requestBody = """
+                {
+                  "code": "%s"
+                }
+                """.formatted(inviteCodeValue);
+
+        mockMvc.perform(post(VALIDATE_INVITE_ENDPOINT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_NOT_ACTIVE"));
+    }
+
     private InviteCode createValidInvite(String code, String professionalEmail) {
         ProfessionalProfile professional = new ProfessionalProfile(
                 "Mario",
