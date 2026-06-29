@@ -12,7 +12,7 @@ Nel primo blocco sono stati aggiunti 9 test di integrazione dedicati ad Auth e s
 
 Nel blocco successivo sono stati aggiunti 5 test di integrazione dedicati a Invite, ruoli e access control.
 
-È stato poi aggiunto un ulteriore blocco di 5 test dedicati al contratto pubblico di validazione dell'invito. Complessivamente sono quindi stati aggiunti 19 test di integrazione.
+È stato poi aggiunto un ulteriore blocco di 8 test dedicati al contratto pubblico di validazione dell'invito e allo stato del professionista proprietario. Complessivamente sono quindi stati aggiunti 22 test di integrazione.
 
 Non sono state apportate modifiche al codice di produzione.
 
@@ -78,7 +78,7 @@ File creato:
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerRegistrationIntegrationTest.java
 ```
 
-## Invite, ruoli e access control
+## Invite, validate-invite e access control
 
 ### Autorizzazioni endpoint Invite
 
@@ -102,16 +102,17 @@ File creato:
 backend/src/test/java/it/zuperman/support_trainer/InviteControllerAuthorizationIntegrationTest.java
 ```
 
-### Riutilizzo di un invito consumato
+### Registrazione cliente tramite invito
 
-È stato aggiunto un test end-to-end che:
+La copertura della registrazione cliente verifica:
 
-* registra e verifica un professionista;
-* effettua il login e ottiene un JWT reale;
-* crea un invito;
-* registra correttamente un primo cliente;
-* tenta di registrare un secondo cliente con lo stesso codice;
-* verifica che la seconda registrazione restituisca `400 Bad Request`.
+* registrazione con invito valido;
+* rifiuto di un invito inesistente;
+* creazione del collegamento professionista-cliente;
+* consumo dell'invito dopo la registrazione;
+* rifiuto del riutilizzo dello stesso invito per un secondo cliente con `400 Bad Request`.
+
+Il test sul riutilizzo usa il flusso reale: registrazione e verifica del professionista, login con JWT, creazione dell'invito e registrazione dei due clienti.
 
 File modificato:
 
@@ -149,9 +150,14 @@ Comportamenti verificati:
 * invito inesistente → `404 Not Found`, `INVITE_CODE_NOT_FOUND`;
 * invito già usato → `400 Bad Request`, `INVITE_CODE_ALREADY_USED`;
 * invito scaduto → `400 Bad Request`, `INVITE_CODE_EXPIRED`;
-* invito inattivo → `400 Bad Request`, `INVITE_CODE_NOT_ACTIVE`.
+* invito inattivo → `400 Bad Request`, `INVITE_CODE_NOT_ACTIVE`;
+* proprietario inattivo → `400 Bad Request`, `INVITE_CODE_NOT_ACTIVE`;
+* proprietario con email non verificata → `400 Bad Request`, `INVITE_CODE_NOT_ACTIVE`;
+* proprietario con account non `ACTIVE` → `400 Bad Request`, `INVITE_CODE_NOT_ACTIVE`.
 
 La validazione pubblica è ora coperta direttamente e non soltanto attraverso il flusso di registrazione cliente. Il test sul caso valido verifica inoltre che la validazione non consumi l'invito.
+
+Validazione e registrazione sono mantenute come coperture separate perché esercitano contratti differenti: la prima controlla lo stato corrente senza consumare il codice, mentre la seconda lo rivalida, crea il collegamento e lo marca come usato.
 
 File creato:
 
@@ -184,9 +190,9 @@ backend/src/test/java/it/zuperman/support_trainer/InviteControllerAuthorizationI
 
 ## Verifica
 
-I test mirati sono stati eseguiti manualmente durante il lavoro sul branch.
+I test mirati sono stati eseguiti manualmente dopo i singoli blocchi di lavoro.
 
-La suite completa Maven è stata eseguita manualmente ed è passata anche dopo l'integrazione dei test sulla validazione pubblica dell'invito. Il numero totale non viene indicato perché non è stato verificato tramite log durante questo aggiornamento documentale.
+La suite completa Maven è stata eseguita manualmente ed è passata dopo le integrazioni Auth, Invite, validate-invite e access control. Il numero totale non viene indicato perché non è stato verificato tramite log durante questo aggiornamento documentale.
 
 Comando utilizzato:
 
@@ -199,15 +205,21 @@ Comando utilizzato:
 * Alcuni test dipendono da `errorCode` specifici. Questo è utile per proteggere il contratto API, ma richiederà aggiornamenti se il contratto degli errori cambierà.
 * Alcune fixture sono duplicate intenzionalmente per evitare refactoring prematuri nei test.
 * Il test della registrazione cliente con invito valido prepara direttamente professionista e invito tramite repository. Questo mantiene il test focalizzato sulla registrazione cliente, ma non copre la generazione reale dell'invito.
-* Gli inviti funzionano come bearer token: chi possiede un codice valido può utilizzarlo una volta. Questo comportamento resta una caratteristica di sicurezza da considerare nel flusso applicativo.
+* Gli inviti funzionano come bearer token: chi possiede un codice valido può utilizzarlo una volta.
+* L'invito non è associato a una specifica email destinataria.
+* La registrazione tramite invito considera immediatamente verificata l'email del cliente.
+* La validazione pubblica restituisce `professionalId` e scadenza dell'invito.
+* La protezione dal doppio utilizzo concorrente dipende dal lock database.
 * Il rischio di regressione che permetta a un professionista di leggere inviti altrui è ora coperto dal test di ownership.
 * Il riutilizzo di un invito già consumato è ora coperto da un test end-to-end.
-* Il contratto principale dell'endpoint pubblico di validazione è ora coperto direttamente e il caso valido verifica che l'invito non venga consumato.
-* Gli stati del professionista proprietario dell'invito, come account non attivo o email non verificata, non fanno parte di questo blocco di test.
+* Il contratto principale dell'endpoint pubblico di validazione, inclusi gli stati non validi del proprietario, è coperto direttamente e il caso valido verifica che l'invito non venga consumato.
+* Restano fuori da questa fase test avanzati di concorrenza, input malformati, rate limiting e hardening operativo.
 
 ## Valutazione finale
 
 Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli, access control e validazione pubblica degli inviti senza modificare il comportamento applicativo.
+
+Il pacchetto Invite / validate-invite / access control è considerato chiudibile per questa fase MVP. Le lacune residue riguardano robustezza avanzata, concorrenza e hardening futuro, non il flusso MVP fondamentale.
 
 Le modifiche sono considerate sicure perché:
 
@@ -215,5 +227,5 @@ Le modifiche sono considerate sicure perché:
 * non toccano codice di produzione;
 * usano il profilo `test`;
 * usano flussi reali di registrazione, verifica email e autenticazione JWT per gli endpoint Invite;
-* verificano direttamente gli stati principali del contratto pubblico di validazione invito;
+* verificano direttamente gli stati principali dell'invito e del professionista proprietario;
 * sono state verificate con test mirati e suite completa.
