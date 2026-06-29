@@ -1,4 +1,4 @@
-# Riepilogo lavoro Codex — Copertura test Auth
+# Riepilogo lavoro Codex — Copertura test Auth e Invite
 
 ## Contesto
 
@@ -8,7 +8,9 @@ L’obiettivo della sessione era testare Codex in modo sicuro, limitando gli int
 
 ## Risultato generale
 
-Sono stati aggiunti 9 nuovi test di integrazione e sono stati isolati 2 test esistenti tramite profilo `test`.
+Nel primo blocco sono stati aggiunti 9 test di integrazione dedicati ad Auth e sono stati isolati 2 test esistenti tramite profilo `test`.
+
+Nel blocco successivo sono stati aggiunti 5 test di integrazione dedicati a Invite, ruoli e access control. Complessivamente sono quindi stati aggiunti 14 test di integrazione.
 
 Non sono state apportate modifiche al codice di produzione.
 
@@ -74,6 +76,63 @@ File creato:
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerRegistrationIntegrationTest.java
 ```
 
+## Invite, ruoli e access control
+
+### Autorizzazioni endpoint Invite
+
+È stata aggiunta una suite di integrazione basata su autenticazione e JWT reali.
+
+Comportamenti verificati:
+
+* utente anonimo:
+  * `GET /api/v1/invites` → `401 Unauthorized`;
+  * `POST /api/v1/invites` → `401 Unauthorized`;
+* utente `CLIENT` autenticato:
+  * `GET /api/v1/invites` → `403 Forbidden`;
+  * `POST /api/v1/invites` → `403 Forbidden`;
+* utente `PROFESSIONAL` autenticato, attivo e verificato:
+  * `POST /api/v1/invites` → `201 Created`;
+  * `GET /api/v1/invites` → `200 OK`.
+
+File creato:
+
+```text
+backend/src/test/java/it/zuperman/support_trainer/InviteControllerAuthorizationIntegrationTest.java
+```
+
+### Riutilizzo di un invito consumato
+
+È stato aggiunto un test end-to-end che:
+
+* registra e verifica un professionista;
+* effettua il login e ottiene un JWT reale;
+* crea un invito;
+* registra correttamente un primo cliente;
+* tenta di registrare un secondo cliente con lo stesso codice;
+* verifica che la seconda registrazione restituisca `400 Bad Request`.
+
+File modificato:
+
+```text
+backend/src/test/java/it/zuperman/support_trainer/AuthControllerRegistrationIntegrationTest.java
+```
+
+### Ownership dell'elenco inviti
+
+È stato aggiunto un test che crea due professionisti e un invito per ciascuno, quindi richiama `GET /api/v1/invites` come primo professionista.
+
+Il test verifica che la risposta:
+
+* contenga l'invito del professionista autenticato;
+* non contenga l'invito dell'altro professionista;
+* contenga esattamente un solo codice nello scenario isolato.
+
+File modificato:
+
+```text
+backend/src/test/java/it/zuperman/support_trainer/InviteControllerAuthorizationIntegrationTest.java
+```
+
 ## Isolamento test con profilo test
 
 È stato aggiunto `@ActiveProfiles("test")` a due test esistenti:
@@ -93,13 +152,14 @@ backend/src/test/java/it/zuperman/support_trainer/UserPersistenceTest.java
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerEmailVerificationIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerLoginIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerRegistrationIntegrationTest.java
+backend/src/test/java/it/zuperman/support_trainer/InviteControllerAuthorizationIntegrationTest.java
 ```
 
 ## Verifica
 
-I test mirati sono stati eseguiti manualmente dopo ogni modifica.
+I test mirati sono stati eseguiti manualmente durante il lavoro sul branch.
 
-La suite completa Maven è stata eseguita manualmente al termine del blocco di lavoro per verificare l’assenza di regressioni.
+La suite completa Maven è stata eseguita manualmente ed è passata. Il numero totale non viene indicato perché non è stato verificato tramite log durante questo aggiornamento documentale.
 
 Comando utilizzato:
 
@@ -111,15 +171,19 @@ Comando utilizzato:
 
 * Alcuni test dipendono da `errorCode` specifici. Questo è utile per proteggere il contratto API, ma richiederà aggiornamenti se il contratto degli errori cambierà.
 * Alcune fixture sono duplicate intenzionalmente per evitare refactoring prematuri nei test.
-* Il test della registrazione cliente con invito valido prepara direttamente professionista e invito tramite repository. Questo mantiene il test focalizzato sulla registrazione cliente, ma non copre la generazione reale dell’invito.
+* Il test della registrazione cliente con invito valido prepara direttamente professionista e invito tramite repository. Questo mantiene il test focalizzato sulla registrazione cliente, ma non copre la generazione reale dell'invito.
+* Gli inviti funzionano come bearer token: chi possiede un codice valido può utilizzarlo una volta. Questo comportamento resta una caratteristica di sicurezza da considerare nel flusso applicativo.
+* Il rischio di regressione che permetta a un professionista di leggere inviti altrui è ora coperto dal test di ownership.
+* Il riutilizzo di un invito già consumato è ora coperto da un test end-to-end.
 
 ## Valutazione finale
 
-Il branch `test-codex` migliora in modo significativo la copertura della parte Auth senza modificare il comportamento applicativo.
+Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli e access control senza modificare il comportamento applicativo.
 
 Le modifiche sono considerate sicure perché:
 
 * sono limitate ai test;
 * non toccano codice di produzione;
 * usano il profilo `test`;
+* usano flussi reali di registrazione, verifica email e autenticazione JWT per gli endpoint Invite;
 * sono state verificate con test mirati e suite completa.
