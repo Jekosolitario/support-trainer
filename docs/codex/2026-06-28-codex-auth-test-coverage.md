@@ -10,7 +10,9 @@ L’obiettivo della sessione era testare Codex in modo sicuro, limitando gli int
 
 Nel primo blocco sono stati aggiunti 9 test di integrazione dedicati ad Auth e sono stati isolati 2 test esistenti tramite profilo `test`.
 
-Nel blocco successivo sono stati aggiunti 5 test di integrazione dedicati a Invite, ruoli e access control. Complessivamente sono quindi stati aggiunti 14 test di integrazione.
+Nel blocco successivo sono stati aggiunti 5 test di integrazione dedicati a Invite, ruoli e access control.
+
+È stato poi aggiunto un ulteriore blocco di 5 test dedicati al contratto pubblico di validazione dell'invito. Complessivamente sono quindi stati aggiunti 19 test di integrazione.
 
 Non sono state apportate modifiche al codice di produzione.
 
@@ -133,6 +135,30 @@ File modificato:
 backend/src/test/java/it/zuperman/support_trainer/InviteControllerAuthorizationIntegrationTest.java
 ```
 
+### Validazione pubblica dell'invito
+
+È stata aggiunta una suite dedicata all'endpoint pubblico:
+
+```text
+POST /api/v1/auth/register/client/validate-invite
+```
+
+Comportamenti verificati:
+
+* invito valido → `200 OK`;
+* invito inesistente → `404 Not Found`, `INVITE_CODE_NOT_FOUND`;
+* invito già usato → `400 Bad Request`, `INVITE_CODE_ALREADY_USED`;
+* invito scaduto → `400 Bad Request`, `INVITE_CODE_EXPIRED`;
+* invito inattivo → `400 Bad Request`, `INVITE_CODE_NOT_ACTIVE`.
+
+La validazione pubblica è ora coperta direttamente e non soltanto attraverso il flusso di registrazione cliente. Il test sul caso valido verifica inoltre che la validazione non consumi l'invito.
+
+File creato:
+
+```text
+backend/src/test/java/it/zuperman/support_trainer/AuthControllerInviteValidationIntegrationTest.java
+```
+
 ## Isolamento test con profilo test
 
 È stato aggiunto `@ActiveProfiles("test")` a due test esistenti:
@@ -152,6 +178,7 @@ backend/src/test/java/it/zuperman/support_trainer/UserPersistenceTest.java
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerEmailVerificationIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerLoginIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerRegistrationIntegrationTest.java
+backend/src/test/java/it/zuperman/support_trainer/AuthControllerInviteValidationIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/InviteControllerAuthorizationIntegrationTest.java
 ```
 
@@ -159,7 +186,7 @@ backend/src/test/java/it/zuperman/support_trainer/InviteControllerAuthorizationI
 
 I test mirati sono stati eseguiti manualmente durante il lavoro sul branch.
 
-La suite completa Maven è stata eseguita manualmente ed è passata. Il numero totale non viene indicato perché non è stato verificato tramite log durante questo aggiornamento documentale.
+La suite completa Maven è stata eseguita manualmente ed è passata anche dopo l'integrazione dei test sulla validazione pubblica dell'invito. Il numero totale non viene indicato perché non è stato verificato tramite log durante questo aggiornamento documentale.
 
 Comando utilizzato:
 
@@ -175,10 +202,12 @@ Comando utilizzato:
 * Gli inviti funzionano come bearer token: chi possiede un codice valido può utilizzarlo una volta. Questo comportamento resta una caratteristica di sicurezza da considerare nel flusso applicativo.
 * Il rischio di regressione che permetta a un professionista di leggere inviti altrui è ora coperto dal test di ownership.
 * Il riutilizzo di un invito già consumato è ora coperto da un test end-to-end.
+* Il contratto principale dell'endpoint pubblico di validazione è ora coperto direttamente e il caso valido verifica che l'invito non venga consumato.
+* Gli stati del professionista proprietario dell'invito, come account non attivo o email non verificata, non fanno parte di questo blocco di test.
 
 ## Valutazione finale
 
-Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli e access control senza modificare il comportamento applicativo.
+Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli, access control e validazione pubblica degli inviti senza modificare il comportamento applicativo.
 
 Le modifiche sono considerate sicure perché:
 
@@ -186,4 +215,5 @@ Le modifiche sono considerate sicure perché:
 * non toccano codice di produzione;
 * usano il profilo `test`;
 * usano flussi reali di registrazione, verifica email e autenticazione JWT per gli endpoint Invite;
+* verificano direttamente gli stati principali del contratto pubblico di validazione invito;
 * sono state verificate con test mirati e suite completa.
