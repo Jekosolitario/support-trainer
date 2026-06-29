@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
@@ -94,6 +95,79 @@ class ClientProfessionalAuthorizationIntegrationTest {
         mockMvc.perform(get("/api/v1/professionals/my")
                         .header(HttpHeaders.AUTHORIZATION, bearer(clientToken)))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Professionista deve accedere solo al dettaglio dei clienti collegati")
+    void shouldEnforceClientDetailOwnershipForProfessional() throws Exception {
+        String professionalAToken = registerVerifyAndLoginProfessional(
+                "professional.a.client.detail@example.com",
+                "Andrea",
+                "Villa"
+        );
+        String professionalAInviteCode = createInvite(professionalAToken);
+        String clientAEmail = "client.a.client.detail@example.com";
+        registerAndLoginClient(professionalAInviteCode, clientAEmail);
+
+        String professionalBToken = registerVerifyAndLoginProfessional(
+                "professional.b.client.detail@example.com",
+                "Beatrice",
+                "Leone"
+        );
+        String professionalBInviteCode = createInvite(professionalBToken);
+        registerAndLoginClient(
+                professionalBInviteCode,
+                "client.b.client.detail@example.com"
+        );
+
+        Long clientAId = userRepository.findByEmail(clientAEmail).orElseThrow().getId();
+
+        mockMvc.perform(get("/api/v1/clients/{clientId}", clientAId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalAToken)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/clients/{clientId}", clientAId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalBToken)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("CLIENT_ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("Cliente deve accedere solo al dettaglio dei professionisti collegati")
+    void shouldEnforceProfessionalDetailOwnershipForClient() throws Exception {
+        String professionalAEmail = "professional.a.professional.detail@example.com";
+        String professionalAToken = registerVerifyAndLoginProfessional(
+                professionalAEmail,
+                "Carlo",
+                "Ferri"
+        );
+        String professionalAInviteCode = createInvite(professionalAToken);
+        String clientAToken = registerAndLoginClient(
+                professionalAInviteCode,
+                "client.a.professional.detail@example.com"
+        );
+
+        String professionalBToken = registerVerifyAndLoginProfessional(
+                "professional.b.professional.detail@example.com",
+                "Diana",
+                "Greco"
+        );
+        String professionalBInviteCode = createInvite(professionalBToken);
+        String clientBToken = registerAndLoginClient(
+                professionalBInviteCode,
+                "client.b.professional.detail@example.com"
+        );
+
+        Long professionalAId = userRepository.findByEmail(professionalAEmail).orElseThrow().getId();
+
+        mockMvc.perform(get("/api/v1/professionals/{professionalId}", professionalAId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(clientAToken)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/professionals/{professionalId}", professionalAId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(clientBToken)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("PROFESSIONAL_ACCESS_DENIED"));
     }
 
     private String registerVerifyAndLoginProfessional(
