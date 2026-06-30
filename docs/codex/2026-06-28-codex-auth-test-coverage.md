@@ -14,6 +14,8 @@ Nel blocco successivo sono stati aggiunti 5 test di integrazione dedicati a Invi
 
 È stato poi aggiunto un ulteriore blocco di 8 test dedicati al contratto pubblico di validazione dell'invito e allo stato del professionista proprietario. Complessivamente sono quindi stati aggiunti 22 test di integrazione.
 
+Sono stati infine aggiunti 9 test di integrazione dedicati al pacchetto Client / Professional access control. Complessivamente sono quindi stati aggiunti 31 test di integrazione.
+
 Non sono state apportate modifiche al codice di produzione.
 
 ## Test aggiunti
@@ -165,6 +167,33 @@ File creato:
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerInviteValidationIntegrationTest.java
 ```
 
+## Client / Professional access control
+
+È stata aggiunta e verificata una suite di integrazione dedicata agli endpoint:
+
+```text
+GET /api/v1/clients/my
+GET /api/v1/professionals/my
+GET /api/v1/clients/{clientId}
+GET /api/v1/professionals/{professionalId}
+```
+
+Comportamenti verificati:
+
+* matrice ruoli base sugli endpoint `/my`, con rifiuto degli utenti anonimi e dei ruoli non autorizzati e accesso consentito al ruolo corretto;
+* ownership dei dettagli, consentiti soltanto all'utente collegato alla risorsa richiesta;
+* isolamento delle liste, per cui il professionista vede soltanto i propri clienti e il cliente soltanto i propri professionisti;
+* esclusione dei collegamenti inattivi da entrambe le liste `/my`;
+* utilizzo dei flussi reali di registrazione, verifica email, login JWT, invito e registrazione cliente.
+
+File creato:
+
+```text
+backend/src/test/java/it/zuperman/support_trainer/ClientProfessionalAuthorizationIntegrationTest.java
+```
+
+Non sono state apportate modifiche al codice di produzione. Il pacchetto Client / Professional access control è considerato chiudibile per l'MVP.
+
 ## Isolamento test con profilo test
 
 È stato aggiunto `@ActiveProfiles("test")` a due test esistenti:
@@ -186,19 +215,23 @@ backend/src/test/java/it/zuperman/support_trainer/AuthControllerLoginIntegration
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerRegistrationIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerInviteValidationIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/InviteControllerAuthorizationIntegrationTest.java
+backend/src/test/java/it/zuperman/support_trainer/ClientProfessionalAuthorizationIntegrationTest.java
 ```
 
 ## Verifica
 
 I test mirati sono stati eseguiti manualmente dopo i singoli blocchi di lavoro.
 
-La suite completa Maven è stata eseguita manualmente ed è passata dopo le integrazioni Auth, Invite, validate-invite e access control. Il numero totale non viene indicato perché non è stato verificato tramite log durante questo aggiornamento documentale.
+Per il pacchetto Client / Professional access control sono stati eseguiti il test mirato e la suite completa Maven. Entrambi sono passati sia nella copia sia nel progetto originale.
 
-Comando utilizzato:
+Comandi utilizzati:
 
 ```powershell
-.\mvnw.cmd test
+./mvnw test -Dtest=ClientProfessionalAuthorizationIntegrationTest
+./mvnw test
 ```
+
+La suite completa Maven è quindi passata dopo le integrazioni Auth, Invite, validate-invite e Client / Professional access control. Il numero totale dei test eseguiti non viene indicato perché non è stato verificato tramite log durante questo aggiornamento documentale.
 
 ## Rischi residui
 
@@ -213,13 +246,16 @@ Comando utilizzato:
 * Il rischio di regressione che permetta a un professionista di leggere inviti altrui è ora coperto dal test di ownership.
 * Il riutilizzo di un invito già consumato è ora coperto da un test end-to-end.
 * Il contratto principale dell'endpoint pubblico di validazione, inclusi gli stati non validi del proprietario, è coperto direttamente e il caso valido verifica che l'invito non venga consumato.
+* Per il pacchetto Client / Professional restano come hardening futuro i dettagli con link disattivato, i profili destinazione non validi, gli ID inesistenti e una matrice di autorizzazione più estesa sugli endpoint di dettaglio.
 * Restano fuori da questa fase test avanzati di concorrenza, input malformati, rate limiting e hardening operativo.
 
 ## Valutazione finale
 
-Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli, access control e validazione pubblica degli inviti senza modificare il comportamento applicativo.
+Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli, access control, validazione pubblica degli inviti e Client / Professional senza modificare il comportamento applicativo.
 
 Il pacchetto Invite / validate-invite / access control è considerato chiudibile per questa fase MVP. Le lacune residue riguardano robustezza avanzata, concorrenza e hardening futuro, non il flusso MVP fondamentale.
+
+Anche il pacchetto Client / Professional access control è considerato chiudibile per l'MVP. Le lacune residue individuate sono classificate come hardening futuro e non bloccano il perimetro attuale.
 
 Le modifiche sono considerate sicure perché:
 
@@ -228,4 +264,5 @@ Le modifiche sono considerate sicure perché:
 * usano il profilo `test`;
 * usano flussi reali di registrazione, verifica email e autenticazione JWT per gli endpoint Invite;
 * verificano direttamente gli stati principali dell'invito e del professionista proprietario;
+* verificano ownership, isolamento delle liste e collegamenti attivi per gli endpoint Client / Professional;
 * sono state verificate con test mirati e suite completa.
