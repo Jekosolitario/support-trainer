@@ -1,6 +1,8 @@
 package it.zuperman.support_trainer;
 
-import com.jayway.jsonpath.JsonPath;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,10 +19,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
+
 import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
 import it.zuperman.support_trainer.auth.token.EmailVerificationToken;
 import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
+import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import jakarta.transaction.Transactional;
 
 @SpringBootTest
@@ -40,6 +46,9 @@ class ClientProfessionalAuthorizationIntegrationTest {
 
     @Autowired
     private EmailVerificationTokenRepository emailVerificationTokenRepository;
+
+    @Autowired
+    private ProfessionalClientLinkRepository professionalClientLinkRepository;
 
     @Test
     @DisplayName("Utente anonimo non deve accedere agli endpoint Client e Professional")
@@ -95,6 +104,160 @@ class ClientProfessionalAuthorizationIntegrationTest {
         mockMvc.perform(get("/api/v1/professionals/my")
                         .header(HttpHeaders.AUTHORIZATION, bearer(clientToken)))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Professionista autenticato deve vedere solo i propri clienti")
+    void shouldReturnOnlyAuthenticatedProfessionalClients() throws Exception {
+        String professionalAToken = registerVerifyAndLoginProfessional(
+                "professional.a.clients.list@example.com",
+                "Alberto",
+                "Riva"
+        );
+        String professionalAInviteCode = createInvite(professionalAToken);
+        String clientAEmail = "client.a.clients.list@example.com";
+        registerAndLoginClient(professionalAInviteCode, clientAEmail);
+
+        String professionalBToken = registerVerifyAndLoginProfessional(
+                "professional.b.clients.list@example.com",
+                "Bianca",
+                "Fontana"
+        );
+        String professionalBInviteCode = createInvite(professionalBToken);
+        String clientBEmail = "client.b.clients.list@example.com";
+        registerAndLoginClient(professionalBInviteCode, clientBEmail);
+
+        Long clientAId = userRepository.findByEmail(clientAEmail).orElseThrow().getId();
+        Long clientBId = userRepository.findByEmail(clientBEmail).orElseThrow().getId();
+
+        MvcResult result = mockMvc.perform(get("/api/v1/clients/my")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalAToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        List<Number> returnedIds = JsonPath.read(
+                result.getResponse().getContentAsString(),
+                "$[*].id"
+        );
+        List<Long> normalizedIds = returnedIds.stream()
+                .map(Number::longValue)
+                .toList();
+
+        assertThat(normalizedIds)
+                .hasSize(1)
+                .contains(clientAId)
+                .doesNotContain(clientBId);
+    }
+
+    @Test
+    @DisplayName("Cliente autenticato deve vedere solo i propri professionisti")
+    void shouldReturnOnlyAuthenticatedClientProfessionals() throws Exception {
+        String professionalAEmail = "professional.a.professionals.list@example.com";
+        String professionalAToken = registerVerifyAndLoginProfessional(
+                professionalAEmail,
+                "Claudio",
+                "Neri"
+        );
+        String professionalAInviteCode = createInvite(professionalAToken);
+        String clientAToken = registerAndLoginClient(
+                professionalAInviteCode,
+                "client.a.professionals.list@example.com"
+        );
+
+        String professionalBEmail = "professional.b.professionals.list@example.com";
+        String professionalBToken = registerVerifyAndLoginProfessional(
+                professionalBEmail,
+                "Daniela",
+                "Costa"
+        );
+        String professionalBInviteCode = createInvite(professionalBToken);
+        registerAndLoginClient(
+                professionalBInviteCode,
+                "client.b.professionals.list@example.com"
+        );
+
+        Long professionalAId = userRepository.findByEmail(professionalAEmail).orElseThrow().getId();
+        Long professionalBId = userRepository.findByEmail(professionalBEmail).orElseThrow().getId();
+
+        MvcResult result = mockMvc.perform(get("/api/v1/professionals/my")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(clientAToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        List<Number> returnedIds = JsonPath.read(
+                result.getResponse().getContentAsString(),
+                "$[*].id"
+        );
+        List<Long> normalizedIds = returnedIds.stream()
+                .map(Number::longValue)
+                .toList();
+
+        assertThat(normalizedIds)
+                .hasSize(1)
+                .contains(professionalAId)
+                .doesNotContain(professionalBId);
+    }
+
+    @Test
+    @DisplayName("Collegamento inattivo deve essere escluso dalla lista clienti del professionista")
+    void shouldExcludeInactiveLinkFromProfessionalClientList() throws Exception {
+        String professionalEmail = "professional.inactive.client.link@example.com";
+        String professionalToken = registerVerifyAndLoginProfessional(
+                professionalEmail,
+                "Elena",
+                "Galli"
+        );
+        String inviteCode = createInvite(professionalToken);
+        String clientEmail = "client.inactive.client.link@example.com";
+        registerAndLoginClient(inviteCode, clientEmail);
+
+        Long professionalId = userRepository.findByEmail(professionalEmail).orElseThrow().getId();
+        Long clientId = userRepository.findByEmail(clientEmail).orElseThrow().getId();
+        ProfessionalClientLink link = professionalClientLinkRepository
+                .findAllByProfessional_IdAndActiveTrue(professionalId)
+                .stream()
+                .filter(candidate -> candidate.getClient().getId().equals(clientId))
+                .findFirst()
+                .orElseThrow();
+
+        link.setActive(false);
+        professionalClientLinkRepository.saveAndFlush(link);
+
+        mockMvc.perform(get("/api/v1/clients/my")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    @DisplayName("Collegamento inattivo deve essere escluso dalla lista professionisti del cliente")
+    void shouldExcludeInactiveLinkFromClientProfessionalList() throws Exception {
+        String professionalEmail = "professional.inactive.professional.link@example.com";
+        String professionalToken = registerVerifyAndLoginProfessional(
+                professionalEmail,
+                "Fabio",
+                "Monti"
+        );
+        String inviteCode = createInvite(professionalToken);
+        String clientEmail = "client.inactive.professional.link@example.com";
+        String clientToken = registerAndLoginClient(inviteCode, clientEmail);
+
+        Long professionalId = userRepository.findByEmail(professionalEmail).orElseThrow().getId();
+        Long clientId = userRepository.findByEmail(clientEmail).orElseThrow().getId();
+        ProfessionalClientLink link = professionalClientLinkRepository
+                .findAllByProfessional_IdAndActiveTrue(professionalId)
+                .stream()
+                .filter(candidate -> candidate.getClient().getId().equals(clientId))
+                .findFirst()
+                .orElseThrow();
+
+        link.setActive(false);
+        professionalClientLinkRepository.saveAndFlush(link);
+
+        mockMvc.perform(get("/api/v1/professionals/my")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(clientToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
     }
 
     @Test
