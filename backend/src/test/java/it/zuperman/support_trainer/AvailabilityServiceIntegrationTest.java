@@ -95,6 +95,52 @@ class AvailabilityServiceIntegrationTest {
         assertThat(savedSlots.get(0).getProfessional().getId()).isEqualTo(professional.getId());
     }
 
+    @Test
+    @DisplayName("Professionista deve aggiornare parzialmente un proprio slot availability")
+    void shouldPartiallyUpdateAndReturnOwnAvailabilitySlot() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(7).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlotResponse createdSlot = availabilityService.createAvailabilitySlot(
+                new CreateAvailabilitySlotRequest(startDateTime, endDateTime)
+        );
+
+        LocalDateTime updatedEndDateTime = endDateTime.plusMinutes(30);
+        UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
+                null,
+                updatedEndDateTime
+        );
+
+        AvailabilitySlotResponse updatedSlot = availabilityService.updateAvailabilitySlot(
+                createdSlot.getId(),
+                updateRequest
+        );
+
+        List<AvailabilitySlotResponse> ownSlots = availabilityService.getMyAvailabilitySlots();
+
+        assertThat(updatedSlot.getStartDateTime()).isEqualTo(startDateTime);
+        assertThat(updatedSlot.getEndDateTime()).isEqualTo(updatedEndDateTime);
+        assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE.name());
+        assertThat(updatedSlot.getActive()).isTrue();
+
+        assertThat(ownSlots).singleElement()
+                .satisfies(slot -> {
+                    assertThat(slot.getId()).isEqualTo(createdSlot.getId());
+                    assertThat(slot.getStartDateTime()).isEqualTo(startDateTime);
+                    assertThat(slot.getEndDateTime()).isEqualTo(updatedEndDateTime);
+                    assertThat(slot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE.name());
+                    assertThat(slot.getActive()).isTrue();
+                });
+
+        AvailabilitySlot savedSlot = availabilitySlotRepository.findById(createdSlot.getId())
+                .orElseThrow();
+
+        assertThat(savedSlot.getProfessional().getId()).isEqualTo(professional.getId());
+    }
+
     private ProfessionalProfile createActivePersonalTrainer() {
         String email = "pro-" + UUID.randomUUID() + "@test.com";
 
