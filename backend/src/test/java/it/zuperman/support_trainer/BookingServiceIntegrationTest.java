@@ -108,6 +108,56 @@ class BookingServiceIntegrationTest {
         assertThat(response.getItems().get(0).getSlotStatus()).isEqualTo("AVAILABLE");
     }
 
+    @Test
+    @DisplayName("Cliente e professionista devono vedere solo le proprie richieste booking")
+    void shouldReturnOnlyAuthenticatedUserBookingRequests() {
+        ProfessionalProfile professionalA = createActivePersonalTrainer();
+        ClientProfile clientA = createActiveClient();
+        ProfessionalProfile professionalB = createActivePersonalTrainer();
+        ClientProfile clientB = createActiveClient();
+
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professionalA, clientA));
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professionalB, clientB));
+
+        LocalDateTime startDateTimeA = LocalDateTime.now().plusDays(30).withNano(0);
+        AvailabilitySlot slotA = availabilitySlotRepository.save(
+                new AvailabilitySlot(professionalA, startDateTimeA, startDateTimeA.plusHours(1))
+        );
+
+        LocalDateTime startDateTimeB = LocalDateTime.now().plusDays(31).withNano(0);
+        AvailabilitySlot slotB = availabilitySlotRepository.save(
+                new AvailabilitySlot(professionalB, startDateTimeB, startDateTimeB.plusHours(1))
+        );
+
+        authenticateAs(clientA.getEmail(), "CLIENT");
+        BookingRequestResponse bookingA = bookingService.createBookingRequest(
+                new CreateBookingRequest(slotA.getId(), "Richiesta coppia A.")
+        );
+
+        authenticateAs(clientB.getEmail(), "CLIENT");
+        BookingRequestResponse bookingB = bookingService.createBookingRequest(
+                new CreateBookingRequest(slotB.getId(), "Richiesta coppia B.")
+        );
+
+        authenticateAs(clientA.getEmail(), "CLIENT");
+        List<Long> clientBookingIds = bookingService.getClientBookingRequests().stream()
+                .map(BookingRequestResponse::getId)
+                .toList();
+
+        assertThat(clientBookingIds)
+                .containsExactly(bookingA.getId())
+                .doesNotContain(bookingB.getId());
+
+        authenticateAs(professionalA.getEmail(), "PROFESSIONAL");
+        List<Long> professionalBookingIds = bookingService.getProfessionalBookingRequests().stream()
+                .map(BookingRequestResponse::getId)
+                .toList();
+
+        assertThat(professionalBookingIds)
+                .containsExactly(bookingA.getId())
+                .doesNotContain(bookingB.getId());
+    }
+
     private ProfessionalProfile createActivePersonalTrainer() {
         String email = "pro-" + UUID.randomUUID() + "@test.com";
 
