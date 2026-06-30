@@ -158,6 +158,52 @@ class BookingServiceIntegrationTest {
                 .doesNotContain(bookingB.getId());
     }
 
+    @Test
+    @DisplayName("Utenti estranei non devono modificare richieste booking altrui")
+    void shouldNotMutateBookingRequestOwnedByAnotherPair() {
+        ProfessionalProfile professionalA = createActivePersonalTrainer();
+        ClientProfile clientA = createActiveClient();
+        ProfessionalProfile professionalB = createActivePersonalTrainer();
+        ClientProfile clientB = createActiveClient();
+
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professionalA, clientA));
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professionalB, clientB));
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(32).withNano(0);
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professionalA, startDateTime, startDateTime.plusHours(1))
+        );
+
+        authenticateAs(clientA.getEmail(), "CLIENT");
+        BookingRequestResponse booking = bookingService.createBookingRequest(
+                new CreateBookingRequest(slot.getId(), "Richiesta coppia A.")
+        );
+
+        authenticateAs(professionalB.getEmail(), "PROFESSIONAL");
+
+        assertThatThrownBy(() -> bookingService.confirmBookingRequest(booking.getId()))
+                .isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("BOOKING_REQUEST_NOT_FOUND"));
+
+        assertThatThrownBy(() -> bookingService.rejectBookingRequest(booking.getId()))
+                .isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("BOOKING_REQUEST_NOT_FOUND"));
+
+        authenticateAs(clientB.getEmail(), "CLIENT");
+
+        assertThatThrownBy(() -> bookingService.cancelBookingRequest(booking.getId()))
+                .isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("BOOKING_REQUEST_ACCESS_DENIED"));
+
+        BookingRequest unchangedBooking = bookingRequestRepository.findById(booking.getId())
+                .orElseThrow();
+        AvailabilitySlot unchangedSlot = availabilitySlotRepository.findById(slot.getId())
+                .orElseThrow();
+
+        assertThat(unchangedBooking.getStatus().name()).isEqualTo("PENDING");
+        assertThat(unchangedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
+    }
+
     private ProfessionalProfile createActivePersonalTrainer() {
         String email = "pro-" + UUID.randomUUID() + "@test.com";
 
