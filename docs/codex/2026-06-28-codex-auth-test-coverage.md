@@ -18,6 +18,8 @@ Sono stati infine aggiunti 9 test di integrazione dedicati al pacchetto Client /
 
 Sono stati inoltre aggiunti 2 test di integrazione dedicati alle lacune MVP residue del pacchetto Availability. Complessivamente sono quindi stati aggiunti 33 test di integrazione; il file Availability contiene ora 14 test a livello service.
 
+Sono stati infine aggiunti 4 test di integrazione dedicati alle lacune MVP residue del pacchetto Booking. Complessivamente sono quindi stati aggiunti 37 test di integrazione; il file Booking contiene ora 17 test a livello service.
+
 Non sono state apportate modifiche al codice di produzione.
 
 ## Test aggiunti
@@ -221,6 +223,32 @@ backend/src/test/java/it/zuperman/support_trainer/AvailabilityServiceIntegration
 
 Non sono state apportate modifiche al codice di produzione. Il pacchetto Availability è considerato chiudibile per l'MVP.
 
+## Booking
+
+La suite di integrazione a livello service dedicata a Booking contiene ora 17 test.
+
+Comportamenti verificati:
+
+* creazione di una booking request `PENDING` su slot disponibile;
+* rifiuto del cliente non collegato;
+* isolamento delle liste restituite da `getClientBookingRequests()` e `getProfessionalBookingRequests()`;
+* protezione del dettaglio booking e rifiuto del cliente estraneo;
+* ownership delle mutazioni, impedendo a un professionista estraneo di confermare o rifiutare booking altrui e a un utente estraneo di cancellarle;
+* conferma della booking con passaggio dello slot a `BOOKED`;
+* rifiuto della booking con slot mantenuto `AVAILABLE`;
+* cancellazione lato cliente di booking `PENDING` e `CONFIRMED`;
+* divieto di cancellazione di una booking `PENDING` da parte del professionista;
+* rifiuto della creazione su slot scaduto, appartenente a un nutrizionista, `BLOCKED` o già `BOOKED`;
+* rifiuto di una seconda richiesta `PENDING` sullo stesso slot.
+
+File modificato:
+
+```text
+backend/src/test/java/it/zuperman/support_trainer/BookingServiceIntegrationTest.java
+```
+
+Non sono state apportate modifiche al codice di produzione. Il pacchetto Booking è considerato chiudibile per l'MVP.
+
 ## Isolamento test con profilo test
 
 È stato aggiunto `@ActiveProfiles("test")` a due test esistenti:
@@ -244,6 +272,7 @@ backend/src/test/java/it/zuperman/support_trainer/AuthControllerInviteValidation
 backend/src/test/java/it/zuperman/support_trainer/InviteControllerAuthorizationIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/ClientProfessionalAuthorizationIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/AvailabilityServiceIntegrationTest.java
+backend/src/test/java/it/zuperman/support_trainer/BookingServiceIntegrationTest.java
 ```
 
 ## Verifica
@@ -254,6 +283,8 @@ Per il pacchetto Client / Professional access control sono stati eseguiti il tes
 
 Anche il pacchetto Availability è stato verificato con test mirati e suite completa Maven. Entrambi sono passati sia nella copia sia nel progetto originale.
 
+Anche il pacchetto Booking è stato verificato con test mirati e suite completa Maven. Entrambi sono passati sia nella copia sia nel progetto originale.
+
 Comandi utilizzati:
 
 ```powershell
@@ -261,7 +292,7 @@ Comandi utilizzati:
 ./mvnw test
 ```
 
-La suite completa Maven è quindi passata dopo le integrazioni Auth, Invite, validate-invite, Client / Professional access control e Availability. Il numero totale dei test eseguiti non viene indicato perché non è stato verificato tramite log durante questo aggiornamento documentale.
+La suite completa Maven è quindi passata dopo le integrazioni Auth, Invite, validate-invite, Client / Professional access control, Availability e Booking. Il numero totale dei test eseguiti non viene indicato perché non è stato verificato tramite log durante questo aggiornamento documentale.
 
 ## Rischi residui
 
@@ -278,17 +309,21 @@ La suite completa Maven è quindi passata dopo le integrazioni Auth, Invite, val
 * Il contratto principale dell'endpoint pubblico di validazione, inclusi gli stati non validi del proprietario, è coperto direttamente e il caso valido verifica che l'invito non venga consumato.
 * Per il pacchetto Client / Professional restano come hardening futuro i dettagli con link disattivato, i profili destinazione non validi, gli ID inesistenti e una matrice di autorizzazione più estesa sugli endpoint di dettaglio.
 * Per il pacchetto Availability restano come hardening futuro una matrice HTTP MockMvc/JWT specifica, i link inattivi, i profili non validi, gli ID inesistenti, i boundary temporali e i test di concorrenza. Non costituiscono bug o blocchi per l'MVP.
+* Per il pacchetto Booking restano come hardening futuro una matrice HTTP MockMvc/JWT specifica, la cancellazione `CONFIRMED` lato professionista, gli ID inesistenti, le transizioni ripetute, gli stati profilo/link inattivi e i test di concorrenza. Non costituiscono bug o blocchi per l'MVP.
+* I filtri per stato e il motivo testuale di rifiuto restano feature future non attive del pacchetto Booking.
 * Restano fuori da questa fase test avanzati di concorrenza, input malformati, rate limiting e hardening operativo.
 
 ## Valutazione finale
 
-Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli, access control, validazione pubblica degli inviti, Client / Professional e Availability senza modificare il comportamento applicativo.
+Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli, access control, validazione pubblica degli inviti, Client / Professional, Availability e Booking senza modificare il comportamento applicativo.
 
 Il pacchetto Invite / validate-invite / access control è considerato chiudibile per questa fase MVP. Le lacune residue riguardano robustezza avanzata, concorrenza e hardening futuro, non il flusso MVP fondamentale.
 
 Anche il pacchetto Client / Professional access control è considerato chiudibile per l'MVP. Le lacune residue individuate sono classificate come hardening futuro e non bloccano il perimetro attuale.
 
 Il pacchetto Availability è considerato chiudibile per l'MVP. Le lacune residue riguardano esclusivamente hardening futuro e non bloccano il flusso MVP fondamentale.
+
+Il pacchetto Booking è considerato chiudibile per l'MVP. Le lacune residue riguardano esclusivamente hardening futuro e non bloccano il flusso MVP fondamentale.
 
 Le modifiche sono considerate sicure perché:
 
@@ -299,4 +334,5 @@ Le modifiche sono considerate sicure perché:
 * verificano direttamente gli stati principali dell'invito e del professionista proprietario;
 * verificano ownership, isolamento delle liste e collegamenti attivi per gli endpoint Client / Professional;
 * verificano le regole principali di Availability, incluse ownership delle mutazioni e aggiornamento parziale positivo;
+* verificano le regole principali di Booking, incluse ownership, isolamento delle liste e integrazione con gli stati Availability;
 * sono state verificate con test mirati e suite completa.
