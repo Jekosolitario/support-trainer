@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
+import it.zuperman.support_trainer.availability.service.AvailabilityService;
 import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
 import it.zuperman.support_trainer.booking.dto.response.BookingRequestResponse;
 import it.zuperman.support_trainer.booking.entity.BookingRequest;
@@ -59,6 +60,9 @@ class BookingServiceIntegrationTest {
 
     @Autowired
     private AvailabilitySlotRepository availabilitySlotRepository;
+
+    @Autowired
+    private AvailabilityService availabilityService;
 
     @Autowired
     private BookingRequestRepository bookingRequestRepository;
@@ -276,6 +280,75 @@ class BookingServiceIntegrationTest {
 
         assertThatThrownBy(() -> bookingService.createBookingRequest(request))
                 .isInstanceOf(AppException.class);
+    }
+
+    @Test
+    @DisplayName("Cliente non deve creare booking su uno slot bloccato")
+    void shouldNotCreateBookingRequestForBlockedSlot() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(33).withNano(0);
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, startDateTime.plusHours(1))
+        );
+
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        availabilityService.blockAvailabilitySlot(slot.getId());
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        assertThatThrownBy(() -> bookingService.createBookingRequest(
+                new CreateBookingRequest(slot.getId(), "Richiesta su slot bloccato.")
+        )).isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_NOT_BOOKABLE"));
+
+        AvailabilitySlot unchangedSlot = availabilitySlotRepository.findById(slot.getId())
+                .orElseThrow();
+
+        assertThat(unchangedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.BLOCKED);
+        assertThat(bookingRequestRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Cliente non deve creare booking su uno slot già prenotato")
+    void shouldNotCreateBookingRequestForBookedSlot() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+
+        professionalClientLinkRepository.save(
+                new ProfessionalClientLink(professional, client)
+        );
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(34).withNano(0);
+        AvailabilitySlot slot = availabilitySlotRepository.save(
+                new AvailabilitySlot(professional, startDateTime, startDateTime.plusHours(1))
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+        BookingRequestResponse pendingBooking = bookingService.createBookingRequest(
+                new CreateBookingRequest(slot.getId(), "Prima richiesta.")
+        );
+
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        bookingService.confirmBookingRequest(pendingBooking.getId());
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        assertThatThrownBy(() -> bookingService.createBookingRequest(
+                new CreateBookingRequest(slot.getId(), "Seconda richiesta.")
+        )).isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_NOT_BOOKABLE"));
+
+        AvailabilitySlot unchangedSlot = availabilitySlotRepository.findById(slot.getId())
+                .orElseThrow();
+
+        assertThat(unchangedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.BOOKED);
+        assertThat(bookingRequestRepository.findAll()).hasSize(1);
     }
 
     @Test
