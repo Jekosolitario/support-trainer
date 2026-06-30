@@ -16,6 +16,8 @@ Nel blocco successivo sono stati aggiunti 5 test di integrazione dedicati a Invi
 
 Sono stati infine aggiunti 9 test di integrazione dedicati al pacchetto Client / Professional access control. Complessivamente sono quindi stati aggiunti 31 test di integrazione.
 
+Sono stati inoltre aggiunti 2 test di integrazione dedicati alle lacune MVP residue del pacchetto Availability. Complessivamente sono quindi stati aggiunti 33 test di integrazione; il file Availability contiene ora 14 test a livello service.
+
 Non sono state apportate modifiche al codice di produzione.
 
 ## Test aggiunti
@@ -194,6 +196,31 @@ backend/src/test/java/it/zuperman/support_trainer/ClientProfessionalAuthorizatio
 
 Non sono state apportate modifiche al codice di produzione. Il pacchetto Client / Professional access control è considerato chiudibile per l'MVP.
 
+## Availability
+
+La suite di integrazione a livello service dedicata ad Availability contiene ora 14 test.
+
+Comportamenti verificati:
+
+* creazione valida di uno slot;
+* prevenzione della sovrapposizione di slot dello stesso professionista;
+* esclusione dei professionisti con specializzazione `NUTRITIONIST`;
+* lettura availability da parte del cliente collegato e rifiuto del cliente non collegato;
+* esclusione degli slot scaduti e degli slot con booking `PENDING`;
+* blocco e sblocco degli slot;
+* rifiuto dell'aggiornamento di uno slot non disponibile;
+* protezioni in presenza di booking pendente o storico;
+* ownership delle mutazioni, impedendo a un professionista di aggiornare, bloccare o sbloccare lo slot di un altro professionista;
+* percorso positivo creazione slot → aggiornamento parziale valido → presenza corretta in `getMyAvailabilitySlots()`.
+
+File modificato:
+
+```text
+backend/src/test/java/it/zuperman/support_trainer/AvailabilityServiceIntegrationTest.java
+```
+
+Non sono state apportate modifiche al codice di produzione. Il pacchetto Availability è considerato chiudibile per l'MVP.
+
 ## Isolamento test con profilo test
 
 È stato aggiunto `@ActiveProfiles("test")` a due test esistenti:
@@ -216,6 +243,7 @@ backend/src/test/java/it/zuperman/support_trainer/AuthControllerRegistrationInte
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerInviteValidationIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/InviteControllerAuthorizationIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/ClientProfessionalAuthorizationIntegrationTest.java
+backend/src/test/java/it/zuperman/support_trainer/AvailabilityServiceIntegrationTest.java
 ```
 
 ## Verifica
@@ -224,6 +252,8 @@ I test mirati sono stati eseguiti manualmente dopo i singoli blocchi di lavoro.
 
 Per il pacchetto Client / Professional access control sono stati eseguiti il test mirato e la suite completa Maven. Entrambi sono passati sia nella copia sia nel progetto originale.
 
+Anche il pacchetto Availability è stato verificato con test mirati e suite completa Maven. Entrambi sono passati sia nella copia sia nel progetto originale.
+
 Comandi utilizzati:
 
 ```powershell
@@ -231,7 +261,7 @@ Comandi utilizzati:
 ./mvnw test
 ```
 
-La suite completa Maven è quindi passata dopo le integrazioni Auth, Invite, validate-invite e Client / Professional access control. Il numero totale dei test eseguiti non viene indicato perché non è stato verificato tramite log durante questo aggiornamento documentale.
+La suite completa Maven è quindi passata dopo le integrazioni Auth, Invite, validate-invite, Client / Professional access control e Availability. Il numero totale dei test eseguiti non viene indicato perché non è stato verificato tramite log durante questo aggiornamento documentale.
 
 ## Rischi residui
 
@@ -247,15 +277,18 @@ La suite completa Maven è quindi passata dopo le integrazioni Auth, Invite, val
 * Il riutilizzo di un invito già consumato è ora coperto da un test end-to-end.
 * Il contratto principale dell'endpoint pubblico di validazione, inclusi gli stati non validi del proprietario, è coperto direttamente e il caso valido verifica che l'invito non venga consumato.
 * Per il pacchetto Client / Professional restano come hardening futuro i dettagli con link disattivato, i profili destinazione non validi, gli ID inesistenti e una matrice di autorizzazione più estesa sugli endpoint di dettaglio.
+* Per il pacchetto Availability restano come hardening futuro una matrice HTTP MockMvc/JWT specifica, i link inattivi, i profili non validi, gli ID inesistenti, i boundary temporali e i test di concorrenza. Non costituiscono bug o blocchi per l'MVP.
 * Restano fuori da questa fase test avanzati di concorrenza, input malformati, rate limiting e hardening operativo.
 
 ## Valutazione finale
 
-Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli, access control, validazione pubblica degli inviti e Client / Professional senza modificare il comportamento applicativo.
+Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli, access control, validazione pubblica degli inviti, Client / Professional e Availability senza modificare il comportamento applicativo.
 
 Il pacchetto Invite / validate-invite / access control è considerato chiudibile per questa fase MVP. Le lacune residue riguardano robustezza avanzata, concorrenza e hardening futuro, non il flusso MVP fondamentale.
 
 Anche il pacchetto Client / Professional access control è considerato chiudibile per l'MVP. Le lacune residue individuate sono classificate come hardening futuro e non bloccano il perimetro attuale.
+
+Il pacchetto Availability è considerato chiudibile per l'MVP. Le lacune residue riguardano esclusivamente hardening futuro e non bloccano il flusso MVP fondamentale.
 
 Le modifiche sono considerate sicure perché:
 
@@ -265,4 +298,5 @@ Le modifiche sono considerate sicure perché:
 * usano flussi reali di registrazione, verifica email e autenticazione JWT per gli endpoint Invite;
 * verificano direttamente gli stati principali dell'invito e del professionista proprietario;
 * verificano ownership, isolamento delle liste e collegamenti attivi per gli endpoint Client / Professional;
+* verificano le regole principali di Availability, incluse ownership delle mutazioni e aggiornamento parziale positivo;
 * sono state verificate con test mirati e suite completa.
