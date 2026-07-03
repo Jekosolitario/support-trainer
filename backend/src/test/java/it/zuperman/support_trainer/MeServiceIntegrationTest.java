@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,7 @@ import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.Gender;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
+import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
 import it.zuperman.support_trainer.profile.dto.request.UpdateMyProfileRequest;
@@ -54,7 +56,7 @@ class MeServiceIntegrationTest {
         SecurityContextHolder.clearContext();
     }
 
-    @Test
+       @Test
     @DisplayName("Cliente autenticato deve leggere il proprio profilo e account")
     void shouldReturnAuthenticatedClientProfileAndAccount() {
         ClientProfile client = createActiveClient();
@@ -116,6 +118,71 @@ class MeServiceIntegrationTest {
         assertThat(account.getRole()).isEqualTo("PROFESSIONAL");
         assertThat(account.getAccountStatus()).isEqualTo("ACTIVE");
         assertThat(account.getEmailVerified()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Cliente deve aggiornare solo i campi consentiti del proprio profilo")
+    void shouldPartiallyUpdateClientProfileAndRejectProfessionalFields() {
+        ClientProfile client = createActiveClient();
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        UpdateMyProfileRequest request = new UpdateMyProfileRequest();
+        request.setFirstName(" Luca ");
+        request.setHeightCm(new BigDecimal("175.50"));
+        request.setPrimaryGoal(" Aumentare la forza ");
+        request.setMedicalNotes(" Nessuna controindicazione. ");
+
+        MyProfileResponse response = meService.updateMyProfile(request);
+
+        assertThat(response.getFirstName()).isEqualTo("Luca");
+        assertThat(response.getLastName()).isEqualTo(client.getLastName());
+        assertThat(response.getBirthDate()).isEqualTo(client.getBirthDate());
+        assertThat(response.getHeightCm()).isEqualByComparingTo("175.50");
+        assertThat(response.getPrimaryGoal()).isEqualTo("Aumentare la forza");
+        assertThat(response.getMedicalNotes()).isEqualTo("Nessuna controindicazione.");
+        assertThat(response.getGender()).isEqualTo(client.getGender());
+        assertThat(response.getSpecialization()).isNull();
+        assertThat(response.getBio()).isNull();
+
+        UpdateMyProfileRequest invalidRequest = new UpdateMyProfileRequest();
+        invalidRequest.setBio("Campo riservato al professionista.");
+
+        assertThatThrownBy(() -> meService.updateMyProfile(invalidRequest))
+                .isInstanceOfSatisfying(AppException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo("PROFILE_FIELDS_NOT_ALLOWED"));
+    }
+
+    @Test
+    @DisplayName("Professionista deve aggiornare solo i campi consentiti del proprio profilo")
+    void shouldPartiallyUpdateProfessionalProfileAndRejectClientFields() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        UpdateMyProfileRequest request = new UpdateMyProfileRequest();
+        request.setLastName(" Verdi ");
+        request.setPhoneNumber(" +39 333 1234567 ");
+        request.setBio(" Personal trainer certificato. ");
+        request.setWorkplaceName(" Support Gym ");
+        request.setCity(" Roma ");
+
+        MyProfileResponse response = meService.updateMyProfile(request);
+
+        assertThat(response.getFirstName()).isEqualTo(professional.getFirstName());
+        assertThat(response.getLastName()).isEqualTo("Verdi");
+        assertThat(response.getSpecialization()).isEqualTo(professional.getSpecialization());
+        assertThat(response.getPhoneNumber()).isEqualTo("+39 333 1234567");
+        assertThat(response.getBio()).isEqualTo("Personal trainer certificato.");
+        assertThat(response.getWorkplaceName()).isEqualTo("Support Gym");
+        assertThat(response.getCity()).isEqualTo("Roma");
+        assertThat(response.getBirthDate()).isNull();
+        assertThat(response.getPrimaryGoal()).isNull();
+
+        UpdateMyProfileRequest invalidRequest = new UpdateMyProfileRequest();
+        invalidRequest.setPrimaryGoal("Campo riservato al cliente.");
+
+        assertThatThrownBy(() -> meService.updateMyProfile(invalidRequest))
+                .isInstanceOfSatisfying(AppException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo("PROFILE_FIELDS_NOT_ALLOWED"));
     }
 
     @Test
