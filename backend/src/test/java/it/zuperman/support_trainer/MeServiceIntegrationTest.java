@@ -22,12 +22,15 @@ import org.springframework.transaction.annotation.Transactional;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
+import it.zuperman.support_trainer.common.enums.ClientOperationalStatus;
 import it.zuperman.support_trainer.common.enums.Gender;
+import it.zuperman.support_trainer.common.enums.ProfessionalOperationalStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
 import it.zuperman.support_trainer.profile.dto.request.UpdateMyProfileRequest;
+import it.zuperman.support_trainer.profile.dto.request.UpdateOperationalStatusRequest;
 import it.zuperman.support_trainer.profile.dto.response.MyAccountResponse;
 import it.zuperman.support_trainer.profile.dto.response.MyProfileResponse;
 import it.zuperman.support_trainer.profile.service.MeService;
@@ -182,7 +185,61 @@ class MeServiceIntegrationTest {
 
         assertThatThrownBy(() -> meService.updateMyProfile(invalidRequest))
                 .isInstanceOfSatisfying(AppException.class, exception ->
-                        assertThat(exception.getErrorCode()).isEqualTo("PROFILE_FIELDS_NOT_ALLOWED"));
+                assertThat(exception.getErrorCode()).isEqualTo("PROFILE_FIELDS_NOT_ALLOWED"));
+    }
+
+    @Test
+    @DisplayName("Cliente deve aggiornare il proprio stato operativo")
+    void shouldUpdateClientOperationalStatus() {
+        ClientProfile client = createActiveClient();
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        UpdateOperationalStatusRequest request = new UpdateOperationalStatusRequest();
+        request.setOperationalStatus(" pausa ");
+
+        MyProfileResponse response = meService.updateMyOperationalStatus(request);
+
+        assertThat(response.getOperationalStatus()).isEqualTo("PAUSA");
+
+        ClientProfile updatedClient = clientProfileRepository.findById(client.getId())
+                .orElseThrow();
+        assertThat(updatedClient.getOperationalStatus()).isEqualTo(ClientOperationalStatus.PAUSA);
+    }
+
+    @Test
+    @DisplayName("Professionista deve aggiornare il proprio stato operativo")
+    void shouldUpdateProfessionalOperationalStatus() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        UpdateOperationalStatusRequest request = new UpdateOperationalStatusRequest();
+        request.setOperationalStatus(" ferie ");
+
+        MyProfileResponse response = meService.updateMyOperationalStatus(request);
+
+        assertThat(response.getOperationalStatus()).isEqualTo("FERIE");
+
+        ProfessionalProfile updatedProfessional = professionalProfileRepository.findById(professional.getId())
+                .orElseThrow();
+        assertThat(updatedProfessional.getOperationalStatus()).isEqualTo(ProfessionalOperationalStatus.FERIE);
+    }
+
+    @Test
+    @DisplayName("Stato operativo non valido deve essere rifiutato")
+    void shouldRejectInvalidOperationalStatus() {
+        ClientProfile client = createActiveClient();
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        UpdateOperationalStatusRequest request = new UpdateOperationalStatusRequest();
+        request.setOperationalStatus("NON_VALIDO");
+
+        assertThatThrownBy(() -> meService.updateMyOperationalStatus(request))
+                .isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("INVALID_OPERATIONAL_STATUS"));
+
+        ClientProfile unchangedClient = clientProfileRepository.findById(client.getId())
+                .orElseThrow();
+        assertThat(unchangedClient.getOperationalStatus()).isEqualTo(ClientOperationalStatus.ATTIVO);
     }
 
     @Test
