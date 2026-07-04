@@ -1,10 +1,10 @@
-# Riepilogo lavoro Codex — Copertura test Auth e Invite
+# Riepilogo lavoro Codex — Copertura test backend MVP
 
 ## Contesto
 
 Questo documento riassume il lavoro svolto sul branch `test-codex` tramite Codex, usando una copia del progetto principale `Support Trainer`.
 
-L’obiettivo della sessione era testare Codex in modo sicuro, limitando gli interventi ai soli test automatici e senza modificare il codice di produzione.
+L’obiettivo iniziale della sessione era testare Codex in modo sicuro, privilegiando test automatici e modifiche mirate. Il lavoro è stato poi esteso ai principali pacchetti backend dell’MVP e a due correzioni minime emerse durante la review Security / Common.
 
 ## Risultato generale
 
@@ -22,7 +22,14 @@ Sono stati infine aggiunti 4 test di integrazione dedicati alle lacune MVP resid
 
 Sono stati inoltre aggiunti 7 test di integrazione dedicati alle lacune MVP residue del pacchetto Profile. Complessivamente sono quindi stati aggiunti 44 test di integrazione; `MeServiceIntegrationTest` contiene ora 9 test.
 
-Non sono state apportate modifiche al codice di produzione.
+Per Security / Common è stato aggiunto un test sul parametro obbligatorio mancante e una nuova suite di 6 test. Complessivamente sono quindi stati aggiunti 51 test di integrazione. Il test di login esistente è stato inoltre esteso per verificare che un access token funzioni come Bearer e che un refresh token venga rifiutato.
+
+La suite backend completa contiene ora 82 test.
+
+Sono state apportate soltanto due modifiche minime al codice di produzione:
+
+* distinzione tra access token e refresh token tramite claim interno `token_type`;
+* gestione di `MissingServletRequestParameterException` con risposta `400 Bad Request` coerente.
 
 ## Test aggiunti
 
@@ -31,12 +38,14 @@ Non sono state apportate modifiche al codice di produzione.
 Sono stati aggiunti test per i seguenti scenari:
 
 * token inesistente;
+* parametro `token` omesso;
 * token già usato;
 * token scaduto.
 
 Comportamenti verificati:
 
 * token inesistente → `404 Not Found`, `EMAIL_VERIFICATION_TOKEN_NOT_FOUND`;
+* parametro `token` omesso → `400 Bad Request`, `MISSING_REQUEST_PARAMETER`;
 * token già usato → `400 Bad Request`, `EMAIL_VERIFICATION_TOKEN_ALREADY_USED`;
 * token scaduto → `400 Bad Request`, `EMAIL_VERIFICATION_TOKEN_EXPIRED`.
 
@@ -57,6 +66,8 @@ Sono stati aggiunti test per i seguenti scenari:
 Comportamenti verificati:
 
 * login corretto → `200 OK`, presenza di `accessToken` e `refreshToken`;
+* access token usato come Bearer su endpoint protetto → accesso consentito;
+* refresh token usato come Bearer su endpoint protetto → `401 Unauthorized`, `INVALID_TOKEN`;
 * password errata → `401 Unauthorized`, `AUTHENTICATION_ERROR`;
 * login prima della verifica email → `403 Forbidden`, `ACCOUNT_NOT_ACTIVE`.
 
@@ -275,6 +286,45 @@ backend/src/test/java/it/zuperman/support_trainer/MeServiceIntegrationTest.java
 
 Non sono state apportate modifiche al codice di produzione. Il pacchetto Profile è considerato chiudibile per l'MVP.
 
+## Security / Common
+
+È stata aggiunta una suite di integrazione dedicata al contratto Security / Common basata su MockMvc, JWT reali e profilo `test`.
+
+Comportamenti verificati:
+
+* richiesta senza JWT a `GET /api/v1/me/account` → `401 Unauthorized`;
+* JWT alterato → `401 Unauthorized`, `INVALID_TOKEN`;
+* JWT scaduto → `401 Unauthorized`, `TOKEN_EXPIRED`;
+* refresh token usato come Bearer → `401 Unauthorized`, `INVALID_TOKEN`;
+* utente `PROFESSIONAL` autenticato su `GET /api/v1/professionals/my`, riservato al ruolo `CLIENT` → `403 Forbidden`, `ACCESS_DENIED`;
+* parametro `token` omesso su `GET /api/v1/auth/verify-email` → `400 Bad Request`, `MISSING_REQUEST_PARAMETER`;
+* presenza dei campi `timestamp`, `status`, `error`, `errorCode` e `message` nel formato `ErrorResponse` per risposte 400, 401 e 403.
+
+File creato:
+
+```text
+backend/src/test/java/it/zuperman/support_trainer/SecurityCommonIntegrationTest.java
+```
+
+Il test di login esistente verifica inoltre che l'access token continui a funzionare sull'endpoint protetto e che il refresh token venga rifiutato come Bearer.
+
+### Correzioni minime di produzione
+
+In `JwtService` access token e refresh token includono ora un claim interno `token_type`. `isTokenValid()` accetta come credenziale Bearer esclusivamente token di tipo `access`. Non sono stati introdotti endpoint di refresh, persistenza, rotazione o revoca.
+
+In `GlobalExceptionHandler` è stata aggiunta la gestione specifica di `MissingServletRequestParameterException`, con `400 Bad Request`, `MISSING_REQUEST_PARAMETER` e formato `ErrorResponse` invariato.
+
+File modificati:
+
+```text
+backend/src/main/java/it/zuperman/support_trainer/security/jwt/JwtService.java
+backend/src/main/java/it/zuperman/support_trainer/common/exception/GlobalExceptionHandler.java
+backend/src/test/java/it/zuperman/support_trainer/AuthControllerLoginIntegrationTest.java
+backend/src/test/java/it/zuperman/support_trainer/AuthControllerEmailVerificationIntegrationTest.java
+```
+
+Il pacchetto Security / Common è considerato chiudibile per l'MVP.
+
 ## Isolamento test con profilo test
 
 È stato aggiunto `@ActiveProfiles("test")` a due test esistenti:
@@ -289,6 +339,8 @@ Questo evita che i test usino accidentalmente il database MySQL locale e forza l
 ## File toccati
 
 ```text
+backend/src/main/java/it/zuperman/support_trainer/security/jwt/JwtService.java
+backend/src/main/java/it/zuperman/support_trainer/common/exception/GlobalExceptionHandler.java
 backend/src/test/java/it/zuperman/support_trainer/SupportTrainerApplicationTests.java
 backend/src/test/java/it/zuperman/support_trainer/UserPersistenceTest.java
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerEmailVerificationIntegrationTest.java
@@ -300,6 +352,7 @@ backend/src/test/java/it/zuperman/support_trainer/ClientProfessionalAuthorizatio
 backend/src/test/java/it/zuperman/support_trainer/AvailabilityServiceIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/BookingServiceIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/MeServiceIntegrationTest.java
+backend/src/test/java/it/zuperman/support_trainer/SecurityCommonIntegrationTest.java
 ```
 
 ## Verifica
@@ -314,14 +367,17 @@ Anche il pacchetto Booking è stato verificato con test mirati e suite completa 
 
 Anche il pacchetto Profile è stato verificato con test mirati e suite completa Maven. Entrambi sono passati sia nella copia sia nel progetto originale.
 
+Anche le correzioni e la suite Security / Common sono state verificate con test mirati e suite completa Maven. La suite completa nel progetto originale ha eseguito 82 test: 0 failure, 0 errori e 0 test ignorati.
+
 Comandi utilizzati:
 
 ```powershell
 ./mvnw test -Dtest=ClientProfessionalAuthorizationIntegrationTest
+./mvnw test -Dtest=SecurityCommonIntegrationTest
 ./mvnw test
 ```
 
-La suite completa Maven è quindi passata dopo le integrazioni Auth, Invite, validate-invite, Client / Professional access control, Availability, Booking e Profile. Il numero totale dei test eseguiti non viene indicato perché non è stato verificato tramite log durante questo aggiornamento documentale.
+La suite completa Maven è quindi passata dopo le integrazioni Auth, Invite, validate-invite, Client / Professional access control, Availability, Booking, Profile e Security / Common.
 
 ## Rischi residui
 
@@ -342,11 +398,13 @@ La suite completa Maven è quindi passata dopo le integrazioni Auth, Invite, val
 * I filtri per stato e il motivo testuale di rifiuto restano feature future non attive del pacchetto Booking.
 * Per il pacchetto Profile restano come hardening futuro una matrice HTTP MockMvc/JWT specifica per `/api/v1/me/**`, account e profili inattivi, email professionista non verificata e una matrice completa delle validazioni DTO, inclusi boundary su data futura, altezza e limiti testuali. Non costituiscono bug o blocchi per l'MVP.
 * L'upload dell'immagine profilo resta una feature futura non attiva.
-* Restano fuori da questa fase test avanzati di concorrenza, input malformati, rate limiting e hardening operativo.
+* Per Security / Common restano come hardening futuro issuer e audience JWT, rotazione delle chiavi, centralizzazione della serializzazione degli errori, rate limiting e logging operativo. Non costituiscono blocchi per l'MVP.
+* Endpoint di refresh, persistenza, rotazione e revoca dei refresh token, logout applicativo e reset password restano feature future non attive.
+* Restano fuori da questa fase test avanzati di concorrenza e ulteriori casi di input malformato.
 
 ## Valutazione finale
 
-Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli, access control, validazione pubblica degli inviti, Client / Professional, Availability, Booking e Profile senza modificare il comportamento applicativo.
+Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli, access control, validazione pubblica degli inviti, Client / Professional, Availability, Booking, Profile e Security / Common. Le sole modifiche di produzione sono le due correzioni minime descritte per la distinzione access/refresh token e per il parametro obbligatorio mancante.
 
 Il pacchetto Invite / validate-invite / access control è considerato chiudibile per questa fase MVP. Le lacune residue riguardano robustezza avanzata, concorrenza e hardening futuro, non il flusso MVP fondamentale.
 
@@ -358,10 +416,12 @@ Il pacchetto Booking è considerato chiudibile per l'MVP. Le lacune residue rigu
 
 Il pacchetto Profile è considerato chiudibile per l'MVP. Le lacune residue riguardano esclusivamente hardening futuro e non bloccano il flusso MVP fondamentale.
 
+Il pacchetto Security / Common è considerato chiudibile per l'MVP. I flussi 400, 401 e 403 principali, la validazione JWT e il rifiuto del refresh token come Bearer sono coperti direttamente.
+
 Le modifiche sono considerate sicure perché:
 
-* sono limitate ai test;
-* non toccano codice di produzione;
+* la maggior parte degli interventi è limitata ai test;
+* le modifiche di produzione sono due correzioni circoscritte, senza refactoring o nuove feature Auth;
 * usano il profilo `test`;
 * usano flussi reali di registrazione, verifica email e autenticazione JWT per gli endpoint Invite;
 * verificano direttamente gli stati principali dell'invito e del professionista proprietario;
@@ -369,4 +429,5 @@ Le modifiche sono considerate sicure perché:
 * verificano le regole principali di Availability, incluse ownership delle mutazioni e aggiornamento parziale positivo;
 * verificano le regole principali di Booking, incluse ownership, isolamento delle liste e integrazione con gli stati Availability;
 * verificano lettura, aggiornamento parziale, separazione dei campi per ruolo e stato operativo del pacchetto Profile;
+* verificano direttamente JWT assente, alterato e scaduto, refresh token rifiutato come Bearer, authority errata e formato comune degli errori 400, 401 e 403;
 * sono state verificate con test mirati e suite completa.
