@@ -95,6 +95,17 @@ class AuthControllerEmailVerificationIntegrationTest {
     }
 
     @Test
+    @DisplayName("Deve restituire bad request quando manca il parametro token")
+    void shouldReturnBadRequestWhenEmailVerificationTokenParameterIsMissing() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/verify-email"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.errorCode").value("MISSING_REQUEST_PARAMETER"))
+                .andExpect(jsonPath("$.message").value("Parametro obbligatorio mancante"));
+    }
+
+    @Test
     @DisplayName("Non deve consentire il riutilizzo di un token di verifica")
     void shouldRejectAlreadyUsedEmailVerificationToken() throws Exception {
         String requestBody = """
