@@ -15,7 +15,7 @@ Stato sintetico:
 - backend Spring Boot presente;
 - API per i flussi principali implementate;
 - autenticazione e autorizzazione per ruolo presenti;
-- test di integrazione per auth, profili, availability e booking presenti;
+- test di integrazione per auth, inviti, access control, profili, availability, booking e Security / Common presenti;
 - database applicativo previsto: MySQL;
 - frontend non ancora implementato;
 - deploy e pipeline CI/CD non presenti;
@@ -33,7 +33,7 @@ Stato sintetico:
 - Jakarta Validation
 - JJWT 0.13.0
 - Lombok
-- Maven Wrapper 3.9.12
+- script Maven Wrapper 3.3.4 con distribuzione Apache Maven 3.9.12
 
 ### Persistenza e test
 
@@ -58,11 +58,13 @@ Stato sintetico:
 - generazione e verifica del token di verifica email;
 - login con JWT;
 - generazione di access token e refresh token;
+- distinzione interna tra access token e refresh token tramite claim JWT;
+- accettazione dei soli access token come Bearer sugli endpoint protetti;
 - autorizzazione per ruolo `PROFESSIONAL` e `CLIENT`;
 - controlli applicativi su stato account, specializzazione e proprietà delle risorse;
 - gestione uniforme degli errori API.
 
-Il refresh token viene generato durante il login, ma non sono ancora presenti endpoint di refresh, rotazione o revoca.
+Il refresh token viene generato durante il login, ma non è accettato come Bearer sugli endpoint protetti. Non sono ancora presenti endpoint di refresh né lifecycle completo di rinnovo, persistenza, rotazione o revoca.
 
 ### Profilo e account
 
@@ -233,9 +235,14 @@ La suite include test relativi a:
 - caricamento del contesto Spring;
 - persistenza JPA degli utenti;
 - registrazione, login e verifica email;
-- aggiornamento del profilo;
-- disponibilità;
-- richieste di prenotazione e relative transizioni.
+- inviti, validazione preventiva e controllo accessi;
+- relazioni e ownership Client / Professional;
+- lettura e aggiornamento del profilo;
+- disponibilità e relative regole business;
+- richieste di prenotazione e relative transizioni;
+- JWT, ruoli, risposte 400/401/403 e gestione degli errori HTTP 404/405/415.
+
+L’ultima suite completa verificata nei report Surefire contiene 85 test, senza failure, errori o test ignorati.
 
 ## 11. Profili Spring
 
@@ -250,11 +257,12 @@ Usa `src/test/resources/application-test.properties` con:
 - database H2 in memoria;
 - schema ricreato tramite `create-drop`;
 - JWT con valori dedicati ai test;
+- origin CORS locale dedicato ai test;
 - logging SQL disabilitato.
 
 Le classi di test principali attivano il profilo con `@ActiveProfiles("test")`.
 
-La proprietà `app.cors.allowed-origins` è richiesta dalla configurazione di sicurezza ma non è definita direttamente in `application-test.properties`. Su un clone pulito è quindi necessario predisporre anche `application.properties` partendo dal file di esempio prima di avviare l'intero contesto di test.
+La proprietà `app.cors.allowed-origins` è definita direttamente nel profilo `test`; la suite non dipende quindi dall’`application.properties` locale, escluso da Git.
 
 Non sono attualmente presenti profili Spring dedicati a sviluppo, staging o produzione.
 
@@ -276,7 +284,7 @@ La cartella `docs` contiene la documentazione funzionale e tecnica. I riferiment
 - [Backend Implementation Roadmap](docs/11-backend-implementation-roadmap.md)
 - [Sprint Availability](docs/16-sprint-04-availability.md)
 - [Sprint Bookings](docs/17-sprint-05-bookings.md)
-- [Copertura test Auth](docs/codex/2026-06-28-codex-auth-test-coverage.md)
+- [Copertura test backend MVP](docs/codex/2026-06-28-codex-auth-test-coverage.md)
 
 ## 13. Roadmap sintetica
 

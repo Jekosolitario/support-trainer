@@ -13,11 +13,14 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultMatcher;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -116,6 +119,40 @@ class SecurityCommonIntegrationTest {
         mockMvc.perform(get("/api/v1/auth/verify-email"))
                 .andExpect(status().isBadRequest())
                 .andExpectAll(errorResponse(400, "BAD_REQUEST", "MISSING_REQUEST_PARAMETER"));
+    }
+
+    @Test
+    @DisplayName("Endpoint inesistente autenticato deve restituire not found")
+    void shouldReturnNotFoundForMissingAuthenticatedEndpoint() throws Exception {
+        UserDetails userDetails = createProfessionalUserDetails();
+        String accessToken = jwtService.generateAccessToken(userDetails);
+
+        mockMvc.perform(get("/api/v1/endpoint-not-found")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isNotFound())
+                .andExpectAll(errorResponse(404, "NOT_FOUND", "RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("Metodo HTTP non supportato deve restituire method not allowed")
+    void shouldReturnMethodNotAllowedForUnsupportedHttpMethod() throws Exception {
+        UserDetails userDetails = createProfessionalUserDetails();
+        String accessToken = jwtService.generateAccessToken(userDetails);
+
+        mockMvc.perform(put(PROTECTED_ENDPOINT)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpectAll(errorResponse(405, "METHOD_NOT_ALLOWED", "METHOD_NOT_ALLOWED"));
+    }
+
+    @Test
+    @DisplayName("Media type non supportato deve restituire unsupported media type")
+    void shouldReturnUnsupportedMediaType() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_XML)
+                        .content("<login/>"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpectAll(errorResponse(415, "UNSUPPORTED_MEDIA_TYPE", "UNSUPPORTED_MEDIA_TYPE"));
     }
 
     private UserDetails createProfessionalUserDetails() {
