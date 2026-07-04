@@ -122,6 +122,8 @@ L’access token:
 - viene generato al login
 - ha scadenza configurabile
 - viene inviato nelle richieste protette
+- contiene il claim interno `token_type = access`
+- è l’unico tipo di JWT accettato come credenziale Bearer sugli endpoint protetti
 
 ### Header standard
 `Authorization: Bearer <access_token>`
@@ -131,13 +133,16 @@ Il refresh token:
 - viene generato al login
 - ha scadenza più lunga rispetto all’access token
 - viene restituito nella `AuthResponse`
+- contiene il claim interno `token_type = refresh`
+- non è accettato come credenziale Bearer sugli endpoint protetti
 
 ## 6.3 Stato attuale del refresh token
 Nel codice attuale:
 - il **refresh token viene generato**
 - il **refresh token viene restituito**
+- il filtro JWT lo rifiuta se viene usato come access token Bearer
 - **non esiste ancora un endpoint dedicato di refresh**
-- **non esiste ancora persistenza o revoca del refresh token**
+- **non esiste ancora un lifecycle completo di rinnovo, persistenza, rotazione o revoca**
 
 Quindi il refresh token è già presente nel modello di autenticazione, ma il relativo flusso di rinnovo non è ancora esposto via endpoint.
 
@@ -146,8 +151,9 @@ Nel codice attuale il JWT contiene solo informazioni essenziali:
 - `subject` = email dell’utente
 - `issuedAt`
 - `expiration`
+- claim interno `token_type`, valorizzato con `access` oppure `refresh`
 
-Attualmente **non** vengono aggiunti claim custom come:
+Attualmente **non** vengono aggiunti altri claim applicativi come:
 - user id
 - role
 - dati business
@@ -236,6 +242,7 @@ La registrazione cliente può essere completata solo con codice invito:
 
 ## 10.2 Errori gestiti
 Il flusso gestisce almeno questi casi:
+- parametro `token` obbligatorio mancante
 - token non trovato
 - token già usato
 - token scaduto
@@ -282,12 +289,13 @@ Il progetto attualmente:
 
 Ma **non implementa ancora**:
 - endpoint di refresh
+- rinnovo dell’access token
 - rotazione token
 - revoca token
 - persistenza token
 
 ## 12.2 Implicazione pratica
-Il refresh token è già previsto nel modello, ma il flusso completo di rinnovo è ancora da completare in uno sprint successivo.
+Il refresh token è già previsto nel modello e distinto dall’access token, ma non può autenticare richieste protette. Il flusso completo di rinnovo resta da completare in uno sprint successivo.
 
 ---
 
@@ -589,8 +597,7 @@ gli origin consentiti sono letti da property applicativa (app.cors.allowed-origi
 metodi e header consentiti sono configurati esplicitamente
 
 ## 21.2 Nota importante
-Nel materiale attualmente analizzato non è presente una configurazione CORS dedicata più dettagliata.  
-Quindi sappiamo che il CORS è abilitato, ma la policy completa va eventualmente verificata in file di configurazione non inclusi oppure in step successivi del progetto.
+La configurazione applicativa di esempio espone la proprietà CORS da personalizzare per ambiente; il profilo `test` definisce invece un origin locale dedicato e autosufficiente.
 
 il backend è predisposto per frontend separato
 gli origin cambiano per ambiente tramite configuration/properties
@@ -651,7 +658,12 @@ Nel codice attuale le situazioni seguenti devono produrre errori chiari:
 
 - credenziali non valide
 - utente non autenticato
-- token mancante o non valido
+- token mancante, alterato, non valido o scaduto
+- refresh token usato impropriamente come Bearer
+- route o risorsa inesistente dopo autenticazione
+- metodo HTTP non supportato
+- media type non supportato
+- parametro HTTP obbligatorio mancante
 - account non attivo
 - email non verificata
 - profilo professionista non attivo
@@ -681,13 +693,15 @@ Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti
 
 - Spring Security + JWT stateless
 - access token + refresh token generati al login
+- claim interno `token_type` per distinguere access e refresh token
+- solo gli access token sono accettati come Bearer sugli endpoint protetti
 - ruoli reali: `PROFESSIONAL`, `CLIENT`
 - specializzazione business: `PERSONAL_TRAINER`, `NUTRITIONIST`
 - verifica email obbligatoria solo per il professionista
 - cliente registrabile solo tramite codice invito valido
 - business authorization gestita nel service layer
 - password hashata con BCrypt
-- refresh token già presente nel modello, ma flusso refresh non ancora esposto via endpoint
+- refresh token già presente nel modello, ma lifecycle di rinnovo, persistenza, rotazione e revoca non ancora implementato
 - forgot password / reset password non ancora implementati
 - Availability è modulo backend implementato e protetto
 - Bookings è modulo backend implementato e protetto

@@ -4,7 +4,7 @@
 
 Questo documento riassume il lavoro svolto sul branch `test-codex` tramite Codex, usando una copia del progetto principale `Support Trainer`.
 
-L’obiettivo iniziale della sessione era testare Codex in modo sicuro, privilegiando test automatici e modifiche mirate. Il lavoro è stato poi esteso ai principali pacchetti backend dell’MVP e a due correzioni minime emerse durante la review Security / Common.
+L’obiettivo iniziale della sessione era testare Codex in modo sicuro, privilegiando test automatici e modifiche mirate. Il lavoro è stato poi esteso ai principali pacchetti backend dell’MVP e alle correzioni minime emerse durante la review Security / Common.
 
 ## Risultato generale
 
@@ -22,14 +22,17 @@ Sono stati infine aggiunti 4 test di integrazione dedicati alle lacune MVP resid
 
 Sono stati inoltre aggiunti 7 test di integrazione dedicati alle lacune MVP residue del pacchetto Profile. Complessivamente sono quindi stati aggiunti 44 test di integrazione; `MeServiceIntegrationTest` contiene ora 9 test.
 
-Per Security / Common è stato aggiunto un test sul parametro obbligatorio mancante e una nuova suite di 6 test. Complessivamente sono quindi stati aggiunti 51 test di integrazione. Il test di login esistente è stato inoltre esteso per verificare che un access token funzioni come Bearer e che un refresh token venga rifiutato.
+Per Security / Common è stato aggiunto un test sul parametro obbligatorio mancante e una nuova suite che contiene ora 9 test. Complessivamente sono quindi stati aggiunti 54 test di integrazione. Il test di login esistente è stato inoltre esteso per verificare che un access token funzioni come Bearer e che un refresh token venga rifiutato.
 
-La suite backend completa contiene ora 82 test.
+La suite backend completa contiene ora 85 test.
 
-Sono state apportate soltanto due modifiche minime al codice di produzione:
+Sono state apportate soltanto tre modifiche minime al codice di produzione:
 
 * distinzione tra access token e refresh token tramite claim interno `token_type`;
 * gestione di `MissingServletRequestParameterException` con risposta `400 Bad Request` coerente.
+* gestione esplicita degli errori HTTP framework per risorsa inesistente, metodo non supportato e media type non supportato.
+
+La configurazione del profilo `test` è stata inoltre resa autosufficiente aggiungendo un origin CORS locale dedicato.
 
 ## Test aggiunti
 
@@ -298,7 +301,10 @@ Comportamenti verificati:
 * refresh token usato come Bearer → `401 Unauthorized`, `INVALID_TOKEN`;
 * utente `PROFESSIONAL` autenticato su `GET /api/v1/professionals/my`, riservato al ruolo `CLIENT` → `403 Forbidden`, `ACCESS_DENIED`;
 * parametro `token` omesso su `GET /api/v1/auth/verify-email` → `400 Bad Request`, `MISSING_REQUEST_PARAMETER`;
-* presenza dei campi `timestamp`, `status`, `error`, `errorCode` e `message` nel formato `ErrorResponse` per risposte 400, 401 e 403.
+* route inesistente dopo autenticazione → `404 Not Found`, `RESOURCE_NOT_FOUND`;
+* metodo HTTP non supportato → `405 Method Not Allowed`, `METHOD_NOT_ALLOWED`;
+* media type non supportato → `415 Unsupported Media Type`, `UNSUPPORTED_MEDIA_TYPE`;
+* presenza dei campi `timestamp`, `status`, `error`, `errorCode` e `message` nel formato `ErrorResponse` per risposte 400, 401, 403, 404, 405 e 415.
 
 File creato:
 
@@ -314,11 +320,16 @@ In `JwtService` access token e refresh token includono ora un claim interno `tok
 
 In `GlobalExceptionHandler` è stata aggiunta la gestione specifica di `MissingServletRequestParameterException`, con `400 Bad Request`, `MISSING_REQUEST_PARAMETER` e formato `ErrorResponse` invariato.
 
+Lo stesso handler gestisce ora esplicitamente `NoResourceFoundException`, `HttpRequestMethodNotSupportedException` e `HttpMediaTypeNotSupportedException`, preservando il formato `ErrorResponse` e restituendo rispettivamente 404, 405 e 415.
+
+Il profilo `test` definisce direttamente `app.cors.allowed-origins=http://localhost`; la suite non dipende più dall’`application.properties` locale ignorato da Git.
+
 File modificati:
 
 ```text
 backend/src/main/java/it/zuperman/support_trainer/security/jwt/JwtService.java
 backend/src/main/java/it/zuperman/support_trainer/common/exception/GlobalExceptionHandler.java
+backend/src/test/resources/application-test.properties
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerLoginIntegrationTest.java
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerEmailVerificationIntegrationTest.java
 ```
@@ -336,11 +347,14 @@ backend/src/test/java/it/zuperman/support_trainer/UserPersistenceTest.java
 
 Questo evita che i test usino accidentalmente il database MySQL locale e forza l’utilizzo della configurazione H2 prevista per l’ambiente di test.
 
+Il profilo `test` contiene anche la proprietà CORS richiesta da `SecurityConfig`, rendendo l’avvio della suite indipendente dalla configurazione applicativa locale.
+
 ## File toccati
 
 ```text
 backend/src/main/java/it/zuperman/support_trainer/security/jwt/JwtService.java
 backend/src/main/java/it/zuperman/support_trainer/common/exception/GlobalExceptionHandler.java
+backend/src/test/resources/application-test.properties
 backend/src/test/java/it/zuperman/support_trainer/SupportTrainerApplicationTests.java
 backend/src/test/java/it/zuperman/support_trainer/UserPersistenceTest.java
 backend/src/test/java/it/zuperman/support_trainer/AuthControllerEmailVerificationIntegrationTest.java
@@ -367,7 +381,7 @@ Anche il pacchetto Booking è stato verificato con test mirati e suite completa 
 
 Anche il pacchetto Profile è stato verificato con test mirati e suite completa Maven. Entrambi sono passati sia nella copia sia nel progetto originale.
 
-Anche le correzioni e la suite Security / Common sono state verificate con test mirati e suite completa Maven. La suite completa nel progetto originale ha eseguito 82 test: 0 failure, 0 errori e 0 test ignorati.
+Anche le correzioni e la suite Security / Common sono state verificate con test mirati e suite completa Maven. Gli ultimi report Surefire disponibili registrano 85 test: 0 failure, 0 errori e 0 test ignorati.
 
 Comandi utilizzati:
 
@@ -404,7 +418,7 @@ La suite completa Maven è quindi passata dopo le integrazioni Auth, Invite, val
 
 ## Valutazione finale
 
-Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli, access control, validazione pubblica degli inviti, Client / Professional, Availability, Booking, Profile e Security / Common. Le sole modifiche di produzione sono le due correzioni minime descritte per la distinzione access/refresh token e per il parametro obbligatorio mancante.
+Il branch `test-codex` migliora in modo significativo la copertura delle aree Auth, Invite, ruoli, access control, validazione pubblica degli inviti, Client / Professional, Availability, Booking, Profile e Security / Common. Le sole modifiche di produzione sono le tre correzioni minime descritte per distinzione access/refresh token, parametro obbligatorio mancante ed errori HTTP framework.
 
 Il pacchetto Invite / validate-invite / access control è considerato chiudibile per questa fase MVP. Le lacune residue riguardano robustezza avanzata, concorrenza e hardening futuro, non il flusso MVP fondamentale.
 
@@ -416,12 +430,12 @@ Il pacchetto Booking è considerato chiudibile per l'MVP. Le lacune residue rigu
 
 Il pacchetto Profile è considerato chiudibile per l'MVP. Le lacune residue riguardano esclusivamente hardening futuro e non bloccano il flusso MVP fondamentale.
 
-Il pacchetto Security / Common è considerato chiudibile per l'MVP. I flussi 400, 401 e 403 principali, la validazione JWT e il rifiuto del refresh token come Bearer sono coperti direttamente.
+Il pacchetto Security / Common è considerato chiudibile per l'MVP. I flussi 400, 401, 403, 404, 405 e 415 principali, la validazione JWT e il rifiuto del refresh token come Bearer sono coperti direttamente.
 
 Le modifiche sono considerate sicure perché:
 
 * la maggior parte degli interventi è limitata ai test;
-* le modifiche di produzione sono due correzioni circoscritte, senza refactoring o nuove feature Auth;
+* le modifiche di produzione sono tre correzioni circoscritte, senza refactoring o nuove feature Auth;
 * usano il profilo `test`;
 * usano flussi reali di registrazione, verifica email e autenticazione JWT per gli endpoint Invite;
 * verificano direttamente gli stati principali dell'invito e del professionista proprietario;
@@ -429,5 +443,5 @@ Le modifiche sono considerate sicure perché:
 * verificano le regole principali di Availability, incluse ownership delle mutazioni e aggiornamento parziale positivo;
 * verificano le regole principali di Booking, incluse ownership, isolamento delle liste e integrazione con gli stati Availability;
 * verificano lettura, aggiornamento parziale, separazione dei campi per ruolo e stato operativo del pacchetto Profile;
-* verificano direttamente JWT assente, alterato e scaduto, refresh token rifiutato come Bearer, authority errata e formato comune degli errori 400, 401 e 403;
+* verificano direttamente JWT assente, alterato e scaduto, refresh token rifiutato come Bearer, authority errata e formato comune degli errori 400, 401, 403, 404, 405 e 415;
 * sono state verificate con test mirati e suite completa.
