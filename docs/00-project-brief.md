@@ -30,9 +30,11 @@ Questo progetto nasce con i seguenti obiettivi:
   - Hibernate / JPA
   - REST API
   - MySQL
-  - HTML
-  - CSS
-  - JavaScript
+  - React
+  - TypeScript
+  - Vite
+- progettazione UI responsive/mobile-first
+- comunicazione frontend-backend tramite API REST JSON
 - costruire un’app completa e realmente funzionante
 - documentare ogni fase dello sviluppo in modo ordinato
 - capire meglio il flusso reale di un progetto full stack
@@ -220,10 +222,19 @@ Per evitare di rendere la prima versione troppo complessa, queste funzionalità 
 - Spring Security
 - MySQL
 
-### Frontend
-- HTML
-- CSS
-- JavaScript Vanilla
+### Frontend web previsto
+- React
+- TypeScript
+- Vite
+- CSS modulare o approccio equivalente da decidere in fase frontend
+- comunicazione con backend tramite API REST JSON
+
+### Strategia mobile futura
+- possibile evoluzione con React Native + Expo;
+- non parte dello sprint frontend iniziale;
+- da valutare dopo stabilizzazione della web app;
+- non implica che tutti i componenti React web siano automaticamente riutilizzabili su mobile;
+- i flussi, la logica applicativa e l’organizzazione API dovranno però essere pensati in modo riutilizzabile.
 
 ### Strumenti di supporto
 - Git / GitHub
@@ -261,11 +272,19 @@ Il backend gestisce:
 
 ### Frontend
 
-Il frontend è previsto con:
+### Frontend web
 
-- HTML;
-- CSS;
-- JavaScript Vanilla.
+Il frontend web sarà sviluppato come applicazione separata dal backend, con:
+
+- React;
+- TypeScript;
+- Vite;
+- progettazione UI responsive/mobile-first;
+- CSS modulare o approccio equivalente da decidere in fase frontend;
+- consumo delle API REST JSON esposte dal backend.
+
+La futura evoluzione mobile potrà essere valutata con React Native + Expo, ma non fa parte dello sprint frontend iniziale.  
+Questa possibilità non implica il riuso automatico dei componenti React web su mobile; tuttavia flussi, logica applicativa e organizzazione API dovranno essere progettati in modo il più possibile riutilizzabile.
 
 Nell’audit attuale non sono stati analizzati file frontend integrati al backend: il lavoro verificato riguarda codice backend, configurazione, test e documentazione.
 

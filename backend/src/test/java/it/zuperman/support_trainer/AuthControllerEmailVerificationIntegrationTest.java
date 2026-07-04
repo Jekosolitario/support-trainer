@@ -1,5 +1,7 @@
 package it.zuperman.support_trainer;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,6 +14,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
@@ -80,5 +83,95 @@ class AuthControllerEmailVerificationIntegrationTest {
         assertThat(verifiedUser.getAccountStatus()).isEqualTo(AccountStatus.ACTIVE);
         assertThat(usedToken.getUsed()).isTrue();
         assertThat(usedToken.getUsedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Deve restituire not found per un token di verifica inesistente")
+    void shouldReturnNotFoundForMissingEmailVerificationToken() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/verify-email")
+                        .param("token", "inesistente"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("EMAIL_VERIFICATION_TOKEN_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("Deve restituire bad request quando manca il parametro token")
+    void shouldReturnBadRequestWhenEmailVerificationTokenParameterIsMissing() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/verify-email"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.errorCode").value("MISSING_REQUEST_PARAMETER"))
+                .andExpect(jsonPath("$.message").value("Parametro obbligatorio mancante"));
+    }
+
+    @Test
+    @DisplayName("Non deve consentire il riutilizzo di un token di verifica")
+    void shouldRejectAlreadyUsedEmailVerificationToken() throws Exception {
+        String requestBody = """
+                {
+                  "firstName": "Luigi",
+                  "lastName": "Verdi",
+                  "email": "luigi.verdi@example.com",
+                  "password": "Password123!",
+                  "specialization": "PERSONAL_TRAINER"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated());
+
+        User savedUser = userRepository.findByEmail("luigi.verdi@example.com").orElseThrow();
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
+                .stream()
+                .filter(token -> token.getUser().getId().equals(savedUser.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        mockMvc.perform(get("/api/v1/auth/verify-email")
+                        .param("token", verificationToken.getToken()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/auth/verify-email")
+                        .param("token", verificationToken.getToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("EMAIL_VERIFICATION_TOKEN_ALREADY_USED"));
+    }
+
+    @Test
+    @DisplayName("Non deve verificare l'email con un token scaduto")
+    void shouldRejectExpiredEmailVerificationToken() throws Exception {
+        String requestBody = """
+                {
+                  "firstName": "Sara",
+                  "lastName": "Galli",
+                  "email": "sara.galli.expired.token@example.com",
+                  "password": "Password123!",
+                  "specialization": "PERSONAL_TRAINER"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated());
+
+        User savedUser = userRepository.findByEmail("sara.galli.expired.token@example.com").orElseThrow();
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
+                .stream()
+                .filter(token -> token.getUser().getId().equals(savedUser.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(verificationToken.getUsed()).isFalse();
+        verificationToken.setExpiresAt(LocalDateTime.now().minusDays(1));
+        emailVerificationTokenRepository.saveAndFlush(verificationToken);
+
+        mockMvc.perform(get("/api/v1/auth/verify-email")
+                        .param("token", verificationToken.getToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("EMAIL_VERIFICATION_TOKEN_EXPIRED"));
     }
 }

@@ -45,7 +45,8 @@ L’utente, dopo login valido, ottiene un accesso temporaneo senza usare session
 ## 3.3 Vantaggi
 Questa scelta è adatta perché:
 - è coerente con un backend REST separato dal frontend
-- si integra bene con frontend HTML/CSS/JS separato
+- si integra bene con un frontend web React + TypeScript + Vite separato dal backend;
+- resta compatibile, a livello di API REST e autenticazione JWT, con una possibile futura app mobile React Native + Expo da valutare dopo la stabilizzazione della web app.
 - permette un controllo chiaro sugli endpoint
 - si adatta bene a un’applicazione scalabile e testabile
 
@@ -121,6 +122,8 @@ L’access token:
 - viene generato al login
 - ha scadenza configurabile
 - viene inviato nelle richieste protette
+- contiene il claim interno `token_type = access`
+- è l’unico tipo di JWT accettato come credenziale Bearer sugli endpoint protetti
 
 ### Header standard
 `Authorization: Bearer <access_token>`
@@ -130,13 +133,16 @@ Il refresh token:
 - viene generato al login
 - ha scadenza più lunga rispetto all’access token
 - viene restituito nella `AuthResponse`
+- contiene il claim interno `token_type = refresh`
+- non è accettato come credenziale Bearer sugli endpoint protetti
 
 ## 6.3 Stato attuale del refresh token
 Nel codice attuale:
 - il **refresh token viene generato**
 - il **refresh token viene restituito**
+- il filtro JWT lo rifiuta se viene usato come access token Bearer
 - **non esiste ancora un endpoint dedicato di refresh**
-- **non esiste ancora persistenza o revoca del refresh token**
+- **non esiste ancora un lifecycle completo di rinnovo, persistenza, rotazione o revoca**
 
 Quindi il refresh token è già presente nel modello di autenticazione, ma il relativo flusso di rinnovo non è ancora esposto via endpoint.
 
@@ -145,8 +151,9 @@ Nel codice attuale il JWT contiene solo informazioni essenziali:
 - `subject` = email dell’utente
 - `issuedAt`
 - `expiration`
+- claim interno `token_type`, valorizzato con `access` oppure `refresh`
 
-Attualmente **non** vengono aggiunti claim custom come:
+Attualmente **non** vengono aggiunti altri claim applicativi come:
 - user id
 - role
 - dati business
@@ -235,6 +242,7 @@ La registrazione cliente può essere completata solo con codice invito:
 
 ## 10.2 Errori gestiti
 Il flusso gestisce almeno questi casi:
+- parametro `token` obbligatorio mancante
 - token non trovato
 - token già usato
 - token scaduto
@@ -281,12 +289,13 @@ Il progetto attualmente:
 
 Ma **non implementa ancora**:
 - endpoint di refresh
+- rinnovo dell’access token
 - rotazione token
 - revoca token
 - persistenza token
 
 ## 12.2 Implicazione pratica
-Il refresh token è già previsto nel modello, ma il flusso completo di rinnovo è ancora da completare in uno sprint successivo.
+Il refresh token è già previsto nel modello e distinto dall’access token, ma non può autenticare richieste protette. Il flusso completo di rinnovo resta da completare in uno sprint successivo.
 
 ---
 
@@ -430,8 +439,6 @@ Il service layer controlla invece:
 - stato del booking;
 - transizioni consentite;
 - blocco di booking e conferme su slot non coerenti con la specializzazione prevista.
-- assenza di modifiche o blocchi manuali su slot con booking `PENDING` attivo;
-- protezione delle operazioni critiche Availability/Bookings in presenza di richieste concorrenti.
 
 ---
 
@@ -539,23 +546,6 @@ Se il collegamento non esiste o l’utente non è autorizzato:
 
 ---
 
-## 18.4 Riserva logica dello slot con booking pending
-
-Una richiesta booking in stato `PENDING` non rende ancora lo slot definitivamente prenotato, perché la conferma del professionista non è ancora avvenuta.
-
-Tuttavia, lo slot viene considerato logicamente impegnato rispetto alle operazioni che potrebbero alterare la richiesta già inviata dal cliente.
-
-Finché esiste una richiesta booking `PENDING` attiva sullo slot, il professionista non può:
-
-- modificarne data o orario;
-- bloccarlo manualmente.
-
-Questa regola impedisce che il cliente attenda una risposta su una disponibilità che nel frattempo viene modificata o resa indisponibile.
-
-Il professionista deve prima gestire la richiesta pendente tramite il flusso Booking previsto, ad esempio rifiutandola.
-
----
-
 ## 19. Password security
 
 ## 19.1 Stato attuale della validazione
@@ -567,12 +557,8 @@ Nel codice attuale la password viene validata con:
 - almeno un numero
 - almeno un carattere speciale
 
-## 19.2 Ambito della validazione forte
-
-La validazione forte della password è attualmente applicata in fase di:
-
-- registrazione professionista;
-- registrazione cliente.
+## 19.2 
+- la validazione forte della password è attualmente applicata in fase di registrazione professionista
 
 ## 19.3 Storage
 La password non viene mai salvata in chiaro.
@@ -611,8 +597,7 @@ gli origin consentiti sono letti da property applicativa (app.cors.allowed-origi
 metodi e header consentiti sono configurati esplicitamente
 
 ## 21.2 Nota importante
-Nel materiale attualmente analizzato non è presente una configurazione CORS dedicata più dettagliata.  
-Quindi sappiamo che il CORS è abilitato, ma la policy completa va eventualmente verificata in file di configurazione non inclusi oppure in step successivi del progetto.
+La configurazione applicativa di esempio espone la proprietà CORS da personalizzare per ambiente; il profilo `test` definisce invece un origin locale dedicato e autosufficiente.
 
 il backend è predisposto per frontend separato
 gli origin cambiano per ambiente tramite configuration/properties
@@ -664,13 +649,6 @@ Questa scelta è coerente con:
 - blocco conferma booking su slot appartenenti a nutrizionisti;
 - transizioni di stato booking consentite;
 - aggiornamento stato slot dopo conferma o cancellazione booking.
-- riserva logica dello slot quando esiste un booking `PENDING`;
-- blocco modifica slot con booking `PENDING` attivo;
-- blocco del blocco manuale slot con booking `PENDING` attivo;
-- protezione da creazione concorrente di booking sullo stesso slot;
-- protezione da transizioni concorrenti della stessa richiesta booking;
-- protezione da conferme concorrenti sullo stesso slot;
-- protezione da overlap availability in operazioni concorrenti dello stesso professionista.
 
 ---
 
@@ -680,7 +658,12 @@ Nel codice attuale le situazioni seguenti devono produrre errori chiari:
 
 - credenziali non valide
 - utente non autenticato
-- token mancante o non valido
+- token mancante, alterato, non valido o scaduto
+- refresh token usato impropriamente come Bearer
+- route o risorsa inesistente dopo autenticazione
+- metodo HTTP non supportato
+- media type non supportato
+- parametro HTTP obbligatorio mancante
 - account non attivo
 - email non verificata
 - profilo professionista non attivo
@@ -701,8 +684,6 @@ Nel codice attuale le situazioni seguenti devono produrre errori chiari:
 - booking tra cliente e professionista non collegati
 - accesso a booking da utente non coinvolto
 - transizione booking non consentita
-- modifica di slot con richiesta booking `PENDING` attiva;
-- blocco manuale di slot con richiesta booking `PENDING` attiva;
 
 ---
 
@@ -712,13 +693,15 @@ Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti
 
 - Spring Security + JWT stateless
 - access token + refresh token generati al login
+- claim interno `token_type` per distinguere access e refresh token
+- solo gli access token sono accettati come Bearer sugli endpoint protetti
 - ruoli reali: `PROFESSIONAL`, `CLIENT`
 - specializzazione business: `PERSONAL_TRAINER`, `NUTRITIONIST`
 - verifica email obbligatoria solo per il professionista
 - cliente registrabile solo tramite codice invito valido
 - business authorization gestita nel service layer
 - password hashata con BCrypt
-- refresh token già presente nel modello, ma flusso refresh non ancora esposto via endpoint
+- refresh token già presente nel modello, ma lifecycle di rinnovo, persistenza, rotazione e revoca non ancora implementato
 - forgot password / reset password non ancora implementati
 - Availability è modulo backend implementato e protetto
 - Bookings è modulo backend implementato e protetto
@@ -731,6 +714,3 @@ Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti
 - un `NUTRITIONIST` non può creare slot availability
 - booking e conferme su slot di nutrizionisti vengono bloccati dal service layer
 - slot scaduti non vengono esposti al cliente e non possono essere prenotati o confermati
-- uno slot con booking `PENDING` attivo è logicamente riservato rispetto a modifica e blocco manuale;
-- il professionista deve gestire la richiesta pendente prima di alterare lo slot;
-- i flussi critici Availability e Bookings proteggono la coerenza dei dati anche in presenza di operazioni concorrenti.

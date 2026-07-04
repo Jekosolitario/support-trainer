@@ -57,7 +57,8 @@ Il modulo **Auth** gestisce:
 - registrazione cliente tramite codice invito;
 - validazione preventiva del codice invito per registrazione cliente;
 - verifica email professionista;
-- login.
+- login;
+- generazione di access token e refresh token distinti tramite claim interno.
 
 ### Endpoint implementati
 
@@ -69,9 +70,10 @@ Il modulo **Auth** gestisce:
 
 ### Cosa non gestisce ancora
 
-Non risultano ancora implementati:
+Il refresh token viene generato e restituito al login, ma non è accettato come Bearer sugli endpoint protetti. Non risultano ancora implementati:
 
-- refresh token;
+- endpoint di refresh e rinnovo dell’access token;
+- persistenza, rotazione e revoca del refresh token;
 - logout applicativo;
 - forgot password;
 - reset password.
@@ -337,7 +339,8 @@ Modulo futuro dedicato allo storico delle misurazioni fisiche del cliente.
 
 Oltre ai moduli business non ancora implementati, restano da valutare o sviluppare:
 
-- refresh token persistenti;
+- endpoint e lifecycle completo del refresh token;
+- persistenza, rotazione e revoca dei refresh token;
 - logout;
 - forgot password;
 - reset password;

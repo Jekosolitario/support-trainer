@@ -95,6 +95,52 @@ class AvailabilityServiceIntegrationTest {
         assertThat(savedSlots.get(0).getProfessional().getId()).isEqualTo(professional.getId());
     }
 
+    @Test
+    @DisplayName("Professionista deve aggiornare parzialmente un proprio slot availability")
+    void shouldPartiallyUpdateAndReturnOwnAvailabilitySlot() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(7).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlotResponse createdSlot = availabilityService.createAvailabilitySlot(
+                new CreateAvailabilitySlotRequest(startDateTime, endDateTime)
+        );
+
+        LocalDateTime updatedEndDateTime = endDateTime.plusMinutes(30);
+        UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
+                null,
+                updatedEndDateTime
+        );
+
+        AvailabilitySlotResponse updatedSlot = availabilityService.updateAvailabilitySlot(
+                createdSlot.getId(),
+                updateRequest
+        );
+
+        List<AvailabilitySlotResponse> ownSlots = availabilityService.getMyAvailabilitySlots();
+
+        assertThat(updatedSlot.getStartDateTime()).isEqualTo(startDateTime);
+        assertThat(updatedSlot.getEndDateTime()).isEqualTo(updatedEndDateTime);
+        assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE.name());
+        assertThat(updatedSlot.getActive()).isTrue();
+
+        assertThat(ownSlots).singleElement()
+                .satisfies(slot -> {
+                    assertThat(slot.getId()).isEqualTo(createdSlot.getId());
+                    assertThat(slot.getStartDateTime()).isEqualTo(startDateTime);
+                    assertThat(slot.getEndDateTime()).isEqualTo(updatedEndDateTime);
+                    assertThat(slot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE.name());
+                    assertThat(slot.getActive()).isTrue();
+                });
+
+        AvailabilitySlot savedSlot = availabilitySlotRepository.findById(createdSlot.getId())
+                .orElseThrow();
+
+        assertThat(savedSlot.getProfessional().getId()).isEqualTo(professional.getId());
+    }
+
     private ProfessionalProfile createActivePersonalTrainer() {
         String email = "pro-" + UUID.randomUUID() + "@test.com";
 
@@ -245,6 +291,48 @@ class AvailabilityServiceIntegrationTest {
 
         assertThat(unblockedResponse.getId()).isEqualTo(slot.getId());
         assertThat(unblockedResponse.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE.name());
+    }
+
+    @Test
+    @DisplayName("Professionista non deve modificare slot availability di un altro professionista")
+    void shouldNotMutateAvailabilitySlotOwnedByAnotherProfessional() {
+        ProfessionalProfile owner = createActivePersonalTrainer();
+        ProfessionalProfile otherProfessional = createActivePersonalTrainer();
+
+        authenticateAs(owner.getEmail(), "PROFESSIONAL");
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(12).withNano(0);
+        LocalDateTime endDateTime = startDateTime.plusHours(1);
+
+        AvailabilitySlotResponse createdSlot = availabilityService.createAvailabilitySlot(
+                new CreateAvailabilitySlotRequest(startDateTime, endDateTime)
+        );
+
+        authenticateAs(otherProfessional.getEmail(), "PROFESSIONAL");
+
+        UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
+                startDateTime.plusDays(1),
+                endDateTime.plusDays(1)
+        );
+
+        assertThatThrownBy(() -> availabilityService.updateAvailabilitySlot(createdSlot.getId(), updateRequest))
+                .isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_NOT_FOUND"));
+
+        assertThatThrownBy(() -> availabilityService.blockAvailabilitySlot(createdSlot.getId()))
+                .isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_NOT_FOUND"));
+
+        assertThatThrownBy(() -> availabilityService.unblockAvailabilitySlot(createdSlot.getId()))
+                .isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_NOT_FOUND"));
+
+        AvailabilitySlot unchangedSlot = availabilitySlotRepository.findById(createdSlot.getId())
+                .orElseThrow();
+
+        assertThat(unchangedSlot.getStartDateTime()).isEqualTo(startDateTime);
+        assertThat(unchangedSlot.getEndDateTime()).isEqualTo(endDateTime);
+        assertThat(unchangedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
     }
 
     @Test
