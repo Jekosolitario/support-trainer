@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import it.zuperman.support_trainer.booking.entity.BookingRequest;
+import it.zuperman.support_trainer.common.time.BusinessDateTimeMapper;
 
 public class BookingRequestResponse {
 
@@ -42,7 +43,10 @@ public class BookingRequestResponse {
         this.items = items;
     }
 
-    public static BookingRequestResponse fromEntity(BookingRequest bookingRequest) {
+    public static BookingRequestResponse fromEntity(
+            BookingRequest bookingRequest,
+            BusinessDateTimeMapper businessDateTimeMapper
+    ) {
         return new BookingRequestResponse(
                 bookingRequest.getId(),
                 bookingRequest.getClient().getId(),
@@ -54,7 +58,7 @@ public class BookingRequestResponse {
                 bookingRequest.getUpdatedAt(),
                 bookingRequest.getItems()
                         .stream()
-                        .map(BookingRequestItemResponse::fromEntity)
+                        .map(item -> BookingRequestItemResponse.fromEntity(item, businessDateTimeMapper))
                         .toList()
         );
     }

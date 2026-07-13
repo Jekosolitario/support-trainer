@@ -3,6 +3,8 @@ package it.zuperman.support_trainer;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -44,6 +46,8 @@ import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRe
 @Transactional
 class AvailabilityServiceIntegrationTest {
 
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Europe/Rome");
+
     @Autowired
     private AvailabilityService availabilityService;
 
@@ -77,16 +81,16 @@ class AvailabilityServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         CreateAvailabilitySlotRequest request = new CreateAvailabilitySlotRequest(
-                startDateTime,
-                endDateTime
+                asBusinessOffset(startDateTime),
+                asBusinessOffset(endDateTime)
         );
 
         AvailabilitySlotResponse response = availabilityService.createAvailabilitySlot(request);
 
         assertThat(response).isNotNull();
         assertThat(response.getId()).isNotNull();
-        assertThat(response.getStartDateTime()).isEqualTo(startDateTime);
-        assertThat(response.getEndDateTime()).isEqualTo(endDateTime);
+        assertThat(response.getStartDateTime()).isEqualTo(asBusinessOffset(startDateTime));
+        assertThat(response.getEndDateTime()).isEqualTo(asBusinessOffset(endDateTime));
         assertThat(response.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE.name());
 
         List<AvailabilitySlot> savedSlots = availabilitySlotRepository.findAll();
@@ -105,13 +109,16 @@ class AvailabilityServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlotResponse createdSlot = availabilityService.createAvailabilitySlot(
-                new CreateAvailabilitySlotRequest(startDateTime, endDateTime)
+                new CreateAvailabilitySlotRequest(
+                        asBusinessOffset(startDateTime),
+                        asBusinessOffset(endDateTime)
+                )
         );
 
         LocalDateTime updatedEndDateTime = endDateTime.plusMinutes(30);
         UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
                 null,
-                updatedEndDateTime
+                asBusinessOffset(updatedEndDateTime)
         );
 
         AvailabilitySlotResponse updatedSlot = availabilityService.updateAvailabilitySlot(
@@ -121,16 +128,16 @@ class AvailabilityServiceIntegrationTest {
 
         List<AvailabilitySlotResponse> ownSlots = availabilityService.getMyAvailabilitySlots();
 
-        assertThat(updatedSlot.getStartDateTime()).isEqualTo(startDateTime);
-        assertThat(updatedSlot.getEndDateTime()).isEqualTo(updatedEndDateTime);
+        assertThat(updatedSlot.getStartDateTime()).isEqualTo(asBusinessOffset(startDateTime));
+        assertThat(updatedSlot.getEndDateTime()).isEqualTo(asBusinessOffset(updatedEndDateTime));
         assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE.name());
         assertThat(updatedSlot.getActive()).isTrue();
 
         assertThat(ownSlots).singleElement()
                 .satisfies(slot -> {
                     assertThat(slot.getId()).isEqualTo(createdSlot.getId());
-                    assertThat(slot.getStartDateTime()).isEqualTo(startDateTime);
-                    assertThat(slot.getEndDateTime()).isEqualTo(updatedEndDateTime);
+                    assertThat(slot.getStartDateTime()).isEqualTo(asBusinessOffset(startDateTime));
+                    assertThat(slot.getEndDateTime()).isEqualTo(asBusinessOffset(updatedEndDateTime));
                     assertThat(slot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE.name());
                     assertThat(slot.getActive()).isTrue();
                 });
@@ -201,15 +208,15 @@ class AvailabilityServiceIntegrationTest {
         LocalDateTime firstEndDateTime = firstStartDateTime.plusHours(2);
 
         CreateAvailabilitySlotRequest firstRequest = new CreateAvailabilitySlotRequest(
-                firstStartDateTime,
-                firstEndDateTime
+                asBusinessOffset(firstStartDateTime),
+                asBusinessOffset(firstEndDateTime)
         );
 
         availabilityService.createAvailabilitySlot(firstRequest);
 
         CreateAvailabilitySlotRequest overlappingRequest = new CreateAvailabilitySlotRequest(
-                firstStartDateTime.plusMinutes(30),
-                firstStartDateTime.plusHours(1).plusMinutes(30)
+                asBusinessOffset(firstStartDateTime.plusMinutes(30)),
+                asBusinessOffset(firstStartDateTime.plusHours(1).plusMinutes(30))
         );
 
         assertThatThrownBy(() -> availabilityService.createAvailabilitySlot(overlappingRequest))
@@ -243,8 +250,8 @@ class AvailabilityServiceIntegrationTest {
 
         assertThat(response).hasSize(1);
         assertThat(response.get(0).getId()).isEqualTo(slot.getId());
-        assertThat(response.get(0).getStartDateTime()).isEqualTo(startDateTime);
-        assertThat(response.get(0).getEndDateTime()).isEqualTo(endDateTime);
+        assertThat(response.get(0).getStartDateTime()).isEqualTo(asBusinessOffset(startDateTime));
+        assertThat(response.get(0).getEndDateTime()).isEqualTo(asBusinessOffset(endDateTime));
         assertThat(response.get(0).getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE.name());
     }
 
@@ -305,14 +312,17 @@ class AvailabilityServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlotResponse createdSlot = availabilityService.createAvailabilitySlot(
-                new CreateAvailabilitySlotRequest(startDateTime, endDateTime)
+                new CreateAvailabilitySlotRequest(
+                        asBusinessOffset(startDateTime),
+                        asBusinessOffset(endDateTime)
+                )
         );
 
         authenticateAs(otherProfessional.getEmail(), "PROFESSIONAL");
 
         UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
-                startDateTime.plusDays(1),
-                endDateTime.plusDays(1)
+                asBusinessOffset(startDateTime.plusDays(1)),
+                asBusinessOffset(endDateTime.plusDays(1))
         );
 
         assertThatThrownBy(() -> availabilityService.updateAvailabilitySlot(createdSlot.getId(), updateRequest))
@@ -351,8 +361,8 @@ class AvailabilityServiceIntegrationTest {
         availabilityService.blockAvailabilitySlot(slot.getId());
 
         UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
-                startDateTime.plusDays(1),
-                endDateTime.plusDays(1)
+                asBusinessOffset(startDateTime.plusDays(1)),
+                asBusinessOffset(endDateTime.plusDays(1))
         );
 
         assertThatThrownBy(() -> availabilityService.updateAvailabilitySlot(slot.getId(), updateRequest))
@@ -420,8 +430,8 @@ class AvailabilityServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         CreateAvailabilitySlotRequest request = new CreateAvailabilitySlotRequest(
-                startDateTime,
-                endDateTime
+                asBusinessOffset(startDateTime),
+                asBusinessOffset(endDateTime)
         );
 
         assertThatThrownBy(() -> availabilityService.createAvailabilitySlot(request))
@@ -457,8 +467,8 @@ class AvailabilityServiceIntegrationTest {
         authenticateAs(professional.getEmail(), "PROFESSIONAL");
 
         UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
-                startDateTime.plusDays(1),
-                endDateTime.plusDays(1)
+                asBusinessOffset(startDateTime.plusDays(1)),
+                asBusinessOffset(endDateTime.plusDays(1))
         );
 
         assertThatThrownBy(() -> availabilityService.updateAvailabilitySlot(slot.getId(), updateRequest))
@@ -560,12 +570,16 @@ class AvailabilityServiceIntegrationTest {
         bookingService.rejectBookingRequest(pendingBooking.getId());
 
         UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
-                startDateTime.plusDays(1),
-                endDateTime.plusDays(1)
+                asBusinessOffset(startDateTime.plusDays(1)),
+                asBusinessOffset(endDateTime.plusDays(1))
         );
 
         assertThatThrownBy(() -> availabilityService.updateAvailabilitySlot(slot.getId(), updateRequest))
                 .isInstanceOf(AppException.class)
                 .hasMessage("Uno slot già coinvolto in una richiesta di prenotazione non può essere ripianificato");
+    }
+
+    private static OffsetDateTime asBusinessOffset(LocalDateTime localDateTime) {
+        return localDateTime.atZone(BUSINESS_ZONE).toOffsetDateTime();
     }
 }

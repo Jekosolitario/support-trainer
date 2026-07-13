@@ -47,7 +47,7 @@ public class AvailabilityController {
     @PatchMapping("/{slotId}")
     public ResponseEntity<AvailabilitySlotResponse> updateAvailabilitySlot(
             @PathVariable Long slotId,
-            @RequestBody UpdateAvailabilitySlotRequest request
+            @Valid @RequestBody UpdateAvailabilitySlotRequest request
     ) {
         AvailabilitySlotResponse response = availabilityService.updateAvailabilitySlot(slotId, request);
         return ResponseEntity.ok(response);

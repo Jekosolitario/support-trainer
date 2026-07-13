@@ -3,6 +3,7 @@ package it.zuperman.support_trainer.common.time;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -66,11 +67,12 @@ class BusinessFlowClockTest {
                 professionalRepository,
                 linkRepository,
                 bookingItemRepository,
-                fixedTimeProvider()
+                fixedTimeProvider(),
+                businessDateTimeMapper()
         );
         CreateAvailabilitySlotRequest request = new CreateAvailabilitySlotRequest(
-                FIXED_BUSINESS_DATE_TIME,
-                FIXED_BUSINESS_DATE_TIME.plusHours(1)
+                businessOffset(FIXED_BUSINESS_DATE_TIME),
+                businessOffset(FIXED_BUSINESS_DATE_TIME.plusHours(1))
         );
 
         assertThatThrownBy(() -> service.createAvailabilitySlot(request))
@@ -110,7 +112,8 @@ class BusinessFlowClockTest {
                 slotRepository,
                 linkRepository,
                 userRepository,
-                fixedTimeProvider()
+                fixedTimeProvider(),
+                businessDateTimeMapper()
         );
 
         assertThatThrownBy(() -> service.createBookingRequest(new CreateBookingRequest(10L, null)))
@@ -127,7 +130,19 @@ class BusinessFlowClockTest {
     }
 
     private static ApplicationTimeProvider fixedTimeProvider() {
-        TimeProperties properties = new TimeProperties(ZoneId.of("Europe/Rome"), ZoneId.of("UTC"));
+        TimeProperties properties = timeProperties();
         return new ApplicationTimeProvider(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC), properties);
+    }
+
+    private static BusinessDateTimeMapper businessDateTimeMapper() {
+        return new BusinessDateTimeMapper(timeProperties());
+    }
+
+    private static TimeProperties timeProperties() {
+        return new TimeProperties(ZoneId.of("Europe/Rome"), ZoneId.of("UTC"));
+    }
+
+    private static OffsetDateTime businessOffset(LocalDateTime value) {
+        return value.atZone(timeProperties().businessZone()).toOffsetDateTime();
     }
 }

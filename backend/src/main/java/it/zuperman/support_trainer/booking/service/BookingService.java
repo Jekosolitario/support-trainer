@@ -27,6 +27,7 @@ import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
+import it.zuperman.support_trainer.common.time.BusinessDateTimeMapper;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 
@@ -39,6 +40,7 @@ public class BookingService {
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
     private final UserRepository userRepository;
     private final ApplicationTimeProvider timeProvider;
+    private final BusinessDateTimeMapper businessDateTimeMapper;
 
     public BookingService(
             BookingRequestRepository bookingRequestRepository,
@@ -46,7 +48,8 @@ public class BookingService {
             AvailabilitySlotRepository availabilitySlotRepository,
             ProfessionalClientLinkRepository professionalClientLinkRepository,
             UserRepository userRepository,
-            ApplicationTimeProvider timeProvider
+            ApplicationTimeProvider timeProvider,
+            BusinessDateTimeMapper businessDateTimeMapper
     ) {
         this.bookingRequestRepository = bookingRequestRepository;
         this.bookingRequestItemRepository = bookingRequestItemRepository;
@@ -54,6 +57,7 @@ public class BookingService {
         this.professionalClientLinkRepository = professionalClientLinkRepository;
         this.userRepository = userRepository;
         this.timeProvider = timeProvider;
+        this.businessDateTimeMapper = businessDateTimeMapper;
     }
 
     @Transactional
@@ -91,7 +95,7 @@ public class BookingService {
         BookingRequestItem savedItem = bookingRequestItemRepository.save(bookingRequestItem);
         savedBookingRequest.getItems().add(savedItem);
 
-        return BookingRequestResponse.fromEntity(savedBookingRequest);
+        return BookingRequestResponse.fromEntity(savedBookingRequest, businessDateTimeMapper);
     }
 
     @Transactional(readOnly = true)
@@ -101,7 +105,10 @@ public class BookingService {
         return bookingRequestRepository
                 .findAllByClient_IdAndActiveTrueOrderByCreatedAtDesc(client.getId())
                 .stream()
-                .map(BookingRequestResponse::fromEntity)
+                .map(bookingRequest -> BookingRequestResponse.fromEntity(
+                        bookingRequest,
+                        businessDateTimeMapper
+                ))
                 .toList();
     }
 
@@ -112,7 +119,10 @@ public class BookingService {
         return bookingRequestRepository
                 .findAllByProfessional_IdAndActiveTrueOrderByCreatedAtDesc(professional.getId())
                 .stream()
-                .map(BookingRequestResponse::fromEntity)
+                .map(bookingRequest -> BookingRequestResponse.fromEntity(
+                        bookingRequest,
+                        businessDateTimeMapper
+                ))
                 .toList();
     }
 
@@ -129,7 +139,7 @@ public class BookingService {
 
         validateBookingRequestVisibility(user, bookingRequest);
 
-        return BookingRequestResponse.fromEntity(bookingRequest);
+        return BookingRequestResponse.fromEntity(bookingRequest, businessDateTimeMapper);
     }
 
     @Transactional
@@ -150,7 +160,7 @@ public class BookingService {
         markSlotsAsBooked(slotsToBook);
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
-        return BookingRequestResponse.fromEntity(savedBookingRequest);
+        return BookingRequestResponse.fromEntity(savedBookingRequest, businessDateTimeMapper);
     }
 
     @Transactional
@@ -168,7 +178,7 @@ public class BookingService {
         releaseSlotsAfterNegativeOutcome(bookingRequest);
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
-        return BookingRequestResponse.fromEntity(savedBookingRequest);
+        return BookingRequestResponse.fromEntity(savedBookingRequest, businessDateTimeMapper);
     }
 
     @Transactional
@@ -189,7 +199,7 @@ public class BookingService {
         releaseSlotsAfterNegativeOutcome(bookingRequest);
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
-        return BookingRequestResponse.fromEntity(savedBookingRequest);
+        return BookingRequestResponse.fromEntity(savedBookingRequest, businessDateTimeMapper);
     }
 
     private String normalizeNote(String note) {

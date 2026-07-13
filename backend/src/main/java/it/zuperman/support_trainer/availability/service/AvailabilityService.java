@@ -1,6 +1,7 @@
 package it.zuperman.support_trainer.availability.service;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,7 @@ import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
+import it.zuperman.support_trainer.common.time.BusinessDateTimeMapper;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
@@ -37,6 +39,7 @@ public class AvailabilityService {
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
     private final BookingRequestItemRepository bookingRequestItemRepository;
     private final ApplicationTimeProvider timeProvider;
+    private final BusinessDateTimeMapper businessDateTimeMapper;
 
     public AvailabilityService(
             AvailabilitySlotRepository availabilitySlotRepository,
@@ -44,7 +47,8 @@ public class AvailabilityService {
             ProfessionalProfileRepository professionalProfileRepository,
             ProfessionalClientLinkRepository professionalClientLinkRepository,
             BookingRequestItemRepository bookingRequestItemRepository,
-            ApplicationTimeProvider timeProvider
+            ApplicationTimeProvider timeProvider,
+            BusinessDateTimeMapper businessDateTimeMapper
     ) {
         this.availabilitySlotRepository = availabilitySlotRepository;
         this.userRepository = userRepository;
@@ -52,6 +56,7 @@ public class AvailabilityService {
         this.professionalClientLinkRepository = professionalClientLinkRepository;
         this.bookingRequestItemRepository = bookingRequestItemRepository;
         this.timeProvider = timeProvider;
+        this.businessDateTimeMapper = businessDateTimeMapper;
     }
 
     @Transactional
@@ -61,23 +66,28 @@ public class AvailabilityService {
 
         professional = lockProfessionalForAvailabilityChange(professional.getId());
 
+        LocalDateTime startDateTime = businessDateTimeMapper
+                .toBusinessLocalDateTime(request.getStartDateTime());
+        LocalDateTime endDateTime = businessDateTimeMapper
+                .toBusinessLocalDateTime(request.getEndDateTime());
+
         validateTimeInterval(request.getStartDateTime(), request.getEndDateTime());
-        validateSlotIsInFuture(request.getStartDateTime());
+        validateSlotIsInFuture(startDateTime);
 
         validateNoOverlappingSlots(
                 professional.getId(),
-                request.getStartDateTime(),
-                request.getEndDateTime()
+                startDateTime,
+                endDateTime
         );
 
         AvailabilitySlot slot = new AvailabilitySlot(
                 professional,
-                request.getStartDateTime(),
-                request.getEndDateTime()
+                startDateTime,
+                endDateTime
         );
 
         AvailabilitySlot savedSlot = availabilitySlotRepository.save(slot);
-        return AvailabilitySlotResponse.fromEntity(savedSlot);
+        return AvailabilitySlotResponse.fromEntity(savedSlot, businessDateTimeMapper);
     }
 
     @Transactional(readOnly = true)
@@ -88,7 +98,7 @@ public class AvailabilityService {
         return availabilitySlotRepository
                 .findAllByProfessional_IdAndActiveTrueOrderByStartDateTimeAsc(professional.getId())
                 .stream()
-                .map(AvailabilitySlotResponse::fromEntity)
+                .map(slot -> AvailabilitySlotResponse.fromEntity(slot, businessDateTimeMapper))
                 .toList();
     }
 
@@ -107,14 +117,21 @@ public class AvailabilityService {
         validateUpdateRequestNotEmpty(request);
 
         LocalDateTime newStartDateTime = request.getStartDateTime() != null
-                ? request.getStartDateTime()
+                ? businessDateTimeMapper.toBusinessLocalDateTime(request.getStartDateTime())
                 : slot.getStartDateTime();
 
         LocalDateTime newEndDateTime = request.getEndDateTime() != null
-                ? request.getEndDateTime()
+                ? businessDateTimeMapper.toBusinessLocalDateTime(request.getEndDateTime())
                 : slot.getEndDateTime();
 
-        validateTimeInterval(newStartDateTime, newEndDateTime);
+        OffsetDateTime newStartOffsetDateTime = request.getStartDateTime() != null
+                ? request.getStartDateTime()
+                : businessDateTimeMapper.toBusinessOffsetDateTime(slot.getStartDateTime());
+        OffsetDateTime newEndOffsetDateTime = request.getEndDateTime() != null
+                ? request.getEndDateTime()
+                : businessDateTimeMapper.toBusinessOffsetDateTime(slot.getEndDateTime());
+
+        validateTimeInterval(newStartOffsetDateTime, newEndOffsetDateTime);
         validateSlotIsInFuture(newStartDateTime);
 
         validateNoOverlappingSlotsExcludingCurrent(
@@ -128,7 +145,7 @@ public class AvailabilityService {
         slot.setEndDateTime(newEndDateTime);
 
         AvailabilitySlot savedSlot = availabilitySlotRepository.save(slot);
-        return AvailabilitySlotResponse.fromEntity(savedSlot);
+        return AvailabilitySlotResponse.fromEntity(savedSlot, businessDateTimeMapper);
     }
 
     @Transactional
@@ -151,7 +168,7 @@ public class AvailabilityService {
         slot.setStatus(AvailabilitySlotStatus.BLOCKED);
 
         AvailabilitySlot savedSlot = availabilitySlotRepository.save(slot);
-        return AvailabilitySlotResponse.fromEntity(savedSlot);
+        return AvailabilitySlotResponse.fromEntity(savedSlot, businessDateTimeMapper);
     }
 
     @Transactional
@@ -172,7 +189,7 @@ public class AvailabilityService {
         slot.setStatus(AvailabilitySlotStatus.AVAILABLE);
 
         AvailabilitySlot savedSlot = availabilitySlotRepository.save(slot);
-        return AvailabilitySlotResponse.fromEntity(savedSlot);
+        return AvailabilitySlotResponse.fromEntity(savedSlot, businessDateTimeMapper);
     }
 
     @Transactional(readOnly = true)
@@ -194,7 +211,7 @@ public class AvailabilityService {
                         BookingRequestStatus.PENDING
                 )
                 .stream()
-                .map(AvailabilitySlotResponse::fromEntity)
+                .map(slot -> AvailabilitySlotResponse.fromEntity(slot, businessDateTimeMapper))
                 .toList();
     }
 
@@ -217,11 +234,11 @@ public class AvailabilityService {
         }
     }
 
-    private void validateTimeInterval(LocalDateTime startDateTime, LocalDateTime endDateTime) {
-        if (!startDateTime.isBefore(endDateTime)) {
+    private void validateTimeInterval(OffsetDateTime startDateTime, OffsetDateTime endDateTime) {
+        if (!startDateTime.toInstant().isBefore(endDateTime.toInstant())) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
-                    "INVALID_TIME_INTERVAL",
+                    "VALIDATION_ERROR",
                     "L'intervallo temporale non è valido"
             );
         }

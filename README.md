@@ -95,6 +95,8 @@ Il refresh token viene generato durante il login, ma non è accettato come Beare
 
 Il modulo Availability è attualmente riservato ai professionisti con specializzazione `PERSONAL_TRAINER`.
 
+Gli orari business degli slot usano un contratto ISO-8601 con offset obbligatorio e zona server `Europe/Rome`: per esempio `2026-07-13T17:30:00+02:00` in estate e `2026-01-13T17:30:00+01:00` in inverno. Il backend rifiuta valori senza offset, `Z` o offset incoerenti, orari nel gap primaverile, orari ambigui nell'overlap autunnale e frazioni di secondo non nulle. Le response Availability e gli orari dello slot inclusi nelle response Booking espongono lo stesso formato.
+
 ### Bookings
 
 - creazione di una richiesta di prenotazione;
@@ -191,7 +193,7 @@ Gli origin CORS non ammettono wildcard, path, query string o fragment: va indica
 
 La configurazione JWT e CORS è tipizzata e validata all'avvio. Proprietà assenti, valori non validi, secret troppo corto o origin non sicuri impediscono l'avvio senza stampare i valori sensibili. Il file `application.properties` resta escluso da Git.
 
-Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazione usa un `Clock` tecnico UTC e deriva da quello stesso istante l'ora civile nella zona business `Europe/Rome`; i flussi applicativi non dipendono dalla timezone predefinita della JVM. Nei test il bean `Clock` può essere sostituito con `Clock.fixed`. Questo è uno stato transitorio: entity, DTO, persistenza e formato JSON usano ancora `LocalDateTime`; il passaggio a `Instant`/`OffsetDateTime` e la configurazione UTC di Hibernate/JDBC saranno introdotti in uno step successivo.
+Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazione usa un `Clock` tecnico UTC e deriva da quello stesso istante l'ora civile nella zona business `Europe/Rome`; i flussi applicativi non dipendono dalla timezone predefinita della JVM. Nei test il bean `Clock` può essere sostituito con `Clock.fixed`. Sul confine HTTP, soltanto gli orari business degli slot sono ora `OffsetDateTime`; entity, repository e colonne `DATETIME(0)` restano temporaneamente `LocalDateTime`. Gli audit `createdAt`/`updatedAt`, i timestamp degli errori e le scadenze di token o inviti restano fuori da questo contratto e sono ancora transitori.
 
 La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle nove tabelle runtime tramite `classpath:db/migration`.
 

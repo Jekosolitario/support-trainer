@@ -380,12 +380,26 @@ I prototipi devono includere loading, empty, errore, successo, validazione, unau
 
 I form che impostano una nuova password devono mostrare una validazione preventiva del massimo di **72 byte UTF-8**, distinguendo byte e caratteri Unicode. Il frontend non deve troncare o trasformare il valore e non deve considerare il controllo locale una protezione sufficiente: il backend resta la fonte autoritativa. Nel login, una password oltre limite va presentata come generico errore di credenziali (`401 AUTHENTICATION_ERROR`), senza indicare se l’account esiste o se la causa è la lunghezza.
 
+### Contratto frontend per gli orari degli slot
+
+Un controllo HTML `datetime-local` non produce alcun offset. Per creare o modificare uno slot, il frontend deve:
+
+- presentare chiaramente all'utente la zona `Europe/Rome`;
+- associare il valore civile a `Europe/Rome`, senza usare implicitamente la timezone del browser;
+- calcolare l'offset effettivo valido per quella specifica data e inviare una stringa ISO-8601, per esempio `2026-07-13T17:30:00+02:00` o `2026-01-13T17:30:00+01:00`;
+- non aggiungere `Z` a una data locale e non inviare il precedente formato senza offset;
+- impedire o segnalare gli orari nel gap primaverile e nell'overlap autunnale;
+- inviare precisione massima al secondo, senza frazioni non nulle;
+- trattare l'offset delle response Availability e degli item Booking come già autorevole, senza una seconda conversione silenziosa.
+
+Il backend resta la fonte autoritativa e ripete tutte le validazioni. Gli audit `createdAt`/`updatedAt` non fanno ancora parte di questo contratto.
+
 ## 14. Punti da chiarire prima dell'implementazione
 
 Questi punti non impediscono la mappa funzionale, ma non sono determinabili come contratto frontend completo dal repository attuale:
 
 1. **Consegna verifica email:** il token viene creato e salvato, ma non esiste invio email né esposizione del token nella risposta di registrazione. Serve una decisione backend/infrastrutturale per rendere autonomo il flusso utente.
-2. **Timezone:** il backend usa ora `Europe/Rome` come zona business esplicita, ma API e DTO restano transitoriamente `LocalDateTime` senza offset. Il frontend non deve interpretarli tramite la timezone implicita del browser né aggiungere `Z`; il passaggio contrattuale a `OffsetDateTime`/`Instant` richiederà un adeguamento coordinato successivo.
+2. **Timezone degli audit:** gli orari degli slot hanno ora offset esplicito `Europe/Rome`; restano da definire e migrare i timestamp audit e gli altri `LocalDateTime` fuori perimetro.
 3. **Storage auth:** il backend non prescrive dove conservare l'access token; la strategia va chiusa considerando sicurezza e assenza del refresh operativo.
 4. **URL pubblico dei link:** non sono configurati nel repository i link frontend definitivi per verifica email e inviti.
 5. **Liste:** non esistono paginazione e filtri API per clienti, professionisti, inviti, slot o booking; la prima UI non deve dipenderne.

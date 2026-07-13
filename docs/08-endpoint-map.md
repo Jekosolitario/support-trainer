@@ -154,6 +154,17 @@ Restituisce i codici invito generati dal professionista autenticato.
 **POST** `/api/v1/availability`  
 Crea un nuovo slot di disponibilità per il professionista autenticato.
 
+Payload temporale:
+
+```json
+{
+  "startDateTime": "2026-07-13T17:30:00+02:00",
+  "endDateTime": "2026-07-13T18:30:00+02:00"
+}
+```
+
+In inverno l'offset atteso è normalmente `+01:00`, per esempio `2026-01-13T17:30:00+01:00`. Lo stesso formato con offset è restituito dalle response.
+
 ### 9.2 Elenco slot del professionista autenticato
 **GET** `/api/v1/availability/my`  
 Restituisce gli slot di disponibilità del professionista autenticato.
@@ -202,6 +213,10 @@ Le operazioni Availability applicano i seguenti controlli:
 - il professionista deve avere account attivo, email verificata e profilo attivo
 - un cliente può leggere gli slot disponibili solo di un professionista a lui collegato
 - l’intervallo temporale deve essere valido
+- l'offset è obbligatorio e deve essere coerente con `Europe/Rome`;
+- gap e overlap DST sono rifiutati, senza normalizzazione o scelta automatica dell'offset;
+- la precisione massima è al secondo e le frazioni non nulle sono rifiutate;
+- inizio e fine sono confrontati come istanti;
 - uno slot creato o aggiornato deve iniziare nel futuro
 - non sono ammessi slot sovrapposti per lo stesso professionista
 - solo slot `AVAILABLE` possono essere aggiornati o bloccati
@@ -215,6 +230,8 @@ Le operazioni Availability applicano i seguenti controlli:
 ---
 
 ## 10. Modulo Bookings
+
+Gli oggetti `items` delle response Booking riportano `startDateTime` ed `endDateTime` con l'offset `Europe/Rome`. I campi audit `createdAt` e `updatedAt` non sono convertiti in questo step e restano transitori.
 
 ### 10.1 Creazione richiesta prenotazione
 **POST** `/api/v1/bookings`  

@@ -1,38 +1,45 @@
 package it.zuperman.support_trainer.availability.dto.request;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
+import it.zuperman.support_trainer.common.time.ValidBusinessDateTime;
 import jakarta.validation.constraints.NotNull;
 
 public class CreateAvailabilitySlotRequest {
 
     @NotNull(message = "La data/ora di inizio è obbligatoria")
-    private LocalDateTime startDateTime;
+    @ValidBusinessDateTime
+    @JsonFormat(without = JsonFormat.Feature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE)
+    private OffsetDateTime startDateTime;
 
     @NotNull(message = "La data/ora di fine è obbligatoria")
-    private LocalDateTime endDateTime;
+    @ValidBusinessDateTime
+    @JsonFormat(without = JsonFormat.Feature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE)
+    private OffsetDateTime endDateTime;
 
     public CreateAvailabilitySlotRequest() {
     }
 
-    public CreateAvailabilitySlotRequest(LocalDateTime startDateTime, LocalDateTime endDateTime) {
+    public CreateAvailabilitySlotRequest(OffsetDateTime startDateTime, OffsetDateTime endDateTime) {
         this.startDateTime = startDateTime;
         this.endDateTime = endDateTime;
     }
 
-    public LocalDateTime getStartDateTime() {
+    public OffsetDateTime getStartDateTime() {
         return startDateTime;
     }
 
-    public void setStartDateTime(LocalDateTime startDateTime) {
+    public void setStartDateTime(OffsetDateTime startDateTime) {
         this.startDateTime = startDateTime;
     }
 
-    public LocalDateTime getEndDateTime() {
+    public OffsetDateTime getEndDateTime() {
         return endDateTime;
     }
 
-    public void setEndDateTime(LocalDateTime endDateTime) {
+    public void setEndDateTime(OffsetDateTime endDateTime) {
         this.endDateTime = endDateTime;
     }
 }

@@ -1,16 +1,17 @@
 package it.zuperman.support_trainer.booking.dto.response;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.booking.entity.BookingRequestItem;
+import it.zuperman.support_trainer.common.time.BusinessDateTimeMapper;
 
 public class BookingRequestItemResponse {
 
     private Long id;
     private Long availabilitySlotId;
-    private LocalDateTime startDateTime;
-    private LocalDateTime endDateTime;
+    private OffsetDateTime startDateTime;
+    private OffsetDateTime endDateTime;
     private String slotStatus;
 
     public BookingRequestItemResponse() {
@@ -19,8 +20,8 @@ public class BookingRequestItemResponse {
     public BookingRequestItemResponse(
             Long id,
             Long availabilitySlotId,
-            LocalDateTime startDateTime,
-            LocalDateTime endDateTime,
+            OffsetDateTime startDateTime,
+            OffsetDateTime endDateTime,
             String slotStatus
     ) {
         this.id = id;
@@ -30,14 +31,17 @@ public class BookingRequestItemResponse {
         this.slotStatus = slotStatus;
     }
 
-    public static BookingRequestItemResponse fromEntity(BookingRequestItem item) {
+    public static BookingRequestItemResponse fromEntity(
+            BookingRequestItem item,
+            BusinessDateTimeMapper businessDateTimeMapper
+    ) {
         AvailabilitySlot slot = item.getAvailabilitySlot();
 
         return new BookingRequestItemResponse(
                 item.getId(),
                 slot.getId(),
-                slot.getStartDateTime(),
-                slot.getEndDateTime(),
+                businessDateTimeMapper.toBusinessOffsetDateTime(slot.getStartDateTime()),
+                businessDateTimeMapper.toBusinessOffsetDateTime(slot.getEndDateTime()),
                 slot.getStatus() != null ? slot.getStatus().name() : null
         );
     }
@@ -50,11 +54,11 @@ public class BookingRequestItemResponse {
         return availabilitySlotId;
     }
 
-    public LocalDateTime getStartDateTime() {
+    public OffsetDateTime getStartDateTime() {
         return startDateTime;
     }
 
-    public LocalDateTime getEndDateTime() {
+    public OffsetDateTime getEndDateTime() {
         return endDateTime;
     }
 

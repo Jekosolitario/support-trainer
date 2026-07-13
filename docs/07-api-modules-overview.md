@@ -244,6 +244,12 @@ La lettura lato cliente è esposta tramite:
 - gli slot con una richiesta booking `PENDING` attiva non vengono mostrati al cliente come disponibilità prenotabili;
 - uno slot con booking `PENDING` attivo non può essere modificato o bloccato manualmente dal professionista.
 
+### Contratto temporale degli slot
+
+Request e response Availability rappresentano `startDateTime` ed `endDateTime` come `OffsetDateTime` ISO-8601. L'offset è obbligatorio e deve coincidere con l'unico offset valido di `Europe/Rome` per quella data civile; gap, overlap, offset incoerenti e frazioni di secondo non nulle sono rifiutati. Esempi: `2026-07-13T17:30:00+02:00` e `2026-01-13T17:30:00+01:00`.
+
+Non esistono attualmente filtri o query parameter temporali negli endpoint Availability.
+
 ### Stati slot gestiti
 
 - `AVAILABLE`
@@ -275,6 +281,8 @@ Nel backend attuale una richiesta booking viene creata a partire da:
 - un singolo `availabilitySlotId`.
 
 Il modello con `BookingRequestItem` resta estendibile a scenari multi-slot futuri, ma l’API attuale opera su un solo slot per richiesta.
+
+Gli item delle response Booking espongono gli orari dello slot con offset `Europe/Rome`, secondo lo stesso contratto Availability. Gli audit `createdAt` e `updatedAt` restano invece `LocalDateTime` transitori e non vanno interpretati come parte del nuovo contratto degli slot.
 
 ### Regole principali implementate
 

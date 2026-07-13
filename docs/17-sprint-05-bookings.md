@@ -516,8 +516,10 @@ Possibile evoluzione tecnica:
 
 Questa miglioria non è inclusa nello Sprint 05 attuale, ma va considerata una feature importante per migliorare la qualità del flusso di prenotazione.
 
-## Riferimento temporale transitorio
+## Contratto temporale degli orari slot
 
 La creazione e la conferma di un booking verificano che lo slot sia futuro usando il `Clock` applicativo UTC, convertito nella zona business esplicita `Europe/Rome`. I controlli sono così indipendenti dalla timezone della macchina e possono essere riprodotti con `Clock.fixed`.
 
-Il contratto REST e il collegamento allo slot restano invariati: gli intervalli sono ancora `LocalDateTime` senza offset e non viene introdotto uno snapshot temporale aggiuntivo. La migrazione a `OffsetDateTime`/`Instant` e le regole DST saranno affrontate separatamente.
+Le copie di `startDateTime` ed `endDateTime` presenti negli item delle response Booking sono ora `OffsetDateTime` e includono l'offset coerente con `Europe/Rome`. Il modulo non introduce uno snapshot temporale aggiuntivo: continua a leggere l'intervallo dall'entity Availability, ancora `LocalDateTime`, e lo converte al confine HTTP tramite il componente condiviso.
+
+Un valore persistito nel gap primaverile o nell'overlap autunnale non viene normalizzato e non riceve un offset scelto automaticamente: genera un errore applicativo controllato. Gli audit Booking `createdAt` e `updatedAt` restano `LocalDateTime` transitori e sono fuori da questo contratto.

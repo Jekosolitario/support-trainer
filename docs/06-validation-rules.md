@@ -171,6 +171,22 @@ Per ogni slot:
 
 Non è consentito creare o aggiornare uno slot già scaduto.
 
+### 6.2.1 Contratto temporale HTTP
+
+I campi HTTP `startDateTime` ed `endDateTime` sono `OffsetDateTime` ISO-8601 con offset obbligatorio. La zona business autoritativa è `Europe/Rome`; esempi validi sono `2026-07-13T17:30:00+02:00` e `2026-01-13T17:30:00+01:00`.
+
+Per ogni valore il backend consulta `ZoneRules.getValidOffsets` sull'ora civile:
+
+- accetta il valore solo quando esiste un unico offset valido e coincide con quello ricevuto;
+- rifiuta valori senza offset, `Z` o altri offset incoerenti;
+- rifiuta il gap primaverile, senza spostare l'orario in avanti;
+- rifiuta l'overlap autunnale anche se viene fornito uno dei due offset validi;
+- accetta precisione massima al secondo e rifiuta frazioni non nulle, senza troncare o arrotondare.
+
+Dopo la validazione individuale, `startDateTime` deve precedere `endDateTime` nel confronto tra i rispettivi `Instant`. I casi non validi producono `400`; le violazioni semanticamente parseabili usano `VALIDATION_ERROR`, mentre un formato non deserializzabile usa `MALFORMED_REQUEST`.
+
+Entity, repository e persistenza restano temporaneamente `LocalDateTime`/`DATETIME(0)`. Nel mapping di risposta un valore persistito in gap o overlap produce un errore applicativo controllato: il backend non inventa un offset.
+
 ### 6.3 Nessuna sovrapposizione
 
 Per lo stesso professionista non devono esistere slot attivi sovrapposti nello stesso intervallo temporale.

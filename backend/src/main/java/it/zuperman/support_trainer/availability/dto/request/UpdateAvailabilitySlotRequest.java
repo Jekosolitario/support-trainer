@@ -1,34 +1,42 @@
 package it.zuperman.support_trainer.availability.dto.request;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+
+import it.zuperman.support_trainer.common.time.ValidBusinessDateTime;
 
 public class UpdateAvailabilitySlotRequest {
 
-    private LocalDateTime startDateTime;
+    @ValidBusinessDateTime
+    @JsonFormat(without = JsonFormat.Feature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE)
+    private OffsetDateTime startDateTime;
 
-    private LocalDateTime endDateTime;
+    @ValidBusinessDateTime
+    @JsonFormat(without = JsonFormat.Feature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE)
+    private OffsetDateTime endDateTime;
 
     public UpdateAvailabilitySlotRequest() {
     }
 
-    public UpdateAvailabilitySlotRequest(LocalDateTime startDateTime, LocalDateTime endDateTime) {
+    public UpdateAvailabilitySlotRequest(OffsetDateTime startDateTime, OffsetDateTime endDateTime) {
         this.startDateTime = startDateTime;
         this.endDateTime = endDateTime;
     }
 
-    public LocalDateTime getStartDateTime() {
+    public OffsetDateTime getStartDateTime() {
         return startDateTime;
     }
 
-    public void setStartDateTime(LocalDateTime startDateTime) {
+    public void setStartDateTime(OffsetDateTime startDateTime) {
         this.startDateTime = startDateTime;
     }
 
-    public LocalDateTime getEndDateTime() {
+    public OffsetDateTime getEndDateTime() {
         return endDateTime;
     }
 
-    public void setEndDateTime(LocalDateTime endDateTime) {
+    public void setEndDateTime(OffsetDateTime endDateTime) {
         this.endDateTime = endDateTime;
     }
 }
