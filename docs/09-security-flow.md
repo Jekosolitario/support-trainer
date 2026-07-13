@@ -158,6 +158,17 @@ Attualmente **non** vengono aggiunti altri claim applicativi come:
 - role
 - dati business
 
+## 6.5 Configurazione e validazione JWT
+
+Le proprietà `app.security.jwt.secret`, `app.security.jwt.expiration` e `app.security.jwt.refresh-expiration` sono raccolte in una configurazione tipizzata e validate durante l'avvio.
+
+- il secret è obbligatorio, deve essere Base64 valido e decodificare almeno 32 byte;
+- le durate devono essere positive;
+- la durata del refresh token deve essere maggiore di quella dell'access token;
+- i numeri senza suffisso mantengono la semantica storica in millisecondi; sono ammessi anche valori espliciti come `1h` o `7d`.
+
+Il servizio JWT riceve questa configurazione come unica dipendenza e conserva in memoria la chiave di firma già decodificata. Nessun secret applicativo è previsto come default o deve essere versionato.
+
 ---
 
 ## 7. Endpoint pubblici e protetti
@@ -591,17 +602,20 @@ Nel codice attuale **non** risulta ancora implementato un token applicativo per:
 ## 21. CORS e frontend separato
 
 ## 21.1 Stato attuale
-il CORS è abilitato in SecurityConfig
-è presente un bean CorsConfigurationSource
-gli origin consentiti sono letti da property applicativa (app.cors.allowed-origins)
-metodi e header consentiti sono configurati esplicitamente
+
+- il CORS è abilitato nella `SecurityFilterChain` tramite il bean `CorsConfigurationSource`;
+- gli origin consentiti sono letti dalla proprietà tipizzata `app.cors.allowed-origins`;
+- la lista è obbligatoria, normalizzata e priva di valori vuoti o duplicati;
+- sono accettate solo origini esatte `http` o `https`, senza wildcard, path, query string o fragment;
+- sono consentiti `GET`, `POST`, `PATCH` e `OPTIONS`, coerenti con le API correnti;
+- sono consentiti gli header `Authorization` e `Content-Type`;
+- `allowCredentials` è disabilitato perché l'autenticazione usa Bearer JWT.
 
 ## 21.2 Nota importante
-La configurazione applicativa di esempio espone la proprietà CORS da personalizzare per ambiente; il profilo `test` definisce invece un origin locale dedicato e autosufficiente.
 
-il backend è predisposto per frontend separato
-gli origin cambiano per ambiente tramite configuration/properties
-per JWT in header Authorization non è richiesto allowCredentials(true)
+La configurazione applicativa di esempio richiede `APP_CORS_ALLOWED_ORIGINS`; il file locale ignorato può continuare a definire direttamente la proprietà e il profilo `test` usa un origin fittizio autonomo. Ogni ambiente deve fornire l'origine esatta del proprio frontend, inclusa l'eventuale porta. Un preflight proveniente da un'origine non configurata viene rifiutato.
+
+Questa configurazione supporta un frontend separato senza usare wildcard e resta sovrascrivibile tramite le normali sorgenti esterne di Spring. Non sono introdotti profili di deploy né valori di produzione nel repository.
 
 ---
 

@@ -13,14 +13,17 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultMatcher;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -44,6 +47,7 @@ class SecurityCommonIntegrationTest {
     private static final String PROTECTED_ENDPOINT = "/api/v1/me/account";
     private static final String ROLE_PROTECTED_ENDPOINT = "/api/v1/professionals/my";
     private static final String PROFESSIONAL_EMAIL = "security.common@example.com";
+    private static final String TEST_ALLOWED_ORIGIN = "http://localhost";
 
     @Autowired
     private MockMvc mockMvc;
@@ -153,6 +157,46 @@ class SecurityCommonIntegrationTest {
                         .content("<login/>"))
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpectAll(errorResponse(415, "UNSUPPORTED_MEDIA_TYPE", "UNSUPPORTED_MEDIA_TYPE"));
+    }
+
+    @Test
+    @DisplayName("Preflight da origine consentita deve essere accettato")
+    void shouldAcceptPreflightFromAllowedOrigin() throws Exception {
+        mockMvc.perform(options("/api/v1/auth/login")
+                        .with(request -> {
+                            request.setServerName("backend.test");
+                            return request;
+                        })
+                        .header(HttpHeaders.ORIGIN, TEST_ALLOWED_ORIGIN)
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.POST.name()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, TEST_ALLOWED_ORIGIN));
+    }
+
+    @Test
+    @DisplayName("Preflight da origine non consentita deve essere rifiutato")
+    void shouldRejectPreflightFromDisallowedOrigin() throws Exception {
+        mockMvc.perform(options("/api/v1/auth/login")
+                        .header(HttpHeaders.ORIGIN, "https://disallowed.test")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.POST.name()))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+    }
+
+    @Test
+    @DisplayName("Preflight deve consentire l'header Authorization")
+    void shouldAllowAuthorizationHeaderInPreflight() throws Exception {
+        mockMvc.perform(options(PROTECTED_ENDPOINT)
+                        .with(request -> {
+                            request.setServerName("backend.test");
+                            return request;
+                        })
+                        .header(HttpHeaders.ORIGIN, TEST_ALLOWED_ORIGIN)
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.GET.name())
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, HttpHeaders.AUTHORIZATION))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, TEST_ALLOWED_ORIGIN))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, HttpHeaders.AUTHORIZATION));
     }
 
     private UserDetails createProfessionalUserDetails() {

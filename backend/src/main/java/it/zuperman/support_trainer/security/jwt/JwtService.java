@@ -7,7 +7,6 @@ import java.util.function.Function;
 
 import javax.crypto.SecretKey;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +14,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import it.zuperman.support_trainer.security.config.JwtProperties;
 
 @Service
 public class JwtService {
@@ -23,14 +23,16 @@ public class JwtService {
     private static final String ACCESS_TOKEN_TYPE = "access";
     private static final String REFRESH_TOKEN_TYPE = "refresh";
 
-    @Value("${app.security.jwt.secret}")
-    private String jwtSecret;
+    private final SecretKey signingKey;
+    private final long jwtExpiration;
+    private final long refreshExpiration;
 
-    @Value("${app.security.jwt.expiration}")
-    private long jwtExpiration;
-
-    @Value("${app.security.jwt.refresh-expiration}")
-    private long refreshExpiration;
+    public JwtService(JwtProperties jwtProperties) {
+        byte[] keyBytes = Decoders.BASE64.decode(jwtProperties.secret());
+        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+        this.jwtExpiration = jwtProperties.expiration().toMillis();
+        this.refreshExpiration = jwtProperties.refreshExpiration().toMillis();
+    }
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -67,7 +69,7 @@ public class JwtService {
                 .subject(userDetails.getUsername())
                 .issuedAt(now)
                 .expiration(expirationDate)
-                .signWith(getSigningKey())
+                .signWith(signingKey)
                 .compact();
     }
 
@@ -94,14 +96,10 @@ public class JwtService {
 
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
-                .verifyWith(getSigningKey())
+                .verifyWith(signingKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
     }
 
-    private SecretKey getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
-        return Keys.hmacShaKeyFor(keyBytes);
-    }
 }

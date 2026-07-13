@@ -168,17 +168,23 @@ Non è richiesta un'installazione globale di Maven. Node.js non è ancora necess
    cp src/main/resources/application-example.properties src/main/resources/application.properties
    ```
 
-3. Creare il database MySQL `support_trainer` e configurare in `application.properties`:
+3. Creare il database MySQL `support_trainer` e valorizzare le proprietà obbligatorie nel file locale ignorato oppure tramite environment:
 
-   - `spring.datasource.url`
-   - `spring.datasource.username`
-   - `spring.datasource.password`
-   - `app.cors.allowed-origins`
-   - `app.security.jwt.secret`
-   - `app.security.jwt.expiration`
-   - `app.security.jwt.refresh-expiration`
+   | Proprietà | Variabile d'ambiente | Formato |
+   |---|---|---|
+   | `spring.datasource.url` | `SPRING_DATASOURCE_URL` | URL JDBC MySQL |
+   | `spring.datasource.username` | `SPRING_DATASOURCE_USERNAME` | utenza database |
+   | `spring.datasource.password` | `SPRING_DATASOURCE_PASSWORD` | password database |
+   | `app.cors.allowed-origins` | `APP_CORS_ALLOWED_ORIGINS` | lista separata da virgole di origini esatte `http`/`https` |
+   | `app.security.jwt.secret` | `APP_SECURITY_JWT_SECRET` | Base64 di almeno 32 byte casuali |
+   | `app.security.jwt.expiration` | `APP_SECURITY_JWT_EXPIRATION` | durata positiva |
+   | `app.security.jwt.refresh-expiration` | `APP_SECURITY_JWT_REFRESH_EXPIRATION` | durata positiva e maggiore dell'access token |
 
-Il secret JWT deve essere una chiave Base64 adeguatamente lunga e non deve essere versionato. Il file `application.properties` è escluso da Git.
+Le durate accettano millisecondi senza suffisso, per compatibilità con i valori attuali, oppure unità esplicite come `1h` e `7d`. Il secret JWT non ha default, non deve essere versionato e non va riutilizzato tra ambienti.
+
+Gli origin CORS non ammettono wildcard, path, query string o fragment: va indicata l'origine esatta del frontend, inclusa l'eventuale porta. Spazi e duplicati vengono normalizzati; `Authorization` e `Content-Type` sono consentiti, mentre le credenziali browser restano disabilitate perché l'autenticazione usa Bearer JWT.
+
+La configurazione JWT e CORS è tipizzata e validata all'avvio. Proprietà assenti, valori non validi, secret troppo corto o origin non sicuri impediscono l'avvio senza stampare i valori sensibili. Il file `application.properties` resta escluso da Git.
 
 La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=none`: lo schema non viene creato automaticamente. Nel progetto non risultano migrazioni Flyway o Liquibase; la struttura dati va predisposta separatamente facendo riferimento alla [documentazione del database](docs/10-database-schema.md).
 
@@ -242,7 +248,7 @@ La suite include test relativi a:
 - richieste di prenotazione e relative transizioni;
 - JWT, ruoli, risposte 400/401/403 e gestione degli errori HTTP 404/405/415.
 
-L’ultima suite completa verificata nei report Surefire contiene 85 test, senza failure, errori o test ignorati.
+L’ultima suite completa verificata contiene 98 test, senza failure, errori o test ignorati: 13 in più rispetto alla baseline precedente di 85 grazie ai test fail-fast sulle proprietà e ai test CORS.
 
 ## 11. Profili Spring
 
@@ -262,9 +268,9 @@ Usa `src/test/resources/application-test.properties` con:
 
 Le classi di test principali attivano il profilo con `@ActiveProfiles("test")`.
 
-La proprietà `app.cors.allowed-origins` è definita direttamente nel profilo `test`; la suite non dipende quindi dall’`application.properties` locale, escluso da Git.
+Le proprietà JWT e `app.cors.allowed-origins` sono definite direttamente nel profilo `test`; la suite non dipende quindi dall’`application.properties` locale, escluso da Git, da MySQL o da segreti reali.
 
-Non sono attualmente presenti profili Spring dedicati a sviluppo, staging o produzione.
+Non sono attualmente presenti profili Spring dedicati a sviluppo, staging o produzione. La configurazione locale usa il file ignorato; i test usano il profilo tracciato `test`; un futuro ambiente di produzione deve fornire i valori esternamente tramite environment o altra sorgente di configurazione Spring, senza versionare segreti.
 
 ## 12. Documentazione disponibile
 

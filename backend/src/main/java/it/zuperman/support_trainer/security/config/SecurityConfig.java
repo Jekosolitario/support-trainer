@@ -2,7 +2,6 @@ package it.zuperman.support_trainer.security.config;
 
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -27,7 +26,7 @@ public class SecurityConfig {
     private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
     private final RestAccessDeniedHandler restAccessDeniedHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final List<String> allowedOrigins;
+    private final CorsProperties corsProperties;
 
     private static final String[] PUBLIC_ENDPOINTS = {
         "/error",
@@ -40,12 +39,12 @@ public class SecurityConfig {
             JwtAuthenticationFilter jwtAuthenticationFilter,
             RestAuthenticationEntryPoint restAuthenticationEntryPoint,
             RestAccessDeniedHandler restAccessDeniedHandler,
-            @Value("${app.cors.allowed-origins}") List<String> allowedOrigins
+            CorsProperties corsProperties
     ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.restAuthenticationEntryPoint = restAuthenticationEntryPoint;
         this.restAccessDeniedHandler = restAccessDeniedHandler;
-        this.allowedOrigins = allowedOrigins;
+        this.corsProperties = corsProperties;
     }
 
     @Bean
@@ -89,9 +88,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(allowedOrigins);
-        configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedOrigins(corsProperties.allowedOrigins());
+        configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        configuration.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

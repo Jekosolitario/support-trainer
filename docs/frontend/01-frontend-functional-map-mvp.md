@@ -211,7 +211,17 @@ Le guard frontend migliorano navigazione e chiarezza, ma non sostituiscono l'aut
 
 La persistenza del token non è definita dal backend. Raccomandazione MVP: isolare la scelta dietro un servizio auth e preferire persistenza di sessione limitata rispetto a persistenza indefinita. Qualunque storage JavaScript resta esposto a XSS; la scelta definitiva va riesaminata insieme al futuro lifecycle refresh.
 
-### 8.3 Risposte 401 e 403
+### 8.3 Contratto CORS per il frontend
+
+- l'origine effettiva del frontend deve comparire esattamente in `app.cors.allowed-origins`, inclusa l'eventuale porta;
+- non sono ammesse wildcard, path, query string o fragment;
+- le chiamate protette possono inviare `Authorization: Bearer <accessToken>` e i payload JSON possono usare `Content-Type`;
+- il preflight `OPTIONS` è gestito dal backend, ma viene rifiutato se l'origine non è configurata;
+- non usare richieste con credenziali browser: `allowCredentials` è deliberatamente disabilitato.
+
+Il valore cambia per ambiente tramite configurazione Spring o `APP_CORS_ALLOWED_ORIGINS`. Il frontend non deve codificare un'origine backend o frontend di produzione nel sorgente.
+
+### 8.4 Risposte 401 e 403
 
 - `401` durante il login: mostrare l'errore nel form, senza redirect ciclici.
 - `401` su una rotta privata (`UNAUTHORIZED`, `TOKEN_EXPIRED`, `INVALID_TOKEN`): cancellare la sessione locale, conservare se utile la destinazione, e reindirizzare a `/login` con messaggio “Sessione scaduta” o “Accesso richiesto”. Non tentare refresh automatici.
