@@ -13,6 +13,7 @@ import it.zuperman.support_trainer.auth.dto.request.LoginRequest;
 import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.invite.service.InviteCodeService;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
@@ -31,7 +32,8 @@ class AuthServicePasswordLimitTest {
             mock(PasswordEncoder.class),
             authenticationManager,
             mock(JwtService.class),
-            mock(ProfessionalClientLinkRepository.class)
+            mock(ProfessionalClientLinkRepository.class),
+            mock(ApplicationTimeProvider.class)
     );
 
     @Test

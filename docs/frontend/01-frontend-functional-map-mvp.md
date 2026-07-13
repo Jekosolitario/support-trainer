@@ -385,7 +385,7 @@ I form che impostano una nuova password devono mostrare una validazione preventi
 Questi punti non impediscono la mappa funzionale, ma non sono determinabili come contratto frontend completo dal repository attuale:
 
 1. **Consegna verifica email:** il token viene creato e salvato, ma non esiste invio email né esposizione del token nella risposta di registrazione. Serve una decisione backend/infrastrutturale per rendere autonomo il flusso utente.
-2. **Timezone:** API e DTO usano `LocalDateTime` senza offset. Va definita la timezone contrattuale prima di formattare o convertire slot e booking nel browser.
+2. **Timezone:** il backend usa ora `Europe/Rome` come zona business esplicita, ma API e DTO restano transitoriamente `LocalDateTime` senza offset. Il frontend non deve interpretarli tramite la timezone implicita del browser né aggiungere `Z`; il passaggio contrattuale a `OffsetDateTime`/`Instant` richiederà un adeguamento coordinato successivo.
 3. **Storage auth:** il backend non prescrive dove conservare l'access token; la strategia va chiusa considerando sicurezza e assenza del refresh operativo.
 4. **URL pubblico dei link:** non sono configurati nel repository i link frontend definitivi per verifica email e inviti.
 5. **Liste:** non esistono paginazione e filtri API per clienti, professionisti, inviti, slot o booking; la prima UI non deve dipenderne.

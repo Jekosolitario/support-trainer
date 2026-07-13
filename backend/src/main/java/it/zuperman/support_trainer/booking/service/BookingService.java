@@ -26,6 +26,7 @@ import it.zuperman.support_trainer.common.enums.BookingRequestStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 
@@ -37,19 +38,22 @@ public class BookingService {
     private final AvailabilitySlotRepository availabilitySlotRepository;
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
     private final UserRepository userRepository;
+    private final ApplicationTimeProvider timeProvider;
 
     public BookingService(
             BookingRequestRepository bookingRequestRepository,
             BookingRequestItemRepository bookingRequestItemRepository,
             AvailabilitySlotRepository availabilitySlotRepository,
             ProfessionalClientLinkRepository professionalClientLinkRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            ApplicationTimeProvider timeProvider
     ) {
         this.bookingRequestRepository = bookingRequestRepository;
         this.bookingRequestItemRepository = bookingRequestItemRepository;
         this.availabilitySlotRepository = availabilitySlotRepository;
         this.professionalClientLinkRepository = professionalClientLinkRepository;
         this.userRepository = userRepository;
+        this.timeProvider = timeProvider;
     }
 
     @Transactional
@@ -254,7 +258,7 @@ public class BookingService {
                 );
             }
 
-            if (!slot.getStartDateTime().isAfter(LocalDateTime.now())) {
+            if (!slot.getStartDateTime().isAfter(timeProvider.nowBusinessDateTime())) {
                 throw new AppException(
                         HttpStatus.CONFLICT,
                         "AVAILABILITY_SLOT_NOT_CONFIRMABLE",
@@ -341,7 +345,7 @@ public class BookingService {
             );
         }
 
-        if (!slot.getStartDateTime().isAfter(LocalDateTime.now())) {
+        if (!slot.getStartDateTime().isAfter(timeProvider.nowBusinessDateTime())) {
             throw new AppException(
                     HttpStatus.CONFLICT,
                     "AVAILABILITY_SLOT_NOT_BOOKABLE",

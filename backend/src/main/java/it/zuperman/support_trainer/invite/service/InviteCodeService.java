@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.exception.AppException;
+import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.invite.entity.InviteCode;
 import it.zuperman.support_trainer.invite.repository.InviteCodeRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
@@ -23,13 +24,16 @@ public class InviteCodeService {
 
     private final InviteCodeRepository inviteCodeRepository;
     private final ProfessionalProfileRepository professionalProfileRepository;
+    private final ApplicationTimeProvider timeProvider;
 
     public InviteCodeService(
             InviteCodeRepository inviteCodeRepository,
-            ProfessionalProfileRepository professionalProfileRepository
+            ProfessionalProfileRepository professionalProfileRepository,
+            ApplicationTimeProvider timeProvider
     ) {
         this.inviteCodeRepository = inviteCodeRepository;
         this.professionalProfileRepository = professionalProfileRepository;
+        this.timeProvider = timeProvider;
     }
 
     @Transactional
@@ -37,7 +41,7 @@ public class InviteCodeService {
         ProfessionalProfile professional = getVerifiedActiveProfessional(professionalEmail);
 
         String code = buildReadableCode();
-        LocalDateTime expiresAt = LocalDateTime.now().plusDays(INVITE_CODE_VALIDITY_DAYS);
+        LocalDateTime expiresAt = timeProvider.nowBusinessDateTime().plusDays(INVITE_CODE_VALIDITY_DAYS);
 
         InviteCode inviteCode = new InviteCode(code, professional, expiresAt);
 
@@ -93,7 +97,7 @@ public class InviteCodeService {
             );
         }
 
-        if (!inviteCode.getExpiresAt().isAfter(LocalDateTime.now())) {
+        if (!inviteCode.getExpiresAt().isAfter(timeProvider.nowBusinessDateTime())) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
                     "INVITE_CODE_EXPIRED",
@@ -203,7 +207,7 @@ public class InviteCodeService {
             );
         }
 
-        if (!inviteCode.getExpiresAt().isAfter(LocalDateTime.now())) {
+        if (!inviteCode.getExpiresAt().isAfter(timeProvider.nowBusinessDateTime())) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
                     "INVITE_CODE_EXPIRED",

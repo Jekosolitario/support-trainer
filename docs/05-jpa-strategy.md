@@ -920,4 +920,12 @@ La suite ordinaria usa H2 con Flyway disabilitato e `ddl-auto=create-drop`. È u
 
 MySQL 8 è il riferimento per migrazioni, charset, collation, foreign key, indici, precisione temporale e lock. La prova delle migrazioni su MySQL deve avvenire in un ambiente isolato dedicato.
 
+## 24. Modello temporale transitorio
+
+I flussi applicativi leggono il tempo tramite un unico `ApplicationTimeProvider`. Il provider usa un bean `Clock` tecnico configurato in UTC e converte il medesimo `Instant` nella zona business esplicita `Europe/Rome` quando il modello corrente richiede un `LocalDateTime`. Nessun servizio applicativo deve dipendere da `ZoneId.systemDefault()` o da `user.timezone`; nei test il `Clock` viene sostituito con `Clock.fixed`.
+
+In questa fase i tipi JPA e i DTO temporali restano invariati. `LocalDateTime`, le colonne MySQL correnti e il formato JSON senza offset sono quindi ancora transitori. Non sono ancora configurati `hibernate.jdbc.time_zone`, timezone Jackson o parametri JDBC UTC, per evitare conversioni implicite prima della migrazione coordinata a `Instant`/`OffsetDateTime`.
+
+Gli audit Hibernate tramite `@CreationTimestamp` e `@UpdateTimestamp` restano temporaneamente invariati e non usano ancora il `Clock` applicativo. La loro migrazione a ownership applicativa appartiene a uno step successivo.
+
 ---

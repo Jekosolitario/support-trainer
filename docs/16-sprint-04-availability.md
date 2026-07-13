@@ -381,3 +381,9 @@ Dopo il completamento dello Sprint 04 è stato introdotto lo Sprint 05 dedicato 
 Il modulo Availability costituisce ora la base operativa del flusso:
 
 cliente collegato -> selezione slot disponibile -> richiesta booking -> conferma/rifiuto/cancellazione
+
+## 17. Riferimento temporale transitorio
+
+I controlli “slot nel futuro” e la soglia usata per la visibilità cliente derivano ora da un `Clock` UTC condiviso e vengono convertiti esplicitamente nella zona business `Europe/Rome`. Il risultato non dipende più dalla timezone della JVM ed è testabile con `Clock.fixed`.
+
+Request, response, entity e query continuano in questa fase a usare `LocalDateTime`. Non cambia il JSON e non sono ancora introdotte validazioni di offset o regole specifiche per gap/overlap DST; il passaggio coordinato a `OffsetDateTime` nell'API e `Instant` nel dominio/persistenza appartiene a uno step successivo.

@@ -1,7 +1,6 @@
 package it.zuperman.support_trainer.security.jwt;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -15,6 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import it.zuperman.support_trainer.security.service.CustomUserDetailsService;
+import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,12 +25,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final CustomUserDetailsService customUserDetailsService;
+    private final ApplicationTimeProvider timeProvider;
 
     public JwtAuthenticationFilter(
             JwtService jwtService,
-            CustomUserDetailsService customUserDetailsService) {
+            CustomUserDetailsService customUserDetailsService,
+            ApplicationTimeProvider timeProvider) {
         this.jwtService = jwtService;
         this.customUserDetailsService = customUserDetailsService;
+        this.timeProvider = timeProvider;
     }
 
     @Override
@@ -110,7 +113,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             """.formatted(
                 escapeJson(errorCode),
                 escapeJson(message),
-                LocalDateTime.now()
+                timeProvider.nowBusinessDateTime()
         );
 
         response.getWriter().write(json);

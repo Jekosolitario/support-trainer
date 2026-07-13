@@ -60,16 +60,16 @@ public class EmailVerificationToken {
         this.used = false;
     }
 
-    public boolean isExpired() {
-    return !expiresAt.isAfter(LocalDateTime.now());
-}
-
-    public boolean isUsable() {
-        return Boolean.FALSE.equals(used) && !isExpired();
+    public boolean isExpired(LocalDateTime currentDateTime) {
+        return !expiresAt.isAfter(currentDateTime);
     }
 
-    public void markAsUsed() {
+    public boolean isUsable(LocalDateTime currentDateTime) {
+        return Boolean.FALSE.equals(used) && !isExpired(currentDateTime);
+    }
+
+    public void markAsUsed(LocalDateTime usedAt) {
         this.used = true;
-        this.usedAt = LocalDateTime.now();
+        this.usedAt = usedAt;
     }
 }

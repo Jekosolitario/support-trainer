@@ -179,6 +179,8 @@ Non è richiesta un'installazione globale di Maven. Node.js non è ancora necess
    | `spring.datasource.username` | `SPRING_DATASOURCE_USERNAME` | utenza database |
    | `spring.datasource.password` | `SPRING_DATASOURCE_PASSWORD` | password database |
    | `app.cors.allowed-origins` | `APP_CORS_ALLOWED_ORIGINS` | lista separata da virgole di origini esatte `http`/`https` |
+   | `app.time.business-zone` | `APP_TIME_BUSINESS_ZONE` | `ZoneId` business; default `Europe/Rome` |
+   | `app.time.clock-zone` | `APP_TIME_CLOCK_ZONE` | zona tecnica, deve rappresentare UTC |
    | `app.security.jwt.secret` | `APP_SECURITY_JWT_SECRET` | Base64 di almeno 32 byte casuali |
    | `app.security.jwt.expiration` | `APP_SECURITY_JWT_EXPIRATION` | durata positiva |
    | `app.security.jwt.refresh-expiration` | `APP_SECURITY_JWT_REFRESH_EXPIRATION` | durata positiva e maggiore dell'access token |
@@ -188,6 +190,8 @@ Le durate accettano millisecondi senza suffisso, per compatibilità con i valori
 Gli origin CORS non ammettono wildcard, path, query string o fragment: va indicata l'origine esatta del frontend, inclusa l'eventuale porta. Spazi e duplicati vengono normalizzati; `Authorization` e `Content-Type` sono consentiti, mentre le credenziali browser restano disabilitate perché l'autenticazione usa Bearer JWT.
 
 La configurazione JWT e CORS è tipizzata e validata all'avvio. Proprietà assenti, valori non validi, secret troppo corto o origin non sicuri impediscono l'avvio senza stampare i valori sensibili. Il file `application.properties` resta escluso da Git.
+
+Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazione usa un `Clock` tecnico UTC e deriva da quello stesso istante l'ora civile nella zona business `Europe/Rome`; i flussi applicativi non dipendono dalla timezone predefinita della JVM. Nei test il bean `Clock` può essere sostituito con `Clock.fixed`. Questo è uno stato transitorio: entity, DTO, persistenza e formato JSON usano ancora `LocalDateTime`; il passaggio a `Instant`/`OffsetDateTime` e la configurazione UTC di Hibernate/JDBC saranno introdotti in uno step successivo.
 
 La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle nove tabelle runtime tramite `classpath:db/migration`.
 
@@ -257,7 +261,7 @@ La suite include test relativi a:
 - richieste di prenotazione e relative transizioni;
 - JWT, ruoli, risposte 400/401/403 e gestione degli errori HTTP 404/405/415.
 
-L’ultima suite completa verificata contiene 98 test, senza failure, errori o test ignorati: 13 in più rispetto alla baseline precedente di 85 grazie ai test fail-fast sulle proprietà e ai test CORS.
+L’ultima suite completa verificata contiene 140 test, senza failure, errori o test ignorati: 19 in più rispetto alla baseline precedente di 121 grazie ai test deterministici del Clock, della configurazione temporale e dei flussi che dipendono dal tempo.
 
 ## 11. Profili Spring
 
@@ -275,6 +279,7 @@ Usa `src/test/resources/application-test.properties` con:
 - `open-in-view` disabilitato;
 - JWT con valori dedicati ai test;
 - origin CORS locale dedicato ai test;
+- Clock UTC e zona business `Europe/Rome` espliciti;
 - logging SQL disabilitato.
 
 Le classi di test principali attivano il profilo con `@ActiveProfiles("test")`.

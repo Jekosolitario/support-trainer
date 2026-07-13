@@ -1,5 +1,6 @@
 package it.zuperman.support_trainer.security.jwt;
 
+import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -14,6 +15,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.security.config.JwtProperties;
 
 @Service
@@ -26,12 +28,14 @@ public class JwtService {
     private final SecretKey signingKey;
     private final long jwtExpiration;
     private final long refreshExpiration;
+    private final ApplicationTimeProvider timeProvider;
 
-    public JwtService(JwtProperties jwtProperties) {
+    public JwtService(JwtProperties jwtProperties, ApplicationTimeProvider timeProvider) {
         byte[] keyBytes = Decoders.BASE64.decode(jwtProperties.secret());
         this.signingKey = Keys.hmacShaKeyFor(keyBytes);
         this.jwtExpiration = jwtProperties.expiration().toMillis();
         this.refreshExpiration = jwtProperties.refreshExpiration().toMillis();
+        this.timeProvider = timeProvider;
     }
 
     public String extractUsername(String token) {
@@ -60,8 +64,9 @@ public class JwtService {
             long expiration,
             String tokenType
     ) {
-        Date now = new Date();
-        Date expirationDate = new Date(now.getTime() + expiration);
+        Instant nowInstant = timeProvider.nowInstant();
+        Date now = Date.from(nowInstant);
+        Date expirationDate = Date.from(nowInstant.plusMillis(expiration));
 
         return Jwts.builder()
                 .claims(extraClaims)
@@ -82,7 +87,7 @@ public class JwtService {
     }
 
     public boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+        return extractExpiration(token).before(Date.from(timeProvider.nowInstant()));
     }
 
     public Date extractExpiration(String token) {
@@ -96,6 +101,7 @@ public class JwtService {
 
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
+                .clock(() -> Date.from(timeProvider.nowInstant()))
                 .verifyWith(signingKey)
                 .build()
                 .parseSignedClaims(token)

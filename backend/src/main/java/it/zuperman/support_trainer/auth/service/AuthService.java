@@ -25,6 +25,7 @@ import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.invite.entity.InviteCode;
 import it.zuperman.support_trainer.invite.service.InviteCodeService;
 import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
@@ -48,6 +49,7 @@ public class AuthService {
     private final ClientProfileRepository clientProfileRepository;
     private final InviteCodeService inviteCodeService;
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
+    private final ApplicationTimeProvider timeProvider;
 
     public AuthService(
             UserRepository userRepository,
@@ -58,7 +60,8 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             AuthenticationManager authenticationManager,
             JwtService jwtService,
-            ProfessionalClientLinkRepository professionalClientLinkRepository
+            ProfessionalClientLinkRepository professionalClientLinkRepository,
+            ApplicationTimeProvider timeProvider
     ) {
         this.userRepository = userRepository;
         this.professionalProfileRepository = professionalProfileRepository;
@@ -69,6 +72,7 @@ public class AuthService {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.professionalClientLinkRepository = professionalClientLinkRepository;
+        this.timeProvider = timeProvider;
     }
 
     @Transactional
@@ -105,7 +109,7 @@ public class AuthService {
         EmailVerificationToken verificationToken = new EmailVerificationToken(
                 savedProfessional,
                 UUID.randomUUID().toString(),
-                LocalDateTime.now().plusHours(EMAIL_VERIFICATION_TOKEN_DURATION_HOURS)
+                timeProvider.nowBusinessDateTime().plusHours(EMAIL_VERIFICATION_TOKEN_DURATION_HOURS)
         );
 
         emailVerificationTokenRepository.save(verificationToken);
@@ -162,7 +166,7 @@ public class AuthService {
         createProfessionalClientLink(professional, savedClient);
 
         inviteCode.setUsed(true);
-        inviteCode.setUsedAt(LocalDateTime.now());
+        inviteCode.setUsedAt(timeProvider.nowBusinessDateTime());
 
         return buildRegistrationResponse(savedClient);
     }
@@ -248,7 +252,9 @@ public class AuthService {
             );
         }
 
-        if (verificationToken.isExpired()) {
+        LocalDateTime currentDateTime = timeProvider.nowBusinessDateTime();
+
+        if (verificationToken.isExpired(currentDateTime)) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
                     "EMAIL_VERIFICATION_TOKEN_EXPIRED",
@@ -261,7 +267,7 @@ public class AuthService {
         user.setEmailVerified(true);
         user.setAccountStatus(AccountStatus.ACTIVE);
 
-        verificationToken.markAsUsed();
+        verificationToken.markAsUsed(currentDateTime);
 
         userRepository.save(user);
         emailVerificationTokenRepository.save(verificationToken);

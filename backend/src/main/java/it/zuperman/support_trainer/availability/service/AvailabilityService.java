@@ -23,6 +23,7 @@ import it.zuperman.support_trainer.common.enums.BookingRequestStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
@@ -35,19 +36,22 @@ public class AvailabilityService {
     private final ProfessionalProfileRepository professionalProfileRepository;
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
     private final BookingRequestItemRepository bookingRequestItemRepository;
+    private final ApplicationTimeProvider timeProvider;
 
     public AvailabilityService(
             AvailabilitySlotRepository availabilitySlotRepository,
             UserRepository userRepository,
             ProfessionalProfileRepository professionalProfileRepository,
             ProfessionalClientLinkRepository professionalClientLinkRepository,
-            BookingRequestItemRepository bookingRequestItemRepository
+            BookingRequestItemRepository bookingRequestItemRepository,
+            ApplicationTimeProvider timeProvider
     ) {
         this.availabilitySlotRepository = availabilitySlotRepository;
         this.userRepository = userRepository;
         this.professionalProfileRepository = professionalProfileRepository;
         this.professionalClientLinkRepository = professionalClientLinkRepository;
         this.bookingRequestItemRepository = bookingRequestItemRepository;
+        this.timeProvider = timeProvider;
     }
 
     @Transactional
@@ -186,7 +190,7 @@ public class AvailabilityService {
                 .findAvailableSlotsVisibleToClient(
                         professionalId,
                         AvailabilitySlotStatus.AVAILABLE,
-                        LocalDateTime.now(),
+                        timeProvider.nowBusinessDateTime(),
                         BookingRequestStatus.PENDING
                 )
                 .stream()
@@ -224,7 +228,7 @@ public class AvailabilityService {
     }
 
     private void validateSlotIsInFuture(LocalDateTime startDateTime) {
-        if (!startDateTime.isAfter(LocalDateTime.now())) {
+        if (!startDateTime.isAfter(timeProvider.nowBusinessDateTime())) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
                     "AVAILABILITY_SLOT_IN_PAST",
