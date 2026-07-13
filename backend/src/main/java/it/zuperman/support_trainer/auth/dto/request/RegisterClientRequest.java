@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import it.zuperman.support_trainer.common.enums.Gender;
+import it.zuperman.support_trainer.security.password.BcryptCompatiblePassword;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Email;
@@ -29,7 +30,8 @@ public class RegisterClientRequest {
     private String email;
 
     @NotBlank(message = "La password è obbligatoria")
-    @Size(min = 8, max = 100, message = "La password deve essere tra 8 e 100 caratteri")
+    @Size(min = 8, message = "La password deve contenere almeno 8 caratteri")
+    @BcryptCompatiblePassword
     @Pattern(
             regexp = "^(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).+$",
             message = "La password deve contenere almeno una maiuscola, un numero e un carattere speciale"

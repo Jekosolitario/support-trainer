@@ -378,6 +378,8 @@ Per Availability è sufficiente iniziare con una lista cronologica e form data/o
 
 I prototipi devono includere loading, empty, errore, successo, validazione, unauthorized e forbidden, non soltanto l'happy path.
 
+I form che impostano una nuova password devono mostrare una validazione preventiva del massimo di **72 byte UTF-8**, distinguendo byte e caratteri Unicode. Il frontend non deve troncare o trasformare il valore e non deve considerare il controllo locale una protezione sufficiente: il backend resta la fonte autoritativa. Nel login, una password oltre limite va presentata come generico errore di credenziali (`401 AUTHENTICATION_ERROR`), senza indicare se l’account esiste o se la causa è la lunghezza.
+
 ## 14. Punti da chiarire prima dell'implementazione
 
 Questi punti non impediscono la mappa funzionale, ma non sono determinabili come contratto frontend completo dal repository attuale:

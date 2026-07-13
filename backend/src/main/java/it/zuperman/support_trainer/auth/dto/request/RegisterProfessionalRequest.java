@@ -1,6 +1,7 @@
 package it.zuperman.support_trainer.auth.dto.request;
 
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
+import it.zuperman.support_trainer.security.password.BcryptCompatiblePassword;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -23,7 +24,8 @@ public class RegisterProfessionalRequest {
     private String email;
 
     @NotBlank(message = "La password è obbligatoria")
-    @Size(min = 8, max = 100, message = "La password deve essere tra 8 e 100 caratteri")
+    @Size(min = 8, message = "La password deve contenere almeno 8 caratteri")
+    @BcryptCompatiblePassword
     @Pattern(
             regexp = "^(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).+$",
             message = "La password deve contenere almeno una maiuscola, un numero e un carattere speciale"

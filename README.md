@@ -195,6 +195,8 @@ Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true`. S
 
 Le tredici tabelle legacy relative a refresh/reset token, workout, nutrition, feedback e misurazioni non sono governate dalle migrazioni correnti e non vengono create, modificate o eliminate. Il perimetro completo è descritto nella [documentazione del database](docs/10-database-schema.md).
 
+Le password impostate durante la registrazione hanno un massimo di 72 byte in codifica UTF-8, che può corrispondere a meno di 72 caratteri quando sono presenti caratteri Unicode. Il backend rifiuta i valori oltre soglia e non li tronca né li normalizza. Nel login, il superamento del limite restituisce lo stesso errore generico `401` delle credenziali non valide, senza rivelare l’esistenza dell’account.
+
 ## 9. Avvio del backend
 
 Dalla cartella `backend`:

@@ -265,13 +265,14 @@ Il flusso gestisce almeno questi casi:
 ## 11.1 Step principali
 1. l’utente invia email e password
 2. il backend normalizza l’email
-3. `AuthenticationManager` autentica le credenziali
-4. il backend recupera l’utente dal database
-5. il backend verifica che l’account sia abilitato all’accesso
-6. se tutto è valido, genera:
+3. il backend rifiuta come credenziali non valide una password oltre 72 byte UTF-8
+4. `AuthenticationManager` autentica le credenziali
+5. il backend recupera l’utente dal database
+6. il backend verifica che l’account sia abilitato all’accesso
+7. se tutto è valido, genera:
    - access token
    - refresh token
-7. il backend restituisce la risposta di login
+8. il backend restituisce la risposta di login
 
 ## 11.2 Controlli aggiuntivi
 Nel login vengono verificati almeno:
@@ -560,16 +561,18 @@ Se il collegamento non esiste o l’utente non è autorizzato:
 ## 19. Password security
 
 ## 19.1 Stato attuale della validazione
-Nel codice attuale la password viene validata con:
+Nelle registrazioni professionista e cliente la password viene validata con:
 - obbligatorietà
 - lunghezza minima `8`
-- lunghezza massima `100`
+- lunghezza massima `72` byte in codifica UTF-8
 - almeno una lettera maiuscola
 - almeno un numero
 - almeno un carattere speciale
 
-## 19.2 
-- la validazione forte della password è attualmente applicata in fase di registrazione professionista
+Il limite è espresso in byte, non in caratteri: alcuni caratteri Unicode occupano più byte in UTF-8. La password oltre il limite viene rifiutata come dato non valido prima dell’hashing. Il valore non viene troncato, normalizzato o trasformato.
+
+## 19.2 Login
+Nel login lo stesso limite è controllato prima della verifica BCrypt. Una password oltre 72 byte produce la stessa risposta generica `401 AUTHENTICATION_ERROR` delle altre credenziali non valide, indipendentemente dall’esistenza dell’account; il dettaglio del limite non viene esposto in questo flusso.
 
 ## 19.3 Storage
 La password non viene mai salvata in chiaro.
@@ -577,6 +580,8 @@ La password non viene mai salvata in chiaro.
 Viene salvata:
 - hashata
 - tramite `BCryptPasswordEncoder`
+
+Algoritmo, costo e formato degli hash esistenti restano invariati.
 
 ---
 

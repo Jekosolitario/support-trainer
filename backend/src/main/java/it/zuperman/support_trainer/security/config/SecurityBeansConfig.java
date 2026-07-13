@@ -5,11 +5,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import it.zuperman.support_trainer.security.password.BcryptLengthAwarePasswordEncoder;
+
 @Configuration
 public class SecurityBeansConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new BcryptLengthAwarePasswordEncoder(new BCryptPasswordEncoder());
     }
 }

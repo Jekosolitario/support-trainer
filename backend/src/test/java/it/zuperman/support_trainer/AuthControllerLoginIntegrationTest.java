@@ -1,6 +1,9 @@
 package it.zuperman.support_trainer;
 
+import java.nio.charset.StandardCharsets;
+
 import com.jayway.jsonpath.JsonPath;
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +41,29 @@ class AuthControllerLoginIntegrationTest {
 
     @Autowired
     private EmailVerificationTokenRepository emailVerificationTokenRepository;
+
+    @Test
+    @DisplayName("Login con account esistente e password ASCII oltre 72 byte deve restituire credenziali non valide")
+    void shouldRejectOversizedAsciiPasswordForExistingAccountWithGenericAuthenticationError() throws Exception {
+        String email = "existing.password.over.limit@example.com";
+        registerAndVerifyProfessional(email, "Password123!");
+
+        String oversizedPassword = "A1!" + "a".repeat(70);
+        assertThat(oversizedPassword).hasSize(73);
+        assertThat(oversizedPassword.getBytes(StandardCharsets.UTF_8)).hasSize(73);
+
+        assertGenericInvalidCredentials(email, oversizedPassword);
+    }
+
+    @Test
+    @DisplayName("Login con account inesistente e password Unicode oltre 72 byte deve avere lo stesso errore generico")
+    void shouldRejectOversizedUnicodePasswordForMissingAccountWithGenericAuthenticationError() throws Exception {
+        String oversizedPassword = "A1!" + "€".repeat(24);
+        assertThat(oversizedPassword).hasSize(27);
+        assertThat(oversizedPassword.getBytes(StandardCharsets.UTF_8)).hasSize(75);
+
+        assertGenericInvalidCredentials("missing.password.over.limit@example.com", oversizedPassword);
+    }
 
     @Test
     @DisplayName("Professionista verificato deve effettuare il login e ricevere i token")
@@ -176,5 +202,51 @@ class AuthControllerLoginIntegrationTest {
                         .content(loginRequestBody))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value("ACCOUNT_NOT_ACTIVE"));
+    }
+
+    private void registerAndVerifyProfessional(String email, String password) throws Exception {
+        String registrationRequestBody = """
+                {
+                  "firstName": "Password",
+                  "lastName": "Limit",
+                  "email": "%s",
+                  "password": "%s",
+                  "specialization": "PERSONAL_TRAINER"
+                }
+                """.formatted(email, password);
+
+        mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registrationRequestBody))
+                .andExpect(status().isCreated());
+
+        User savedUser = userRepository.findByEmail(email).orElseThrow();
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
+                .stream()
+                .filter(token -> token.getUser().getId().equals(savedUser.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        mockMvc.perform(get("/api/v1/auth/verify-email")
+                        .param("token", verificationToken.getToken()))
+                .andExpect(status().isOk());
+    }
+
+    private void assertGenericInvalidCredentials(String email, String password) throws Exception {
+        String loginRequestBody = """
+                {
+                  "email": "%s",
+                  "password": "%s"
+                }
+                """.formatted(email, password);
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginRequestBody))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.errorCode").value("AUTHENTICATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("Credenziali non valide"));
     }
 }

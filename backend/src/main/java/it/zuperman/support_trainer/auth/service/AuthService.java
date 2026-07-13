@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,6 +32,7 @@ import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkReposit
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
 import it.zuperman.support_trainer.security.jwt.JwtService;
+import it.zuperman.support_trainer.security.password.BcryptPasswordPolicy;
 
 @Service
 public class AuthService {
@@ -85,7 +87,7 @@ public class AuthService {
                 request.getFirstName().trim(),
                 request.getLastName().trim(),
                 normalizedEmail,
-                passwordEncoder.encode(request.getPassword()),
+                encodePassword(request.getPassword()),
                 request.getSpecialization()
         );
 
@@ -132,7 +134,7 @@ public class AuthService {
                 request.getFirstName().trim(),
                 request.getLastName().trim(),
                 normalizedEmail,
-                passwordEncoder.encode(request.getPassword()),
+                encodePassword(request.getPassword()),
                 request.getBirthDate(),
                 request.getHeightCm(),
                 request.getPrimaryGoal().trim(),
@@ -268,6 +270,10 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
         String normalizedEmail = normalizeEmail(request.getEmail());
 
+        if (!BcryptPasswordPolicy.isWithinLimit(request.getPassword())) {
+            throw new BadCredentialsException("Credenziali non valide");
+        }
+
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         normalizedEmail,
@@ -350,6 +356,18 @@ public class AuthService {
                 user.getEmail(),
                 user.getRole().name()
         );
+    }
+
+    private String encodePassword(String password) {
+        if (!BcryptPasswordPolicy.isWithinLimit(password)) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "VALIDATION_ERROR",
+                    BcryptPasswordPolicy.MAX_LENGTH_MESSAGE
+            );
+        }
+
+        return passwordEncoder.encode(password);
     }
 
     private UserDetails buildUserDetails(User user) {

@@ -61,9 +61,12 @@ L’email deve:
 ### 3.3 Password
 La password deve rispettare almeno queste regole:
 - minimo **8 caratteri**
+- massimo **72 byte in codifica UTF-8**
 - almeno **una lettera maiuscola**
 - almeno **un numero**
 - almeno **un carattere speciale**
+
+Il limite massimo è calcolato sui byte UTF-8, non sul solo numero di caratteri Java. Il backend rifiuta il valore oltre soglia prima dell’hashing e non tronca, normalizza o trasforma la password.
 
 ### 3.4 Stato iniziale account
 Alla registrazione, l’account professionista deve nascere con:
@@ -87,6 +90,7 @@ La registrazione cliente richiede un codice invito valido.
 ### 4.2 Password cliente
 La password del cliente deve rispettare almeno queste regole:
 - minimo **8 caratteri**
+- massimo **72 byte in codifica UTF-8**
 - almeno **una lettera maiuscola**
 - almeno **un numero**
 - almeno **un carattere speciale**
