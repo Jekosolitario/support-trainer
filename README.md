@@ -18,7 +18,7 @@ Stato sintetico:
 - test di integrazione per auth, inviti, access control, profili, availability, booking e Security / Common presenti;
 - database applicativo previsto: MySQL;
 - frontend non ancora implementato;
-- deploy e pipeline CI/CD non presenti;
+- pipeline CI GitHub Actions per build, test e package del backend presente; deploy non configurato;
 - progetto non ancora considerato production-ready.
 
 ## 3. Stack tecnico
