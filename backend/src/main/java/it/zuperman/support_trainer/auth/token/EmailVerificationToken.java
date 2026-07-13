@@ -36,7 +36,7 @@ public class EmailVerificationToken {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "token", nullable = false, unique = true, length = 255)
+    @Column(name = "token", nullable = false, unique = true, length = 500)
     private String token;
 
     @Column(name = "expires_at", nullable = false)

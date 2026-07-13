@@ -34,12 +34,12 @@ public abstract class User extends BaseEntity {
     @Column(name = "password", nullable = false, length = 255)
     private String password;
 
-    @Column(name = "profile_image_url")
+    @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
 
     @Setter(AccessLevel.PROTECTED)
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false, length = 30)
+    @Column(name = "role", nullable = false, length = 50)
     private Role role;
 
     @Enumerated(EnumType.STRING)

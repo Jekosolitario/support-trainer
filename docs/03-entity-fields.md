@@ -368,12 +368,13 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 | `recoveryTime`    | `String`          |           No |       Sì | `null`  | Recupero tra le serie               |
 | `extraTechniques` | `String` / `Text` |           No |       Sì | `null`  | Superset, drop set, rest pause ecc. |
 | `description`     | `String` / `Text` |           No |       Sì | `null`  | Spiegazioni esercizio               |
-| `loggedLoad`      | `String`          |           No |       Sì | `null`  | Carico registrato                   |
-| `loggedReps`      | `String`          |           No |       Sì | `null`  | Ripetizioni registrate              |
+| `loggedLoad`      | `BigDecimal`      |           No |       Sì | `null`  | Carico registrato, `DECIMAL(6,2)` nello schema legacy futuro |
+| `loggedReps`      | `Integer`         |           No |       Sì | `null`  | Ripetizioni registrate nello schema legacy futuro |
 | `notes`           | `String` / `Text` |           No |       Sì | `null`  | Note aggiuntive                     |
 
 ### Note
 - `sets` e `reps` come `String` danno più flessibilità nella v1
+- `loggedLoad` e `loggedReps` descrivono valori consuntivi numerici; le relative tabelle non sono ancora governate da Flyway né integrate nel codice runtime
 
 ---
 

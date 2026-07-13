@@ -97,10 +97,12 @@ Rappresenta un cliente registrato alla piattaforma.
 
 ### Campi specifici iniziali
 - `operationalStatus`
-- `phoneNumber`
 - `birthDate`
 - `heightCm`
 - `primaryGoal`
+- `gender`
+- `medicalNotes`
+- `injuryNotes`
 - `notes`
 - `active`
 
@@ -432,6 +434,7 @@ Questa decisione verrà definita meglio in una fase successiva.
 - `ClientProfile`
 - `ProfessionalClientLink`
 - `InviteCode`
+- `EmailVerificationToken`
 - `AvailabilitySlot`
 - `BookingRequest`
 - `BookingRequestItem`

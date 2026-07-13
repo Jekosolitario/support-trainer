@@ -867,3 +867,51 @@ Per Support Trainer risultano implementate e confermate le seguenti scelte:
 - coordinamento transazionale tra moduli Availability e Bookings sullo stesso slot.
 
 ---
+
+## 23. Versionamento dello schema con Flyway
+
+### 23.1 Ownership
+
+Flyway è il proprietario esclusivo dello schema MySQL delle nove tabelle runtime:
+
+- `users`;
+- `professional_profiles`;
+- `client_profiles`;
+- `professional_client_links`;
+- `invite_codes`;
+- `email_verification_tokens`;
+- `availability_slots`;
+- `booking_requests`;
+- `booking_request_items`.
+
+Hibernate usa `ddl-auto=validate` sugli ambienti MySQL e non deve creare o aggiornare lo schema. Le tredici tabelle legacy dei moduli futuri non appartengono ancora al perimetro Flyway.
+
+### 23.2 Migrazioni iniziali
+
+- `V1__create_legacy_compatible_runtime_schema.sql` riproduce lo schema runtime legacy rilevato, incluse le dimensioni non restrittive e i timestamp aggiuntivi delle tabelle JOINED.
+- `V2__align_runtime_schema_contract.sql` allarga `client_profiles.primary_goal`, normalizza `booking_request_items.updated_at` e aggiunge gli indici composti richiesti dalle query correnti.
+
+Le migrazioni già applicate sono immutabili. Le evoluzioni successive devono essere aggiunte come nuove migrazioni versionate e sono forward-only.
+
+### 23.3 Database vuoto ed esistente
+
+Su uno schema MySQL 8 nuovo e vuoto Flyway applica V1 e V2 in ordine, quindi Hibernate valida il mapping.
+
+Uno schema esistente non deve essere migrato automaticamente. Prima della baseline manuale sono obbligatori:
+
+1. backup verificato;
+2. clone isolato;
+3. confronto tra clone e V1;
+4. prova della baseline e della V2 sul clone;
+5. verifica applicativa e dei conteggi;
+6. approvazione esplicita per operare sul database reale.
+
+`baseline-on-migrate` resta disabilitato. Flyway `clean` è vietato sugli ambienti persistenti e la configurazione applicativa lo disabilita.
+
+### 23.4 Strategia di test
+
+La suite ordinaria usa H2 con Flyway disabilitato e `ddl-auto=create-drop`. È una verifica rapida del comportamento applicativo, non una certificazione del DDL MySQL.
+
+MySQL 8 è il riferimento per migrazioni, charset, collation, foreign key, indici, precisione temporale e lock. La prova delle migrazioni su MySQL deve avvenire in un ambiente isolato dedicato.
+
+---

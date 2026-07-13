@@ -24,7 +24,7 @@ import lombok.Setter;
 public class ProfessionalProfile extends User {
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "specialization", nullable = false, length = 50)
+    @Column(name = "specialization", nullable = false, length = 100)
     private ProfessionalSpecialization specialization;
 
     @Enumerated(EnumType.STRING)
@@ -44,10 +44,10 @@ public class ProfessionalProfile extends User {
     @Column(name = "city", length = 100)
     private String city;
 
-    @Column(name = "instagram_url", length = 255)
+    @Column(name = "instagram_url", length = 500)
     private String instagramUrl;
 
-    @Column(name = "website_url", length = 255)
+    @Column(name = "website_url", length = 500)
     private String websiteUrl;
 
     @Column(name = "active", nullable = false)

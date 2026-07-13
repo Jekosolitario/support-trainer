@@ -30,6 +30,7 @@ Stato sintetico:
 - Spring Web MVC
 - Spring Security
 - Spring Data JPA / Hibernate
+- Flyway 11.14.1, gestito dal BOM Spring Boot
 - Jakarta Validation
 - JJWT 0.13.0
 - Lombok
@@ -39,6 +40,7 @@ Stato sintetico:
 
 - MySQL per l'ambiente applicativo
 - H2 in memoria per i test
+- migrazioni Flyway versionate per le nove tabelle runtime MySQL
 - JUnit
 - Spring Test e MockMvc
 - AssertJ
@@ -126,6 +128,7 @@ support_trainer/
 ├── backend/
 │   ├── src/main/java/       # Codice applicativo
 │   ├── src/main/resources/  # Configurazione Spring
+│   │   └── db/migration/    # Migrazioni Flyway dello schema runtime
 │   ├── src/test/java/       # Test automatici
 │   ├── src/test/resources/  # Configurazione del profilo test
 │   ├── pom.xml
@@ -186,7 +189,11 @@ Gli origin CORS non ammettono wildcard, path, query string o fragment: va indica
 
 La configurazione JWT e CORS è tipizzata e validata all'avvio. Proprietà assenti, valori non validi, secret troppo corto o origin non sicuri impediscono l'avvio senza stampare i valori sensibili. Il file `application.properties` resta escluso da Git.
 
-La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=none`: lo schema non viene creato automaticamente. Nel progetto non risultano migrazioni Flyway o Liquibase; la struttura dati va predisposta separatamente facendo riferimento alla [documentazione del database](docs/10-database-schema.md).
+La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle nove tabelle runtime tramite `classpath:db/migration`.
+
+Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true`. Su un database nuovo e vuoto applica in ordine la V1 legacy-compatible e la V2 di convergenza. Un database esistente non deve essere avviato direttamente con le migrazioni abilitate: prima sono obbligatori backup, clone di verifica, confronto dello schema e baseline manuale esplicitamente approvata. Il comando Flyway `clean` è vietato sugli ambienti persistenti.
+
+Le tredici tabelle legacy relative a refresh/reset token, workout, nutrition, feedback e misurazioni non sono governate dalle migrazioni correnti e non vengono create, modificate o eliminate. Il perimetro completo è descritto nella [documentazione del database](docs/10-database-schema.md).
 
 ## 9. Avvio del backend
 
@@ -262,13 +269,15 @@ Usa `src/test/resources/application-test.properties` con:
 
 - database H2 in memoria;
 - schema ricreato tramite `create-drop`;
+- Flyway disabilitato;
+- `open-in-view` disabilitato;
 - JWT con valori dedicati ai test;
 - origin CORS locale dedicato ai test;
 - logging SQL disabilitato.
 
 Le classi di test principali attivano il profilo con `@ActiveProfiles("test")`.
 
-Le proprietà JWT e `app.cors.allowed-origins` sono definite direttamente nel profilo `test`; la suite non dipende quindi dall’`application.properties` locale, escluso da Git, da MySQL o da segreti reali.
+Le proprietà JWT e `app.cors.allowed-origins` sono definite direttamente nel profilo `test`; la suite non dipende quindi dall’`application.properties` locale, escluso da Git, da MySQL o da segreti reali. H2 resta la suite applicativa rapida, ma non certifica la sintassi DDL MySQL, i lock o l'esecuzione reale delle migrazioni: questi controlli richiedono un ambiente MySQL 8 isolato.
 
 Non sono attualmente presenti profili Spring dedicati a sviluppo, staging o produzione. La configurazione locale usa il file ignorato; i test usano il profilo tracciato `test`; un futuro ambiente di produzione deve fornire i valori esternamente tramite environment o altra sorgente di configurazione Spring, senza versionare segreti.
 

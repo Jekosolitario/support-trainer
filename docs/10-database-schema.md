@@ -37,6 +37,17 @@ Tutte le tabelle principali usano:
 Per alcune tabelle principali si usa:
 - `active BOOLEAN NOT NULL DEFAULT TRUE`
 
+### 2.5 Engine, charset e versionamento
+
+Le tabelle runtime MySQL usano esplicitamente:
+
+- `ENGINE=InnoDB`;
+- charset `utf8mb4`;
+- collation `utf8mb4_0900_ai_ci`;
+- foreign key con `ON UPDATE RESTRICT` e `ON DELETE RESTRICT`.
+
+Flyway governa esclusivamente le nove tabelle runtime della sezione 3. La V1 riproduce lo schema legacy runtime; la V2 converge al contratto canonico descritto in questo documento. Sugli ambienti MySQL Hibernate usa `ddl-auto=validate`.
+
 ---
 
 ## 3. Schema attualmente integrato nel backend
@@ -66,6 +77,8 @@ Tabella base della gerarchia utenti.
 - `role` `NOT NULL`
 - `account_status` `NOT NULL`
 - `email_verified` `NOT NULL`
+- `profile_image_url` `VARCHAR(500)` nullable
+- `role` e `account_status` `VARCHAR(50)`
 
 ### Note
 Questa tabella contiene i campi comuni a tutti gli utenti.
@@ -86,6 +99,8 @@ Tabella figlia di `users` per i professionisti.
 - `instagram_url`
 - `website_url`
 - `active`
+- `created_at`
+- `updated_at`
 
 ### Chiavi
 - `id` → PK e FK verso `users(id)`
@@ -94,6 +109,8 @@ Tabella figlia di `users` per i professionisti.
 - `specialization` `NOT NULL`
 - `operational_status` `NOT NULL`
 - `active` `NOT NULL DEFAULT TRUE`
+- `specialization` `VARCHAR(100)`
+- `instagram_url` e `website_url` `VARCHAR(500)`
 
 ### Note
 Rappresenta i dati specifici del professionista.
@@ -114,6 +131,8 @@ Tabella figlia di `users` per i clienti.
 - `injury_notes`
 - `notes`
 - `active`
+- `created_at`
+- `updated_at`
 
 ### Chiavi
 - `id` → PK e FK verso `users(id)`
@@ -125,6 +144,8 @@ Tabella figlia di `users` per i clienti.
 - `primary_goal` `NOT NULL`
 - `gender` `NOT NULL`
 - `active` `NOT NULL DEFAULT TRUE`
+- `height_cm` `DECIMAL(5,2)`
+- `primary_goal` `VARCHAR(255)` dopo la V2
 
 ---
 
@@ -203,6 +224,7 @@ Codici invito generati dai professionisti.
 ### Vincoli principali
 - `user_id` `NOT NULL`
 - `token` `NOT NULL UNIQUE`
+- `token` `VARCHAR(500)`
 - `expires_at` `NOT NULL`
 - `used` `NOT NULL DEFAULT FALSE`
 
@@ -334,6 +356,8 @@ Dettaglio degli slot collegati a una richiesta booking.
 
 - `booking_request_id` `NOT NULL`
 - `availability_slot_id` `NOT NULL`
+- coppia (`booking_request_id`, `availability_slot_id`) `UNIQUE`
+- `updated_at DATETIME(0) NOT NULL` dopo il backfill della V2
 
 ### Note
 
@@ -351,7 +375,9 @@ La tabella collega la richiesta allo slot availability selezionato e consente al
 
 ## 4. Tabelle già presenti nel database ma non ancora integrate nel codice
 
-Queste tabelle possono già essere presenti nel database MySQL locale come preparazione ai moduli successivi, ma **al momento non risultano ancora integrate nei flussi runtime del backend attuale**.
+Queste tabelle possono già essere presenti nel database MySQL locale come preparazione ai moduli successivi, ma **al momento non risultano ancora integrate nei flussi runtime del backend attuale e non sono governate da Flyway**.
+
+Il perimetro legacy non governato comprende tredici tabelle: `refresh_tokens`, `password_reset_tokens`, `workout_plans`, `workout_weeks`, `workout_days`, `workout_exercises`, `workout_feedbacks`, `nutrition_plans`, `nutrition_weeks`, `nutrition_days`, `nutrition_entries`, `nutrition_feedbacks` e `client_measurements`. Le migrazioni runtime non le creano, non le modificano e non le eliminano.
 
 ## 4.1 `refresh_tokens`
 
@@ -407,7 +433,7 @@ Questa tabella può già essere presente nel database, ma il flusso di forgot/re
 
 ## 5. Schema pianificato per moduli futuri
 
-Le tabelle seguenti appartengono alla roadmap progettuale, ma **non sono ancora da considerare integrate nel backend attuale**.
+Le tabelle seguenti appartengono alla roadmap progettuale, ma **non sono ancora da considerare integrate nel backend attuale né governate dalle migrazioni Flyway runtime**.
 
 ---
 
@@ -877,3 +903,48 @@ Per Support Trainer si confermano le seguenti scelte:
 - slot scaduti o con booking `PENDING` esclusi dalle disponibilità mostrate al cliente;
 - intervallo temporale degli slot immutabile dopo il primo coinvolgimento in una richiesta booking;
 - ripianificazione gestita tramite creazione di un nuovo slot, non modifica dello slot storico.
+
+---
+
+## 12. Migrazioni Flyway dello schema runtime
+
+### 12.1 Perimetro e ordine
+
+Le risorse versionate sono applicate in questo ordine:
+
+1. `V1__create_legacy_compatible_runtime_schema.sql`;
+2. `V2__align_runtime_schema_contract.sql`.
+
+La V1 crea esclusivamente le nove tabelle runtime, con PK, FK restrittive, unique, nullability, default, precisioni, engine, charset, collation e indici dello schema legacy. Non contiene dati applicativi.
+
+La V2:
+
+- porta `client_profiles.primary_goal` da `VARCHAR(150)` a `VARCHAR(255)`;
+- valorizza in modo conservativo gli eventuali `booking_request_items.updated_at` nulli usando `created_at` o il timestamp corrente;
+- porta `booking_request_items.updated_at` a `DATETIME(0) NOT NULL`;
+- aggiunge quattro indici composti motivati dalle query runtime.
+
+### 12.2 Indici di convergenza
+
+- `invite_codes(professional_id, created_at)` supporta la lista inviti del professionista ordinata per creazione.
+- `availability_slots(professional_id, active, status, start_date_time)` supporta gli slot visibili al cliente filtrati per stato e ordinati temporalmente.
+- `booking_requests(client_id, active, created_at)` supporta le liste booking del cliente.
+- `booking_requests(professional_id, active, created_at)` supporta le liste booking del professionista.
+
+Gli indici legacy con prefissi parzialmente sovrapposti vengono preservati nella prima adozione per mantenere la migrazione non distruttiva. Un'eventuale rimozione richiederà dati rappresentativi, analisi `EXPLAIN` e una migrazione separata.
+
+Non viene introdotta una unique su `professional_client_links(professional_id, client_id, active)`: impedirebbe di conservare più record storici inattivi della stessa coppia.
+
+### 12.3 Database vuoto
+
+Su uno schema MySQL 8 nuovo e vuoto Flyway applica V1 e V2; successivamente Hibernate valida lo schema con `ddl-auto=validate`. Questa procedura deve essere verificata in un ambiente MySQL isolato prima dell'uso operativo.
+
+### 12.4 Database esistente
+
+Non è ammessa la baseline automatica. Prima di registrare manualmente uno schema esistente alla versione 1 sono obbligatori backup, clone isolato, confronto con la V1, prova della V2, verifica dei dati e approvazione esplicita.
+
+`baseline-on-migrate` deve rimanere `false`. Flyway `clean` è vietato sugli ambienti persistenti ed è disabilitato dalla configurazione. Le tabelle legacy future restano fuori dalla history finché i relativi moduli non saranno progettati e approvati.
+
+### 12.5 Immutabilità e rollback
+
+Una migrazione già applicata non deve essere modificata. Le correzioni successive usano nuove migrazioni forward-only. Il recupero da un errore durante l'adozione iniziale si basa su backup verificato e ripristino controllato, non sulla cancellazione automatica dello schema.
