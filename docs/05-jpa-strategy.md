@@ -896,19 +896,22 @@ Hibernate usa `ddl-auto=validate` sugli ambienti MySQL e non deve creare o aggio
 
 - `V1__create_legacy_compatible_runtime_schema.sql` riproduce lo schema runtime legacy rilevato, incluse le dimensioni non restrittive e i timestamp aggiuntivi delle tabelle JOINED.
 - `V2__align_runtime_schema_contract.sql` allarga `client_profiles.primary_goal`, rende `booking_request_items.updated_at` obbligatorio preservandone la precisione legacy a sei cifre e aggiunge gli indici composti richiesti dalle query correnti.
+- Le migrazioni `V3_1`–`V3_9`, una per tabella runtime, ampliano esclusivamente a `DATETIME(6)` le colonne che rappresentano istanti. Conservano nullability, default e `ON UPDATE`, non contengono DML e non modificano date civili, vincoli, indici o relazioni.
+
+L'ampliamento strutturale aggiunge frazione zero ai valori precedentemente memorizzati a precisione di secondo. Non interpreta i `DATETIME` legacy, non applica conversioni di timezone e non completa la persistenza UTC.
 
 Le migrazioni già applicate sono immutabili. Le evoluzioni successive devono essere aggiunte come nuove migrazioni versionate e sono forward-only.
 
 ### 23.3 Database vuoto ed esistente
 
-Su uno schema MySQL 8 nuovo e vuoto Flyway applica V1 e V2 in ordine, quindi Hibernate valida il mapping.
+Su uno schema MySQL 8 nuovo e vuoto Flyway applica V1, V2 e `V3_1`–`V3_9` in ordine, quindi Hibernate valida il mapping.
 
 Uno schema esistente non deve essere migrato automaticamente. Prima della baseline manuale sono obbligatori:
 
 1. backup verificato;
 2. clone isolato;
 3. confronto tra clone e V1;
-4. prova della baseline e della V2 sul clone;
+4. prova della baseline, della V2 e delle migrazioni `V3_1`–`V3_9` sul clone;
 5. verifica applicativa e dei conteggi;
 6. approvazione esplicita per operare sul database reale.
 
@@ -918,14 +921,14 @@ Uno schema esistente non deve essere migrato automaticamente. Prima della baseli
 
 La suite ordinaria usa H2 con Flyway disabilitato e `ddl-auto=create-drop`. È una verifica rapida del comportamento applicativo, non una certificazione del DDL MySQL.
 
-MySQL 8 è il riferimento per migrazioni, charset, collation, foreign key, indici, precisione temporale e lock. La prova delle migrazioni su MySQL deve avvenire in un ambiente isolato dedicato.
+MySQL 8 è il riferimento per migrazioni, charset, collation, foreign key, indici, precisione temporale e lock. La sequenza completa fino a `V3_9` deve essere provata sia su uno schema vuoto sia su un clone legacy, verificando che anno, mese, giorno, ora, minuto e secondo restino invariati e che la nuova frazione sia zero dove la sorgente era `DATETIME(0)`.
 
 ## 24. Modello temporale transitorio
 
 I flussi applicativi leggono il tempo tramite un unico `ApplicationTimeProvider`. Il provider usa un bean `Clock` tecnico configurato in UTC e converte il medesimo `Instant` nella zona business esplicita `Europe/Rome` quando il modello corrente richiede un `LocalDateTime`. Nessun servizio applicativo deve dipendere da `ZoneId.systemDefault()` o da `user.timezone`; nei test il `Clock` viene sostituito con `Clock.fixed`.
 
-In questa fase i tipi JPA e i DTO temporali restano invariati. `LocalDateTime`, le colonne MySQL correnti e il formato JSON senza offset sono quindi ancora transitori. Non sono ancora configurati `hibernate.jdbc.time_zone`, timezone Jackson o parametri JDBC UTC, per evitare conversioni implicite prima della migrazione coordinata a `Instant`/`OffsetDateTime`.
+In questa fase i tipi JPA e i DTO temporali restano invariati. `LocalDateTime` e il formato JSON senza offset sono quindi ancora transitori. Le colonne runtime gestite dalle V3 hanno precisione `DATETIME(6)`, ma il loro contenuto conserva la precedente semantica civile e non è ancora normalizzato a UTC. Non sono configurati `hibernate.jdbc.time_zone`, timezone Jackson o parametri JDBC UTC, per evitare conversioni implicite prima della migrazione coordinata a `Instant`/`OffsetDateTime`.
 
-Gli audit Hibernate tramite `@CreationTimestamp` e `@UpdateTimestamp` restano temporaneamente invariati e non usano ancora il `Clock` applicativo. La loro migrazione a ownership applicativa appartiene a uno step successivo.
+Gli audit Hibernate tramite `@CreationTimestamp` e `@UpdateTimestamp` e i default DB con `CURRENT_TIMESTAMP(6)`/`ON UPDATE` restano temporaneamente invariati. Non usano ancora il `Clock` applicativo e la loro migrazione a ownership applicativa appartiene a uno step successivo, insieme alla configurazione UTC e alla conversione dei dati legacy.
 
 ---
