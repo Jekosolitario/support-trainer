@@ -14,6 +14,8 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 class FlywayMigrationResourcesTest {
 
@@ -77,6 +79,19 @@ class FlywayMigrationResourcesTest {
     }
 
     @Test
+    void migrationDirectoryShouldContainOnlyV1AndV2() throws IOException {
+        Resource[] resources = new PathMatchingResourcePatternResolver()
+                .getResources("classpath*:db/migration/V*__*.sql");
+
+        assertThat(resources)
+                .extracting(Resource::getFilename)
+                .containsExactlyInAnyOrder(
+                        "V1__create_legacy_compatible_runtime_schema.sql",
+                        "V2__align_runtime_schema_contract.sql"
+                );
+    }
+
+    @Test
     void v1ShouldCreateOnlyTheApprovedRuntimeTables() throws IOException {
         Matcher matcher = CREATE_TABLE.matcher(readResource(MIGRATIONS.getFirst()));
         Set<String> createdTables = new LinkedHashSet<>();
@@ -103,6 +118,25 @@ class FlywayMigrationResourcesTest {
             assertThat(DESTRUCTIVE_STATEMENT.matcher(sql).find()).isFalse();
             assertThat(sql).doesNotContainIgnoringCase("CREATE TABLE IF NOT EXISTS");
         }
+    }
+
+    @Test
+    void v2ShouldPreserveBookingItemUpdatedAtMicroseconds() throws IOException {
+        String sql = readResource(MIGRATIONS.get(1));
+
+        assertThat(sql)
+                .containsPattern(
+                        "(?is)UPDATE\\s+booking_request_items\\s+"
+                                + "SET\\s+updated_at\\s*=\\s*COALESCE\\(created_at,\\s*CURRENT_TIMESTAMP\\(6\\)\\)\\s+"
+                                + "WHERE\\s+updated_at\\s+IS\\s+NULL\\s*;"
+                )
+                .containsPattern(
+                        "(?is)ALTER\\s+TABLE\\s+booking_request_items\\s+"
+                                + "MODIFY\\s+COLUMN\\s+updated_at\\s+DATETIME\\(6\\)\\s+NOT\\s+NULL\\s+"
+                                + "DEFAULT\\s+CURRENT_TIMESTAMP\\(6\\)\\s+"
+                                + "ON\\s+UPDATE\\s+CURRENT_TIMESTAMP\\(6\\)\\s*;"
+                )
+                .doesNotContainIgnoringCase("DATETIME(0)");
     }
 
     @Test

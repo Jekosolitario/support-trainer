@@ -357,11 +357,13 @@ Dettaglio degli slot collegati a una richiesta booking.
 - `booking_request_id` `NOT NULL`
 - `availability_slot_id` `NOT NULL`
 - coppia (`booking_request_id`, `availability_slot_id`) `UNIQUE`
-- `updated_at DATETIME(0) NOT NULL` dopo il backfill della V2
+- `updated_at DATETIME(6) NOT NULL` dopo il backfill conservativo della V2
 
 ### Note
 
 Nel backend attuale ogni booking creato tramite API contiene un solo item.
+
+`DATETIME(6)` è il contratto canonico temporaneo di `updated_at` per preservare esattamente i valori legacy non nulli. La V2 valorizza soltanto gli eventuali null; la definizione di una precisione temporale globale resta rinviata all'intervento CM-05.
 
 La tabella collega la richiesta allo slot availability selezionato e consente al service layer di:
 
@@ -920,8 +922,8 @@ La V1 crea esclusivamente le nove tabelle runtime, con PK, FK restrittive, uniqu
 La V2:
 
 - porta `client_profiles.primary_goal` da `VARCHAR(150)` a `VARCHAR(255)`;
-- valorizza in modo conservativo gli eventuali `booking_request_items.updated_at` nulli usando `created_at` o il timestamp corrente;
-- porta `booking_request_items.updated_at` a `DATETIME(0) NOT NULL`;
+- valorizza esclusivamente gli eventuali `booking_request_items.updated_at` nulli usando `created_at` o, in fallback, `CURRENT_TIMESTAMP(6)`;
+- porta `booking_request_items.updated_at` a `DATETIME(6) NOT NULL`, preservando esattamente i valori legacy già presenti e mantenendo default e aggiornamento automatico a precisione 6;
 - aggiunge quattro indici composti motivati dalle query runtime.
 
 ### 12.2 Indici di convergenza

@@ -140,6 +140,12 @@ senza campo `updatedAt`.
 
 Nel backend reale non risultano utilizzate callback JPA `@PrePersist` o `@PreUpdate` per la gestione standard dei timestamp.
 
+## 5.6 Precisione canonica temporanea per il dato legacy
+
+Durante l'adozione iniziale di Flyway, `booking_request_items.updated_at` usa temporaneamente `DATETIME(6) NOT NULL` come contratto canonico. La V2 valorizza esclusivamente gli eventuali valori nulli e preserva senza arrotondamenti tutti i timestamp legacy già presenti.
+
+Questa decisione è locale al campo e serve a evitare perdita di dati durante la migrazione. Non definisce ancora il modello temporale globale dell'applicazione: l'eventuale uniformazione delle precisioni resta rinviata all'intervento CM-05.
+
 ---
 
 ## 6. Mapping degli enum
@@ -889,7 +895,7 @@ Hibernate usa `ddl-auto=validate` sugli ambienti MySQL e non deve creare o aggio
 ### 23.2 Migrazioni iniziali
 
 - `V1__create_legacy_compatible_runtime_schema.sql` riproduce lo schema runtime legacy rilevato, incluse le dimensioni non restrittive e i timestamp aggiuntivi delle tabelle JOINED.
-- `V2__align_runtime_schema_contract.sql` allarga `client_profiles.primary_goal`, normalizza `booking_request_items.updated_at` e aggiunge gli indici composti richiesti dalle query correnti.
+- `V2__align_runtime_schema_contract.sql` allarga `client_profiles.primary_goal`, rende `booking_request_items.updated_at` obbligatorio preservandone la precisione legacy a sei cifre e aggiunge gli indici composti richiesti dalle query correnti.
 
 Le migrazioni già applicate sono immutabili. Le evoluzioni successive devono essere aggiunte come nuove migrazioni versionate e sono forward-only.
 
