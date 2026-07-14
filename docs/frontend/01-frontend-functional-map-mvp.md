@@ -94,7 +94,7 @@ Nel `PATCH` profilo professionista, `instagramUrl` e `websiteUrl` seguono un con
 | Dashboard cliente | Composizione di `GET /api/v1/professionals/my` e `GET /api/v1/bookings/client` | Implementabile ora come composizione | Non esiste un endpoint dashboard. Mostrare riepiloghi derivati senza promettere statistiche avanzate. |
 | Profilo/account | Endpoint `/api/v1/me/**` | Implementabile ora | Form per dati anagrafici e note pertinenti al cliente. |
 | Professionisti collegati | `GET /api/v1/professionals/my` | Implementabile ora | Lista, non singolo professionista. Empty state se non emergono collegamenti leggibili. |
-| Dettaglio professionista | `GET /api/v1/professionals/{professionalId}` | Implementabile ora | Accessibile soltanto con collegamento attivo. Mostrare specializzazione e contatti disponibili. |
+| Dettaglio professionista | `GET /api/v1/professionals/{professionalId}` | Implementabile ora | Accessibile soltanto con collegamento attivo. Un `404 PROFESSIONAL_NOT_FOUND` non permette di distinguere professionista inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista. |
 | Disponibilità professionista | `GET /api/v1/professionals/{professionalId}/availability` | Implementabile ora solo per personal trainer collegato | Mostrare solo slot restituiti dal server. Per un nutrizionista l'area non va offerta. Empty state distinto da errore. |
 | Crea booking | `POST /api/v1/bookings` | Implementabile ora | Body: un solo `availabilitySlotId` e nota facoltativa fino a 1000 caratteri. Confermare data/ora e professionista prima dell'invio. |
 | Lista booking | `GET /api/v1/bookings/client` | Implementabile ora | Stati: `PENDING`, `CONFIRMED`, `REJECTED`, `CANCELLED`. Nessun filtro server documentato. |
@@ -108,7 +108,7 @@ Nel `PATCH` profilo professionista, `instagramUrl` e `websiteUrl` seguono un con
 | Dashboard professionista | Composizione di clienti, inviti e, solo per personal trainer, availability/booking | Implementabile ora come composizione | Nessun endpoint aggregato. I widget devono dipendere dalla specializzazione. |
 | Profilo/account | Endpoint `/api/v1/me/**` | Implementabile ora | Campi professionista: contatti, bio, luogo di lavoro, città e link. |
 | Clienti collegati | `GET /api/v1/clients/my` | Implementabile ora | Lista dei soli clienti collegati e leggibili. |
-| Dettaglio cliente | `GET /api/v1/clients/{clientId}` | Implementabile ora | Solo con collegamento attivo; i dati medici richiedono un layout sobrio e accesso non ambiguo. |
+| Dettaglio cliente | `GET /api/v1/clients/{clientId}` | Implementabile ora | Solo con collegamento attivo. Un `404 CLIENT_NOT_FOUND` non permette di distinguere cliente inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista. I campi restituiti non cambiano in questa remediation. |
 | Crea invito | `POST /api/v1/invites` | Implementabile ora | Nessun body. Dopo `201`, mostrare codice, scadenza e azione “Copia”. Non inventare invio email automatico. |
 | Lista inviti | `GET /api/v1/invites` | Implementabile ora | Mostrare attivo/usato/scaduto derivando lo scaduto da `expiresAt`. Non esistono dettaglio o disattivazione manuale. |
 
@@ -221,12 +221,13 @@ La persistenza del token non è definita dal backend. Raccomandazione MVP: isola
 
 Il valore cambia per ambiente tramite configurazione Spring o `APP_CORS_ALLOWED_ORIGINS`. Il frontend non deve codificare un'origine backend o frontend di produzione nel sorgente.
 
-### 8.4 Risposte 401 e 403
+### 8.4 Risposte 401, 403 e 404
 
 - `401` durante il login: mostrare l'errore nel form, senza redirect ciclici.
 - `401` su una rotta privata (`UNAUTHORIZED`, `TOKEN_EXPIRED`, `INVALID_TOKEN`): cancellare la sessione locale, conservare se utile la destinazione, e reindirizzare a `/login` con messaggio “Sessione scaduta” o “Accesso richiesto”. Non tentare refresh automatici.
 - `403 ACCESS_DENIED` da SecurityConfig: lasciare intatta la sessione, mostrare pagina “Non autorizzato” e offrire ritorno alla dashboard corretta.
-- `403` business (relazione assente, profilo non attivo, specializzazione non consentita): mostrare il messaggio contestuale e ricaricare i dati se l'azione potrebbe essere diventata obsoleta.
+- nei dettagli cliente e professionista, `404 CLIENT_NOT_FOUND` e `404 PROFESSIONAL_NOT_FOUND` coprono in modo indistinguibile ID inesistente, relazione assente o inattiva e profilo non leggibile; il frontend non deve tentare di dedurre quale caso si sia verificato;
+- gli altri `403` business, per esempio specializzazione non consentita in flussi diversi, mantengono il comportamento contestuale esistente.
 
 L'azione “Esci” dell'MVP è solo frontend: elimina token e stato utente e torna al login. Non esiste revoca backend.
 
@@ -260,8 +261,8 @@ Il contratto comune reale è `ErrorResponse`:
 |---|---|
 | `400 Bad Request` | Mostrare errori campo per `VALIDATION_ERROR`; per body, path o query malformati mostrare messaggio generale. Comprende anche alcune violazioni di stato/invito. |
 | `401 Unauthorized` | Login: errore credenziali. Area privata: sessione assente/scaduta/non valida e nuovo login. |
-| `403 Forbidden` | Utente autenticato ma ruolo, relazione, stato profilo o specializzazione non consentono l'operazione. Non fare logout automatico. |
-| `404 Not Found` | Stato “Risorsa non trovata”; offrire ritorno alla lista. |
+| `403 Forbidden` | Utente autenticato ma il ruolo non consente l'endpoint, oppure un altro flusso business nega l'operazione. Non fare logout automatico. |
+| `404 Not Found` | Stato neutro “Risorsa non trovata”; offrire ritorno alla lista. Nei dettagli cliente/professionista include anche la risorsa fuori dal perimetro del principal e non deve essere interpretato per distinguere il motivo. |
 | `409 Conflict` | Dato già esistente o stato concorrente/obsoleto, per esempio email duplicata, slot sovrapposto o transizione booking non più valida. Mostrare messaggio e ricaricare la risorsa quando opportuno. |
 | `500 Internal Server Error` | Messaggio neutro, possibilità di riprovare e nessun dettaglio tecnico. |
 

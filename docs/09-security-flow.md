@@ -433,6 +433,12 @@ Tutto il resto richiede autenticazione valida.
 - `PATCH /api/v1/me/profile`
 - `PATCH /api/v1/me/profile/operational-status`
 
+### Anti-enumerazione nei dettagli profilo
+
+I dettagli `GET /api/v1/clients/{clientId}` e `GET /api/v1/professionals/{professionalId}` interrogano direttamente il perimetro accessibile al principal. La query combina ID richiesto, ID del principal, collegamento attivo e stati di account/profilo già richiesti dal dominio; non esegue prima un lookup del solo ID né una query di esistenza usata per scegliere un errore diverso.
+
+Un risultato vuoto produce sempre il medesimo 404 specifico dell'endpoint, sia per ID inesistente sia per collegamento assente o inattivo e profilo non leggibile. La policy non modifica i confini di Spring Security: richiesta anonima e token non valido restano 401, mentre un ruolo non ammesso sull'endpoint resta 403. Gli stati operativi, come `PAUSA` o `FERIE`, restano informazioni di dominio e non sono criteri di occultamento del dettaglio.
+
 ---
 
 ## 16.3 Nota su SecurityConfig e service layer
@@ -688,7 +694,7 @@ Nel codice attuale le situazioni seguenti devono produrre errori chiari:
 - profilo professionista non attivo
 - profilo cliente non attivo
 - accesso a endpoint con authority errata
-- accesso a risorsa non collegata all’utente
+- accesso ai dettagli cliente/professionista fuori dal perimetro del principal, esposto come 404 uniforme
 - uso di codice invito non valido, non attivo, già usato o scaduto
 - creazione slot availability nel passato
 - creazione slot availability sovrapposto

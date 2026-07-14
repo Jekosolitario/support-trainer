@@ -120,7 +120,7 @@ Restituisce l’elenco clienti collegati al professionista autenticato.
 
 ### 6.2 Dettaglio cliente
 **GET** `/api/v1/clients/{clientId}`  
-Restituisce il dettaglio di un cliente, solo se autorizzato tramite collegamento valido.
+Restituisce il dettaglio di un cliente solo se una ricerca scoped trova ID, professionista autenticato, collegamento attivo e stati leggibili. ID inesistente, collegamento assente o inattivo e profilo non leggibile producono lo stesso `404 CLIENT_NOT_FOUND`; un principal con ruolo `CLIENT` riceve invece `403`. Il payload di successo non cambia in questo intervento.
 
 ---
 
@@ -132,7 +132,7 @@ Restituisce i professionisti collegati al cliente autenticato.
 
 ### 7.2 Dettaglio professionista
 **GET** `/api/v1/professionals/{professionalId}`  
-Restituisce il dettaglio di un professionista, solo se autorizzato tramite collegamento valido.
+Restituisce il dettaglio di un professionista solo se una ricerca scoped trova ID, cliente autenticato, collegamento attivo e stati leggibili. ID inesistente, collegamento assente o inattivo e profilo non leggibile producono lo stesso `404 PROFESSIONAL_NOT_FOUND`; un principal con ruolo `PROFESSIONAL` riceve invece `403`. Il payload di successo non cambia in questo intervento.
 
 ---
 

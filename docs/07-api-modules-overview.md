@@ -122,7 +122,8 @@ Il modulo **Clients** consente al professionista autenticato di leggere i client
 
 - accesso riservato al professionista;
 - lettura consentita solo per clienti collegati;
-- controllo della relazione attiva nel service layer.
+- il dettaglio usa una ricerca scoped per ID cliente, professionista autenticato, collegamento attivo e stati leggibili;
+- cliente inesistente o non accessibile restituiscono lo stesso `404 CLIENT_NOT_FOUND`; il `403` resta riservato al ruolo non autorizzato sull'endpoint.
 
 ---
 
@@ -142,6 +143,8 @@ Il modulo **Professionals** consente al cliente autenticato di leggere i profess
 
 - accesso riservato al cliente;
 - lettura dettaglio consentita solo verso professionisti collegati;
+- il dettaglio usa una ricerca scoped per ID professionista, cliente autenticato, collegamento attivo e stati leggibili;
+- professionista inesistente o non accessibile restituiscono lo stesso `404 PROFESSIONAL_NOT_FOUND`; il `403` resta riservato al ruolo non autorizzato sull'endpoint;
 - lettura availability consentita solo verso professionisti collegati;
 - vengono esposti solo slot disponibili, non scaduti e privi di richieste booking `PENDING` attive.
 

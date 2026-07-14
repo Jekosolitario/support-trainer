@@ -449,6 +449,14 @@ Per procedere con ordine, l’ordine consigliato è questo:
 
 ---
 
+## 19.1 Remediation anti-enumerazione dei dettagli
+
+Lo stato corrente applica una ricerca scoped ai due endpoint di dettaglio. Il repository dei collegamenti restituisce direttamente un profilo soltanto quando coincidono ID target, ID del principal, collegamento attivo e stati leggibili. Non viene caricato prima il profilo per stabilire se esiste e non viene eseguito un controllo separato del collegamento per produrre un errore differente.
+
+Per `GET /api/v1/clients/{clientId}`, ID inesistente, cliente mai collegato al principal, collegamento inattivo e profilo non leggibile restituiscono lo stesso `404 CLIENT_NOT_FOUND`. Per `GET /api/v1/professionals/{professionalId}` gli stessi casi restituiscono `404 PROFESSIONAL_NOT_FOUND`. Il ruolo errato continua a essere respinto da Spring Security con 403 e una richiesta anonima con 401. Liste, DTO e campi restituiti non sono stati modificati da questa remediation.
+
+---
+
 ## 20. Definition of Done dello sprint
 Lo sprint è completato solo se:
 
