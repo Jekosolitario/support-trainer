@@ -2,6 +2,7 @@ package it.zuperman.support_trainer.auth.service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -40,6 +41,7 @@ import it.zuperman.support_trainer.security.password.BcryptPasswordPolicy;
 public class AuthService {
 
     private static final Duration EMAIL_VERIFICATION_TOKEN_VALIDITY = Duration.ofHours(24);
+    private static final Duration EMAIL_VERIFICATION_RESEND_COOLDOWN = Duration.ofSeconds(60);
 
     private final UserRepository userRepository;
     private final ProfessionalProfileRepository professionalProfileRepository;
@@ -168,14 +170,18 @@ public class AuthService {
         return buildRegistrationResponse(savedClient);
     }
 
-    private void createEmailVerificationToken(User user) {
+    private EmailVerificationToken createEmailVerificationToken(User user) {
+        return createEmailVerificationToken(user, timeProvider.nowInstant());
+    }
+
+    private EmailVerificationToken createEmailVerificationToken(User user, Instant issuedAt) {
         EmailVerificationToken verificationToken = new EmailVerificationToken(
                 user,
                 UUID.randomUUID().toString(),
-                timeProvider.nowInstant().plus(EMAIL_VERIFICATION_TOKEN_VALIDITY)
+                issuedAt.plus(EMAIL_VERIFICATION_TOKEN_VALIDITY)
         );
 
-        emailVerificationTokenRepository.save(verificationToken);
+        return emailVerificationTokenRepository.save(verificationToken);
     }
 
     private void validateProfessionalCanLinkClients(ProfessionalProfile professional) {
@@ -284,6 +290,55 @@ public class AuthService {
 
         userRepository.save(user);
         emailVerificationTokenRepository.save(verificationToken);
+    }
+
+    @Transactional
+    public void resendEmailVerification(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        User user = userRepository.findByEmailForUpdate(normalizedEmail).orElse(null);
+
+        if (!isEligibleForEmailVerificationResend(user)) {
+            return;
+        }
+
+        Instant currentDateTime = timeProvider.nowInstant();
+        List<EmailVerificationToken> existingTokens
+                = emailVerificationTokenRepository.findByUser_IdOrderByCreatedAtDescIdDesc(user.getId());
+
+        if (isEmailVerificationResendCooldownActive(existingTokens, currentDateTime)) {
+            return;
+        }
+
+        List<EmailVerificationToken> tokensToInvalidate = existingTokens.stream()
+                .filter(token -> Boolean.FALSE.equals(token.getUsed()))
+                .toList();
+
+        tokensToInvalidate.forEach(token -> token.markAsUsed(currentDateTime));
+        if (!tokensToInvalidate.isEmpty()) {
+            emailVerificationTokenRepository.saveAllAndFlush(tokensToInvalidate);
+        }
+
+        createEmailVerificationToken(user, currentDateTime);
+    }
+
+    private boolean isEligibleForEmailVerificationResend(User user) {
+        return user != null
+                && user.getAccountStatus() == AccountStatus.PENDING_VERIFICATION
+                && Boolean.FALSE.equals(user.getEmailVerified())
+                && isProfileActive(user);
+    }
+
+    private boolean isEmailVerificationResendCooldownActive(
+            List<EmailVerificationToken> existingTokens,
+            Instant currentDateTime
+    ) {
+        if (existingTokens.isEmpty()) {
+            return false;
+        }
+
+        Instant cooldownEndsAt = existingTokens.get(0).getCreatedAt()
+                .plus(EMAIL_VERIFICATION_RESEND_COOLDOWN);
+        return currentDateTime.isBefore(cooldownEndsAt);
     }
 
     private boolean isVerificationStateCoherent(User user) {

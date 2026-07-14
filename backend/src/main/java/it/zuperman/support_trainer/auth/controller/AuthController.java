@@ -14,6 +14,7 @@ import it.zuperman.support_trainer.auth.dto.request.ConfirmEmailVerificationRequ
 import it.zuperman.support_trainer.auth.dto.request.LoginRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterClientRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterProfessionalRequest;
+import it.zuperman.support_trainer.auth.dto.request.ResendEmailVerificationRequest;
 import it.zuperman.support_trainer.auth.dto.response.AuthResponse;
 import it.zuperman.support_trainer.auth.service.AuthService;
 import it.zuperman.support_trainer.invite.dto.request.ValidateInviteCodeRequest;
@@ -57,6 +58,17 @@ public class AuthController {
     ) {
         authService.verifyEmail(request.getToken());
         return ResponseEntity.ok(Map.of("message", "Email verificata correttamente"));
+    }
+
+    @PostMapping("/email-verification/resend")
+    public ResponseEntity<Map<String, String>> resendEmailVerification(
+            @Valid @RequestBody ResendEmailVerificationRequest request
+    ) {
+        authService.resendEmailVerification(request.getEmail());
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(
+                "message",
+                "Se l'indirizzo è associato a un account da verificare, riceverai le istruzioni necessarie"
+        ));
     }
 
     @PostMapping("/login")
