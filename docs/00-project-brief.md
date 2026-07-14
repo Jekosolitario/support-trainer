@@ -50,7 +50,7 @@ Nel backend risultano completati:
 
 - autenticazione JWT;
 - registrazione professionista;
-- verifica email professionista;
+- verifica email obbligatoria per professionista e cliente;
 - codice invito;
 - registrazione cliente tramite invito valido;
 - collegamento automatico professionista-cliente;

@@ -633,7 +633,7 @@ L’ordine consigliato definitivo aggiornato è:
 2. fondazioni tecniche — completato
 3. utenti — completato
 4. security e auth — completato
-5. verifica email professionista — completato
+5. verifica email uniforme per professionista e cliente — completato
 6. inviti + registrazione cliente + link — completato
 7. profilo/account — completato
 8. relazioni clienti/professionisti read — completato

@@ -49,7 +49,7 @@ La separazione tra ruolo e specializzazione consente di:
 Nel backend reale risultano implementate:
 
 - registrazione professionista;
-- verifica email professionista;
+- verifica email uniforme per professionista e cliente;
 - login JWT;
 - registrazione cliente tramite codice invito;
 - validazione preventiva del codice invito;
@@ -87,7 +87,7 @@ Non risultano ancora implementate:
 
 Il professionista può registrarsi liberamente al sistema selezionando la propria specializzazione.
 
-Dopo la registrazione deve confermare il proprio indirizzo email.
+Dopo la registrazione deve confermare il proprio indirizzo email tramite il POST pubblico dedicato.
 
 Fino alla verifica email, il professionista non può utilizzare le funzionalità operative protette, tra cui:
 
@@ -106,9 +106,11 @@ Può completare la registrazione solo se possiede un codice invito:
 - non utilizzato;
 - non scaduto.
 
+La registrazione crea atomicamente cliente pending, token email, link attivo e consumo dell'invito. Fino alla conferma il cliente resta `PENDING_VERIFICATION`, con `emailVerified=false`, non può fare login e non è leggibile dal professionista collegato. Dopo il POST di conferma passa a `ACTIVE` ed `emailVerified=true`.
+
 ### 4.3 Collegamento cliente-professionista — Implementato
 
-Il collegamento tra cliente e professionista viene creato automaticamente dopo una registrazione cliente completata con successo tramite invito valido.
+Il collegamento tra cliente e professionista viene creato automaticamente durante la registrazione cliente completata con successo tramite invito valido. L'invito è già consumato, ma il link non rende leggibile il cliente finché l'account è pending.
 
 Nel backend attuale la relazione è gestita tramite:
 
@@ -441,7 +443,7 @@ Il cliente può assumere uno dei seguenti stati operativi:
 Risultano già implementati:
 
 - registrazione e autenticazione;
-- verifica email professionista;
+- verifica email obbligatoria per professionista e cliente;
 - inviti e registrazione cliente;
 - collegamento cliente-professionista;
 - profilo/account;

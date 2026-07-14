@@ -61,17 +61,18 @@ Gli endpoint sotto `/api/v1/auth/**` sono pubblici.
 | Home / landing | Pagina statica di ingresso. Nessun endpoint richiesto. CTA verso login e registrazione professionista; l'accesso cliente parte da un invito. | Contenuto pronto, eventuale fallback contenuti | Nessun errore API |
 | Login | Autenticare cliente o professionista con `POST /api/v1/auth/login`. Campi: email e password. | Idle, invio, successo e redirect per ruolo, errore credenziali, account non attivo | `400` validazione/body, `401 AUTHENTICATION_ERROR`, `403 ACCOUNT_NOT_ACTIVE`, `EMAIL_NOT_VERIFIED`, profilo non attivo |
 | Registrazione professionista | Creare un account con `POST /api/v1/auth/register/professional`. Campi: nome, cognome, email, password, specializzazione `PERSONAL_TRAINER` o `NUTRITIONIST`. | Form, validazione, invio, `201`, istruzione di verifica email | `400 VALIDATION_ERROR`, `409 EMAIL_ALREADY_REGISTERED` |
-| Verifica email | Consumare `token` da query string con `GET /api/v1/auth/verify-email?token=...`. | Verifica in corso, verificata, token mancante, non valido, già usato o scaduto; CTA al login dopo successo | `400 MISSING_REQUEST_PARAMETER`, `400 EMAIL_VERIFICATION_TOKEN_ALREADY_USED`, `400 EMAIL_VERIFICATION_TOKEN_EXPIRED`, `404 EMAIL_VERIFICATION_TOKEN_NOT_FOUND` |
+| Verifica email | Leggere il token nella futura pagina React e inviare `POST /api/v1/auth/email-verification/confirm` con body `token`. | Verifica in corso, verificata, non valido o scaduto; secondo utilizzo idempotente; CTA al login dopo successo | `400` body/validazione, `404 EMAIL_VERIFICATION_TOKEN_NOT_FOUND`, `410 EMAIL_VERIFICATION_TOKEN_EXPIRED` |
 | Validazione invito | Verificare il codice prima di mostrare il form cliente con `POST /api/v1/auth/register/client/validate-invite`. Body: `code`. | Form codice, validazione, valido con scadenza, non valido/scaduto/usato, retry | `400 VALIDATION_ERROR` e codici `INVITE_CODE_*`; `404 INVITE_CODE_NOT_FOUND` |
-| Registrazione cliente | Creare l'account con `POST /api/v1/auth/register/client` dopo validazione invito. Campi: nome, cognome, email, password, codice, data di nascita, altezza, obiettivo, genere; note mediche/infortuni/generali facoltative. | Form multi-sezione, validazione campo, invio, `201`, CTA al login | `400` validazione o invito non più valido, `403` professionista non utilizzabile, `409 EMAIL_ALREADY_REGISTERED` |
+| Registrazione cliente | Creare l'account con `POST /api/v1/auth/register/client` dopo validazione invito. Campi: nome, cognome, email, password, codice, data di nascita, altezza, obiettivo, genere; note mediche/infortuni/generali facoltative. | Form multi-sezione, validazione campo, invio, `201`, schermata “Controlla la tua email” | `400` validazione o invito non più valido, `403` professionista non utilizzabile, `409 EMAIL_ALREADY_REGISTERED` |
 | Pagine informative statiche | Eventuali pagine legali o informative non richiedono backend, ma vanno create solo quando contenuti e requisiti sono definiti. | Contenuto e pagina non trovata frontend | Nessun errore API |
 
 Note di flusso verificate:
 
 - le risposte di registrazione contengono identità e ruolo, ma `accessToken`, `refreshToken` e `tokenType` sono `null`; dopo la registrazione occorre passare dal login;
-- il cliente registrato tramite invito nasce già attivo e con email verificata;
-- il professionista nasce `PENDING_VERIFICATION` e non può fare login operativo prima della verifica;
-- il backend genera e persiste un token di verifica valido 24 ore, ma nel repository non è presente un servizio che invii l'email e il token non viene restituito dalla registrazione. La pagina di verifica è implementabile quando riceve un token, ma la consegna del link non costituisce oggi un flusso end-to-end utilizzabile dal solo frontend;
+- cliente e professionista nascono `PENDING_VERIFICATION`, con `emailVerified=false`, e non possono fare login prima della conferma;
+- per il cliente il link è già creato e l'invito consumato, ma il cliente pending non è visibile al professionista;
+- il backend genera e persiste per entrambi un token valido 24 ore, ma non invia ancora email e non implementa resend;
+- la futura pagina deve leggere il token, rimuoverlo subito dall'URL, conservarlo solo in memoria e non inserirlo in `localStorage` o analytics; invia quindi il POST, mostra la CTA login in caso di successo e un messaggio con futura CTA resend in caso di 410;
 - il codice invito è monouso, non è legato a una specifica email destinataria e scade dopo 7 giorni.
 
 ## 5. Funzionalità private implementabili ora
@@ -166,10 +167,12 @@ I path seguenti sono una convenzione frontend proposta: il repository non contie
 /register/professional
 /invite/validate
 /register/client
-/verify-email?token=...
+/verify-email#token=...
 ```
 
 Flusso cliente consigliato: `/invite/validate` valida il codice e, in caso positivo, passa a `/register/client` conservando il codice. Non saltare la validazione lato server durante la registrazione: il backend la ripete correttamente.
+
+Dopo entrambe le registrazioni il frontend mostra “Controlla la tua email”. Il futuro link apre `/verify-email`, la pagina legge e rimuove il token dall'URL, effettua il POST e presenta la CTA login. Un secondo utilizzo coerente resta un successo. Il frontend applicativo e la consegna email non sono implementati in questo step.
 
 ### Area cliente
 

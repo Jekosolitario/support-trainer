@@ -56,9 +56,9 @@ Registra un nuovo professionista.
 **POST** `/api/v1/auth/login`  
 Autentica l’utente e restituisce la risposta di login.
 
-### 4.3 Verifica email professionista
-**GET** `/api/v1/auth/verify-email`  
-Conferma l’account professionista tramite token di verifica.
+### 4.3 Conferma email uniforme
+**POST** `/api/v1/auth/email-verification/confirm`
+Conferma l’account professionista o cliente tramite body JSON `{"token":"..."}`. Il token è obbligatorio, non blank e lungo al massimo 500 caratteri. Il primo consumo valido restituisce `200`, attiva l'account e marca il token usato; il secondo consumo coerente restituisce nuovamente `200` senza cambiare `usedAt`. Token inesistente e scaduto producono rispettivamente `404` e `410 Gone`. Il precedente `GET /api/v1/auth/verify-email` non è più esposto.
 
 ### 4.4 Validazione codice invito cliente
 **POST** `/api/v1/auth/register/client/validate-invite`  
@@ -66,7 +66,7 @@ Verifica che il codice invito esista, sia attivo, non sia scaduto e non sia già
 
 ### 4.5 Registrazione cliente con invito
 **POST** `/api/v1/auth/register/client`  
-Completa la registrazione cliente usando un codice invito valido.
+Completa la registrazione cliente usando un codice invito valido. La risposta resta `201` senza JWT; cliente, link, consumo invito e token email sono atomici, mentre il login resta vietato fino alla conferma.
 
 ---
 
@@ -323,7 +323,7 @@ In particolare:
 - `POST /api/v1/auth/register/client`
 - `POST /api/v1/auth/register/client/validate-invite`
 - `POST /api/v1/auth/login`
-- `GET /api/v1/auth/verify-email`
+- `POST /api/v1/auth/email-verification/confirm`
 
 ### 11.2 Endpoint protetti
 Tutti gli altri endpoint richiedono autenticazione valida tramite JWT.

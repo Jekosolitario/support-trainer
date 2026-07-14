@@ -114,13 +114,28 @@ Distribuzione dei test verificata:
 
 Questi test forniscono una copertura funzionale significativa dell'MVP, ma non equivalgono a una misura percentuale di code coverage: nel repository non è presente un report JaCoCo verificato.
 
+### 5.1 Stato aggiornato dopo STEP 7B-A
+
+Il 14 luglio 2026 `./mvnw.cmd clean verify` è stato rieseguito con successo tramite il Wrapper del repository: 31 suite, 218 test, 0 failure, 0 errori e 0 skipped, cioè 11 test in più rispetto alla baseline approvata di 207. La durata Maven è stata 51,664 secondi e la somma dei tempi Surefire 34,123 secondi.
+
+Le suite direttamente aggiornate o introdotte per il flusso uniforme sono:
+
+| Classe test | Test | Copertura principale |
+|---|---:|---|
+| `AuthControllerEmailVerificationIntegrationTest` | 13 | conferma POST, validazione body e media type, idempotenza, scadenza 410 e rimozione del GET mutante |
+| `AuthControllerLoginIntegrationTest` | 5 | rifiuto degli account pending e login dopo conferma |
+| `AuthControllerRegistrationIntegrationTest` | 8 | registrazione, stato pending, token da 24 ore, link e consumo invito |
+| `ClientEmailVerificationIntegrationTest` | 3 | client pending, link filtrato, conferma, invito e rollback atomico |
+
+Il flusso è ora comune a professionista e cliente: entrambe le nuove registrazioni restano pending fino a `POST /api/v1/auth/email-verification/confirm`. Il primo consumo coerente attiva l'account; la ripetizione è idempotente senza modificare `usedAt`; il token scaduto restituisce `410 Gone`. Il link cliente-professionista e il consumo dell'invito restano nella transazione di registrazione, mentre il cliente pending non è esposto dai flussi operativi. Il GET mutante non è più disponibile. Invio email reale, resend e migrazione retroattiva dei clienti esistenti restano fuori perimetro.
+
 ## 6. Pacchetti chiusi
 
 ### Auth
 
-- **Responsabilità**: registrazione dei due ruoli, verifica email del professionista, login e generazione dei token.
-- **Test principali**: `AuthControllerEmailVerificationIntegrationTest`, `AuthControllerLoginIntegrationTest`, `AuthControllerRegistrationIntegrationTest`.
-- **Stato finale MVP**: chiuso per i flussi dichiarati. Reset password, logout e lifecycle completo del refresh token restano esclusi.
+- **Responsabilità**: registrazione pending dei due ruoli, conferma email uniforme tramite POST, login e generazione dei token JWT dopo l'attivazione.
+- **Test principali**: `AuthControllerEmailVerificationIntegrationTest`, `ClientEmailVerificationIntegrationTest`, `AuthControllerLoginIntegrationTest`, `AuthControllerRegistrationIntegrationTest`.
+- **Stato finale MVP**: il GET mutante è rimosso; la conferma è idempotente sullo stato coerente e la scadenza produce 410. Invio email reale, resend, reset password, logout e lifecycle completo del refresh token restano esclusi. I clienti già persistiti non sono migrati.
 
 ### Invite
 

@@ -69,12 +69,12 @@ La password deve rispettare almeno queste regole:
 Il limite massimo è calcolato sui byte UTF-8, non sul solo numero di caratteri Java. Il backend rifiuta il valore oltre soglia prima dell’hashing e non tronca, normalizza o trasforma la password.
 
 ### 3.4 Stato iniziale account
-Alla registrazione, l’account professionista deve nascere con:
+Alla registrazione, sia l’account professionista sia il cliente devono nascere con:
 - `accountStatus = PENDING_VERIFICATION`
 - `emailVerified = false`
 
 ### 3.5 Blocco funzioni operative
-Finché l’email non è verificata, il professionista non può:
+Finché l’email non è verificata, l’utente non può effettuare login. Il professionista non può inoltre:
 - generare codici invito
 - collegare clienti
 - utilizzare funzionalità operative riservate
@@ -123,6 +123,12 @@ A quel punto:
 Il collegamento cliente-professionista deve essere creato solo dopo:
 - registrazione completata correttamente
 - validazione finale del codice invito
+
+La stessa transazione crea il cliente pending e il token email, crea il link attivo e consuma l'invito. Il link non rende il cliente leggibile finché `accountStatus` non diventa `ACTIVE`. Una conferma scaduta o fallita non ripristina l'invito e un fallimento della registrazione non deve lasciare cliente, link o token parziali.
+
+### 4.7 Conferma email uniforme
+
+La conferma usa `POST /api/v1/auth/email-verification/confirm` con un token non blank di massimo 500 caratteri nel body JSON. Il primo consumo valido porta l'utente a `ACTIVE`, imposta `emailVerified=true` e valorizza `usedAt`. Il secondo POST è idempotente soltanto se lo stato finale è coerente e non modifica `usedAt`. Un token inesistente produce 404; un token con `expiresAt <= now` produce `410 Gone`. Il precedente GET mutante non è più disponibile.
 
 ---
 

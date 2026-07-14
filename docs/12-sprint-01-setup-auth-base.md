@@ -60,3 +60,7 @@ Aggiungere poi:
 - libreria JWT scelta per access token / refresh token
 
 ---
+
+## Stato successivo — remediation STEP 7B-A
+
+Questo documento conserva lo scope storico dello Sprint 1. Nello stato applicativo successivo, la verifica email è obbligatoria sia per `PROFESSIONAL` sia per `CLIENT`: entrambi nascono con account `PENDING_VERIFICATION` ed `emailVerified = false` e vengono attivati tramite `POST /api/v1/auth/email-verification/confirm`. La remediation non modifica retroattivamente gli account cliente già presenti.

@@ -88,29 +88,23 @@ La specializzazione serve per:
 
 ## 5. Stato account e accesso
 
-## 5.1 Account professionista
-Alla registrazione il professionista nasce con:
+## 5.1 Account professionista e cliente
+Alla registrazione entrambi i ruoli nascono con:
 - `accountStatus = PENDING_VERIFICATION`
 - `emailVerified = false`
 
-## 5.2 Attivazione professionista
+## 5.2 Attivazione uniforme
 Solo dopo verifica email:
 - `accountStatus = ACTIVE`
 - `emailVerified = true`
 
 ## 5.3 Blocco operativo
-Finché il professionista non è attivo e verificato:
-- non può completare correttamente il login
+Finché l'utente non è attivo e verificato non può completare correttamente il login. Il professionista inoltre:
 - non può generare codici invito
 - non può usare le funzionalità operative che richiedono profilo attivo e verificato
 
 ## 5.4 Cliente
-Nel codice attuale il cliente:
-- non richiede verifica email separata
-- può registrarsi solo tramite codice invito valido
-- in registrazione viene portato direttamente a:
-  - `accountStatus = ACTIVE`
-  - `emailVerified = true`
+Il cliente può registrarsi solo tramite codice invito valido. La registrazione crea subito link e token e consuma l'invito, ma l'account resta pending e il professionista non può leggerlo fino alla conferma. La nuova regola riguarda le nuove registrazioni e non migra i clienti già salvati.
 
 ---
 
@@ -178,7 +172,7 @@ In base al codice attuale, gli endpoint pubblici effettivamente implementati son
 
 - `POST /api/v1/auth/register/professional`
 - `POST /api/v1/auth/register/client`
-- `GET /api/v1/auth/verify-email`
+- `POST /api/v1/auth/email-verification/confirm`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/register/client/validate-invite`
 
@@ -217,15 +211,15 @@ Prima della verifica email:
 
 ## 9.1 Step principali
 1. il cliente invia i dati di registrazione insieme al codice invito
-2. il backend verifica che l’email non sia già registrata
-3. il backend valida il codice invito
-4. il backend recupera il professionista associato al codice
-5. il backend crea l’account cliente
-6. il cliente viene impostato come:
-   - `ACTIVE`
-   - `emailVerified = true`
-7. il backend crea il collegamento `ProfessionalClientLink`
-8. il backend marca il codice invito come usato
+2. il backend acquisisce e valida con lock il codice invito
+3. il backend verifica il professionista associato e l'unicità dell'email
+4. il backend crea l’account cliente
+5. il cliente viene impostato come:
+   - `PENDING_VERIFICATION`
+   - `emailVerified = false`
+6. il backend crea il collegamento `ProfessionalClientLink`
+7. il backend marca il codice invito come usato
+8. il backend crea il token email da 24 ore
 9. la registrazione restituisce una `AuthResponse` senza token di login
 
 ## 9.2 Regola importante
@@ -240,23 +234,24 @@ La registrazione cliente può essere completata solo con codice invito:
 ## 10. Flusso verifica email
 
 ## 10.1 Step principali
-1. il professionista richiama `GET /api/v1/auth/verify-email?token=...`
+1. il professionista o cliente invia `POST /api/v1/auth/email-verification/confirm` con il token nel body
 2. il backend cerca il token
 3. il backend verifica che il token:
    - esista
-   - non sia già usato
+   - non sia già usato, salvo stato finale già coerente
    - non sia scaduto
 4. il backend aggiorna l’utente:
    - `emailVerified = true`
    - `accountStatus = ACTIVE`
-5. il backend marca il token come usato
+5. il backend marca il token come usato e valorizza `usedAt`
+6. un secondo POST sullo stesso stato coerente restituisce 200 senza modificare nuovamente `usedAt`
 
 ## 10.2 Errori gestiti
 Il flusso gestisce almeno questi casi:
-- parametro `token` obbligatorio mancante
+- body o campo `token` obbligatorio mancante/non valido
 - token non trovato
-- token già usato
-- token scaduto
+- token usato con stato incoerente
+- token scaduto, restituito come `410 Gone`
 
 ---
 
@@ -612,8 +607,9 @@ Oltre ai JWT, nel codice attuale esiste un token applicativo dedicato per:
 Il token di verifica email è:
 - casuale
 - con scadenza
-- monouso
-- invalidato dopo utilizzo
+- consumabile una sola volta per attivare l’account
+- idempotente dopo il consumo quando token, account e profilo sono già nello stato finale coerente
+- marcato come usato dopo il primo utilizzo valido
 
 ## 20.3 Token non presenti
 Nel codice attuale **non** risulta ancora implementato un token applicativo per:
@@ -733,7 +729,7 @@ Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti
 - solo gli access token sono accettati come Bearer sugli endpoint protetti
 - ruoli reali: `PROFESSIONAL`, `CLIENT`
 - specializzazione business: `PERSONAL_TRAINER`, `NUTRITIONIST`
-- verifica email obbligatoria solo per il professionista
+- verifica email obbligatoria per professionista e cliente
 - cliente registrabile solo tramite codice invito valido
 - business authorization gestita nel service layer
 - password hashata con BCrypt

@@ -91,6 +91,8 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 - `email` deve essere **univoca**
 - `password` deve contenere il valore **criptato/hashato**
 - `accountStatus` è diverso da `operationalStatus`
+- per le nuove registrazioni entrambi i ruoli mantengono i default `PENDING_VERIFICATION` ed `emailVerified=false` fino alla conferma email
+- i clienti già persistiti come `ACTIVE` e verificati non sono modificati da questa regola
 
 ---
 
@@ -237,7 +239,10 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 ### Note
 
 - `token` è univoco;
-- il token è utilizzabile solo se non usato e non scaduto;
+- professionisti e clienti ricevono lo stesso tipo di token, con durata di 24 ore reali;
+- il primo consumo valido attiva l'account e valorizza `usedAt`;
+- un consumo successivo è idempotente soltanto quando token, stato account, verifica email e profilo restano coerenti;
+- il token scade quando `expiresAt <= now`;
 - questa entity non eredita da `BaseEntity`;
 - non contiene `updatedAt`.
 

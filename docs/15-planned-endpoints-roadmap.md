@@ -38,7 +38,7 @@ Questo file serve come roadmap tecnica preliminare, non come mappa API definitiv
 Alla data attuale risultano già implementati:
 
 - auth base
-- verifica email professionista
+- verifica email obbligatoria per professionista e cliente
 - invite code
 - registrazione cliente con invito
 - link professionista-cliente

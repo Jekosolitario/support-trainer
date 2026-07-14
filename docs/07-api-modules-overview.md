@@ -56,7 +56,7 @@ Il modulo **Auth** gestisce:
 - registrazione professionista;
 - registrazione cliente tramite codice invito;
 - validazione preventiva del codice invito per registrazione cliente;
-- verifica email professionista;
+- verifica email uniforme per professionisti e clienti;
 - login;
 - generazione di access token e refresh token distinti tramite claim interno.
 
@@ -65,7 +65,7 @@ Il modulo **Auth** gestisce:
 - `POST /api/v1/auth/register/professional`
 - `POST /api/v1/auth/register/client`
 - `POST /api/v1/auth/register/client/validate-invite`
-- `GET /api/v1/auth/verify-email`
+- `POST /api/v1/auth/email-verification/confirm`
 - `POST /api/v1/auth/login`
 
 ### Cosa non gestisce ancora
@@ -77,6 +77,8 @@ Il refresh token viene generato e restituito al login, ma non è accettato come 
 - logout applicativo;
 - forgot password;
 - reset password.
+
+Entrambe le registrazioni producono account pending senza JWT e un token valido 24 ore. La registrazione cliente continua a consumare l'invito e creare il link nella stessa transazione, ma le query Clients escludono il cliente fino alla conferma. La conferma POST è idempotente sullo stato finale coerente; il vecchio GET mutante è stato rimosso. Invio email e resend non sono ancora implementati.
 
 ---
 
