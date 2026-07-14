@@ -125,6 +125,19 @@ Il modulo **Clients** consente al professionista autenticato di leggere i client
 - il dettaglio usa una ricerca scoped per ID cliente, professionista autenticato, collegamento attivo e stati leggibili;
 - cliente inesistente o non accessibile restituiscono lo stesso `404 CLIENT_NOT_FOUND`; il `403` resta riservato al ruolo non autorizzato sull'endpoint.
 
+### Payload condivisi
+
+`GET /api/v1/clients/my` restituisce esclusivamente:
+
+- `id`;
+- `firstName`;
+- `lastName`;
+- `profileImageUrl`.
+
+`GET /api/v1/clients/{clientId}` restituisce esclusivamente gli stessi campi e `primaryGoal`.
+
+PT e nutrizionista collegati ricevono lo stesso payload minimo. Dati fisici, note, stato operativo, stati tecnici e audit restano owner-only tramite i moduli `/me`. La query scoped può ancora caricare internamente l'entity completa, ma i dati esclusi non vengono serializzati.
+
 ---
 
 ## 7. Modulo Professionals — Implementato

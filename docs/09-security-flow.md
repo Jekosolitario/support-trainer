@@ -439,6 +439,17 @@ I dettagli `GET /api/v1/clients/{clientId}` e `GET /api/v1/professionals/{profes
 
 Un risultato vuoto produce sempre il medesimo 404 specifico dell'endpoint, sia per ID inesistente sia per collegamento assente o inattivo e profilo non leggibile. La policy non modifica i confini di Spring Security: richiesta anonima e token non valido restano 401, mentre un ruolo non ammesso sull'endpoint resta 403. Gli stati operativi, come `PAUSA` o `FERIE`, restano informazioni di dominio e non sono criteri di occultamento del dettaglio.
 
+### Minimizzazione del profilo cliente condiviso
+
+Superato il controllo scoped, il professionista non riceve l'entity completa:
+
+- la lista espone soltanto `id`, `firstName`, `lastName` e `profileImageUrl`;
+- il dettaglio aggiunge soltanto `primaryGoal`;
+- stato operativo, flag `active`, dati fisici, note, stato account e audit non vengono serializzati;
+- `PERSONAL_TRAINER` e `NUTRITIONIST` ricevono intenzionalmente lo stesso contratto minimo nell'MVP.
+
+Il profilo owner `/me` resta separato e completo. La modifica non introduce consenso, scope, revoca, audit delle visualizzazioni o una differenziazione per specializzazione; tali aspetti richiedono decisioni future dedicate.
+
 ---
 
 ## 16.3 Nota su SecurityConfig e service layer

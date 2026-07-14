@@ -116,11 +116,28 @@ Aggiorna lo stato operativo dell’utente autenticato.
 
 ### 6.1 Elenco clienti del professionista autenticato
 **GET** `/api/v1/clients/my`  
-Restituisce l’elenco clienti collegati al professionista autenticato.
+Restituisce l’elenco clienti collegati al professionista autenticato con il seguente payload minimo per elemento:
+
+- `id`;
+- `firstName`;
+- `lastName`;
+- `profileImageUrl`.
+
+La lista non espone obiettivo, stato operativo, stato tecnico, dati fisici o note.
 
 ### 6.2 Dettaglio cliente
 **GET** `/api/v1/clients/{clientId}`  
-Restituisce il dettaglio di un cliente solo se una ricerca scoped trova ID, professionista autenticato, collegamento attivo e stati leggibili. ID inesistente, collegamento assente o inattivo e profilo non leggibile producono lo stesso `404 CLIENT_NOT_FOUND`; un principal con ruolo `CLIENT` riceve invece `403`. Il payload di successo non cambia in questo intervento.
+Restituisce il dettaglio di un cliente solo se una ricerca scoped trova ID, professionista autenticato, collegamento attivo e stati leggibili. ID inesistente, collegamento assente o inattivo e profilo non leggibile producono lo stesso `404 CLIENT_NOT_FOUND`; un principal con ruolo `CLIENT` riceve invece `403`.
+
+Il payload di successo contiene esclusivamente:
+
+- `id`;
+- `firstName`;
+- `lastName`;
+- `profileImageUrl`;
+- `primaryGoal`.
+
+PT e nutrizionista usano lo stesso contratto. Il link attivo autorizza il profilo condiviso minimo, non l'intero profilo personale.
 
 ---
 

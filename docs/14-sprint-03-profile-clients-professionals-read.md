@@ -455,6 +455,15 @@ Lo stato corrente applica una ricerca scoped ai due endpoint di dettaglio. Il re
 
 Per `GET /api/v1/clients/{clientId}`, ID inesistente, cliente mai collegato al principal, collegamento inattivo e profilo non leggibile restituiscono lo stesso `404 CLIENT_NOT_FOUND`. Per `GET /api/v1/professionals/{professionalId}` gli stessi casi restituiscono `404 PROFESSIONAL_NOT_FOUND`. Il ruolo errato continua a essere respinto da Spring Security con 403 e una richiesta anonima con 401. Liste, DTO e campi restituiti non sono stati modificati da questa remediation.
 
+## 19.2 Remediation successiva: minimizzazione del profilo cliente condiviso
+
+Una remediation successiva mantiene invariata la ricerca scoped introdotta al punto precedente e restringe soltanto i DTO Clients:
+
+- `ClientSummaryResponse`: `id`, `firstName`, `lastName`, `profileImageUrl`;
+- `ClientDetailResponse`: gli stessi campi e `primaryGoal`.
+
+Non vengono più restituiti ai professionisti stato operativo, flag `active`, nascita, altezza, genere, note mediche, note sugli infortuni, note generiche, stati account o audit. PT e nutrizionista ricevono lo stesso payload minimo. Profilo personale, registrazione, persistenza, Availability, Booking e Invite non cambiano.
+
 ---
 
 ## 20. Definition of Done dello sprint

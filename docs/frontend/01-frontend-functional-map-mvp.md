@@ -107,8 +107,8 @@ Nel `PATCH` profilo professionista, `instagramUrl` e `websiteUrl` seguono un con
 |---|---|---|---|
 | Dashboard professionista | Composizione di clienti, inviti e, solo per personal trainer, availability/booking | Implementabile ora come composizione | Nessun endpoint aggregato. I widget devono dipendere dalla specializzazione. |
 | Profilo/account | Endpoint `/api/v1/me/**` | Implementabile ora | Campi professionista: contatti, bio, luogo di lavoro, città e link. |
-| Clienti collegati | `GET /api/v1/clients/my` | Implementabile ora | Lista dei soli clienti collegati e leggibili. |
-| Dettaglio cliente | `GET /api/v1/clients/{clientId}` | Implementabile ora | Solo con collegamento attivo. Un `404 CLIENT_NOT_FOUND` non permette di distinguere cliente inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista. I campi restituiti non cambiano in questa remediation. |
+| Clienti collegati | `GET /api/v1/clients/my` | Implementabile ora | Ogni elemento contiene soltanto `id`, `firstName`, `lastName` e `profileImageUrl`; non mostrare obiettivo o stato operativo. |
+| Dettaglio cliente | `GET /api/v1/clients/{clientId}` | Implementabile ora | Solo con collegamento attivo. Contiene identità minima e `primaryGoal`. Un `404 CLIENT_NOT_FOUND` non permette di distinguere cliente inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista. |
 | Crea invito | `POST /api/v1/invites` | Implementabile ora | Nessun body. Dopo `201`, mostrare codice, scadenza e azione “Copia”. Non inventare invio email automatico. |
 | Lista inviti | `GET /api/v1/invites` | Implementabile ora | Mostrare attivo/usato/scaduto derivando lo scaduto da `expiresAt`. Non esistono dettaglio o disattivazione manuale. |
 
@@ -128,6 +128,15 @@ Nel `PATCH` profilo professionista, `instagramUrl` e `websiteUrl` seguono un con
 ### 5.5 Nutrizionista
 
 Il nutrizionista usa le funzionalità comuni del professionista, ma non dispone di un modulo Nutrition attivo. Availability e Booking tramite slot sono bloccati nel service layer. Dashboard e navigazione devono quindi limitarsi a profilo/account, clienti e inviti. Una voce Nutrition può comparire solo in wireframe futuro o, se davvero utile alla comunicazione, disabilitata con badge “In arrivo”; nell'MVP operativo è preferibile nasconderla.
+
+### 5.6 Contratto frontend del profilo cliente condiviso
+
+- PT e nutrizionista usano temporaneamente lo stesso contratto minimo;
+- la lista non deve mostrare o conservare `primaryGoal`, `operationalStatus` o altri campi assenti;
+- il dettaglio aggiunge soltanto `primaryGoal` all'identità della lista;
+- dati fisici e note non devono entrare nello state della pagina professionista, in cache persistenti o analytics;
+- il profilo personale del cliente ottenuto da `/api/v1/me/**` è un contratto distinto e non va riutilizzato nelle schermate professionista;
+- schermate anamnesi, infortuni o note professionali non fanno parte dell'MVP corrente.
 
 ## 6. Funzionalità future da prevedere ma non attivare
 

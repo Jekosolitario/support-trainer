@@ -131,8 +131,8 @@ Questi test forniscono una copertura funzionale significativa dell'MVP, ma non e
 ### Client / Professional
 
 - **Responsabilità**: lettura degli utenti collegati e dei relativi dettagli, limitata per ruolo, link attivo e ownership.
-- **Test principali**: `ClientProfessionalAuthorizationIntegrationTest`.
-- **Stato finale MVP**: chiuso per la consultazione delle relazioni. Non esiste un controller autonomo per la gestione manuale dei link.
+- **Test principali**: `ClientProfessionalAuthorizationIntegrationTest` e `ClientDataMinimizationIntegrationTest`.
+- **Stato finale MVP**: chiuso per la consultazione delle relazioni. I professionisti ricevono un riepilogo cliente con identità minima e un dettaglio che aggiunge soltanto `primaryGoal`; dati fisici, note, stati tecnici e audit restano fuori dai DTO Clients. Non esiste un controller autonomo per la gestione manuale dei link.
 
 ### Profile
 

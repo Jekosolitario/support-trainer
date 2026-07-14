@@ -144,6 +144,17 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
   - `NOT_SPECIFIED`
 - `primaryGoal` per la v1 può restare testo libero
 
+### Contratto pubblico minimizzato dei dati cliente
+
+La struttura persistita di `ClientProfile` non coincide con il profilo condiviso ai professionisti.
+
+- `GET /api/v1/clients/my` espone soltanto `id`, `firstName`, `lastName` e `profileImageUrl`;
+- `GET /api/v1/clients/{clientId}` aggiunge esclusivamente `primaryGoal`;
+- `operationalStatus`, `active`, `birthDate`, `heightCm`, `gender`, `medicalNotes`, `injuryNotes`, `notes`, stati account e audit restano fuori dai DTO Clients;
+- `PERSONAL_TRAINER` e `NUTRITIONIST` usano lo stesso contratto minimo nell'MVP.
+
+Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/profile` e `/api/v1/me/account`. La minimizzazione riguarda soltanto la risposta HTTP condivisa e non modifica entity, colonne o dati già persistiti. Eventuali sezioni specialistiche future richiederanno uno scopo e una policy dedicati.
+
 ---
 
 ## 3.4 ClientMeasurement

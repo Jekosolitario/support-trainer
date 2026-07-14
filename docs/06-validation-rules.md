@@ -634,6 +634,17 @@ La rimozione tramite stringa vuota permette al frontend di offrire un form profi
 
 Il campo `profileImageUrl` non rientra ancora in un flusso frontend/API dedicato di upload o aggiornamento immagine profilo; tale funzionalità resta futura.
 
+### 13.4 Minimizzazione delle response Clients
+
+La validità del collegamento autorizza l'accesso all'endpoint, ma non rende visibile l'intero `ClientProfile`.
+
+- la lista `/api/v1/clients/my` ammette come chiavi pubbliche soltanto `id`, `firstName`, `lastName` e `profileImageUrl`;
+- il dettaglio `/api/v1/clients/{clientId}` ammette le stesse chiavi e `primaryGoal`;
+- i test HTTP confrontano l'insieme completo delle proprietà, senza dipendere dall'ordine JSON;
+- PT e nutrizionista ricevono lo stesso payload minimo.
+
+Le regole di registrazione e aggiornamento del profilo owner restano invariate. Questa è una regola di minimizzazione tecnica del contratto API e non costituisce una dichiarazione di conformità legale.
+
 ---
 
 ## 14. Validazioni generali su stati ed enum
