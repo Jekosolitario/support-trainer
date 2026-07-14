@@ -130,6 +130,12 @@ La stessa transazione crea il cliente pending e il token email, crea il link att
 
 La conferma usa `POST /api/v1/auth/email-verification/confirm` con un token non blank di massimo 500 caratteri nel body JSON. Il primo consumo valido porta l'utente a `ACTIVE`, imposta `emailVerified=true` e valorizza `usedAt`. Il secondo POST è idempotente soltanto se lo stato finale è coerente e non modifica `usedAt`. Un token inesistente produce 404; un token con `expiresAt <= now` produce `410 Gone`. Il precedente GET mutante non è più disponibile.
 
+### 4.8 Reinvio senza enumerazione
+
+Il reinvio usa `POST /api/v1/auth/email-verification/resend` con un'email obbligatoria, valida e lunga al massimo 100 caratteri. Dopo `trim` e lowercase, ogni input sintatticamente valido restituisce lo stesso `202 Accepted`: account inesistente, verificato, non idoneo o in cooldown non sono distinguibili. Solo `CLIENT` e `PROFESSIONAL` con profilo attivo, `PENDING_VERIFICATION` ed `emailVerified=false` possono generare un nuovo token.
+
+Il cooldown è attivo quando `now < latestToken.createdAt + 60 secondi`; al boundary esatto il reinvio è consentito. Sotto lock pessimista sull'utente, tutti i precedenti token `used=false` vengono marcati `used=true` con `usedAt=now`, quindi viene creato un solo token da 24 ore. I token già usati non cambiano. Questa invalidazione riusa semanticamente `used/usedAt` perché lo schema corrente non contiene campi di revoca. Invito e `ProfessionalClientLink` non vengono modificati; token, email, stato e tempo residuo non compaiono nella risposta o nei log. Sender reale e rate limiting distribuito restano fuori perimetro.
+
 ---
 
 ## 5. Validazioni collegamento professionista-cliente

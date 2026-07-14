@@ -66,6 +66,7 @@ Il modulo **Auth** gestisce:
 - `POST /api/v1/auth/register/client`
 - `POST /api/v1/auth/register/client/validate-invite`
 - `POST /api/v1/auth/email-verification/confirm`
+- `POST /api/v1/auth/email-verification/resend`
 - `POST /api/v1/auth/login`
 
 ### Cosa non gestisce ancora
@@ -78,7 +79,7 @@ Il refresh token viene generato e restituito al login, ma non è accettato come 
 - forgot password;
 - reset password.
 
-Entrambe le registrazioni producono account pending senza JWT e un token valido 24 ore. La registrazione cliente continua a consumare l'invito e creare il link nella stessa transazione, ma le query Clients escludono il cliente fino alla conferma. La conferma POST è idempotente sullo stato finale coerente; il vecchio GET mutante è stato rimosso. Invio email e resend non sono ancora implementati.
+Entrambe le registrazioni producono account pending senza JWT e un token valido 24 ore. La registrazione cliente continua a consumare l'invito e creare il link nella stessa transazione, ma le query Clients escludono il cliente fino alla conferma. La conferma POST è idempotente sullo stato finale coerente; il vecchio GET mutante è stato rimosso. Il reinvio è comune ai due ruoli, risponde sempre 202 per email valide, applica 60 secondi di cooldown e sostituisce tecnicamente i token non usati tramite `used/usedAt`. Non espone token o stato account e non modifica inviti o link. L'invio email reale e il rate limiting distribuito non sono ancora implementati.
 
 ---
 

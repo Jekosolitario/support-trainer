@@ -232,8 +232,8 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 | `user`      | `User`          |           Sì |       No | —       | Utente destinatario della verifica |
 | `token`     | `String`        |           Sì |       No | —       | Token univoco di verifica email    |
 | `expiresAt` | `Instant`       |           Sì |       No | —       | Scadenza UTC dopo 24 ore reali     |
-| `used`      | `Boolean`       |           Sì |       No | `false` | Token già utilizzato o no          |
-| `usedAt`    | `Instant`       |           No |       Sì | `null`  | Istante UTC di utilizzo            |
+| `used`      | `Boolean`       |           Sì |       No | `false` | Token consumato o invalidato       |
+| `usedAt`    | `Instant`       |           No |       Sì | `null`  | Istante UTC di uso o invalidazione |
 | `createdAt` | `Instant`       |           Sì |       No | audit app | Istante UTC di creazione         |
 
 ### Note
@@ -242,6 +242,9 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 - professionisti e clienti ricevono lo stesso tipo di token, con durata di 24 ore reali;
 - il primo consumo valido attiva l'account e valorizza `usedAt`;
 - un consumo successivo è idempotente soltanto quando token, stato account, verifica email e profilo restano coerenti;
+- un reinvio consentito marca `used=true` e `usedAt=now` su tutti i precedenti token non usati, senza modificare quelli già usati;
+- l'uso di `used` per la revoca è un limite semantico dell'attuale schema, che non dispone di `revokedAt` o `active`;
+- dopo il reinvio resta un solo token non usato, con nuova durata di 24 ore;
 - il token scade quando `expiresAt <= now`;
 - questa entity non eredita da `BaseEntity`;
 - non contiene `updatedAt`.

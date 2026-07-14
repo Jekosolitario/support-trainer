@@ -108,6 +108,8 @@ Può completare la registrazione solo se possiede un codice invito:
 
 La registrazione crea atomicamente cliente pending, token email, link attivo e consumo dell'invito. Fino alla conferma il cliente resta `PENDING_VERIFICATION`, con `emailVerified=false`, non può fare login e non è leggibile dal professionista collegato. Dopo il POST di conferma passa a `ACTIVE` ed `emailVerified=true`.
 
+Professionista e cliente possono richiedere il reinvio con `POST /api/v1/auth/email-verification/resend`. Il backend restituisce sempre lo stesso `202 Accepted` per email sintatticamente valide, senza rivelare esistenza o stato dell'account. Solo un profilo attivo, pending e non verificato riceve logicamente un nuovo token; il cooldown è 60 secondi dal token più recente e termina al boundary esatto. Il reinvio invalida tramite `used/usedAt` tutti i precedenti token non usati, lascia un solo token utilizzabile da 24 ore e non modifica invito o link. La consegna email reale non è ancora presente.
+
 ### 4.3 Collegamento cliente-professionista — Implementato
 
 Il collegamento tra cliente e professionista viene creato automaticamente durante la registrazione cliente completata con successo tramite invito valido. L'invito è già consumato, ma il link non rende leggibile il cliente finché l'account è pending.

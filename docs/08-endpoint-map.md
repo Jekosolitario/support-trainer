@@ -60,11 +60,15 @@ Autentica l’utente e restituisce la risposta di login.
 **POST** `/api/v1/auth/email-verification/confirm`
 Conferma l’account professionista o cliente tramite body JSON `{"token":"..."}`. Il token è obbligatorio, non blank e lungo al massimo 500 caratteri. Il primo consumo valido restituisce `200`, attiva l'account e marca il token usato; il secondo consumo coerente restituisce nuovamente `200` senza cambiare `usedAt`. Token inesistente e scaduto producono rispettivamente `404` e `410 Gone`. Il precedente `GET /api/v1/auth/verify-email` non è più esposto.
 
-### 4.4 Validazione codice invito cliente
+### 4.4 Reinvio verifica email
+**POST** `/api/v1/auth/email-verification/resend`
+Accetta `{"email":"utente@example.com"}` e restituisce sempre `202 Accepted` con messaggio neutro per richieste sintatticamente valide. Supporta entrambi i ruoli senza rivelare esistenza, stato, cooldown o creazione del token. Solo account pending, non verificati e con profilo attivo generano un nuovo token; il cooldown è 60 secondi dal token più recente e termina al boundary esatto. I precedenti token non usati vengono invalidati tramite `used/usedAt`, lasciando un solo token utilizzabile per 24 ore. Nessun token viene restituito o registrato; invito e link restano invariati.
+
+### 4.5 Validazione codice invito cliente
 **POST** `/api/v1/auth/register/client/validate-invite`  
 Verifica che il codice invito esista, sia attivo, non sia scaduto e non sia già usato.
 
-### 4.5 Registrazione cliente con invito
+### 4.6 Registrazione cliente con invito
 **POST** `/api/v1/auth/register/client`  
 Completa la registrazione cliente usando un codice invito valido. La risposta resta `201` senza JWT; cliente, link, consumo invito e token email sono atomici, mentre il login resta vietato fino alla conferma.
 
@@ -324,6 +328,7 @@ In particolare:
 - `POST /api/v1/auth/register/client/validate-invite`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/email-verification/confirm`
+- `POST /api/v1/auth/email-verification/resend`
 
 ### 11.2 Endpoint protetti
 Tutti gli altri endpoint richiedono autenticazione valida tramite JWT.

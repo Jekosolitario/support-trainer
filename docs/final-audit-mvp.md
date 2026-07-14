@@ -129,13 +129,23 @@ Le suite direttamente aggiornate o introdotte per il flusso uniforme sono:
 
 Il flusso è ora comune a professionista e cliente: entrambe le nuove registrazioni restano pending fino a `POST /api/v1/auth/email-verification/confirm`. Il primo consumo coerente attiva l'account; la ripetizione è idempotente senza modificare `usedAt`; il token scaduto restituisce `410 Gone`. Il link cliente-professionista e il consumo dell'invito restano nella transazione di registrazione, mentre il cliente pending non è esposto dai flussi operativi. Il GET mutante non è più disponibile. Invio email reale, resend e migrazione retroattiva dei clienti esistenti restano fuori perimetro.
 
+### 5.2 Stato aggiornato dopo STEP 7B-B
+
+Il 14 luglio 2026 `.\mvnw.cmd clean verify` è stato rieseguito con successo tramite il Wrapper del repository: 32 suite, 227 test, 0 failure, 0 errori e 0 skipped, cioè 9 test in più rispetto alla baseline approvata di 218. La durata Maven è stata 40,519 secondi e la somma dei tempi Surefire 27,811 secondi. È stato prodotto il JAR `support_trainer-0.0.1-SNAPSHOT.jar`.
+
+La nuova suite `AuthControllerEmailResendIntegrationTest` contiene 9 test dedicati al reinvio uniforme. Copre PROFESSIONAL e CLIENT pending, risposta anti-enumerazione, normalizzazione dell'email, account non idonei, validazione HTTP, invalidazione di più token precedenti e cooldown controllato senza attese reali. Verifica inoltre il boundary esatto dei 60 secondi, la ripartenza del cooldown, la scadenza del nuovo token dopo 24 ore, l'inutilizzabilità dei vecchi token, la conferma con il nuovo token e il login successivo.
+
+`POST /api/v1/auth/email-verification/resend` è pubblico e accetta l'email esclusivamente nel body JSON. Ogni email sintatticamente valida riceve lo stesso `202 Accepted`, indipendentemente da esistenza, stato, idoneità o cooldown dell'account. Soltanto un profilo concreto attivo, con `accountStatus=PENDING_VERIFICATION` ed `emailVerified=false`, può ottenere un nuovo token. Il lock pessimistico sull'utente serializza i reinvii dello stesso account; nella stessa transazione tutti i token precedenti non usati sono marcati `used=true` e `usedAt=now`, quindi viene creato un solo UUID v4 valido per 24 ore. L'uso di `used` per rappresentare anche l'invalidazione resta un limite semantico dello schema corrente.
+
+Il reinvio non modifica invito o collegamento cliente-professionista e non espone né registra email, token, stato account o tempo residuo. L'invio email reale, il rate limiting distribuito e una certificazione della concorrenza su MySQL restano fuori perimetro; i test H2 dimostrano sequenzialmente l'invariante di un solo token non usato, mentre il lock applicativo costituisce la protezione prevista per le richieste concorrenti.
+
 ## 6. Pacchetti chiusi
 
 ### Auth
 
-- **Responsabilità**: registrazione pending dei due ruoli, conferma email uniforme tramite POST, login e generazione dei token JWT dopo l'attivazione.
-- **Test principali**: `AuthControllerEmailVerificationIntegrationTest`, `ClientEmailVerificationIntegrationTest`, `AuthControllerLoginIntegrationTest`, `AuthControllerRegistrationIntegrationTest`.
-- **Stato finale MVP**: il GET mutante è rimosso; la conferma è idempotente sullo stato coerente e la scadenza produce 410. Invio email reale, resend, reset password, logout e lifecycle completo del refresh token restano esclusi. I clienti già persistiti non sono migrati.
+- **Responsabilità**: registrazione pending dei due ruoli, conferma e reinvio email uniformi tramite POST, login e generazione dei token JWT dopo l'attivazione.
+- **Test principali**: `AuthControllerEmailVerificationIntegrationTest`, `AuthControllerEmailResendIntegrationTest`, `ClientEmailVerificationIntegrationTest`, `AuthControllerLoginIntegrationTest`, `AuthControllerRegistrationIntegrationTest`.
+- **Stato finale MVP**: il GET mutante è rimosso; la conferma è idempotente sullo stato coerente e la scadenza produce 410. Il reinvio usa una risposta uniforme 202, cooldown di 60 secondi e invalidazione dei token precedenti, senza modificare inviti o link. Invio email reale, rate limiting distribuito, reset password, logout e lifecycle completo del refresh token restano esclusi. I clienti già persistiti non sono migrati.
 
 ### Invite
 

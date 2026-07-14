@@ -302,3 +302,7 @@ In Sprint 02 il collegamento `ProfessionalClientLink` viene introdotto come part
 ## Stato successivo — remediation STEP 7B-A
 
 Questo documento conserva il contratto storico dello Sprint 2. Nello stato applicativo corrente, la registrazione tramite invito crea anche per il cliente un account `PENDING_VERIFICATION`, un token email e il collegamento attivo nella stessa transazione; il codice invito viene consumato, ma il collegamento resta invisibile ai flussi operativi finché il cliente non verifica l’email. La conferma comune a professionista e cliente usa `POST /api/v1/auth/email-verification/confirm` con il token nel body JSON; il precedente `GET /api/v1/auth/verify-email` non è più esposto. Una ripetizione sullo stato finale coerente è idempotente e non aggiorna nuovamente `usedAt`; un token scaduto restituisce `410 Gone`. Gli account cliente preesistenti non vengono riscritti retroattivamente.
+
+## Stato successivo — remediation STEP 7B-B
+
+Il cliente pending e il professionista pending possono richiedere un reinvio uniforme con body email. La risposta pubblica è sempre 202 per input valido e non permette enumerazione; al termine del cooldown di 60 secondi i token non usati precedenti vengono marcati `used/usedAt` e sostituiti da un solo token da 24 ore. Per il cliente, invito già consumato e `ProfessionalClientLink` restano invariati e il link continua a essere inerte fino alla conferma. Non esiste ancora consegna email reale.

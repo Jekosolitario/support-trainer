@@ -64,3 +64,7 @@ Aggiungere poi:
 ## Stato successivo — remediation STEP 7B-A
 
 Questo documento conserva lo scope storico dello Sprint 1. Nello stato applicativo successivo, la verifica email è obbligatoria sia per `PROFESSIONAL` sia per `CLIENT`: entrambi nascono con account `PENDING_VERIFICATION` ed `emailVerified = false` e vengono attivati tramite `POST /api/v1/auth/email-verification/confirm`. La remediation non modifica retroattivamente gli account cliente già presenti.
+
+## Stato successivo — remediation STEP 7B-B
+
+Il reinvio è ora disponibile tramite `POST /api/v1/auth/email-verification/resend` per entrambi i ruoli. Ogni email sintatticamente valida riceve lo stesso `202 Accepted`; solo account pending, non verificati e con profilo attivo generano un nuovo token. Il cooldown è 60 secondi e i token precedenti non usati vengono invalidati tramite `used/usedAt`. Il sender reale e il rate limiting distribuito restano fuori perimetro.

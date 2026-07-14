@@ -24,7 +24,7 @@ Nello stato attuale del progetto, il sistema adotta i seguenti principi:
   - **autorizzazione**
   - **business authorization**
 - protezione degli endpoint sensibili
-- verifica email obbligatoria per il professionista
+- verifica email obbligatoria e reinvio uniforme per professionista e cliente
 - controlli business aggiuntivi nel service layer sulle risorse accessibili
 
 ---
@@ -173,6 +173,7 @@ In base al codice attuale, gli endpoint pubblici effettivamente implementati son
 - `POST /api/v1/auth/register/professional`
 - `POST /api/v1/auth/register/client`
 - `POST /api/v1/auth/email-verification/confirm`
+- `POST /api/v1/auth/email-verification/resend`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/register/client/validate-invite`
 
@@ -252,6 +253,17 @@ Il flusso gestisce almeno questi casi:
 - token non trovato
 - token usato con stato incoerente
 - token scaduto, restituito come `410 Gone`
+
+## 10.3 Reinvio uniforme
+
+1. il chiamante invia `POST /api/v1/auth/email-verification/resend` con l'email nel body;
+2. il service normalizza l'email e acquisisce un lock pessimista sull'utente, se esiste;
+3. account inesistenti, verificati, non pending, incoerenti, con profilo inattivo o in cooldown terminano senza mutazioni;
+4. per un account idoneo, se sono trascorsi almeno 60 secondi dal token più recente, i token non usati vengono marcati `used=true` e `usedAt=now`;
+5. viene creato un solo nuovo token UUID v4 con durata esatta di 24 ore;
+6. ogni richiesta sintatticamente valida restituisce lo stesso `202 Accepted`, senza email, ruolo, stato, cooldown o token.
+
+Al boundary `now == latestToken.createdAt + 60 secondi` il reinvio è consentito. L'invalidazione tramite `used/usedAt` è un compromesso semantico dello schema esistente. Inviti e collegamenti non cambiano. Il sender reale e il rate limiting distribuito non sono implementati.
 
 ---
 
@@ -610,6 +622,8 @@ Il token di verifica email è:
 - consumabile una sola volta per attivare l’account
 - idempotente dopo il consumo quando token, account e profilo sono già nello stato finale coerente
 - marcato come usato dopo il primo utilizzo valido
+- sostituito dal reinvio dopo un cooldown di 60 secondi, marcando come usati i precedenti token ancora inutilizzati
+- mai restituito o registrato dal flusso di reinvio
 
 ## 20.3 Token non presenti
 Nel codice attuale **non** risulta ancora implementato un token applicativo per:

@@ -39,6 +39,7 @@ Alla data attuale risultano già implementati:
 
 - auth base
 - verifica email obbligatoria per professionista e cliente
+- reinvio verifica email uniforme e anti-enumerazione
 - invite code
 - registrazione cliente con invito
 - link professionista-cliente

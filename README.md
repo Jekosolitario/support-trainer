@@ -59,6 +59,7 @@ Stato sintetico:
 - registrazione cliente tramite codice invito valido;
 - generazione del token di verifica email per professionisti e clienti;
 - conferma email uniforme e idempotente tramite `POST /api/v1/auth/email-verification/confirm`;
+- reinvio uniforme tramite `POST /api/v1/auth/email-verification/resend`, senza enumerazione degli account;
 - login con JWT;
 - generazione di access token e refresh token;
 - distinzione interna tra access token e refresh token tramite claim JWT;
@@ -69,7 +70,9 @@ Stato sintetico:
 
 Il refresh token viene generato durante il login, ma non è accettato come Bearer sugli endpoint protetti. Non sono ancora presenti endpoint di refresh né lifecycle completo di rinnovo, persistenza, rotazione o revoca.
 
-Entrambi i ruoli nascono con account `PENDING_VERIFICATION` ed `emailVerified=false`, ricevono un token valido 24 ore e possono effettuare login soltanto dopo la conferma. Nella registrazione cliente il link professionale viene creato e l'invito consumato nella stessa transazione, ma il cliente pending non è visibile né operativo. Il precedente GET mutante è stato rimosso; token scaduti producono `410 Gone` e un secondo POST sul token già consumato restituisce successo soltanto se lo stato finale dell'utente è coerente. L'invio email reale e il resend non sono ancora implementati; i clienti già persistiti non vengono migrati.
+Entrambi i ruoli nascono con account `PENDING_VERIFICATION` ed `emailVerified=false`, ricevono un token valido 24 ore e possono effettuare login soltanto dopo la conferma. Nella registrazione cliente il link professionale viene creato e l'invito consumato nella stessa transazione, ma il cliente pending non è visibile né operativo. Il precedente GET mutante è stato rimosso; token scaduti producono `410 Gone` e un secondo POST sul token già consumato restituisce successo soltanto se lo stato finale dell'utente è coerente.
+
+Il reinvio accetta l'email nel body, risponde sempre `202 Accepted` con lo stesso messaggio per ogni indirizzo sintatticamente valido e crea un token solo per profili attivi ancora pending. Il cooldown è di 60 secondi dal token più recente, con reinvio consentito al boundary esatto. Quando il reinvio è consentito, i precedenti token non usati vengono invalidati tecnicamente tramite `used=true` e `usedAt`, lasciando un solo token utilizzabile da 24 ore. Token, email, stato account e tempo residuo non sono esposti. Invito e link cliente-professionista restano invariati. L'invio email reale e il rate limiting distribuito non sono ancora implementati; i clienti già persistiti non vengono migrati.
 
 ### Profilo e account
 
@@ -270,7 +273,7 @@ La suite include test relativi a:
 - richieste di prenotazione e relative transizioni;
 - JWT, ruoli, risposte 400/401/403 e gestione degli errori HTTP 404/405/415.
 
-L’ultima suite completa verificata contiene 218 test, senza failure, errori o test ignorati: 11 in più rispetto alla baseline precedente di 207 grazie alla copertura della conferma email uniforme, dell’idempotenza e del flusso cliente pending.
+L’ultima suite completa verificata contiene 227 test, senza failure, errori o test ignorati: 9 in più rispetto alla baseline approvata di 218 grazie alla copertura del reinvio uniforme, del cooldown, dell’invalidazione dei token precedenti e dei flussi pending per entrambi i ruoli.
 
 ## 11. Profili Spring
 

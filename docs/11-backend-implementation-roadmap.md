@@ -145,9 +145,9 @@ Nel progetto attuale:
 
 ---
 
-## FASE 4 — Verifica email professionista
+## FASE 4 — Verifica email uniforme
 ### Obiettivo
-Chiudere bene il ciclo di attivazione del professionista.
+Chiudere il ciclo di attivazione di professionista e cliente senza enumerazione degli account.
 
 ### Da fare
 - `EmailVerificationToken`
@@ -155,11 +155,14 @@ Chiudere bene il ciclo di attivazione del professionista.
 - generazione token alla registrazione professionista
 - blocco professionista non verificato
 - attivazione account dopo verifica
+- reinvio uniforme con risposta 202, cooldown e invalidazione dei token precedenti
 
 ### Definition of Done
-- professionista registrabile ma non operativo finché non verifica email
+- professionista e cliente registrabili ma non operativi finché non verificano l'email
 - `emailVerified = true` dopo verifica
 - `accountStatus = ACTIVE` dopo verifica
+- reinvio disponibile ai due ruoli senza esporre esistenza o stato dell'account
+- un solo token non usato dopo il reinvio, con cooldown autoritativo di 60 secondi
 - flusso auth realistico e coerente
 
 ---
@@ -633,7 +636,7 @@ L’ordine consigliato definitivo aggiornato è:
 2. fondazioni tecniche — completato
 3. utenti — completato
 4. security e auth — completato
-5. verifica email uniforme per professionista e cliente — completato
+5. verifica email uniforme e reinvio sicuro per professionista e cliente — completato
 6. inviti + registrazione cliente + link — completato
 7. profilo/account — completato
 8. relazioni clienti/professionisti read — completato
