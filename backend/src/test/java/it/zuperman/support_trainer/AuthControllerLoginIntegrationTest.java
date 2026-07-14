@@ -92,9 +92,7 @@ class AuthControllerLoginIntegrationTest {
                 .findFirst()
                 .orElseThrow();
 
-        mockMvc.perform(get("/api/v1/auth/verify-email")
-                        .param("token", verificationToken.getToken()))
-                .andExpect(status().isOk());
+        confirmEmail(verificationToken.getToken());
 
         String loginRequestBody = """
                 {
@@ -152,9 +150,7 @@ class AuthControllerLoginIntegrationTest {
                 .findFirst()
                 .orElseThrow();
 
-        mockMvc.perform(get("/api/v1/auth/verify-email")
-                        .param("token", verificationToken.getToken()))
-                .andExpect(status().isOk());
+        confirmEmail(verificationToken.getToken());
 
         String loginRequestBody = """
                 {
@@ -227,8 +223,15 @@ class AuthControllerLoginIntegrationTest {
                 .findFirst()
                 .orElseThrow();
 
-        mockMvc.perform(get("/api/v1/auth/verify-email")
-                        .param("token", verificationToken.getToken()))
+        confirmEmail(verificationToken.getToken());
+    }
+
+    private void confirmEmail(String token) throws Exception {
+        mockMvc.perform(post("/api/v1/auth/email-verification/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"token":"%s"}
+                                """.formatted(token)))
                 .andExpect(status().isOk());
     }
 

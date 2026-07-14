@@ -27,6 +27,7 @@ import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
+import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.invite.entity.InviteCode;
 import it.zuperman.support_trainer.invite.repository.InviteCodeRepository;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
@@ -58,6 +59,9 @@ class AuthControllerRegistrationIntegrationTest {
 
     @Autowired
     private EmailVerificationTokenRepository emailVerificationTokenRepository;
+
+    @Autowired
+    private ApplicationTimeProvider timeProvider;
 
     @Test
     @DisplayName("Deve accettare in registrazione una password di esattamente 72 byte UTF-8")
@@ -227,6 +231,7 @@ class AuthControllerRegistrationIntegrationTest {
     void shouldRegisterClientWithValidInviteCode() throws Exception {
         String clientEmail = "elena.ricci.valid.invite@example.com";
         String inviteCodeValue = "VALID-CLIENT-INVITE";
+        Instant beforeRegistration = timeProvider.nowInstant();
 
         ProfessionalProfile professional = new ProfessionalProfile(
                 "Andrea",
@@ -266,14 +271,29 @@ class AuthControllerRegistrationIntegrationTest {
                         .content(requestBody))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email").value(clientEmail))
-                .andExpect(jsonPath("$.role").value("CLIENT"));
+                .andExpect(jsonPath("$.role").value("CLIENT"))
+                .andExpect(jsonPath("$.accessToken").isEmpty())
+                .andExpect(jsonPath("$.refreshToken").isEmpty());
+
+        Instant afterRegistration = timeProvider.nowInstant();
 
         ClientProfile savedClient = clientProfileRepository.findByEmail(clientEmail).orElseThrow();
         assertThat(savedClient.getEmail()).isEqualTo(clientEmail);
         assertThat(savedClient.getFirstName()).isEqualTo("Elena");
         assertThat(savedClient.getLastName()).isEqualTo("Ricci");
-        assertThat(savedClient.getAccountStatus()).isEqualTo(AccountStatus.ACTIVE);
-        assertThat(savedClient.getEmailVerified()).isTrue();
+        assertThat(savedClient.getAccountStatus()).isEqualTo(AccountStatus.PENDING_VERIFICATION);
+        assertThat(savedClient.getEmailVerified()).isFalse();
+        assertThat(savedClient.getActive()).isTrue();
+
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
+                .stream()
+                .filter(token -> token.getUser().getId().equals(savedClient.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(verificationToken.getUsed()).isFalse();
+        assertThat(verificationToken.getExpiresAt())
+                .isAfterOrEqualTo(beforeRegistration.plusSeconds(86_400))
+                .isBeforeOrEqualTo(afterRegistration.plusSeconds(86_400));
 
         assertThat(professionalClientLinkRepository
                 .existsByProfessional_IdAndClient_IdAndActiveTrue(
@@ -316,8 +336,11 @@ class AuthControllerRegistrationIntegrationTest {
                 .findFirst()
                 .orElseThrow();
 
-        mockMvc.perform(get("/api/v1/auth/verify-email")
-                        .param("token", verificationToken.getToken()))
+        mockMvc.perform(post("/api/v1/auth/email-verification/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"token":"%s"}
+                                """.formatted(verificationToken.getToken())))
                 .andExpect(status().isOk());
 
         String professionalLoginRequestBody = """

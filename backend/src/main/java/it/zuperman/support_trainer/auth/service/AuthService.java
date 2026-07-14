@@ -107,13 +107,7 @@ public class AuthService {
             );
         }
 
-        EmailVerificationToken verificationToken = new EmailVerificationToken(
-                savedProfessional,
-                UUID.randomUUID().toString(),
-                timeProvider.nowInstant().plus(EMAIL_VERIFICATION_TOKEN_VALIDITY)
-        );
-
-        emailVerificationTokenRepository.save(verificationToken);
+        createEmailVerificationToken(savedProfessional);
 
         return buildRegistrationResponse(savedProfessional);
     }
@@ -122,6 +116,11 @@ public class AuthService {
     public AuthResponse registerClient(RegisterClientRequest request) {
         String normalizedEmail = normalizeEmail(request.getEmail());
 
+        InviteCode inviteCode = inviteCodeService.validateInviteCodeForRegistration(request.getInviteCode());
+        ProfessionalProfile professional = inviteCode.getProfessional();
+
+        validateProfessionalCanLinkClients(professional);
+
         if (userRepository.findByEmail(normalizedEmail).isPresent()) {
             throw new AppException(
                     HttpStatus.CONFLICT,
@@ -129,11 +128,6 @@ public class AuthService {
                     "Email già registrata"
             );
         }
-
-        InviteCode inviteCode = inviteCodeService.validateInviteCodeForRegistration(request.getInviteCode());
-        ProfessionalProfile professional = inviteCode.getProfessional();
-
-        validateProfessionalCanLinkClients(professional);
 
         ClientProfile client = new ClientProfile(
                 request.getFirstName().trim(),
@@ -150,8 +144,8 @@ public class AuthService {
         client.setInjuryNotes(normalizeOptionalText(request.getInjuryNotes()));
         client.setNotes(normalizeOptionalText(request.getNotes()));
 
-        client.setAccountStatus(AccountStatus.ACTIVE);
-        client.setEmailVerified(true);
+        client.setAccountStatus(AccountStatus.PENDING_VERIFICATION);
+        client.setEmailVerified(false);
 
         ClientProfile savedClient;
         try {
@@ -169,7 +163,19 @@ public class AuthService {
         inviteCode.setUsed(true);
         inviteCode.setUsedAt(timeProvider.nowInstant());
 
+        createEmailVerificationToken(savedClient);
+
         return buildRegistrationResponse(savedClient);
+    }
+
+    private void createEmailVerificationToken(User user) {
+        EmailVerificationToken verificationToken = new EmailVerificationToken(
+                user,
+                UUID.randomUUID().toString(),
+                timeProvider.nowInstant().plus(EMAIL_VERIFICATION_TOKEN_VALIDITY)
+        );
+
+        emailVerificationTokenRepository.save(verificationToken);
     }
 
     private void validateProfessionalCanLinkClients(ProfessionalProfile professional) {
@@ -245,7 +251,13 @@ public class AuthService {
                 "Token di verifica non valido"
         ));
 
+        User user = verificationToken.getUser();
+
         if (Boolean.TRUE.equals(verificationToken.getUsed())) {
+            if (isVerificationStateCoherent(user)) {
+                return;
+            }
+
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
                     "EMAIL_VERIFICATION_TOKEN_ALREADY_USED",
@@ -257,13 +269,13 @@ public class AuthService {
 
         if (verificationToken.isExpired(currentDateTime)) {
             throw new AppException(
-                    HttpStatus.BAD_REQUEST,
+                    HttpStatus.GONE,
                     "EMAIL_VERIFICATION_TOKEN_EXPIRED",
                     "Token di verifica scaduto"
             );
         }
 
-        User user = verificationToken.getUser();
+        validateProfileIsActive(user);
 
         user.setEmailVerified(true);
         user.setAccountStatus(AccountStatus.ACTIVE);
@@ -272,6 +284,44 @@ public class AuthService {
 
         userRepository.save(user);
         emailVerificationTokenRepository.save(verificationToken);
+    }
+
+    private boolean isVerificationStateCoherent(User user) {
+        return Boolean.TRUE.equals(user.getEmailVerified())
+                && user.getAccountStatus() == AccountStatus.ACTIVE
+                && isProfileActive(user);
+    }
+
+    private void validateProfileIsActive(User user) {
+        if (isProfileActive(user)) {
+            return;
+        }
+
+        if (user instanceof ProfessionalProfile) {
+            throw new AppException(
+                    HttpStatus.FORBIDDEN,
+                    "PROFESSIONAL_NOT_ACTIVE",
+                    "Profilo professionista non attivo"
+            );
+        }
+
+        throw new AppException(
+                HttpStatus.FORBIDDEN,
+                "CLIENT_NOT_ACTIVE",
+                "Profilo cliente non attivo"
+        );
+    }
+
+    private boolean isProfileActive(User user) {
+        if (user instanceof ProfessionalProfile professionalProfile) {
+            return Boolean.TRUE.equals(professionalProfile.getActive());
+        }
+
+        if (user instanceof ClientProfile clientProfile) {
+            return Boolean.TRUE.equals(clientProfile.getActive());
+        }
+
+        return false;
     }
 
     public AuthResponse login(LoginRequest request) {

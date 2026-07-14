@@ -5,13 +5,12 @@ import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import it.zuperman.support_trainer.auth.dto.request.ConfirmEmailVerificationRequest;
 import it.zuperman.support_trainer.auth.dto.request.LoginRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterClientRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterProfessionalRequest;
@@ -52,9 +51,11 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping("/verify-email")
-    public ResponseEntity<Map<String, String>> verifyEmail(@RequestParam("token") String token) {
-        authService.verifyEmail(token);
+    @PostMapping("/email-verification/confirm")
+    public ResponseEntity<Map<String, String>> confirmEmailVerification(
+            @Valid @RequestBody ConfirmEmailVerificationRequest request
+    ) {
+        authService.verifyEmail(request.getToken());
         return ResponseEntity.ok(Map.of("message", "Email verificata correttamente"));
     }
 

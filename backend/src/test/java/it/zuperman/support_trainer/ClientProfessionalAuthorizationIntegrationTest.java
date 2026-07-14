@@ -576,9 +576,7 @@ class ClientProfessionalAuthorizationIntegrationTest {
                 .findFirst()
                 .orElseThrow();
 
-        mockMvc.perform(get("/api/v1/auth/verify-email")
-                        .param("token", verificationToken.getToken()))
-                .andExpect(status().isOk());
+        confirmEmail(verificationToken.getToken());
 
         return login(email, PASSWORD);
     }
@@ -612,7 +610,24 @@ class ClientProfessionalAuthorizationIntegrationTest {
                         .content(registrationRequestBody))
                 .andExpect(status().isCreated());
 
+        User savedClient = userRepository.findByEmail(email).orElseThrow();
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
+                .stream()
+                .filter(token -> token.getUser().getId().equals(savedClient.getId()))
+                .findFirst()
+                .orElseThrow();
+        confirmEmail(verificationToken.getToken());
+
         return login(email, PASSWORD);
+    }
+
+    private void confirmEmail(String token) throws Exception {
+        mockMvc.perform(post("/api/v1/auth/email-verification/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"token":"%s"}
+                                """.formatted(token)))
+                .andExpect(status().isOk());
     }
 
     private String login(String email, String password) throws Exception {

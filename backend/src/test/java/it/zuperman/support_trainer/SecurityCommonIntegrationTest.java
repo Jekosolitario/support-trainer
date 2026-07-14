@@ -118,11 +118,12 @@ class SecurityCommonIntegrationTest {
     }
 
     @Test
-    @DisplayName("Parametro obbligatorio mancante deve restituire bad request coerente")
-    void shouldReturnBadRequestForMissingRequiredParameter() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/verify-email"))
+    @DisplayName("Body obbligatorio mancante deve restituire bad request coerente")
+    void shouldReturnBadRequestForMissingRequiredBody() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/email-verification/confirm")
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
-                .andExpectAll(errorResponse(400, "BAD_REQUEST", "MISSING_REQUEST_PARAMETER"));
+                .andExpectAll(errorResponse(400, "BAD_REQUEST", "MALFORMED_REQUEST"));
     }
 
     @Test
