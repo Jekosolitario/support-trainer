@@ -282,7 +282,7 @@ Nel backend attuale una richiesta booking viene creata a partire da:
 
 Il modello con `BookingRequestItem` resta estendibile a scenari multi-slot futuri, ma l’API attuale opera su un solo slot per richiesta.
 
-Gli item delle response Booking espongono gli orari dello slot con offset `Europe/Rome`, secondo lo stesso contratto Availability. Gli audit `createdAt` e `updatedAt` restano invece `LocalDateTime` transitori e non vanno interpretati come parte del nuovo contratto degli slot.
+Gli item delle response Booking espongono gli orari dello slot con offset `Europe/Rome`, secondo lo stesso contratto Availability. Gli audit `createdAt` e `updatedAt` della richiesta sono invece `Instant` UTC serializzati con `Z`; i confronti di validità degli slot avvengono direttamente sugli istanti.
 
 ### Regole principali implementate
 
@@ -447,3 +447,7 @@ Il workflow Availability / Bookings è consolidato anche nei casi critici:
 - slot con booking `PENDING` non esposti come disponibili;
 - slot con booking `PENDING` non modificabili o bloccabili manualmente;
 - operazioni concorrenti protette nei punti sensibili del flusso.
+
+## 19. Contratto temporale UTC
+
+Audit e scadenze esposti da account, booking e inviti sono `Instant` ISO-8601 con `Z`. L'invito dura 168 ore reali e il token email 24 ore reali. Solo gli orari civili degli slot restano `OffsetDateTime`, con offset validato e restituito secondo `Europe/Rome`; `LocalDate` resta invariato.

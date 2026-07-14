@@ -105,6 +105,8 @@ Il codice deve:
 ### 4.4 Registrazione entro scadenza
 L’utente che utilizza il codice invito deve completare la registrazione entro la scadenza del codice.
 
+La scadenza è un `Instant` calcolato come 168 ore reali dal `Clock` applicativo, non come sette giorni civili; il passaggio DST non modifica la durata. Analogamente, il token di verifica email dura esattamente 24 ore reali e al confine `now == expiresAt` è già scaduto.
+
 Se la registrazione non viene completata entro tale termine:
 - il codice non è più valido
 - la registrazione associata non deve essere considerata valida/completata
@@ -185,7 +187,7 @@ Per ogni valore il backend consulta `ZoneRules.getValidOffsets` sull'ora civile:
 
 Dopo la validazione individuale, `startDateTime` deve precedere `endDateTime` nel confronto tra i rispettivi `Instant`. I casi non validi producono `400`; le violazioni semanticamente parseabili usano `VALIDATION_ERROR`, mentre un formato non deserializzabile usa `MALFORMED_REQUEST`.
 
-Entity, repository e persistenza restano temporaneamente `LocalDateTime`/`DATETIME(0)`. Nel mapping di risposta un valore persistito in gap o overlap produce un errore applicativo controllato: il backend non inventa un offset.
+Entity, repository e query usano `Instant`; i valori sono persistiti in UTC su `DATETIME(6)`. Il mapper converte le request validate in istanti e ricostruisce le response con l'offset effettivo di `Europe/Rome`, senza dipendere dalla timezone JVM.
 
 ### 6.3 Nessuna sovrapposizione
 

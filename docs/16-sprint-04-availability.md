@@ -384,8 +384,8 @@ cliente collegato -> selezione slot disponibile -> richiesta booking -> conferma
 
 ## 17. Contratto temporale degli slot
 
-I controlli “slot nel futuro” e la soglia usata per la visibilità cliente derivano ora da un `Clock` UTC condiviso e vengono convertiti esplicitamente nella zona business `Europe/Rome`. Il risultato non dipende più dalla timezone della JVM ed è testabile con `Clock.fixed`.
+I controlli “slot nel futuro” e la soglia usata per la visibilità cliente confrontano direttamente `Instant` derivati dal `Clock` UTC condiviso. Il risultato non dipende dalla timezone della JVM ed è testabile con `Clock.fixed`.
 
 Le request di creazione e modifica e tutte le response Availability usano ora `OffsetDateTime` per `startDateTime` ed `endDateTime`. Il client deve inviare l'offset esplicito coerente con `Europe/Rome`, per esempio `+02:00` in estate e `+01:00` in inverno. Il backend rifiuta assenza di offset, offset incoerenti, gap primaverili, overlap autunnali e precisione oltre il secondo; l'intervallo è confrontato sugli istanti.
 
-Entity, repository, query e colonne `DATETIME(0)` restano temporaneamente `LocalDateTime`. La conversione avviene in un componente centralizzato soltanto dopo aver dimostrato che l'ora civile ha un unico offset valido. Anche il mapping inverso rifiuta in modo controllato eventuali dati persistiti non rappresentabili univocamente.
+Entity, repository e query usano ora `Instant`; le colonne restano `DATETIME(6)` ma assumono semantica UTC. Il componente centralizzato valida la request `OffsetDateTime`, la converte in `Instant` e ricostruisce la response con l'offset effettivo di `Europe/Rome`. V4 converte i dati legacy e le V5 trasferiscono l'audit all'applicazione: entrambe sono state validate su MySQL 8.0.44 da database vuoto e da clone legacy, con Hibernate `ddl-auto=validate`. Il database locale reale non è stato baselinato o migrato.

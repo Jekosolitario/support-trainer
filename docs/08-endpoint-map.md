@@ -231,7 +231,7 @@ Le operazioni Availability applicano i seguenti controlli:
 
 ## 10. Modulo Bookings
 
-Gli oggetti `items` delle response Booking riportano `startDateTime` ed `endDateTime` con l'offset `Europe/Rome`. I campi audit `createdAt` e `updatedAt` non sono convertiti in questo step e restano transitori.
+Gli oggetti `items` delle response Booking riportano `startDateTime` ed `endDateTime` con l'offset `Europe/Rome`. I campi audit `createdAt` e `updatedAt` sono invece `Instant` ISO-8601 UTC con `Z`.
 
 ### 10.1 Creazione richiesta prenotazione
 **POST** `/api/v1/bookings`  
@@ -364,3 +364,10 @@ Per Support Trainer si confermano le seguenti scelte:
 - `instagramUrl` e `websiteUrl` del profilo professionista, se valorizzati, devono iniziare con `http://` oppure `https://`;
 - nel `PATCH /api/v1/me/profile`, l’invio di un valore vuoto per `instagramUrl` o `websiteUrl` rimuove il link precedentemente salvato;
 - il frontend dovrà gestire separatamente valore invariato, nuovo URL e rimozione esplicita del link.
+
+## 21. Formati temporali delle response
+
+- `createdAt`, `updatedAt`, `expiresAt` e `usedAt` esposti da account, booking e inviti sono `Instant` ISO-8601 UTC con `Z`;
+- gli orari degli slot Availability e degli item Booking restano `OffsetDateTime` con l'offset valido di `Europe/Rome` e precisione al secondo;
+- le date civili, inclusa `birthDate`, restano `LocalDate`;
+- il frontend non deve applicare una timezone globale ai payload: può localizzare gli `Instant` per la presentazione, ma deve preservare gli offset degli slot ricevuti dal backend.

@@ -392,14 +392,14 @@ Un controllo HTML `datetime-local` non produce alcun offset. Per creare o modifi
 - inviare precisione massima al secondo, senza frazioni non nulle;
 - trattare l'offset delle response Availability e degli item Booking come già autorevole, senza una seconda conversione silenziosa.
 
-Il backend resta la fonte autoritativa e ripete tutte le validazioni. Gli audit `createdAt`/`updatedAt` non fanno ancora parte di questo contratto.
+Il backend resta la fonte autoritativa e ripete tutte le validazioni. Gli audit `createdAt`/`updatedAt` fanno parte del contratto come `Instant` ISO-8601 UTC con `Z`.
 
 ## 14. Punti da chiarire prima dell'implementazione
 
 Questi punti non impediscono la mappa funzionale, ma non sono determinabili come contratto frontend completo dal repository attuale:
 
 1. **Consegna verifica email:** il token viene creato e salvato, ma non esiste invio email né esposizione del token nella risposta di registrazione. Serve una decisione backend/infrastrutturale per rendere autonomo il flusso utente.
-2. **Timezone degli audit:** gli orari degli slot hanno ora offset esplicito `Europe/Rome`; restano da definire e migrare i timestamp audit e gli altri `LocalDateTime` fuori perimetro.
+2. **Contratto temporale:** audit e scadenze account/booking/inviti arrivano come `Instant` UTC con `Z`; gli orari degli slot conservano l'offset esplicito `Europe/Rome` e le date civili restano `LocalDate`. La UI deve distinguere questi tre tipi e non applicare una timezone globale ai payload.
 3. **Storage auth:** il backend non prescrive dove conservare l'access token; la strategia va chiusa considerando sicurezza e assenza del refresh operativo.
 4. **URL pubblico dei link:** non sono configurati nel repository i link frontend definitivi per verifica email e inviti.
 5. **Liste:** non esistono paginazione e filtri API per clienti, professionisti, inviti, slot o booking; la prima UI non deve dipenderne.

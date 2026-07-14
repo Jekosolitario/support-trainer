@@ -22,8 +22,8 @@ Per la v1, tutti gli identificativi possono essere modellati come:
 
 ### 2.2 Timestamp
 Dove presenti:
-- `createdAt` → `LocalDateTime`
-- `updatedAt` → `LocalDateTime`
+- `createdAt` → `Instant`
+- `updatedAt` → `Instant`
 
 ### 2.3 Campi decimali
 Per pesi, misure e valori numerici con decimali si consiglia:
@@ -84,8 +84,8 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 | `role`            | `Enum`          |           Sì |       No | —                      | `CLIENT`, `PROFESSIONAL`                         |
 | `accountStatus`   | `Enum`          |           Sì |       No | `PENDING_VERIFICATION` | Stato account                                    |
 | `emailVerified`   | `Boolean`       |           Sì |       No | `false`                | Verifica email completata o no                   |
-| `createdAt`       | `LocalDateTime` |           Sì |       No | auto                   | Timestamp creazione                              |
-| `updatedAt`       | `LocalDateTime` |           Sì |       No | auto                   | Timestamp ultimo aggiornamento                   |
+| `createdAt`       | `Instant`       |           Sì |       No | audit app              | Istante UTC di creazione                         |
+| `updatedAt`       | `Instant`       |           Sì |       No | audit app              | Istante UTC ultimo aggiornamento                 |
 
 ### Note
 - `email` deve essere **univoca**
@@ -177,8 +177,8 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 | `id`           | `Long`                |           Sì |       No | —       | Identificativo univoco                          |
 | `professional` | `ProfessionalProfile` |           Sì |       No | —       | Professionista collegato                        |
 | `client`       | `ClientProfile`       |           Sì |       No | —       | Cliente collegato                               |
-| `createdAt`    | `LocalDateTime`       |           Sì |       No | auto    | Data collegamento                               |
-| `updatedAt`    | `LocalDateTime`       |           Sì |       No | auto    | Timestamp ultimo aggiornamento del collegamento |
+| `createdAt`    | `Instant`             |           Sì |       No | audit app | Data collegamento UTC                           |
+| `updatedAt`    | `Instant`             |           Sì |       No | audit app | Istante UTC ultimo aggiornamento                |
 | `active`       | `Boolean`             |           Sì |       No | `true`  | Collegamento attivo/disattivato                 |
 
 ### Note
@@ -194,12 +194,12 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 | `id`           | `Long`                |           Sì |       No | —       | Identificativo univoco                           |
 | `code`         | `String`              |           Sì |       No | —       | Codice invito univoco                            |
 | `professional` | `ProfessionalProfile` |           Sì |       No | —       | Professionista che genera il codice              |
-| `expiresAt`    | `LocalDateTime`       |           Sì |       No | —       | Data/ora scadenza                                |
+| `expiresAt`    | `Instant`             |           Sì |       No | —       | Scadenza UTC dopo 168 ore reali                  |
 | `used`         | `Boolean`             |           Sì |       No | `false` | Codice già usato o no                            |
 | `active`       | `Boolean`             |           Sì |       No | `true`  | Flag logico di attivazione/disattivazione codice |
-| `updatedAt`    | `LocalDateTime`       |           Sì |       No | auto    | Timestamp ultimo aggiornamento                   |
-| `usedAt`       | `LocalDateTime`       |           No |       Sì | `null`  | Data/ora utilizzo                                |
-| `createdAt`    | `LocalDateTime`       |           Sì |       No | auto    | Data creazione                                   |
+| `updatedAt`    | `Instant`             |           Sì |       No | audit app | Istante UTC ultimo aggiornamento                |
+| `usedAt`       | `Instant`             |           No |       Sì | `null`  | Istante UTC di utilizzo                          |
+| `createdAt`    | `Instant`             |           Sì |       No | audit app | Istante UTC di creazione                        |
 
 ### Note
 - `code` deve essere **univoco**
@@ -218,10 +218,10 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 | `id`        | `Long`          |           Sì |       No | auto    | Identificativo univoco             |
 | `user`      | `User`          |           Sì |       No | —       | Utente destinatario della verifica |
 | `token`     | `String`        |           Sì |       No | —       | Token univoco di verifica email    |
-| `expiresAt` | `LocalDateTime` |           Sì |       No | —       | Data/ora scadenza token            |
+| `expiresAt` | `Instant`       |           Sì |       No | —       | Scadenza UTC dopo 24 ore reali     |
 | `used`      | `Boolean`       |           Sì |       No | `false` | Token già utilizzato o no          |
-| `usedAt`    | `LocalDateTime` |           No |       Sì | `null`  | Data/ora utilizzo                  |
-| `createdAt` | `LocalDateTime` |           Sì |       No | auto    | Timestamp creazione                |
+| `usedAt`    | `Instant`       |           No |       Sì | `null`  | Istante UTC di utilizzo            |
+| `createdAt` | `Instant`       |           Sì |       No | audit app | Istante UTC di creazione         |
 
 ### Note
 
@@ -238,12 +238,12 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 | --------------- | --------------------- | -----------: | -------: | ----------- | -------------------------------------- |
 | `id`            | `Long`                |           Sì |       No | auto        | Identificativo univoco                 |
 | `professional`  | `ProfessionalProfile` |           Sì |       No | —           | Professionista proprietario dello slot |
-| `startDateTime` | `LocalDateTime`       |           Sì |       No | —           | Inizio slot                            |
-| `endDateTime`   | `LocalDateTime`       |           Sì |       No | —           | Fine slot                              |
+| `startDateTime` | `Instant`             |           Sì |       No | —           | Inizio slot persistito UTC             |
+| `endDateTime`   | `Instant`             |           Sì |       No | —           | Fine slot persistita UTC               |
 | `status`        | `Enum`                |           Sì |       No | `AVAILABLE` | Stato slot                             |
 | `active`        | `Boolean`             |           Sì |       No | `true`      | Flag logico di attivazione             |
-| `createdAt`     | `LocalDateTime`       |           Sì |       No | auto        | Timestamp creazione                    |
-| `updatedAt`     | `LocalDateTime`       |           Sì |       No | auto        | Timestamp ultimo aggiornamento         |
+| `createdAt`     | `Instant`             |           Sì |       No | audit app   | Istante UTC creazione                  |
+| `updatedAt`     | `Instant`             |           Sì |       No | audit app   | Istante UTC ultimo aggiornamento       |
 
 ### Note
 
@@ -270,8 +270,8 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 | `note`         | `String` / `Text`          |           No |       Sì | `null`      | Nota facoltativa del cliente   |
 | `active`       | `Boolean`                  |           Sì |       No | `true`      | Flag logico di attivazione     |
 | `items`        | `List<BookingRequestItem>` |           Sì |       No | lista vuota | Slot collegati alla richiesta  |
-| `createdAt`    | `LocalDateTime`            |           Sì |       No | auto        | Timestamp creazione            |
-| `updatedAt`    | `LocalDateTime`            |           Sì |       No | auto        | Timestamp ultimo aggiornamento |
+| `createdAt`    | `Instant`                  |           Sì |       No | audit app   | Istante UTC creazione          |
+| `updatedAt`    | `Instant`                  |           Sì |       No | audit app   | Istante UTC aggiornamento      |
 
 ### Note
 
@@ -295,8 +295,8 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 | `id`               | `Long`             |           Sì |       No | auto    | Identificativo univoco         |
 | `bookingRequest`   | `BookingRequest`   |           Sì |       No | —       | Richiesta principale           |
 | `availabilitySlot` | `AvailabilitySlot` |           Sì |       No | —       | Slot richiesto                 |
-| `createdAt`        | `LocalDateTime`    |           Sì |       No | auto    | Timestamp creazione            |
-| `updatedAt`        | `LocalDateTime`    |           Sì |       No | auto    | Timestamp ultimo aggiornamento |
+| `createdAt`        | `Instant`          |           Sì |       No | audit app | Istante UTC creazione          |
+| `updatedAt`        | `Instant`          |           Sì |       No | audit app | Istante UTC aggiornamento      |
 
 ### Note
 

@@ -86,8 +86,8 @@ Questa classe contiene i campi comuni:
 ### Mapping implementato
 
 - `id` → `@Id` + `@GeneratedValue(strategy = GenerationType.IDENTITY)`
-- `createdAt` → `@CreationTimestamp`
-- `updatedAt` → `@UpdateTimestamp`
+- `createdAt` → `@CreatedDate`
+- `updatedAt` → `@LastModifiedDate`
 
 La gerarchia business `User` estende `BaseEntity`, mentre le altre entity principali utilizzano direttamente `BaseEntity` dove appropriato.
 
@@ -111,10 +111,11 @@ Per le entity JPA:
 
 ## 5.1 Strategia implementata
 
-I campi temporali automatici comuni sono gestiti nella classe `BaseEntity` tramite annotazioni Hibernate:
+I campi temporali automatici comuni sono gestiti nella classe `BaseEntity` tramite Spring Data JPA Auditing:
 
-- `@CreationTimestamp`
-- `@UpdateTimestamp`
+- `@CreatedDate`
+- `@LastModifiedDate`
+- `@EntityListeners(AuditingEntityListener.class)`
 
 ## 5.2 Campi implementati
 
@@ -138,7 +139,7 @@ senza campo `updatedAt`.
 
 ## 5.5 Nota di coerenza
 
-Nel backend reale non risultano utilizzate callback JPA `@PrePersist` o `@PreUpdate` per la gestione standard dei timestamp.
+`@EnableJpaAuditing` usa un `DateTimeProvider` basato esclusivamente su `ApplicationTimeProvider.nowInstant()`. Non vengono iniettati bean nelle entity e non sono usate callback `@PrePersist` o `@PreUpdate`.
 
 ## 5.6 Precisione canonica temporanea per il dato legacy
 
@@ -892,11 +893,13 @@ Flyway è il proprietario esclusivo dello schema MySQL delle nove tabelle runtim
 
 Hibernate usa `ddl-auto=validate` sugli ambienti MySQL e non deve creare o aggiornare lo schema. Le tredici tabelle legacy dei moduli futuri non appartengono ancora al perimetro Flyway.
 
-### 23.2 Migrazioni iniziali
+### 23.2 Migrazioni runtime
 
 - `V1__create_legacy_compatible_runtime_schema.sql` riproduce lo schema runtime legacy rilevato, incluse le dimensioni non restrittive e i timestamp aggiuntivi delle tabelle JOINED.
 - `V2__align_runtime_schema_contract.sql` allarga `client_profiles.primary_goal`, rende `booking_request_items.updated_at` obbligatorio preservandone la precisione legacy a sei cifre e aggiunge gli indici composti richiesti dalle query correnti.
 - Le migrazioni `V3_1`–`V3_9`, una per tabella runtime, ampliano esclusivamente a `DATETIME(6)` le colonne che rappresentano istanti. Conservano nullability, default e `ON UPDATE`, non contengono DML e non modificano date civili, vincoli, indici o relazioni.
+- La migrazione Java V4 converte i valori legacy da `Europe/Rome` a UTC soltanto dopo una preflight completa su struttura, precisione, gap, overlap, conteggi e integrità dei dati.
+- Le migrazioni `V5_1`–`V5_9` trasferiscono l'ownership degli audit all'applicazione, rimuovendo default e `ON UPDATE`; i quattro timestamp ombra dei profili diventano nullable e restano congelati.
 
 L'ampliamento strutturale aggiunge frazione zero ai valori precedentemente memorizzati a precisione di secondo. Non interpreta i `DATETIME` legacy, non applica conversioni di timezone e non completa la persistenza UTC.
 
@@ -904,14 +907,14 @@ Le migrazioni già applicate sono immutabili. Le evoluzioni successive devono es
 
 ### 23.3 Database vuoto ed esistente
 
-Su uno schema MySQL 8 nuovo e vuoto Flyway applica V1, V2 e `V3_1`–`V3_9` in ordine, quindi Hibernate valida il mapping.
+Su uno schema MySQL 8 nuovo e vuoto Flyway applica in ordine V1, V2, `V3_1`–`V3_9`, V4 e `V5_1`–`V5_9`, quindi Hibernate valida il mapping.
 
 Uno schema esistente non deve essere migrato automaticamente. Prima della baseline manuale sono obbligatori:
 
 1. backup verificato;
 2. clone isolato;
 3. confronto tra clone e V1;
-4. prova della baseline, della V2 e delle migrazioni `V3_1`–`V3_9` sul clone;
+4. prova sul clone della baseline e dell'intera sequenza da V2 a `V5_9`;
 5. verifica applicativa e dei conteggi;
 6. approvazione esplicita per operare sul database reale.
 
@@ -921,14 +924,14 @@ Uno schema esistente non deve essere migrato automaticamente. Prima della baseli
 
 La suite ordinaria usa H2 con Flyway disabilitato e `ddl-auto=create-drop`. È una verifica rapida del comportamento applicativo, non una certificazione del DDL MySQL.
 
-MySQL 8 è il riferimento per migrazioni, charset, collation, foreign key, indici, precisione temporale e lock. La sequenza completa fino a `V3_9` deve essere provata sia su uno schema vuoto sia su un clone legacy, verificando che anno, mese, giorno, ora, minuto e secondo restino invariati e che la nuova frazione sia zero dove la sorgente era `DATETIME(0)`.
+MySQL 8 è il riferimento per migrazioni, charset, collation, foreign key, indici, precisione temporale e lock. Su MySQL 8.0.44 sono riusciti sia il percorso da database vuoto `V1` → `V5.9` sia quello da clone legacy `BASELINE 1` → `V2` → `V5.9`, inclusa la successiva validazione Hibernate. Timestamp e microsecondi, dati, vincoli e indici sono stati preservati.
 
-## 24. Modello temporale transitorio
+## 24. Modello temporale UTC
 
 I flussi applicativi leggono il tempo tramite un unico `ApplicationTimeProvider`. Il provider usa un bean `Clock` tecnico configurato in UTC e converte il medesimo `Instant` nella zona business esplicita `Europe/Rome` quando il modello corrente richiede un `LocalDateTime`. Nessun servizio applicativo deve dipendere da `ZoneId.systemDefault()` o da `user.timezone`; nei test il `Clock` viene sostituito con `Clock.fixed`.
 
-In questa fase i tipi JPA e i DTO temporali restano invariati. `LocalDateTime` e il formato JSON senza offset sono quindi ancora transitori. Le colonne runtime gestite dalle V3 hanno precisione `DATETIME(6)`, ma il loro contenuto conserva la precedente semantica civile e non è ancora normalizzato a UTC. Non sono configurati `hibernate.jdbc.time_zone`, timezone Jackson o parametri JDBC UTC, per evitare conversioni implicite prima della migrazione coordinata a `Instant`/`OffsetDateTime`.
+Gli istanti runtime mappati sono ora `Instant`, normalizzati ai microsecondi e associati a `DATETIME(6)` senza `TIMESTAMP WITH TIME ZONE`. Hibernate usa `hibernate.jdbc.time_zone=UTC`; la connessione MySQL deve impostare la sessione a `+00:00`. Non è configurata una timezone Jackson globale: gli audit e le scadenze sono serializzati con `Z`, mentre gli slot restano `OffsetDateTime` `Europe/Rome` al confine HTTP.
 
-Gli audit Hibernate tramite `@CreationTimestamp` e `@UpdateTimestamp` e i default DB con `CURRENT_TIMESTAMP(6)`/`ON UPDATE` restano temporaneamente invariati. Non usano ancora il `Clock` applicativo e la loro migrazione a ownership applicativa appartiene a uno step successivo, insieme alla configurazione UTC e alla conversione dei dati legacy.
+La V4 Java converte i 23 campi legacy da `Europe/Rome` a UTC dopo una preflight completa; le V5 rimuovono default e `ON UPDATE`, trasferendo l'ownership all'applicazione. I timestamp ombra dei profili vengono convertiti e poi congelati come nullable. La validazione MySQL ha convertito 70 valori valorizzati sul clone legacy, preservando due null e cinque valori con microsecondi, e ha verificato che gap, overlap o schema inatteso interrompano V4 prima del primo DML. Il mapping `Instant` e l'auditing basato sul `Clock` applicativo sono stati verificati con Hibernate `ddl-auto=validate`. Il database locale reale `support_trainer` non è stato baselinato o migrato.
 
 ---

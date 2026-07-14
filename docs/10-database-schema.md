@@ -33,6 +33,8 @@ Tutte le tabelle principali usano:
   - `used_at`
   - `recorded_at`
 
+I 23 campi runtime che rappresentano istanti usano `DATETIME(6)` con semantica UTC. L'applicazione li mappa come `Instant`, imposta Hibernate/JDBC in UTC e normalizza a microsecondi. `Europe/Rome` non è una timezone di persistenza: resta la zona business per l'input/output civile degli slot.
+
 ### 2.4 Soft delete
 Per alcune tabelle principali si usa:
 - `active BOOLEAN NOT NULL DEFAULT TRUE`
@@ -46,7 +48,7 @@ Le tabelle runtime MySQL usano esplicitamente:
 - collation `utf8mb4_0900_ai_ci`;
 - foreign key con `ON UPDATE RESTRICT` e `ON DELETE RESTRICT`.
 
-Flyway governa esclusivamente le nove tabelle runtime della sezione 3. La V1 riproduce lo schema legacy runtime; la V2 converge al contratto canonico iniziale; le migrazioni `V3_1`–`V3_9` ampliano a microsecondi le colonne che rappresentano istanti senza convertirne il contenuto. Sugli ambienti MySQL Hibernate usa `ddl-auto=validate`.
+Flyway governa esclusivamente le nove tabelle runtime della sezione 3. La V1 riproduce lo schema legacy runtime; la V2 converge al contratto canonico iniziale; `V3_1`–`V3_9` ampliano a microsecondi le colonne. La V4 Java converte i valori legacy `Europe/Rome` in UTC dopo controlli completi su schema, InnoDB, precisione, gap/overlap, conteggi e digest. Essendo MySQL-specifica, la V4 verifica la precisione tramite `information_schema.COLUMNS.DATETIME_PRECISION`: `DatabaseMetaData.DECIMAL_DIGITS` non è autoritativo perché Connector/J può restituirlo nullo anche per `DATETIME(6)`. Le `V5_1`–`V5_9` rimuovono default e `ON UPDATE`; gli audit mappati restano `NOT NULL`, mentre i quattro timestamp ombra dei profili diventano nullable e congelati. Sugli ambienti MySQL Hibernate usa `ddl-auto=validate`.
 
 ---
 
@@ -924,7 +926,17 @@ Le risorse versionate sono applicate in questo ordine:
 8. `V3_6__expand_email_verification_tokens_timestamps_to_microseconds.sql`;
 9. `V3_7__expand_availability_slots_timestamps_to_microseconds.sql`;
 10. `V3_8__expand_booking_requests_timestamps_to_microseconds.sql`;
-11. `V3_9__expand_booking_request_items_timestamps_to_microseconds.sql`.
+11. `V3_9__expand_booking_request_items_timestamps_to_microseconds.sql`;
+12. `V4__convert_runtime_datetimes_from_rome_to_utc`;
+13. `V5_1__transfer_users_audit_ownership_to_application.sql`;
+14. `V5_2__freeze_professional_profile_shadow_timestamps.sql`;
+15. `V5_3__freeze_client_profile_shadow_timestamps.sql`;
+16. `V5_4__transfer_link_audit_ownership_to_application.sql`;
+17. `V5_5__transfer_invite_audit_ownership_to_application.sql`;
+18. `V5_6__transfer_email_token_audit_ownership_to_application.sql`;
+19. `V5_7__transfer_availability_audit_ownership_to_application.sql`;
+20. `V5_8__transfer_booking_request_audit_ownership_to_application.sql`;
+21. `V5_9__transfer_booking_item_audit_ownership_to_application.sql`.
 
 La V1 crea esclusivamente le nove tabelle runtime, con PK, FK restrittive, unique, nullability, default, precisioni, engine, charset, collation e indici dello schema legacy. Non contiene dati applicativi.
 
@@ -937,7 +949,7 @@ La V2:
 
 Le nove V3 contengono esclusivamente un `ALTER TABLE` ciascuna. Portano a `DATETIME(6)` i timestamp della rispettiva tabella, preservando nullability, default e aggiornamento automatico. `client_profiles.birth_date` resta `DATE`; `booking_request_items.updated_at`, già definito a microsecondi dalla V2, non viene alterato nuovamente.
 
-Il passaggio da `DATETIME(0)` a `DATETIME(6)` mantiene invariati anno, mese, giorno, ora, minuto e secondo e aggiunge una frazione zero. Non viene usato `CONVERT_TZ` e non avviene alcuna conversione `Europe/Rome` → UTC. I tipi Java restano `LocalDateTime`; default DB e auditing Hibernate restano temporaneamente attivi. Configurazione UTC, ownership applicativa e conversione dei valori appartengono a migrazioni successive.
+Il passaggio strutturale delle sole V3 da `DATETIME(0)` a `DATETIME(6)` mantiene invariati anno, mese, giorno, ora, minuto e secondo e aggiunge una frazione zero. Le V3 non usano `CONVERT_TZ` e non convertono i valori da `Europe/Rome` a UTC: questa responsabilità appartiene alla successiva V4, mentre le V5 trasferiscono l'ownership degli audit all'applicazione.
 
 ### 12.2 Indici di convergenza
 
@@ -952,14 +964,16 @@ Non viene introdotta una unique su `professional_client_links(professional_id, c
 
 ### 12.3 Database vuoto
 
-Su uno schema MySQL 8 nuovo e vuoto Flyway applica V1, V2 e `V3_1`–`V3_9`; successivamente Hibernate valida lo schema con `ddl-auto=validate`. Questa procedura deve essere verificata in un ambiente MySQL isolato prima dell'uso operativo, includendo nullability, default, `ON UPDATE`, indici, foreign key e check.
+Su MySQL 8.0.44 è stato verificato con successo il percorso da schema nuovo e vuoto `V1` → `V5.9`, seguito da Hibernate `ddl-auto=validate`. La verifica ha incluso nullability, default, `ON UPDATE`, indici, foreign key, check e mapping `Instant`/JDBC UTC.
 
 ### 12.4 Database esistente
 
-Non è ammessa la baseline automatica. Prima di registrare manualmente uno schema esistente alla versione 1 sono obbligatori backup, clone isolato, confronto con la V1, prova della V2 e di `V3_1`–`V3_9`, verifica dei dati e approvazione esplicita. Sul clone va dimostrato che l'ampliamento non modifichi la parte intera dei timestamp e preservi le frazioni già presenti in `booking_request_items.updated_at`.
+Non è ammessa la baseline automatica. Prima di registrare manualmente uno schema esistente alla versione 1 sono obbligatori backup, clone isolato, confronto con la V1, prova dell'intera sequenza da V2 a `V5.9`, verifica dei dati e approvazione esplicita. Su MySQL 8.0.44 il percorso da clone legacy `BASELINE 1` → `V2` → `V5.9` ha convertito 70 valori valorizzati da `Europe/Rome` a UTC, preservando due null, cinque timestamp con microsecondi, dati, vincoli e indici.
 
 `baseline-on-migrate` deve rimanere `false`. Flyway `clean` è vietato sugli ambienti persistenti ed è disabilitato dalla configurazione. Le tabelle legacy future restano fuori dalla history finché i relativi moduli non saranno progettati e approvati.
 
 ### 12.5 Immutabilità e rollback
 
-V1 e V2 sono immutabili, così come ogni migrazione dopo la prima applicazione. Le correzioni successive usano nuove migrazioni forward-only. Poiché il DDL MySQL comporta commit impliciti, la separazione delle V3 per tabella limita l'ambito di un errore e ne facilita la diagnosi. Il recupero resta basato su backup verificato e ripristino controllato, non sulla cancellazione automatica dello schema.
+V1, V2 e V3 sono immutabili, così come ogni migrazione dopo la prima applicazione. Le correzioni successive usano nuove migrazioni forward-only. La V4 contiene soltanto DML transazionale e non effettua commit manuali; ogni V5 contiene il solo DDL della propria tabella per circoscrivere i commit impliciti MySQL. Il recupero resta basato su backup verificato e ripristino controllato, non sulla cancellazione automatica dello schema.
+
+V4 e V5 sono state validate su database MySQL isolati sia da schema vuoto sia da clone legacy. Le prove negative hanno confermato che gap, overlap o schema inatteso interrompono V4 prima del primo DML; sono stati verificati anche auditing applicativo, mapping `Instant` e conservazione della precisione a microsecondi. Il database locale reale `support_trainer` non è stato baselinato o migrato. Il rilascio deve coordinare backend, configurazione JDBC/Hibernate UTC e migrazioni V4/V5 nella stessa finestra approvata.

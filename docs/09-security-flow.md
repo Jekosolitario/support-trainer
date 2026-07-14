@@ -736,6 +736,6 @@ Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti
 
 ## 26. Riferimento temporale dei flussi di sicurezza
 
-JWT, verifica email, inviti e timestamp delle risposte di errore usano l'unica fonte temporale applicativa. Il `Clock` tecnico opera in UTC; JWT converte esplicitamente l'`Instant` in `Date` mantenendo invariati claim, algoritmo e durate. Le scadenze ancora persistite come `LocalDateTime` e i timestamp degli errori vengono temporaneamente derivati nella zona business `Europe/Rome`, preservando il contratto HTTP esistente.
+JWT, verifica email, inviti e timestamp delle risposte di errore usano l'unica fonte temporale applicativa. Il `Clock` tecnico opera in UTC; JWT converte esplicitamente l'`Instant` in `Date` mantenendo invariati claim, algoritmo e durate. Le scadenze di verifica email e invito sono ora `Instant` persistiti in UTC e durano rispettivamente 24 e 168 ore reali. Il timestamp non persistito di `ErrorResponse` resta intenzionalmente nel precedente contratto civile.
 
-I test di sicurezza possono sostituire il bean con `Clock.fixed`, rendendo deterministici issued-at, expiration, consumo dei token e timestamp 401/403. Il formato JSON non cambia in questo step e continua a non contenere offset; la migrazione a timestamp UTC/offset espliciti resta pianificata.
+I test di sicurezza possono sostituire il bean con `Clock.fixed`, rendendo deterministici issued-at, expiration, consumo dei token e timestamp 401/403. Le scadenze esposte per gli inviti sono serializzate in ISO-8601 UTC con `Z`; endpoint e messaggi restano invariati.
