@@ -99,7 +99,7 @@ class BusinessFlowClockTest {
         when(slotRepository.findActiveByIdForUpdate(10L)).thenReturn(Optional.of(slot));
         when(slot.getProfessional()).thenReturn(professional);
         when(slot.getStatus()).thenReturn(AvailabilitySlotStatus.AVAILABLE);
-        when(slot.getStartDateTime()).thenReturn(FIXED_BUSINESS_DATE_TIME);
+        when(slot.getStartDateTime()).thenReturn(FIXED_INSTANT);
         when(professional.getId()).thenReturn(1L);
         when(professional.getActive()).thenReturn(true);
         when(professional.getAccountStatus()).thenReturn(AccountStatus.ACTIVE);

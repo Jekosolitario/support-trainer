@@ -1,8 +1,8 @@
 package it.zuperman.support_trainer.invite.service;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -28,7 +28,20 @@ class InviteCodeServiceTimeTest {
     @Test
     void shouldCreateInviteExpiryFromFixedClock() {
         Instant fixedInstant = Instant.parse("2026-07-13T15:30:45Z");
-        LocalDateTime fixedBusinessDateTime = LocalDateTime.of(2026, 7, 13, 17, 30, 45);
+        assertInviteValidity(fixedInstant);
+    }
+
+    @Test
+    void shouldKeepExactOneHundredSixtyEightHourValidityAcrossSpringDstChange() {
+        assertInviteValidity(Instant.parse("2026-03-25T12:00:00Z"));
+    }
+
+    @Test
+    void shouldKeepExactOneHundredSixtyEightHourValidityAcrossAutumnDstChange() {
+        assertInviteValidity(Instant.parse("2026-10-21T12:00:00Z"));
+    }
+
+    private static void assertInviteValidity(Instant fixedInstant) {
         InviteCodeRepository inviteCodeRepository = mock(InviteCodeRepository.class);
         ProfessionalProfileRepository professionalRepository = mock(ProfessionalProfileRepository.class);
         ProfessionalProfile professional = activeProfessional();
@@ -44,7 +57,7 @@ class InviteCodeServiceTimeTest {
 
         InviteCode inviteCode = service.createInviteCode("professional@example.com");
 
-        assertThat(inviteCode.getExpiresAt()).isEqualTo(fixedBusinessDateTime.plusDays(7));
+        assertThat(inviteCode.getExpiresAt()).isEqualTo(fixedInstant.plus(Duration.ofHours(168)));
     }
 
     private static ProfessionalProfile activeProfessional() {

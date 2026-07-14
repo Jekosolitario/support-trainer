@@ -1,6 +1,6 @@
 package it.zuperman.support_trainer.invite.dto.response;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import it.zuperman.support_trainer.invite.entity.InviteCode;
 
@@ -9,11 +9,11 @@ public class InviteCodeResponse {
     private Long id;
     private String code;
     private Long professionalId;
-    private LocalDateTime expiresAt;
+    private Instant expiresAt;
     private Boolean used;
-    private LocalDateTime usedAt;
+    private Instant usedAt;
     private Boolean active;
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     public InviteCodeResponse() {
     }
@@ -22,11 +22,11 @@ public class InviteCodeResponse {
             Long id,
             String code,
             Long professionalId,
-            LocalDateTime expiresAt,
+            Instant expiresAt,
             Boolean used,
-            LocalDateTime usedAt,
+            Instant usedAt,
             Boolean active,
-            LocalDateTime createdAt
+            Instant createdAt
     ) {
         this.id = id;
         this.code = code;
@@ -75,11 +75,11 @@ public class InviteCodeResponse {
         this.professionalId = professionalId;
     }
 
-    public LocalDateTime getExpiresAt() {
+    public Instant getExpiresAt() {
         return expiresAt;
     }
 
-    public void setExpiresAt(LocalDateTime expiresAt) {
+    public void setExpiresAt(Instant expiresAt) {
         this.expiresAt = expiresAt;
     }
 
@@ -91,11 +91,11 @@ public class InviteCodeResponse {
         this.used = used;
     }
 
-    public LocalDateTime getUsedAt() {
+    public Instant getUsedAt() {
         return usedAt;
     }
 
-    public void setUsedAt(LocalDateTime usedAt) {
+    public void setUsedAt(Instant usedAt) {
         this.usedAt = usedAt;
     }
 
@@ -107,11 +107,11 @@ public class InviteCodeResponse {
         this.active = active;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 }

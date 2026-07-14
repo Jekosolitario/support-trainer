@@ -1,6 +1,7 @@
 package it.zuperman.support_trainer.invite.service;
 
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,7 +21,7 @@ import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRe
 @Service
 public class InviteCodeService {
 
-    private static final int INVITE_CODE_VALIDITY_DAYS = 7;
+    private static final Duration INVITE_CODE_VALIDITY = Duration.ofHours(168);
 
     private final InviteCodeRepository inviteCodeRepository;
     private final ProfessionalProfileRepository professionalProfileRepository;
@@ -41,7 +42,7 @@ public class InviteCodeService {
         ProfessionalProfile professional = getVerifiedActiveProfessional(professionalEmail);
 
         String code = buildReadableCode();
-        LocalDateTime expiresAt = timeProvider.nowBusinessDateTime().plusDays(INVITE_CODE_VALIDITY_DAYS);
+        Instant expiresAt = timeProvider.nowInstant().plus(INVITE_CODE_VALIDITY);
 
         InviteCode inviteCode = new InviteCode(code, professional, expiresAt);
 
@@ -97,7 +98,7 @@ public class InviteCodeService {
             );
         }
 
-        if (!inviteCode.getExpiresAt().isAfter(timeProvider.nowBusinessDateTime())) {
+        if (!inviteCode.getExpiresAt().isAfter(timeProvider.nowInstant())) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
                     "INVITE_CODE_EXPIRED",
@@ -207,7 +208,7 @@ public class InviteCodeService {
             );
         }
 
-        if (!inviteCode.getExpiresAt().isAfter(timeProvider.nowBusinessDateTime())) {
+        if (!inviteCode.getExpiresAt().isAfter(timeProvider.nowInstant())) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
                     "INVITE_CODE_EXPIRED",

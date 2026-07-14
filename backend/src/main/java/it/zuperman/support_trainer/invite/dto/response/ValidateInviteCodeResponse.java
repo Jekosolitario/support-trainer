@@ -1,6 +1,6 @@
 package it.zuperman.support_trainer.invite.dto.response;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import it.zuperman.support_trainer.invite.entity.InviteCode;
 
@@ -9,7 +9,7 @@ public class ValidateInviteCodeResponse {
     private Boolean valid;
     private String code;
     private Long professionalId;
-    private LocalDateTime expiresAt;
+    private Instant expiresAt;
 
     public ValidateInviteCodeResponse() {
     }
@@ -18,7 +18,7 @@ public class ValidateInviteCodeResponse {
             Boolean valid,
             String code,
             Long professionalId,
-            LocalDateTime expiresAt
+            Instant expiresAt
     ) {
         this.valid = valid;
         this.code = code;
@@ -59,11 +59,11 @@ public class ValidateInviteCodeResponse {
         this.professionalId = professionalId;
     }
 
-    public LocalDateTime getExpiresAt() {
+    public Instant getExpiresAt() {
         return expiresAt;
     }
 
-    public void setExpiresAt(LocalDateTime expiresAt) {
+    public void setExpiresAt(Instant expiresAt) {
         this.expiresAt = expiresAt;
     }
 }

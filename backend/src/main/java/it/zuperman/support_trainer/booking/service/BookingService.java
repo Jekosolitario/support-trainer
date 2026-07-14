@@ -1,6 +1,5 @@
 package it.zuperman.support_trainer.booking.service;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -268,7 +267,7 @@ public class BookingService {
                 );
             }
 
-            if (!slot.getStartDateTime().isAfter(timeProvider.nowBusinessDateTime())) {
+            if (!slot.getStartDateTime().isAfter(timeProvider.nowInstant())) {
                 throw new AppException(
                         HttpStatus.CONFLICT,
                         "AVAILABILITY_SLOT_NOT_CONFIRMABLE",
@@ -355,7 +354,7 @@ public class BookingService {
             );
         }
 
-        if (!slot.getStartDateTime().isAfter(timeProvider.nowBusinessDateTime())) {
+        if (!slot.getStartDateTime().isAfter(timeProvider.nowInstant())) {
             throw new AppException(
                     HttpStatus.CONFLICT,
                     "AVAILABILITY_SLOT_NOT_BOOKABLE",

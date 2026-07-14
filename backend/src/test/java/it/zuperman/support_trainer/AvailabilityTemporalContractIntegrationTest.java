@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.stream.Stream;
 
@@ -53,7 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     AvailabilityTemporalContractIntegrationTest.FixedClockConfiguration.class
 })
 @AutoConfigureMockMvc
-@AutoConfigureTestDatabase
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 @Transactional
 class AvailabilityTemporalContractIntegrationTest {
@@ -115,8 +114,8 @@ class AvailabilityTemporalContractIntegrationTest {
     void shouldUpdateAvailabilityAndListItWithOffset() throws Exception {
         AvailabilitySlot slot = availabilitySlotRepository.saveAndFlush(new AvailabilitySlot(
                 professional,
-                LocalDateTime.parse("2026-01-20T17:30:00"),
-                LocalDateTime.parse("2026-01-20T18:30:00")
+                Instant.parse("2026-01-20T16:30:00Z"),
+                Instant.parse("2026-01-20T17:30:00Z")
         ));
 
         mockMvc.perform(patch("/api/v1/availability/{slotId}", slot.getId())
@@ -182,8 +181,8 @@ class AvailabilityTemporalContractIntegrationTest {
         professionalClientLinkRepository.saveAndFlush(new ProfessionalClientLink(professional, client));
         AvailabilitySlot slot = availabilitySlotRepository.saveAndFlush(new AvailabilitySlot(
                 professional,
-                LocalDateTime.parse("2026-07-20T17:30:00"),
-                LocalDateTime.parse("2026-07-20T18:30:00")
+                Instant.parse("2026-07-20T15:30:00Z"),
+                Instant.parse("2026-07-20T16:30:00Z")
         ));
 
         mockMvc.perform(post("/api/v1/bookings")

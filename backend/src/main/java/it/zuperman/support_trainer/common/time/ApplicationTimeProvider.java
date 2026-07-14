@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
 import org.springframework.stereotype.Component;
@@ -21,7 +22,7 @@ public class ApplicationTimeProvider {
     }
 
     public Instant nowInstant() {
-        return clock.instant();
+        return clock.instant().truncatedTo(ChronoUnit.MICROS);
     }
 
     public LocalDateTime nowBusinessDateTime() {

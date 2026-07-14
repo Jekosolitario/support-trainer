@@ -1,6 +1,9 @@
 package it.zuperman.support_trainer.availability.entity;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import it.zuperman.support_trainer.common.entity.BaseEntity;
 import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
@@ -29,11 +32,13 @@ public class AvailabilitySlot extends BaseEntity {
     @JoinColumn(name = "professional_id", nullable = false)
     private ProfessionalProfile professional;
 
-    @Column(name = "start_date_time", nullable = false)
-    private LocalDateTime startDateTime;
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
+    @Column(name = "start_date_time", nullable = false, columnDefinition = "DATETIME(6)")
+    private Instant startDateTime;
 
-    @Column(name = "end_date_time", nullable = false)
-    private LocalDateTime endDateTime;
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
+    @Column(name = "end_date_time", nullable = false, columnDefinition = "DATETIME(6)")
+    private Instant endDateTime;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
@@ -44,8 +49,8 @@ public class AvailabilitySlot extends BaseEntity {
 
     public AvailabilitySlot(
             ProfessionalProfile professional,
-            LocalDateTime startDateTime,
-            LocalDateTime endDateTime
+            Instant startDateTime,
+            Instant endDateTime
     ) {
         this.professional = professional;
         this.startDateTime = startDateTime;

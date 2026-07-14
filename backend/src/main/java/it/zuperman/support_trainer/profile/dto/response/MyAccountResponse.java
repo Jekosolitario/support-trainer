@@ -1,6 +1,6 @@
 package it.zuperman.support_trainer.profile.dto.response;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import it.zuperman.support_trainer.common.entity.User;
 
@@ -11,8 +11,8 @@ public class MyAccountResponse {
     private String role;
     private String accountStatus;
     private Boolean emailVerified;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
 
     public MyAccountResponse() {
     }
@@ -23,8 +23,8 @@ public class MyAccountResponse {
             String role,
             String accountStatus,
             Boolean emailVerified,
-            LocalDateTime createdAt,
-            LocalDateTime updatedAt
+            Instant createdAt,
+            Instant updatedAt
     ) {
         this.id = id;
         this.email = email;
@@ -87,19 +87,19 @@ public class MyAccountResponse {
         this.emailVerified = emailVerified;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
-    public LocalDateTime getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(LocalDateTime updatedAt) {
+    public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
     }
 }

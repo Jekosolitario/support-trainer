@@ -3,6 +3,8 @@ package it.zuperman.support_trainer;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -89,7 +91,7 @@ class BookingServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -125,12 +127,12 @@ class BookingServiceIntegrationTest {
 
         LocalDateTime startDateTimeA = LocalDateTime.now().plusDays(30).withNano(0);
         AvailabilitySlot slotA = availabilitySlotRepository.save(
-                new AvailabilitySlot(professionalA, startDateTimeA, startDateTimeA.plusHours(1))
+                new AvailabilitySlot(professionalA, asBusinessInstant(startDateTimeA), asBusinessInstant(startDateTimeA.plusHours(1)))
         );
 
         LocalDateTime startDateTimeB = LocalDateTime.now().plusDays(31).withNano(0);
         AvailabilitySlot slotB = availabilitySlotRepository.save(
-                new AvailabilitySlot(professionalB, startDateTimeB, startDateTimeB.plusHours(1))
+                new AvailabilitySlot(professionalB, asBusinessInstant(startDateTimeB), asBusinessInstant(startDateTimeB.plusHours(1)))
         );
 
         authenticateAs(clientA.getEmail(), "CLIENT");
@@ -175,7 +177,7 @@ class BookingServiceIntegrationTest {
 
         LocalDateTime startDateTime = LocalDateTime.now().plusDays(32).withNano(0);
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professionalA, startDateTime, startDateTime.plusHours(1))
+                new AvailabilitySlot(professionalA, asBusinessInstant(startDateTime), asBusinessInstant(startDateTime.plusHours(1)))
         );
 
         authenticateAs(clientA.getEmail(), "CLIENT");
@@ -268,7 +270,7 @@ class BookingServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -294,7 +296,7 @@ class BookingServiceIntegrationTest {
 
         LocalDateTime startDateTime = LocalDateTime.now().plusDays(33).withNano(0);
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, startDateTime.plusHours(1))
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(startDateTime.plusHours(1)))
         );
 
         authenticateAs(professional.getEmail(), "PROFESSIONAL");
@@ -326,7 +328,7 @@ class BookingServiceIntegrationTest {
 
         LocalDateTime startDateTime = LocalDateTime.now().plusDays(34).withNano(0);
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, startDateTime.plusHours(1))
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(startDateTime.plusHours(1)))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -365,7 +367,7 @@ class BookingServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -406,7 +408,7 @@ class BookingServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -447,7 +449,7 @@ class BookingServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -486,7 +488,7 @@ class BookingServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -535,7 +537,7 @@ class BookingServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -583,7 +585,7 @@ class BookingServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -625,7 +627,7 @@ class BookingServiceIntegrationTest {
         LocalDateTime endDateTime = LocalDateTime.now().minusHours(1).withNano(0);
 
         AvailabilitySlot expiredSlot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -669,7 +671,7 @@ class BookingServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot invalidSlot = availabilitySlotRepository.save(
-                new AvailabilitySlot(nutritionist, startDateTime, endDateTime)
+                new AvailabilitySlot(nutritionist, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -698,7 +700,7 @@ class BookingServiceIntegrationTest {
         LocalDateTime futureEndDateTime = futureStartDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, futureStartDateTime, futureEndDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(futureStartDateTime), asBusinessInstant(futureEndDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -711,8 +713,8 @@ class BookingServiceIntegrationTest {
         BookingRequestResponse pendingResponse
                 = bookingService.createBookingRequest(request);
 
-        slot.setStartDateTime(LocalDateTime.now().minusHours(2).withNano(0));
-        slot.setEndDateTime(LocalDateTime.now().minusHours(1).withNano(0));
+        slot.setStartDateTime(asBusinessInstant(LocalDateTime.now().minusHours(2).withNano(0)));
+        slot.setEndDateTime(asBusinessInstant(LocalDateTime.now().minusHours(1).withNano(0)));
         availabilitySlotRepository.save(slot);
 
         authenticateAs(professional.getEmail(), "PROFESSIONAL");
@@ -749,7 +751,7 @@ class BookingServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot invalidSlot = availabilitySlotRepository.save(
-                new AvailabilitySlot(nutritionist, startDateTime, endDateTime)
+                new AvailabilitySlot(nutritionist, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         BookingRequest bookingRequest = bookingRequestRepository.save(
@@ -785,7 +787,7 @@ class BookingServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -805,5 +807,8 @@ class BookingServiceIntegrationTest {
         assertThatThrownBy(() -> bookingService.createBookingRequest(secondRequest))
                 .isInstanceOf(AppException.class)
                 .hasMessage("Esiste già una richiesta di prenotazione in attesa per questo slot");
+    }
+    private static Instant asBusinessInstant(LocalDateTime localDateTime) {
+        return localDateTime.atZone(ZoneId.of("Europe/Rome")).toInstant();
     }
 }

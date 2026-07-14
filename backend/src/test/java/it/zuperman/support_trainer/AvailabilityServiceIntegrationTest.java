@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
@@ -240,7 +241,7 @@ class AvailabilityServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -265,7 +266,7 @@ class AvailabilityServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -284,7 +285,7 @@ class AvailabilityServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         AvailabilitySlotResponse blockedResponse
@@ -340,8 +341,8 @@ class AvailabilityServiceIntegrationTest {
         AvailabilitySlot unchangedSlot = availabilitySlotRepository.findById(createdSlot.getId())
                 .orElseThrow();
 
-        assertThat(unchangedSlot.getStartDateTime()).isEqualTo(startDateTime);
-        assertThat(unchangedSlot.getEndDateTime()).isEqualTo(endDateTime);
+        assertThat(unchangedSlot.getStartDateTime()).isEqualTo(asBusinessInstant(startDateTime));
+        assertThat(unchangedSlot.getEndDateTime()).isEqualTo(asBusinessInstant(endDateTime));
         assertThat(unchangedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
     }
 
@@ -355,7 +356,7 @@ class AvailabilityServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         availabilityService.blockAvailabilitySlot(slot.getId());
@@ -382,16 +383,16 @@ class AvailabilityServiceIntegrationTest {
         AvailabilitySlot expiredSlot = availabilitySlotRepository.save(
                 new AvailabilitySlot(
                         professional,
-                        LocalDateTime.now().minusHours(2).withNano(0),
-                        LocalDateTime.now().minusHours(1).withNano(0)
+                        asBusinessInstant(LocalDateTime.now().minusHours(2).withNano(0)),
+                        asBusinessInstant(LocalDateTime.now().minusHours(1).withNano(0))
                 )
         );
 
         AvailabilitySlot futureSlot = availabilitySlotRepository.save(
                 new AvailabilitySlot(
                         professional,
-                        LocalDateTime.now().plusDays(21).withNano(0),
-                        LocalDateTime.now().plusDays(21).plusHours(1).withNano(0)
+                        asBusinessInstant(LocalDateTime.now().plusDays(21).withNano(0)),
+                        asBusinessInstant(LocalDateTime.now().plusDays(21).plusHours(1).withNano(0))
                 )
         );
 
@@ -455,7 +456,7 @@ class AvailabilityServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -490,7 +491,7 @@ class AvailabilityServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -525,7 +526,7 @@ class AvailabilityServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(requestingClient.getEmail(), "CLIENT");
@@ -556,7 +557,7 @@ class AvailabilityServiceIntegrationTest {
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
-                new AvailabilitySlot(professional, startDateTime, endDateTime)
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
@@ -581,5 +582,9 @@ class AvailabilityServiceIntegrationTest {
 
     private static OffsetDateTime asBusinessOffset(LocalDateTime localDateTime) {
         return localDateTime.atZone(BUSINESS_ZONE).toOffsetDateTime();
+    }
+
+    private static Instant asBusinessInstant(LocalDateTime localDateTime) {
+        return localDateTime.atZone(BUSINESS_ZONE).toInstant();
     }
 }

@@ -1,6 +1,6 @@
 package it.zuperman.support_trainer.common.time;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.TimeZone;
@@ -20,30 +20,30 @@ class BusinessDateTimeMapperTest {
     );
 
     @Test
-    void shouldAcceptSummerOffsetAndConvertRequestToLocalDateTime() {
+    void shouldAcceptSummerOffsetAndConvertRequestToInstant() {
         OffsetDateTime value = OffsetDateTime.parse("2026-07-13T17:30:00+02:00");
 
-        assertThat(mapper.toBusinessLocalDateTime(value))
-                .isEqualTo(LocalDateTime.parse("2026-07-13T17:30:00"));
+        assertThat(mapper.toInstant(value))
+                .isEqualTo(Instant.parse("2026-07-13T15:30:00Z"));
     }
 
     @Test
-    void shouldAcceptWinterOffsetAndConvertRequestToLocalDateTime() {
+    void shouldAcceptWinterOffsetAndConvertRequestToInstant() {
         OffsetDateTime value = OffsetDateTime.parse("2026-01-13T17:30:00+01:00");
 
-        assertThat(mapper.toBusinessLocalDateTime(value))
-                .isEqualTo(LocalDateTime.parse("2026-01-13T17:30:00"));
+        assertThat(mapper.toInstant(value))
+                .isEqualTo(Instant.parse("2026-01-13T16:30:00Z"));
     }
 
     @Test
-    void shouldMapSummerLocalDateTimeToExpectedOffset() {
-        assertThat(mapper.toBusinessOffsetDateTime(LocalDateTime.parse("2026-07-13T17:30:00")))
+    void shouldMapSummerInstantToExpectedOffset() {
+        assertThat(mapper.toBusinessOffsetDateTime(Instant.parse("2026-07-13T15:30:00Z")))
                 .isEqualTo(OffsetDateTime.parse("2026-07-13T17:30:00+02:00"));
     }
 
     @Test
-    void shouldMapWinterLocalDateTimeToExpectedOffset() {
-        assertThat(mapper.toBusinessOffsetDateTime(LocalDateTime.parse("2026-01-13T17:30:00")))
+    void shouldMapWinterInstantToExpectedOffset() {
+        assertThat(mapper.toBusinessOffsetDateTime(Instant.parse("2026-01-13T16:30:00Z")))
                 .isEqualTo(OffsetDateTime.parse("2026-01-13T17:30:00+01:00"));
     }
 
@@ -90,18 +90,8 @@ class BusinessDateTimeMapperTest {
     }
 
     @Test
-    void shouldRejectPersistedSpringGapWithoutInventingOffset() {
-        assertInvalidStoredValue(LocalDateTime.parse("2026-03-29T02:30:00"));
-    }
-
-    @Test
-    void shouldRejectPersistedAutumnOverlapWithoutChoosingOffset() {
-        assertInvalidStoredValue(LocalDateTime.parse("2026-10-25T02:30:00"));
-    }
-
-    @Test
     void shouldRejectPersistedFractionsWithoutRounding() {
-        assertInvalidStoredValue(LocalDateTime.parse("2026-07-13T17:30:00.000001"));
+        assertInvalidStoredValue(Instant.parse("2026-07-13T15:30:00.000001Z"));
     }
 
     @Test
@@ -111,7 +101,7 @@ class BusinessDateTimeMapperTest {
         try {
             TimeZone.setDefault(TimeZone.getTimeZone("America/New_York"));
 
-            assertThat(mapper.toBusinessOffsetDateTime(LocalDateTime.parse("2026-07-13T17:30:00")))
+            assertThat(mapper.toBusinessOffsetDateTime(Instant.parse("2026-07-13T15:30:00Z")))
                     .isEqualTo(OffsetDateTime.parse("2026-07-13T17:30:00+02:00"));
         } finally {
             TimeZone.setDefault(originalDefault);
@@ -119,14 +109,14 @@ class BusinessDateTimeMapperTest {
     }
 
     private void assertInvalidRequest(String value) {
-        assertThatThrownBy(() -> mapper.toBusinessLocalDateTime(OffsetDateTime.parse(value)))
+        assertThatThrownBy(() -> mapper.toInstant(OffsetDateTime.parse(value)))
                 .isInstanceOfSatisfying(AppException.class, exception -> {
                     assertThat(exception.getStatus().value()).isEqualTo(400);
                     assertThat(exception.getErrorCode()).isEqualTo("VALIDATION_ERROR");
                 });
     }
 
-    private void assertInvalidStoredValue(LocalDateTime value) {
+    private void assertInvalidStoredValue(Instant value) {
         assertThatThrownBy(() -> mapper.toBusinessOffsetDateTime(value))
                 .isInstanceOfSatisfying(AppException.class, exception -> {
                     assertThat(exception.getStatus().value()).isEqualTo(500);

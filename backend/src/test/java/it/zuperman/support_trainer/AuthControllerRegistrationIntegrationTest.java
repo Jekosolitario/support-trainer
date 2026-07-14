@@ -1,7 +1,7 @@
 package it.zuperman.support_trainer;
 
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import com.jayway.jsonpath.JsonPath;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,7 +36,7 @@ import jakarta.transaction.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@AutoConfigureTestDatabase
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 @Transactional
 class AuthControllerRegistrationIntegrationTest {
@@ -243,7 +243,7 @@ class AuthControllerRegistrationIntegrationTest {
         InviteCode inviteCode = new InviteCode(
                 inviteCodeValue,
                 savedProfessional,
-                LocalDateTime.now().plusDays(1)
+                Instant.now().plusSeconds(86_400)
         );
         inviteCodeRepository.saveAndFlush(inviteCode);
 

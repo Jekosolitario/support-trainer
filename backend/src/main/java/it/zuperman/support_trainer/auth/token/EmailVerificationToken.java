@@ -1,12 +1,16 @@
 package it.zuperman.support_trainer.auth.token;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
-import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import it.zuperman.support_trainer.common.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -23,6 +27,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
+@EntityListeners(AuditingEntityListener.class)
 @Table(name = "email_verification_tokens")
 public class EmailVerificationToken {
 
@@ -39,36 +44,39 @@ public class EmailVerificationToken {
     @Column(name = "token", nullable = false, unique = true, length = 500)
     private String token;
 
-    @Column(name = "expires_at", nullable = false)
-    private LocalDateTime expiresAt;
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
+    @Column(name = "expires_at", nullable = false, columnDefinition = "DATETIME(6)")
+    private Instant expiresAt;
 
     @Column(name = "used", nullable = false)
     private Boolean used = false;
 
-    @Column(name = "used_at")
-    private LocalDateTime usedAt;
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
+    @Column(name = "used_at", columnDefinition = "DATETIME(6)")
+    private Instant usedAt;
 
-    @CreationTimestamp
+    @CreatedDate
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
     @Setter(AccessLevel.NONE)
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "DATETIME(6)")
+    private Instant createdAt;
 
-    public EmailVerificationToken(User user, String token, LocalDateTime expiresAt) {
+    public EmailVerificationToken(User user, String token, Instant expiresAt) {
         this.user = user;
         this.token = token;
         this.expiresAt = expiresAt;
         this.used = false;
     }
 
-    public boolean isExpired(LocalDateTime currentDateTime) {
+    public boolean isExpired(Instant currentDateTime) {
         return !expiresAt.isAfter(currentDateTime);
     }
 
-    public boolean isUsable(LocalDateTime currentDateTime) {
+    public boolean isUsable(Instant currentDateTime) {
         return Boolean.FALSE.equals(used) && !isExpired(currentDateTime);
     }
 
-    public void markAsUsed(LocalDateTime usedAt) {
+    public void markAsUsed(Instant usedAt) {
         this.used = true;
         this.usedAt = usedAt;
     }

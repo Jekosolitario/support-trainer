@@ -31,6 +31,16 @@ class ApplicationTimeProviderTest {
     }
 
     @Test
+    void shouldTruncateNanosecondsToMicrosecondsWithoutRounding() {
+        Instant nanosecondInstant = Instant.parse("2026-07-13T15:30:45.123456999Z");
+        ApplicationTimeProvider timeProvider = fixedTimeProvider(nanosecondInstant);
+
+        assertThat(timeProvider.nowInstant())
+                .isEqualTo(Instant.parse("2026-07-13T15:30:45.123456Z"));
+        assertThat(timeProvider.nowInstant().getNano() % 1_000).isZero();
+    }
+
+    @Test
     void shouldConvertSummerInstantUsingDaylightSavingOffset() {
         ApplicationTimeProvider timeProvider = fixedTimeProvider(Instant.parse("2026-07-13T15:30:00Z"));
 

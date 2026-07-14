@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -17,6 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+
+import db.migration.V4__convert_runtime_datetimes_from_rome_to_utc;
 
 class FlywayMigrationResourcesTest {
 
@@ -31,7 +35,28 @@ class FlywayMigrationResourcesTest {
             "db/migration/V3_6__expand_email_verification_tokens_timestamps_to_microseconds.sql",
             "db/migration/V3_7__expand_availability_slots_timestamps_to_microseconds.sql",
             "db/migration/V3_8__expand_booking_requests_timestamps_to_microseconds.sql",
-            "db/migration/V3_9__expand_booking_request_items_timestamps_to_microseconds.sql"
+            "db/migration/V3_9__expand_booking_request_items_timestamps_to_microseconds.sql",
+            "db/migration/V5_1__transfer_users_audit_ownership_to_application.sql",
+            "db/migration/V5_2__freeze_professional_profile_shadow_timestamps.sql",
+            "db/migration/V5_3__freeze_client_profile_shadow_timestamps.sql",
+            "db/migration/V5_4__transfer_link_audit_ownership_to_application.sql",
+            "db/migration/V5_5__transfer_invite_audit_ownership_to_application.sql",
+            "db/migration/V5_6__transfer_email_token_audit_ownership_to_application.sql",
+            "db/migration/V5_7__transfer_availability_audit_ownership_to_application.sql",
+            "db/migration/V5_8__transfer_booking_request_audit_ownership_to_application.sql",
+            "db/migration/V5_9__transfer_booking_item_audit_ownership_to_application.sql"
+    );
+
+    private static final List<V5MigrationContract> V5_MIGRATIONS = List.of(
+            new V5MigrationContract(MIGRATIONS.get(11), "users", false),
+            new V5MigrationContract(MIGRATIONS.get(12), "professional_profiles", true),
+            new V5MigrationContract(MIGRATIONS.get(13), "client_profiles", true),
+            new V5MigrationContract(MIGRATIONS.get(14), "professional_client_links", false),
+            new V5MigrationContract(MIGRATIONS.get(15), "invite_codes", false),
+            new V5MigrationContract(MIGRATIONS.get(16), "email_verification_tokens", false),
+            new V5MigrationContract(MIGRATIONS.get(17), "availability_slots", false),
+            new V5MigrationContract(MIGRATIONS.get(18), "booking_requests", false),
+            new V5MigrationContract(MIGRATIONS.get(19), "booking_request_items", false)
     );
 
     private static final List<V3MigrationContract> V3_MIGRATIONS = List.of(
@@ -147,7 +172,16 @@ class FlywayMigrationResourcesTest {
                         "V3_6__expand_email_verification_tokens_timestamps_to_microseconds.sql",
                         "V3_7__expand_availability_slots_timestamps_to_microseconds.sql",
                         "V3_8__expand_booking_requests_timestamps_to_microseconds.sql",
-                        "V3_9__expand_booking_request_items_timestamps_to_microseconds.sql"
+                        "V3_9__expand_booking_request_items_timestamps_to_microseconds.sql",
+                        "V5_1__transfer_users_audit_ownership_to_application.sql",
+                        "V5_2__freeze_professional_profile_shadow_timestamps.sql",
+                        "V5_3__freeze_client_profile_shadow_timestamps.sql",
+                        "V5_4__transfer_link_audit_ownership_to_application.sql",
+                        "V5_5__transfer_invite_audit_ownership_to_application.sql",
+                        "V5_6__transfer_email_token_audit_ownership_to_application.sql",
+                        "V5_7__transfer_availability_audit_ownership_to_application.sql",
+                        "V5_8__transfer_booking_request_audit_ownership_to_application.sql",
+                        "V5_9__transfer_booking_item_audit_ownership_to_application.sql"
                 )
                 .allMatch(name -> VALID_MIGRATION_NAME.matcher(name).matches());
 
@@ -156,7 +190,7 @@ class FlywayMigrationResourcesTest {
     }
 
     @Test
-    void migrationDirectoryShouldContainOnlyApprovedMigrationsThroughV3() throws IOException {
+    void migrationDirectoryShouldContainOnlyApprovedSqlMigrationsThroughV5() throws IOException {
         Resource[] resources = new PathMatchingResourcePatternResolver()
                 .getResources("classpath*:db/migration/V*__*.sql");
 
@@ -170,13 +204,33 @@ class FlywayMigrationResourcesTest {
     }
 
     @Test
-    void migrationDirectoryShouldNotContainV4OrLater() throws IOException {
-        Resource[] resources = new PathMatchingResourcePatternResolver()
-                .getResources("classpath*:db/migration/V*__*.sql");
+    void v4JavaMigrationShouldHaveExplicitStableChecksumAndNoSchemaChanges() throws IOException {
+        V4__convert_runtime_datetimes_from_rome_to_utc first
+                = new V4__convert_runtime_datetimes_from_rome_to_utc();
+        V4__convert_runtime_datetimes_from_rome_to_utc second
+                = new V4__convert_runtime_datetimes_from_rome_to_utc();
+        String source = Files.readString(
+                Path.of("src/main/java/db/migration/V4__convert_runtime_datetimes_from_rome_to_utc.java"),
+                StandardCharsets.UTF_8
+        );
 
-        assertThat(resources)
-                .extracting(Resource::getFilename)
-                .noneMatch(filename -> filename.matches("^V(?:[4-9]|[1-9][0-9]).*"));
+        assertThat(first.getVersion().toString()).isEqualTo("4");
+        assertThat(first.getChecksum())
+                .isNotNull()
+                .isEqualTo(second.getChecksum())
+                .isNotEqualTo(-1886151667);
+        assertThat(first.canExecuteInTransaction()).isTrue();
+        assertThat(source)
+                .contains("getValidOffsets")
+                .contains("information_schema.COLUMNS")
+                .contains("DATETIME_PRECISION")
+                .contains("IS_NULLABLE")
+                .contains("SELECT DATABASE()")
+                .doesNotContain("DECIMAL_DIGITS")
+                .doesNotContain("DatabaseMetaData")
+                .doesNotContainIgnoringCase("CONVERT_TZ")
+                .doesNotContainPattern("(?i)\\b(CREATE|ALTER|DROP|TRUNCATE)\\s+TABLE\\b")
+                .doesNotContain(".commit(");
     }
 
     @Test
@@ -251,6 +305,38 @@ class FlywayMigrationResourcesTest {
     }
 
     @Test
+    void v5MigrationsShouldOnlyTransferAuditOwnershipOnRuntimeTables() throws IOException {
+        Pattern forbiddenDml = Pattern.compile("(?im)^\\s*(INSERT|UPDATE|DELETE)\\b");
+
+        for (V5MigrationContract contract : V5_MIGRATIONS) {
+            String sql = readResource(contract.path());
+            Matcher matcher = ALTER_TABLE.matcher(sql);
+            Set<String> alteredTables = new LinkedHashSet<>();
+            while (matcher.find()) {
+                alteredTables.add(matcher.group(1).toLowerCase(Locale.ROOT));
+            }
+
+            assertThat(alteredTables).containsExactly(contract.table());
+            assertThat(sql)
+                    .containsIgnoringCase("DATETIME(6)")
+                    .doesNotContainIgnoringCase("DEFAULT CURRENT_TIMESTAMP")
+                    .doesNotContainIgnoringCase("ON UPDATE CURRENT_TIMESTAMP")
+                    .doesNotContainIgnoringCase("CONVERT_TZ");
+            assertThat(forbiddenDml.matcher(sql).find()).isFalse();
+            assertThat(LEGACY_FUTURE_TABLES)
+                    .allSatisfy(table -> assertThat(sql).doesNotContainIgnoringCase(table));
+
+            if (contract.frozenShadowTimestamps()) {
+                assertThat(sql)
+                        .containsIgnoringCase("created_at DATETIME(6) NULL")
+                        .containsIgnoringCase("updated_at DATETIME(6) NULL");
+            } else {
+                assertThat(sql).containsIgnoringCase("created_at DATETIME(6) NOT NULL");
+            }
+        }
+    }
+
+    @Test
     void v2ShouldPreserveBookingItemUpdatedAtMicroseconds() throws IOException {
         String sql = readResource(MIGRATIONS.get(1));
 
@@ -274,13 +360,20 @@ class FlywayMigrationResourcesTest {
         Properties properties = readProperties("application-example.properties");
 
         assertThat(properties.getProperty("spring.jpa.hibernate.ddl-auto")).isEqualTo("validate");
+        assertThat(properties.getProperty("spring.jpa.properties.hibernate.jdbc.time_zone")).isEqualTo("UTC");
+        assertThat(properties.getProperty("app.time.business-zone")).contains("Europe/Rome");
+        assertThat(properties.getProperty("app.time.clock-zone")).contains("UTC");
         assertThat(properties.getProperty("spring.jpa.open-in-view")).isEqualTo("false");
         assertThat(properties.getProperty("spring.flyway.enabled")).isEqualTo("true");
         assertThat(properties.getProperty("spring.flyway.locations")).isEqualTo("classpath:db/migration");
         assertThat(properties.getProperty("spring.flyway.baseline-on-migrate")).isEqualTo("false");
         assertThat(properties.getProperty("spring.flyway.clean-disabled")).isEqualTo("true");
         assertThat(readResource("application-example.properties"))
-                .doesNotContain("spring.flyway.baseline-on-migrate=true");
+                .contains("connectionTimeZone=%2B00:00")
+                .contains("forceConnectionTimeZoneToSession=true")
+                .doesNotContain("hibernate.jdbc.time_zone=SYSTEM")
+                .doesNotContain("hibernate.jdbc.time_zone=Europe/Rome")
+                .doesNotContain("spring.jackson.time-zone");
     }
 
     @Test
@@ -289,6 +382,7 @@ class FlywayMigrationResourcesTest {
 
         assertThat(properties.getProperty("spring.datasource.driver-class-name")).isEqualTo("org.h2.Driver");
         assertThat(properties.getProperty("spring.jpa.hibernate.ddl-auto")).isEqualTo("create-drop");
+        assertThat(properties.getProperty("spring.jpa.properties.hibernate.jdbc.time_zone")).isEqualTo("UTC");
         assertThat(properties.getProperty("spring.jpa.open-in-view")).isEqualTo("false");
         assertThat(properties.getProperty("spring.flyway.enabled")).isEqualTo("false");
         assertThat(readResource("application-test.properties"))
@@ -315,5 +409,8 @@ class FlywayMigrationResourcesTest {
     }
 
     private record V3MigrationContract(String path, String table, List<String> columnDefinitions) {
+    }
+
+    private record V5MigrationContract(String path, String table, boolean frozenShadowTimestamps) {
     }
 }

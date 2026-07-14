@@ -1,6 +1,6 @@
 package it.zuperman.support_trainer;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
@@ -26,7 +26,7 @@ import jakarta.transaction.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@AutoConfigureTestDatabase
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 @Transactional
 class AuthControllerEmailVerificationIntegrationTest {
@@ -166,7 +166,7 @@ class AuthControllerEmailVerificationIntegrationTest {
                 .orElseThrow();
 
         assertThat(verificationToken.getUsed()).isFalse();
-        verificationToken.setExpiresAt(LocalDateTime.now().minusDays(1));
+        verificationToken.setExpiresAt(Instant.now().minusSeconds(86_400));
         emailVerificationTokenRepository.saveAndFlush(verificationToken);
 
         mockMvc.perform(get("/api/v1/auth/verify-email")

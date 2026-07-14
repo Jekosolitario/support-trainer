@@ -1,5 +1,6 @@
 package it.zuperman.support_trainer.common.time;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -46,29 +47,20 @@ public class BusinessDateTimeMapper {
         }
     }
 
-    public LocalDateTime toBusinessLocalDateTime(OffsetDateTime value) {
+    public Instant toInstant(OffsetDateTime value) {
         if (value == null) {
             throw invalidRequest("La data e ora sono obbligatorie");
         }
 
         validateRequestDateTime(value);
-        return value.toLocalDateTime();
+        return value.toInstant();
     }
 
-    public OffsetDateTime toBusinessOffsetDateTime(LocalDateTime value) {
+    public OffsetDateTime toBusinessOffsetDateTime(Instant value) {
         if (value == null || value.getNano() != 0) {
             throw invalidStoredDateTime();
         }
-
-        List<ZoneOffset> validOffsets = timeProperties.businessZone()
-                .getRules()
-                .getValidOffsets(value);
-
-        if (validOffsets.size() != 1) {
-            throw invalidStoredDateTime();
-        }
-
-        return OffsetDateTime.of(value, validOffsets.getFirst());
+        return value.atZone(timeProperties.businessZone()).toOffsetDateTime();
     }
 
     private AppException invalidRequest(String message) {

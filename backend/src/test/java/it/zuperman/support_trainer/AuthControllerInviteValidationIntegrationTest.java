@@ -1,6 +1,6 @@
 package it.zuperman.support_trainer;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
@@ -26,7 +26,7 @@ import jakarta.transaction.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@AutoConfigureTestDatabase
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 @Transactional
 class AuthControllerInviteValidationIntegrationTest {
@@ -95,7 +95,7 @@ class AuthControllerInviteValidationIntegrationTest {
                 "professional.used.invite.validation@example.com"
         );
         inviteCode.setUsed(true);
-        inviteCode.setUsedAt(LocalDateTime.now().minusHours(1));
+        inviteCode.setUsedAt(Instant.now().minusSeconds(3_600));
         inviteCodeRepository.saveAndFlush(inviteCode);
 
         String requestBody = """
@@ -119,7 +119,7 @@ class AuthControllerInviteValidationIntegrationTest {
                 inviteCodeValue,
                 "professional.expired.invite.validation@example.com"
         );
-        inviteCode.setExpiresAt(LocalDateTime.now().minusDays(1));
+        inviteCode.setExpiresAt(Instant.now().minusSeconds(86_400));
         inviteCodeRepository.saveAndFlush(inviteCode);
 
         String requestBody = """
@@ -250,7 +250,7 @@ class AuthControllerInviteValidationIntegrationTest {
         InviteCode inviteCode = new InviteCode(
                 code,
                 savedProfessional,
-                LocalDateTime.now().plusDays(1)
+                Instant.now().plusSeconds(86_400)
         );
 
         return inviteCodeRepository.saveAndFlush(inviteCode);

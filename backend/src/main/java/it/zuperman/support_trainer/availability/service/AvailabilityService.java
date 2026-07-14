@@ -1,7 +1,6 @@
 package it.zuperman.support_trainer.availability.service;
 
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -66,12 +65,10 @@ public class AvailabilityService {
 
         professional = lockProfessionalForAvailabilityChange(professional.getId());
 
-        LocalDateTime startDateTime = businessDateTimeMapper
-                .toBusinessLocalDateTime(request.getStartDateTime());
-        LocalDateTime endDateTime = businessDateTimeMapper
-                .toBusinessLocalDateTime(request.getEndDateTime());
+        Instant startDateTime = businessDateTimeMapper.toInstant(request.getStartDateTime());
+        Instant endDateTime = businessDateTimeMapper.toInstant(request.getEndDateTime());
 
-        validateTimeInterval(request.getStartDateTime(), request.getEndDateTime());
+        validateTimeInterval(startDateTime, endDateTime);
         validateSlotIsInFuture(startDateTime);
 
         validateNoOverlappingSlots(
@@ -116,22 +113,15 @@ public class AvailabilityService {
         validateSlotHasNoBookingHistoryForReschedule(slot.getId());
         validateUpdateRequestNotEmpty(request);
 
-        LocalDateTime newStartDateTime = request.getStartDateTime() != null
-                ? businessDateTimeMapper.toBusinessLocalDateTime(request.getStartDateTime())
+        Instant newStartDateTime = request.getStartDateTime() != null
+                ? businessDateTimeMapper.toInstant(request.getStartDateTime())
                 : slot.getStartDateTime();
 
-        LocalDateTime newEndDateTime = request.getEndDateTime() != null
-                ? businessDateTimeMapper.toBusinessLocalDateTime(request.getEndDateTime())
+        Instant newEndDateTime = request.getEndDateTime() != null
+                ? businessDateTimeMapper.toInstant(request.getEndDateTime())
                 : slot.getEndDateTime();
 
-        OffsetDateTime newStartOffsetDateTime = request.getStartDateTime() != null
-                ? request.getStartDateTime()
-                : businessDateTimeMapper.toBusinessOffsetDateTime(slot.getStartDateTime());
-        OffsetDateTime newEndOffsetDateTime = request.getEndDateTime() != null
-                ? request.getEndDateTime()
-                : businessDateTimeMapper.toBusinessOffsetDateTime(slot.getEndDateTime());
-
-        validateTimeInterval(newStartOffsetDateTime, newEndOffsetDateTime);
+        validateTimeInterval(newStartDateTime, newEndDateTime);
         validateSlotIsInFuture(newStartDateTime);
 
         validateNoOverlappingSlotsExcludingCurrent(
@@ -207,7 +197,7 @@ public class AvailabilityService {
                 .findAvailableSlotsVisibleToClient(
                         professionalId,
                         AvailabilitySlotStatus.AVAILABLE,
-                        timeProvider.nowBusinessDateTime(),
+                        timeProvider.nowInstant(),
                         BookingRequestStatus.PENDING
                 )
                 .stream()
@@ -234,8 +224,8 @@ public class AvailabilityService {
         }
     }
 
-    private void validateTimeInterval(OffsetDateTime startDateTime, OffsetDateTime endDateTime) {
-        if (!startDateTime.toInstant().isBefore(endDateTime.toInstant())) {
+    private void validateTimeInterval(Instant startDateTime, Instant endDateTime) {
+        if (!startDateTime.isBefore(endDateTime)) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
                     "VALIDATION_ERROR",
@@ -244,8 +234,8 @@ public class AvailabilityService {
         }
     }
 
-    private void validateSlotIsInFuture(LocalDateTime startDateTime) {
-        if (!startDateTime.isAfter(timeProvider.nowBusinessDateTime())) {
+    private void validateSlotIsInFuture(Instant startDateTime) {
+        if (!startDateTime.isAfter(timeProvider.nowInstant())) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
                     "AVAILABILITY_SLOT_IN_PAST",
@@ -256,8 +246,8 @@ public class AvailabilityService {
 
     private void validateNoOverlappingSlots(
             Long professionalId,
-            LocalDateTime startDateTime,
-            LocalDateTime endDateTime
+            Instant startDateTime,
+            Instant endDateTime
     ) {
         boolean overlapping = availabilitySlotRepository
                 .existsByProfessional_IdAndActiveTrueAndStartDateTimeLessThanAndEndDateTimeGreaterThan(
@@ -278,8 +268,8 @@ public class AvailabilityService {
     private void validateNoOverlappingSlotsExcludingCurrent(
             Long professionalId,
             Long slotId,
-            LocalDateTime startDateTime,
-            LocalDateTime endDateTime
+            Instant startDateTime,
+            Instant endDateTime
     ) {
         boolean overlapping = availabilitySlotRepository
                 .existsByProfessional_IdAndActiveTrueAndIdNotAndStartDateTimeLessThanAndEndDateTimeGreaterThan(

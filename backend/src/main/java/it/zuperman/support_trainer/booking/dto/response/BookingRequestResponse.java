@@ -1,6 +1,6 @@
 package it.zuperman.support_trainer.booking.dto.response;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 import it.zuperman.support_trainer.booking.entity.BookingRequest;
@@ -14,8 +14,8 @@ public class BookingRequestResponse {
     private String status;
     private String note;
     private Boolean active;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
     private List<BookingRequestItemResponse> items;
 
     public BookingRequestResponse() {
@@ -28,8 +28,8 @@ public class BookingRequestResponse {
             String status,
             String note,
             Boolean active,
-            LocalDateTime createdAt,
-            LocalDateTime updatedAt,
+            Instant createdAt,
+            Instant updatedAt,
             List<BookingRequestItemResponse> items
     ) {
         this.id = id;
@@ -87,11 +87,11 @@ public class BookingRequestResponse {
         return active;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public LocalDateTime getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
     }
 

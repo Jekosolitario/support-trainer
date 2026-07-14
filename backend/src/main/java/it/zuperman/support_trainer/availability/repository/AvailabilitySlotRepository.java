@@ -1,6 +1,6 @@
 package it.zuperman.support_trainer.availability.repository;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,15 +18,15 @@ public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySl
 
     boolean existsByProfessional_IdAndActiveTrueAndStartDateTimeLessThanAndEndDateTimeGreaterThan(
             Long professionalId,
-            LocalDateTime endDateTime,
-            LocalDateTime startDateTime
+            Instant endDateTime,
+            Instant startDateTime
     );
 
     boolean existsByProfessional_IdAndActiveTrueAndIdNotAndStartDateTimeLessThanAndEndDateTimeGreaterThan(
             Long professionalId,
             Long slotId,
-            LocalDateTime endDateTime,
-            LocalDateTime startDateTime
+            Instant endDateTime,
+            Instant startDateTime
     );
 
     List<AvailabilitySlot> findAllByProfessional_IdAndActiveTrueOrderByStartDateTimeAsc(Long professionalId);
@@ -46,7 +46,7 @@ public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySl
 List<AvailabilitySlot> findAvailableSlotsVisibleToClient(
         @Param("professionalId") Long professionalId,
         @Param("status") AvailabilitySlotStatus status,
-        @Param("startDateTime") LocalDateTime startDateTime,
+        @Param("startDateTime") Instant startDateTime,
         @Param("pendingStatus") BookingRequestStatus pendingStatus
 );
 

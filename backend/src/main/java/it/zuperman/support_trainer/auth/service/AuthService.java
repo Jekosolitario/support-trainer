@@ -1,6 +1,7 @@
 package it.zuperman.support_trainer.auth.service;
 
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -38,7 +39,7 @@ import it.zuperman.support_trainer.security.password.BcryptPasswordPolicy;
 @Service
 public class AuthService {
 
-    private static final long EMAIL_VERIFICATION_TOKEN_DURATION_HOURS = 24L;
+    private static final Duration EMAIL_VERIFICATION_TOKEN_VALIDITY = Duration.ofHours(24);
 
     private final UserRepository userRepository;
     private final ProfessionalProfileRepository professionalProfileRepository;
@@ -109,7 +110,7 @@ public class AuthService {
         EmailVerificationToken verificationToken = new EmailVerificationToken(
                 savedProfessional,
                 UUID.randomUUID().toString(),
-                timeProvider.nowBusinessDateTime().plusHours(EMAIL_VERIFICATION_TOKEN_DURATION_HOURS)
+                timeProvider.nowInstant().plus(EMAIL_VERIFICATION_TOKEN_VALIDITY)
         );
 
         emailVerificationTokenRepository.save(verificationToken);
@@ -166,7 +167,7 @@ public class AuthService {
         createProfessionalClientLink(professional, savedClient);
 
         inviteCode.setUsed(true);
-        inviteCode.setUsedAt(timeProvider.nowBusinessDateTime());
+        inviteCode.setUsedAt(timeProvider.nowInstant());
 
         return buildRegistrationResponse(savedClient);
     }
@@ -252,7 +253,7 @@ public class AuthService {
             );
         }
 
-        LocalDateTime currentDateTime = timeProvider.nowBusinessDateTime();
+        Instant currentDateTime = timeProvider.nowInstant();
 
         if (verificationToken.isExpired(currentDateTime)) {
             throw new AppException(
