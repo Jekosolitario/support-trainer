@@ -18,22 +18,18 @@ import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkReposit
 import it.zuperman.support_trainer.professional.dto.response.ProfessionalDetailResponse;
 import it.zuperman.support_trainer.professional.dto.response.ProfessionalSummaryResponse;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
-import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
 
 @Service
 public class ProfessionalService {
 
     private final UserRepository userRepository;
-    private final ProfessionalProfileRepository professionalProfileRepository;
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
 
     public ProfessionalService(
             UserRepository userRepository,
-            ProfessionalProfileRepository professionalProfileRepository,
             ProfessionalClientLinkRepository professionalClientLinkRepository
     ) {
         this.userRepository = userRepository;
-        this.professionalProfileRepository = professionalProfileRepository;
         this.professionalClientLinkRepository = professionalClientLinkRepository;
     }
 
@@ -66,23 +62,15 @@ public class ProfessionalService {
     }
 
     private ProfessionalProfile getAccessibleProfessional(Long clientId, Long professionalId) {
-        ProfessionalProfile professional = professionalProfileRepository.findById(professionalId)
-                .orElseThrow(() -> new AppException(
+        return professionalClientLinkRepository.findAccessibleProfessional(
+                clientId,
+                professionalId,
+                AccountStatus.ACTIVE
+        ).orElseThrow(() -> new AppException(
                 HttpStatus.NOT_FOUND,
                 "PROFESSIONAL_NOT_FOUND",
                 "Professionista non trovato"
         ));
-
-        if (!isReadableProfessional(professional)) {
-            throw new AppException(
-                    HttpStatus.NOT_FOUND,
-                    "PROFESSIONAL_NOT_FOUND",
-                    "Professionista non trovato"
-            );
-        }
-
-        validateProfessionalAccess(clientId, professionalId);
-        return professional;
     }
 
     private void validateAuthenticatedUserAccess(User user) {
@@ -120,21 +108,6 @@ public class ProfessionalService {
                         "Profilo cliente non attivo"
                 );
             }
-        }
-    }
-
-    private void validateProfessionalAccess(Long clientId, Long professionalId) {
-        boolean linked = professionalClientLinkRepository.existsByProfessional_IdAndClient_IdAndActiveTrue(
-                professionalId,
-                clientId
-        );
-
-        if (!linked) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "PROFESSIONAL_ACCESS_DENIED",
-                    "Non puoi accedere a questo professionista"
-            );
         }
     }
 

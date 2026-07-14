@@ -1,6 +1,10 @@
 package it.zuperman.support_trainer;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
@@ -23,10 +27,15 @@ import com.jayway.jsonpath.JsonPath;
 
 import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
 import it.zuperman.support_trainer.auth.token.EmailVerificationToken;
+import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.common.entity.User;
+import it.zuperman.support_trainer.common.enums.AccountStatus;
+import it.zuperman.support_trainer.common.enums.Gender;
+import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
+import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import jakarta.transaction.Transactional;
 
 @SpringBootTest
@@ -58,6 +67,14 @@ class ClientProfessionalAuthorizationIntegrationTest {
 
         mockMvc.perform(get("/api/v1/professionals/my"))
                 .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/clients/{clientId}", Long.MAX_VALUE))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+
+        mockMvc.perform(get("/api/v1/professionals/{professionalId}", Long.MAX_VALUE))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
     }
 
     @Test
@@ -73,6 +90,12 @@ class ClientProfessionalAuthorizationIntegrationTest {
                 inviteCode,
                 "client.wrong.role@example.com"
         );
+        Long professionalId = userRepository.findByEmail("professional.wrong.role@example.com")
+                .orElseThrow()
+                .getId();
+        Long clientId = userRepository.findByEmail("client.wrong.role@example.com")
+                .orElseThrow()
+                .getId();
 
         mockMvc.perform(get("/api/v1/clients/my")
                         .header(HttpHeaders.AUTHORIZATION, bearer(clientToken)))
@@ -81,6 +104,16 @@ class ClientProfessionalAuthorizationIntegrationTest {
         mockMvc.perform(get("/api/v1/professionals/my")
                         .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/v1/clients/{clientId}", clientId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(clientToken)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+
+        mockMvc.perform(get("/api/v1/professionals/{professionalId}", professionalId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
     }
 
     @Test
@@ -287,12 +320,62 @@ class ClientProfessionalAuthorizationIntegrationTest {
 
         mockMvc.perform(get("/api/v1/clients/{clientId}", clientAId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(professionalAToken)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(clientAId));
 
         mockMvc.perform(get("/api/v1/clients/{clientId}", clientAId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(professionalBToken)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("CLIENT_ACCESS_DENIED"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("CLIENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Cliente non trovato"));
+    }
+
+    @Test
+    @DisplayName("Dettaglio cliente non accessibile deve restituire un payload 404 uniforme")
+    void shouldReturnUniformNotFoundForInaccessibleClientDetails() throws Exception {
+        String professionalEmail = "professional.client.uniform.not-found@example.com";
+        String professionalToken = registerVerifyAndLoginProfessional(
+                professionalEmail,
+                "Elisa",
+                "Marchetti"
+        );
+        ProfessionalProfile professional = getProfessional(professionalEmail);
+
+        ClientProfile neverLinkedClient = saveActiveClient("client.never-linked@example.com");
+        ClientProfile inactiveLinkClient = saveActiveClient("client.inactive-link@example.com");
+        ProfessionalClientLink inactiveLink = new ProfessionalClientLink(professional, inactiveLinkClient);
+        inactiveLink.setActive(false);
+        professionalClientLinkRepository.saveAndFlush(inactiveLink);
+
+        ClientProfile inactiveClient = saveActiveClient("client.inactive-profile@example.com");
+        professionalClientLinkRepository.saveAndFlush(new ProfessionalClientLink(professional, inactiveClient));
+        inactiveClient.setActive(false);
+        userRepository.saveAndFlush(inactiveClient);
+
+        List<Map<String, Object>> payloads = List.of(
+                getComparableNotFoundPayload(
+                        "/api/v1/clients/{resourceId}",
+                        Long.MAX_VALUE,
+                        professionalToken
+                ),
+                getComparableNotFoundPayload(
+                        "/api/v1/clients/{resourceId}",
+                        neverLinkedClient.getId(),
+                        professionalToken
+                ),
+                getComparableNotFoundPayload(
+                        "/api/v1/clients/{resourceId}",
+                        inactiveLinkClient.getId(),
+                        professionalToken
+                ),
+                getComparableNotFoundPayload(
+                        "/api/v1/clients/{resourceId}",
+                        inactiveClient.getId(),
+                        professionalToken
+                )
+        );
+
+        assertUniformNotFoundPayload(payloads, "CLIENT_NOT_FOUND", "Cliente non trovato");
     }
 
     @Test
@@ -325,12 +408,145 @@ class ClientProfessionalAuthorizationIntegrationTest {
 
         mockMvc.perform(get("/api/v1/professionals/{professionalId}", professionalAId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(clientAToken)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(professionalAId));
 
         mockMvc.perform(get("/api/v1/professionals/{professionalId}", professionalAId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(clientBToken)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("PROFESSIONAL_ACCESS_DENIED"));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("PROFESSIONAL_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Professionista non trovato"));
+    }
+
+    @Test
+    @DisplayName("Dettaglio professionista non accessibile deve restituire un payload 404 uniforme")
+    void shouldReturnUniformNotFoundForInaccessibleProfessionalDetails() throws Exception {
+        String linkedProfessionalEmail = "professional.client-principal@example.com";
+        String linkedProfessionalToken = registerVerifyAndLoginProfessional(
+                linkedProfessionalEmail,
+                "Lorenzo",
+                "Parisi"
+        );
+        String clientEmail = "client.professional.uniform.not-found@example.com";
+        String clientToken = registerAndLoginClient(createInvite(linkedProfessionalToken), clientEmail);
+        ClientProfile client = getClient(clientEmail);
+
+        ProfessionalProfile neverLinkedProfessional = saveActiveProfessional(
+                "professional.never-linked@example.com"
+        );
+        ProfessionalProfile inactiveLinkProfessional = saveActiveProfessional(
+                "professional.inactive-link@example.com"
+        );
+        ProfessionalClientLink inactiveLink = new ProfessionalClientLink(inactiveLinkProfessional, client);
+        inactiveLink.setActive(false);
+        professionalClientLinkRepository.saveAndFlush(inactiveLink);
+
+        ProfessionalProfile inactiveProfessional = saveActiveProfessional(
+                "professional.inactive-profile@example.com"
+        );
+        professionalClientLinkRepository.saveAndFlush(new ProfessionalClientLink(inactiveProfessional, client));
+        inactiveProfessional.setActive(false);
+        userRepository.saveAndFlush(inactiveProfessional);
+
+        List<Map<String, Object>> payloads = List.of(
+                getComparableNotFoundPayload(
+                        "/api/v1/professionals/{resourceId}",
+                        Long.MAX_VALUE,
+                        clientToken
+                ),
+                getComparableNotFoundPayload(
+                        "/api/v1/professionals/{resourceId}",
+                        neverLinkedProfessional.getId(),
+                        clientToken
+                ),
+                getComparableNotFoundPayload(
+                        "/api/v1/professionals/{resourceId}",
+                        inactiveLinkProfessional.getId(),
+                        clientToken
+                ),
+                getComparableNotFoundPayload(
+                        "/api/v1/professionals/{resourceId}",
+                        inactiveProfessional.getId(),
+                        clientToken
+                )
+        );
+
+        assertUniformNotFoundPayload(
+                payloads,
+                "PROFESSIONAL_NOT_FOUND",
+                "Professionista non trovato"
+        );
+    }
+
+    private Map<String, Object> getComparableNotFoundPayload(
+            String endpoint,
+            Long resourceId,
+            String token
+    ) throws Exception {
+        MvcResult result = mockMvc.perform(get(endpoint, resourceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isNotFound())
+                .andReturn();
+
+        Map<String, Object> payload = new LinkedHashMap<>(JsonPath.read(
+                result.getResponse().getContentAsString(),
+                "$"
+        ));
+        payload.remove("timestamp");
+        return payload;
+    }
+
+    private void assertUniformNotFoundPayload(
+            List<Map<String, Object>> payloads,
+            String errorCode,
+            String message
+    ) {
+        Map<String, Object> expectedPayload = payloads.get(0);
+
+        assertThat(payloads).allMatch(expectedPayload::equals);
+        assertThat(expectedPayload)
+                .containsEntry("status", 404)
+                .containsEntry("error", "NOT_FOUND")
+                .containsEntry("errorCode", errorCode)
+                .containsEntry("message", message);
+        assertThat(expectedPayload.get("validationErrors")).isNull();
+    }
+
+    private ClientProfile saveActiveClient(String email) {
+        ClientProfile client = new ClientProfile(
+                "Cliente",
+                "Test",
+                email,
+                PASSWORD,
+                LocalDate.of(1994, 6, 15),
+                new BigDecimal("175.00"),
+                "Obiettivo test",
+                Gender.OTHER
+        );
+        client.setAccountStatus(AccountStatus.ACTIVE);
+        client.setEmailVerified(true);
+        return userRepository.saveAndFlush(client);
+    }
+
+    private ProfessionalProfile saveActiveProfessional(String email) {
+        ProfessionalProfile professional = new ProfessionalProfile(
+                "Professionista",
+                "Test",
+                email,
+                PASSWORD,
+                ProfessionalSpecialization.PERSONAL_TRAINER
+        );
+        professional.setAccountStatus(AccountStatus.ACTIVE);
+        professional.setEmailVerified(true);
+        return userRepository.saveAndFlush(professional);
+    }
+
+    private ClientProfile getClient(String email) {
+        return (ClientProfile) userRepository.findByEmail(email).orElseThrow();
+    }
+
+    private ProfessionalProfile getProfessional(String email) {
+        return (ProfessionalProfile) userRepository.findByEmail(email).orElseThrow();
     }
 
     private String registerVerifyAndLoginProfessional(

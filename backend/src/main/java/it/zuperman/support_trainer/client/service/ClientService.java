@@ -11,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 import it.zuperman.support_trainer.client.dto.response.ClientDetailResponse;
 import it.zuperman.support_trainer.client.dto.response.ClientSummaryResponse;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
-import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.exception.AppException;
@@ -24,16 +23,13 @@ import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 public class ClientService {
 
     private final UserRepository userRepository;
-    private final ClientProfileRepository clientProfileRepository;
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
 
     public ClientService(
             UserRepository userRepository,
-            ClientProfileRepository clientProfileRepository,
             ProfessionalClientLinkRepository professionalClientLinkRepository
     ) {
         this.userRepository = userRepository;
-        this.clientProfileRepository = clientProfileRepository;
         this.professionalClientLinkRepository = professionalClientLinkRepository;
     }
 
@@ -65,23 +61,15 @@ public class ClientService {
     }
 
     private ClientProfile getAccessibleClient(Long professionalId, Long clientId) {
-        ClientProfile client = clientProfileRepository.findById(clientId)
-                .orElseThrow(() -> new AppException(
+        return professionalClientLinkRepository.findAccessibleClient(
+                professionalId,
+                clientId,
+                AccountStatus.ACTIVE
+        ).orElseThrow(() -> new AppException(
                 HttpStatus.NOT_FOUND,
                 "CLIENT_NOT_FOUND",
                 "Cliente non trovato"
         ));
-
-        if (!isReadableClient(client)) {
-            throw new AppException(
-                    HttpStatus.NOT_FOUND,
-                    "CLIENT_NOT_FOUND",
-                    "Cliente non trovato"
-            );
-        }
-
-        validateClientAccess(professionalId, clientId);
-        return client;
     }
 
     private void validateAuthenticatedUserAccess(User user) {
@@ -119,21 +107,6 @@ public class ClientService {
                         "Profilo cliente non attivo"
                 );
             }
-        }
-    }
-
-    private void validateClientAccess(Long professionalId, Long clientId) {
-        boolean linked = professionalClientLinkRepository.existsByProfessional_IdAndClient_IdAndActiveTrue(
-                professionalId,
-                clientId
-        );
-
-        if (!linked) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "CLIENT_ACCESS_DENIED",
-                    "Non puoi accedere a questo cliente"
-            );
         }
     }
 
