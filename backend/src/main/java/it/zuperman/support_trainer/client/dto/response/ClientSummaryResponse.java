@@ -8,9 +8,6 @@ public class ClientSummaryResponse {
     private String firstName;
     private String lastName;
     private String profileImageUrl;
-    private String operationalStatus;
-    private String primaryGoal;
-    private Boolean active;
 
     public ClientSummaryResponse() {
     }
@@ -19,18 +16,12 @@ public class ClientSummaryResponse {
             Long id,
             String firstName,
             String lastName,
-            String profileImageUrl,
-            String operationalStatus,
-            String primaryGoal,
-            Boolean active
+            String profileImageUrl
     ) {
         this.id = id;
         this.firstName = firstName;
         this.lastName = lastName;
         this.profileImageUrl = profileImageUrl;
-        this.operationalStatus = operationalStatus;
-        this.primaryGoal = primaryGoal;
-        this.active = active;
     }
 
     public static ClientSummaryResponse fromClient(ClientProfile client) {
@@ -38,10 +29,7 @@ public class ClientSummaryResponse {
                 client.getId(),
                 client.getFirstName(),
                 client.getLastName(),
-                client.getProfileImageUrl(),
-                client.getOperationalStatus() != null ? client.getOperationalStatus().name() : null,
-                client.getPrimaryGoal(),
-                client.getActive()
+                client.getProfileImageUrl()
         );
     }
 
@@ -75,29 +63,5 @@ public class ClientSummaryResponse {
 
     public void setProfileImageUrl(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
-    }
-
-    public String getOperationalStatus() {
-        return operationalStatus;
-    }
-
-    public void setOperationalStatus(String operationalStatus) {
-        this.operationalStatus = operationalStatus;
-    }
-
-    public String getPrimaryGoal() {
-        return primaryGoal;
-    }
-
-    public void setPrimaryGoal(String primaryGoal) {
-        this.primaryGoal = primaryGoal;
-    }
-
-    public Boolean getActive() {
-        return active;
-    }
-
-    public void setActive(Boolean active) {
-        this.active = active;
     }
 }
