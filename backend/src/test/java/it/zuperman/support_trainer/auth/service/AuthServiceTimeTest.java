@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -35,6 +36,7 @@ import it.zuperman.support_trainer.security.jwt.JwtService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -61,6 +63,8 @@ class AuthServiceTimeTest {
     private JwtService jwtService;
     @Mock
     private ProfessionalClientLinkRepository professionalClientLinkRepository;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private AuthService authService;
 
@@ -76,8 +80,11 @@ class AuthServiceTimeTest {
                 authenticationManager,
                 jwtService,
                 professionalClientLinkRepository,
-                fixedTimeProvider()
+                fixedTimeProvider(),
+                eventPublisher
         );
+        lenient().when(emailVerificationTokenRepository.save(any(EmailVerificationToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -200,7 +207,8 @@ class AuthServiceTimeTest {
                 authenticationManager,
                 jwtService,
                 professionalClientLinkRepository,
-                fixedTimeProvider(instant)
+                fixedTimeProvider(instant),
+                eventPublisher
         );
     }
 

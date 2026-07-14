@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,7 +34,8 @@ class AuthServicePasswordLimitTest {
             authenticationManager,
             mock(JwtService.class),
             mock(ProfessionalClientLinkRepository.class),
-            mock(ApplicationTimeProvider.class)
+            mock(ApplicationTimeProvider.class),
+            mock(ApplicationEventPublisher.class)
     );
 
     @Test

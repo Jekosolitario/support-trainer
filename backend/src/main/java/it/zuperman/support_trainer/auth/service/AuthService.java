@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -28,6 +29,8 @@ import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
+import it.zuperman.support_trainer.email.event.EmailVerificationRequestedEvent;
+import it.zuperman.support_trainer.email.model.EmailVerificationReason;
 import it.zuperman.support_trainer.invite.entity.InviteCode;
 import it.zuperman.support_trainer.invite.service.InviteCodeService;
 import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
@@ -53,6 +56,7 @@ public class AuthService {
     private final InviteCodeService inviteCodeService;
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
     private final ApplicationTimeProvider timeProvider;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AuthService(
             UserRepository userRepository,
@@ -64,7 +68,8 @@ public class AuthService {
             AuthenticationManager authenticationManager,
             JwtService jwtService,
             ProfessionalClientLinkRepository professionalClientLinkRepository,
-            ApplicationTimeProvider timeProvider
+            ApplicationTimeProvider timeProvider,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.userRepository = userRepository;
         this.professionalProfileRepository = professionalProfileRepository;
@@ -76,6 +81,7 @@ public class AuthService {
         this.jwtService = jwtService;
         this.professionalClientLinkRepository = professionalClientLinkRepository;
         this.timeProvider = timeProvider;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -109,7 +115,12 @@ public class AuthService {
             );
         }
 
-        createEmailVerificationToken(savedProfessional);
+        EmailVerificationToken verificationToken = createEmailVerificationToken(savedProfessional);
+        publishEmailVerificationRequested(
+                savedProfessional,
+                verificationToken,
+                EmailVerificationReason.REGISTRATION
+        );
 
         return buildRegistrationResponse(savedProfessional);
     }
@@ -165,7 +176,8 @@ public class AuthService {
         inviteCode.setUsed(true);
         inviteCode.setUsedAt(timeProvider.nowInstant());
 
-        createEmailVerificationToken(savedClient);
+        EmailVerificationToken verificationToken = createEmailVerificationToken(savedClient);
+        publishEmailVerificationRequested(savedClient, verificationToken, EmailVerificationReason.REGISTRATION);
 
         return buildRegistrationResponse(savedClient);
     }
@@ -182,6 +194,20 @@ public class AuthService {
         );
 
         return emailVerificationTokenRepository.save(verificationToken);
+    }
+
+    private void publishEmailVerificationRequested(
+            User user,
+            EmailVerificationToken verificationToken,
+            EmailVerificationReason reason
+    ) {
+        eventPublisher.publishEvent(new EmailVerificationRequestedEvent(
+                user.getEmail(),
+                verificationToken.getToken(),
+                verificationToken.getExpiresAt(),
+                reason,
+                UUID.randomUUID()
+        ));
     }
 
     private void validateProfessionalCanLinkClients(ProfessionalProfile professional) {
@@ -318,7 +344,8 @@ public class AuthService {
             emailVerificationTokenRepository.saveAllAndFlush(tokensToInvalidate);
         }
 
-        createEmailVerificationToken(user, currentDateTime);
+        EmailVerificationToken verificationToken = createEmailVerificationToken(user, currentDateTime);
+        publishEmailVerificationRequested(user, verificationToken, EmailVerificationReason.RESEND);
     }
 
     private boolean isEligibleForEmailVerificationResend(User user) {
