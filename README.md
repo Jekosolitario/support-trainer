@@ -60,6 +60,7 @@ Stato sintetico:
 - generazione del token di verifica email per professionisti e clienti;
 - conferma email uniforme e idempotente tramite `POST /api/v1/auth/email-verification/confirm`;
 - reinvio uniforme tramite `POST /api/v1/auth/email-verification/resend`, senza enumerazione degli account;
+- richiesta di consegna della verifica email eseguita in modo sincrono soltanto dopo il commit;
 - login con JWT;
 - generazione di access token e refresh token;
 - distinzione interna tra access token e refresh token tramite claim JWT;
@@ -72,7 +73,7 @@ Il refresh token viene generato durante il login, ma non è accettato come Beare
 
 Entrambi i ruoli nascono con account `PENDING_VERIFICATION` ed `emailVerified=false`, ricevono un token valido 24 ore e possono effettuare login soltanto dopo la conferma. Nella registrazione cliente il link professionale viene creato e l'invito consumato nella stessa transazione, ma il cliente pending non è visibile né operativo. Il precedente GET mutante è stato rimosso; token scaduti producono `410 Gone` e un secondo POST sul token già consumato restituisce successo soltanto se lo stato finale dell'utente è coerente.
 
-Il reinvio accetta l'email nel body, risponde sempre `202 Accepted` con lo stesso messaggio per ogni indirizzo sintatticamente valido e crea un token solo per profili attivi ancora pending. Il cooldown è di 60 secondi dal token più recente, con reinvio consentito al boundary esatto. Quando il reinvio è consentito, i precedenti token non usati vengono invalidati tecnicamente tramite `used=true` e `usedAt`, lasciando un solo token utilizzabile da 24 ore. Token, email, stato account e tempo residuo non sono esposti. Invito e link cliente-professionista restano invariati. L'invio email reale e il rate limiting distribuito non sono ancora implementati; i clienti già persistiti non vengono migrati.
+Il reinvio accetta l'email nel body, risponde sempre `202 Accepted` con lo stesso messaggio per ogni indirizzo sintatticamente valido e crea un token solo per profili attivi ancora pending. Il cooldown è di 60 secondi dal token più recente, con reinvio consentito al boundary esatto. Quando il reinvio è consentito, i precedenti token non usati vengono invalidati tecnicamente tramite `used=true` e `usedAt`, lasciando un solo token utilizzabile da 24 ore. Token, email, stato account e tempo residuo non sono esposti. Invito e link cliente-professionista restano invariati. Dopo il commit di registrazione o reinvio, un listener applicativo costruisce il link `{verification-page-url}#token={tokenEncoded}` e lo affida a una porta indipendente dal provider. Il default locale è `DISABLED`; i test usano il sender `IN_MEMORY` senza rete. Un errore del sender è assorbito dopo il commit e non cambia le risposte `201`/`202`, ma senza outbox la consegna non è garantita. Un adapter SMTP reale e il rate limiting distribuito non sono ancora implementati; i clienti già persistiti non vengono migrati.
 
 ### Profilo e account
 
@@ -189,6 +190,8 @@ Non è richiesta un'installazione globale di Maven. Node.js non è ancora necess
    | `app.cors.allowed-origins` | `APP_CORS_ALLOWED_ORIGINS` | lista separata da virgole di origini esatte `http`/`https` |
    | `app.time.business-zone` | `APP_TIME_BUSINESS_ZONE` | `ZoneId` business; default `Europe/Rome` |
    | `app.time.clock-zone` | `APP_TIME_CLOCK_ZONE` | zona tecnica, deve rappresentare UTC |
+   | `app.email.mode` | `APP_EMAIL_MODE` | `DISABLED` (default locale sicuro) oppure `IN_MEMORY` |
+   | `app.email.verification-page-url` | `APP_EMAIL_VERIFICATION_PAGE_URL` | URL assoluto `http`/`https` della pagina, senza query o fragment |
    | `app.security.jwt.secret` | `APP_SECURITY_JWT_SECRET` | Base64 di almeno 32 byte casuali |
    | `app.security.jwt.expiration` | `APP_SECURITY_JWT_EXPIRATION` | durata positiva |
    | `app.security.jwt.refresh-expiration` | `APP_SECURITY_JWT_REFRESH_EXPIRATION` | durata positiva e maggiore dell'access token |
@@ -198,6 +201,8 @@ Le durate accettano millisecondi senza suffisso, per compatibilità con i valori
 Gli origin CORS non ammettono wildcard, path, query string o fragment: va indicata l'origine esatta del frontend, inclusa l'eventuale porta. Spazi e duplicati vengono normalizzati; `Authorization` e `Content-Type` sono consentiti, mentre le credenziali browser restano disabilitate perché l'autenticazione usa Bearer JWT.
 
 La configurazione JWT e CORS è tipizzata e validata all'avvio. Proprietà assenti, valori non validi, secret troppo corto o origin non sicuri impediscono l'avvio senza stampare i valori sensibili. Il file `application.properties` resta escluso da Git.
+
+Anche `app.email` è tipizzata e fail-fast. `verification-page-url` rappresenta direttamente la futura pagina frontend e può includere un base path; il backend aggiunge il token codificato nel fragment `#token=...`. `DISABLED` è soltanto un default locale sicuro e non rende la configurazione pronta per produzione. `IN_MEMORY` conserva messaggi esclusivamente nel processo, non espone inbox HTTP e viene usato dal profilo `test`; non sono configurati host SMTP, credenziali o accessi di rete.
 
 Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazione usa un unico `Clock` tecnico UTC; `ApplicationTimeProvider.nowInstant()` tronca, senza arrotondare, alla precisione canonica di sei cifre. Gli istanti persistiti e gli audit applicativi sono `Instant` su colonne `DATETIME(6)`, con `spring.jpa.properties.hibernate.jdbc.time_zone=UTC`; `Europe/Rome` resta soltanto la zona business. Spring Data JPA valorizza `createdAt` e `updatedAt`. Le scadenze email e invito sono rispettivamente 24 e 168 ore reali e sono esposte con `Z`. Sul confine HTTP gli orari degli slot restano `OffsetDateTime` al secondo, validati contro gap, overlap e offset di `Europe/Rome`. `ErrorResponse` resta intenzionalmente fuori da questa conversione.
 
@@ -273,7 +278,7 @@ La suite include test relativi a:
 - richieste di prenotazione e relative transizioni;
 - JWT, ruoli, risposte 400/401/403 e gestione degli errori HTTP 404/405/415.
 
-L’ultima suite completa verificata contiene 227 test, senza failure, errori o test ignorati: 9 in più rispetto alla baseline approvata di 218 grazie alla copertura del reinvio uniforme, del cooldown, dell’invalidazione dei token precedenti e dei flussi pending per entrambi i ruoli.
+L’ultima suite completa verificata contiene 257 test, senza failure, errori o test ignorati: 30 in più rispetto alla baseline approvata di 227 grazie alla copertura dell’infrastruttura email, del link nel fragment, degli adapter `DISABLED`/`IN_MEMORY`, del commit/rollback e del fallimento del sender.
 
 ## 11. Profili Spring
 
@@ -292,6 +297,7 @@ Usa `src/test/resources/application-test.properties` con:
 - JWT con valori dedicati ai test;
 - origin CORS locale dedicato ai test;
 - Clock UTC e zona business `Europe/Rome` espliciti;
+- sender email `IN_MEMORY` e pagina fittizia assoluta, senza rete o credenziali;
 - logging SQL disabilitato.
 
 Le classi di test principali attivano il profilo con `@ActiveProfiles("test")`.

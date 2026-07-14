@@ -61,7 +61,7 @@ Gli endpoint sotto `/api/v1/auth/**` sono pubblici.
 | Home / landing | Pagina statica di ingresso. Nessun endpoint richiesto. CTA verso login e registrazione professionista; l'accesso cliente parte da un invito. | Contenuto pronto, eventuale fallback contenuti | Nessun errore API |
 | Login | Autenticare cliente o professionista con `POST /api/v1/auth/login`. Campi: email e password. | Idle, invio, successo e redirect per ruolo, errore credenziali, account non attivo | `400` validazione/body, `401 AUTHENTICATION_ERROR`, `403 ACCOUNT_NOT_ACTIVE`, `EMAIL_NOT_VERIFIED`, profilo non attivo |
 | Registrazione professionista | Creare un account con `POST /api/v1/auth/register/professional`. Campi: nome, cognome, email, password, specializzazione `PERSONAL_TRAINER` o `NUTRITIONIST`. | Form, validazione, invio, `201`, istruzione di verifica email | `400 VALIDATION_ERROR`, `409 EMAIL_ALREADY_REGISTERED` |
-| Verifica email | Leggere il token nella futura pagina React e inviare `POST /api/v1/auth/email-verification/confirm` con body `token`. | Verifica in corso, verificata, non valido o scaduto; secondo utilizzo idempotente; CTA al login dopo successo | `400` body/validazione, `404 EMAIL_VERIFICATION_TOKEN_NOT_FOUND`, `410 EMAIL_VERIFICATION_TOKEN_EXPIRED` |
+| Verifica email | Ricevere `/verify-email#token=...`, rimuovere subito il fragment e inviare `POST /api/v1/auth/email-verification/confirm` con body `token`. | Verifica in corso, verificata, non valido o scaduto; secondo utilizzo idempotente; CTA al login dopo successo | `400` body/validazione, `404 EMAIL_VERIFICATION_TOKEN_NOT_FOUND`, `410 EMAIL_VERIFICATION_TOKEN_EXPIRED` |
 | Reinvio verifica | Dalla schermata “Controlla la tua email”, inviare `POST /api/v1/auth/email-verification/resend` con body `email`. | Messaggio sempre neutro; azione “Invia di nuovo”; pulsante UX disabilitato 60 secondi, senza assumere che il backend abbia creato un token | `400` validazione/body, `415` media type; ogni email valida riceve `202` identico |
 | Validazione invito | Verificare il codice prima di mostrare il form cliente con `POST /api/v1/auth/register/client/validate-invite`. Body: `code`. | Form codice, validazione, valido con scadenza, non valido/scaduto/usato, retry | `400 VALIDATION_ERROR` e codici `INVITE_CODE_*`; `404 INVITE_CODE_NOT_FOUND` |
 | Registrazione cliente | Creare l'account con `POST /api/v1/auth/register/client` dopo validazione invito. Campi: nome, cognome, email, password, codice, data di nascita, altezza, obiettivo, genere; note mediche/infortuni/generali facoltative. | Form multi-sezione, validazione campo, invio, `201`, schermata “Controlla la tua email” | `400` validazione o invito non più valido, `403` professionista non utilizzabile, `409 EMAIL_ALREADY_REGISTERED` |
@@ -72,8 +72,9 @@ Note di flusso verificate:
 - le risposte di registrazione contengono identità e ruolo, ma `accessToken`, `refreshToken` e `tokenType` sono `null`; dopo la registrazione occorre passare dal login;
 - cliente e professionista nascono `PENDING_VERIFICATION`, con `emailVerified=false`, e non possono fare login prima della conferma;
 - per il cliente il link è già creato e l'invito consumato, ma il cliente pending non è visibile al professionista;
-- il backend genera e persiste per entrambi un token valido 24 ore e implementa il reinvio uniforme, ma non invia ancora email;
-- la futura pagina deve leggere il token, rimuoverlo subito dall'URL, conservarlo solo in memoria e non inserirlo in `localStorage` o analytics; invia quindi il POST, mostra la CTA login in caso di successo e il messaggio neutro di reinvio in caso di 410;
+- il backend genera e persiste per entrambi un token valido 24 ore e, dopo commit, affida un link con token nel fragment alla porta email; il default locale non invia e non esiste ancora un adapter SMTP reale;
+- la futura pagina deve leggere il fragment, rimuoverlo immediatamente dall'URL prima di avviare analytics, monitoring o altre integrazioni, conservarlo solo in memoria e non inserirlo in `localStorage`; invia quindi il POST, mostra la CTA login in caso di successo e il messaggio neutro di reinvio in caso di 410;
+- la pagina di verifica non deve usare `HashRouter`, perché il fragment è riservato al token, né trasmettere il token a strumenti di analytics o monitoring;
 - l'azione “Invia di nuovo” usa l'email della registrazione, non mostra se l'account esiste e non invia email o token ad analytics; il frontend può disabilitare il pulsante per 60 secondi, ma il backend resta autoritativo e non espone il tempo residuo;
 - il codice invito è monouso, non è legato a una specifica email destinataria e scade dopo 7 giorni.
 
@@ -413,9 +414,9 @@ Il backend resta la fonte autoritativa e ripete tutte le validazioni. Gli audit 
 
 Questi punti non impediscono la mappa funzionale, ma non sono determinabili come contratto frontend completo dal repository attuale:
 
-1. **Consegna verifica email:** registrazione e reinvio creano e salvano il token, ma non esiste invio email né esposizione del token nelle risposte. Serve una decisione backend/infrastrutturale per rendere autonomo il flusso utente.
+1. **Consegna verifica email:** registrazione e reinvio creano e salvano il token e, dopo commit, producono una richiesta di consegna; non esiste ancora l'adapter SMTP reale e il default locale è disabilitato. La porta in-memory è solo per test/debug e non è esposta via endpoint.
 2. **Contratto temporale:** audit e scadenze account/booking/inviti arrivano come `Instant` UTC con `Z`; gli orari degli slot conservano l'offset esplicito `Europe/Rome` e le date civili restano `LocalDate`. La UI deve distinguere questi tre tipi e non applicare una timezone globale ai payload.
 3. **Storage auth:** il backend non prescrive dove conservare l'access token; la strategia va chiusa considerando sicurezza e assenza del refresh operativo.
-4. **URL pubblico dei link:** non sono configurati nel repository i link frontend definitivi per verifica email e inviti.
+4. **URL pubblico dei link:** `app.email.verification-page-url` configura la pagina di verifica, ma il valore pubblico definitivo di ciascun ambiente non è ancora definito; i link invito restano separati.
 5. **Liste:** non esistono paginazione e filtri API per clienti, professionisti, inviti, slot o booking; la prima UI non deve dipenderne.
 6. **Dashboard:** non esiste un contratto aggregato; contenuti e metriche devono restare una composizione minima dei dati già disponibili.

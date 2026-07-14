@@ -64,6 +64,8 @@ Conferma l’account professionista o cliente tramite body JSON `{"token":"..."}
 **POST** `/api/v1/auth/email-verification/resend`
 Accetta `{"email":"utente@example.com"}` e restituisce sempre `202 Accepted` con messaggio neutro per richieste sintatticamente valide. Supporta entrambi i ruoli senza rivelare esistenza, stato, cooldown o creazione del token. Solo account pending, non verificati e con profilo attivo generano un nuovo token; il cooldown è 60 secondi dal token più recente e termina al boundary esatto. I precedenti token non usati vengono invalidati tramite `used/usedAt`, lasciando un solo token utilizzabile per 24 ore. Nessun token viene restituito o registrato; invito e link restano invariati.
 
+Per registrazione professionista, registrazione cliente e reinvio idoneo, il backend pubblica la richiesta di consegna dentro la transazione e la esegue soltanto dopo il commit. Il link destinato al frontend ha forma `{verification-page-url}#token={tokenEncoded}`. Un errore del sender non cambia `201 Created` o `202 Accepted`; non esiste alcun endpoint per consultare i messaggi in-memory.
+
 ### 4.5 Validazione codice invito cliente
 **POST** `/api/v1/auth/register/client/validate-invite`  
 Verifica che il codice invito esista, sia attivo, non sia scaduto e non sia già usato.

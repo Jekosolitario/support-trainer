@@ -137,6 +137,12 @@ La nuova suite `AuthControllerEmailResendIntegrationTest` contiene 9 test dedica
 
 `POST /api/v1/auth/email-verification/resend` è pubblico e accetta l'email esclusivamente nel body JSON. Ogni email sintatticamente valida riceve lo stesso `202 Accepted`, indipendentemente da esistenza, stato, idoneità o cooldown dell'account. Soltanto un profilo concreto attivo, con `accountStatus=PENDING_VERIFICATION` ed `emailVerified=false`, può ottenere un nuovo token. Il lock pessimistico sull'utente serializza i reinvii dello stesso account; nella stessa transazione tutti i token precedenti non usati sono marcati `used=true` e `usedAt=now`, quindi viene creato un solo UUID v4 valido per 24 ore. L'uso di `used` per rappresentare anche l'invalidazione resta un limite semantico dello schema corrente.
 
+### 5.4 Infrastruttura applicativa email — remediation STEP 7C-B
+
+Registrazioni e reinvii idonei pubblicano ora, dopo la creazione del token e dentro la transazione Auth, un evento immutabile privo di entity. Un listener sincrono `AFTER_COMMIT` con fallback disabilitato costruisce `{verification-page-url}#token={tokenEncoded}` e chiama una porta specializzata. Il sender `DISABLED` è il default locale no-op; `IN_MEMORY` è thread-safe e consente test/CI senza rete. Rollback ed eventi senza transazione non inviano, mentre un errore del sender viene assorbito dopo il commit e non modifica le risposte `201`/`202`. I log contengono solo correlation ID, motivo e tipo di errore. Nessun endpoint espone inbox, destinatario, token o URL. SMTP reale, template, retry e outbox restano assenti; la consegna non è quindi durevole né garantita.
+
+Il 15 luglio 2026 `.\mvnw.cmd clean verify` ha completato con 39 suite, 257 test, 0 failure, 0 errori e 0 skipped: 30 test in più della baseline di 227. La durata Maven è stata 41,668 secondi; è stato prodotto `support_trainer-0.0.1-SNAPSHOT.jar`.
+
 Il reinvio non modifica invito o collegamento cliente-professionista e non espone né registra email, token, stato account o tempo residuo. L'invio email reale, il rate limiting distribuito e una certificazione della concorrenza su MySQL restano fuori perimetro; i test H2 dimostrano sequenzialmente l'invariante di un solo token non usato, mentre il lock applicativo costituisce la protezione prevista per le richieste concorrenti.
 
 ## 6. Pacchetti chiusi

@@ -305,4 +305,8 @@ Questo documento conserva il contratto storico dello Sprint 2. Nello stato appli
 
 ## Stato successivo — remediation STEP 7B-B
 
-Il cliente pending e il professionista pending possono richiedere un reinvio uniforme con body email. La risposta pubblica è sempre 202 per input valido e non permette enumerazione; al termine del cooldown di 60 secondi i token non usati precedenti vengono marcati `used/usedAt` e sostituiti da un solo token da 24 ore. Per il cliente, invito già consumato e `ProfessionalClientLink` restano invariati e il link continua a essere inerte fino alla conferma. Non esiste ancora consegna email reale.
+Il cliente pending e il professionista pending possono richiedere un reinvio uniforme con body email. La risposta pubblica è sempre 202 per input valido e non permette enumerazione; al termine del cooldown di 60 secondi i token non usati precedenti vengono marcati `used/usedAt` e sostituiti da un solo token da 24 ore. Per il cliente, invito già consumato e `ProfessionalClientLink` restano invariati e il link continua a essere inerte fino alla conferma.
+
+## Stato successivo — remediation STEP 7C-B
+
+La registrazione cliente pubblica la richiesta email solo dopo avere creato cliente, collegamento, consumo invito e token nella stessa transazione. Il listener la consegna esclusivamente dopo commit; il rollback non lascia né dati parziali né messaggi. La registrazione professionista e il reinvio seguono lo stesso contratto. Il sender locale è disabilitato, quello di test è in-memory e senza rete; un errore non cambia le risposte HTTP. SMTP reale e garanzia durevole tramite outbox restano futuri.

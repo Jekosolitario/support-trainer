@@ -636,7 +636,7 @@ L’ordine consigliato definitivo aggiornato è:
 2. fondazioni tecniche — completato
 3. utenti — completato
 4. security e auth — completato
-5. verifica email uniforme e reinvio sicuro per professionista e cliente — completato
+5. verifica email uniforme, reinvio sicuro e infrastruttura di consegna dopo commit — completato
 6. inviti + registrazione cliente + link — completato
 7. profilo/account — completato
 8. relazioni clienti/professionisti read — completato
@@ -649,3 +649,7 @@ L’ordine consigliato definitivo aggiornato è:
 15. measurements
 16. password reset
 17. hardening finale e preparazione deploy
+
+## Stato successivo — remediation STEP 7C-B
+
+Registrazione professionista, registrazione cliente e reinvio idoneo pubblicano ora una richiesta email immutabile dentro la transazione Auth. Un listener sincrono `AFTER_COMMIT`, senza fallback, costruisce il link frontend con token nel fragment e usa una porta indipendente dal provider. Il default locale `DISABLED` non effettua invii; il profilo test usa `IN_MEMORY` senza rete. Gli errori di consegna non annullano il commit né cambiano `201`/`202`. Adapter SMTP, template, retry e outbox sono una fase futura distinta; finché manca l'outbox la consegna non è garantita.
