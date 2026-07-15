@@ -12,12 +12,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import it.zuperman.support_trainer.auth.dto.request.LoginRequest;
 import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
-import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
-import it.zuperman.support_trainer.invite.service.InviteCodeService;
-import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
-import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
 import it.zuperman.support_trainer.security.jwt.JwtService;
 
 class AuthServicePasswordLimitTest {
@@ -26,16 +22,14 @@ class AuthServicePasswordLimitTest {
     private final AuthenticationManager authenticationManager = mock(AuthenticationManager.class);
     private final AuthService authService = new AuthService(
             userRepository,
-            mock(ProfessionalProfileRepository.class),
             mock(EmailVerificationTokenRepository.class),
-            mock(ClientProfileRepository.class),
-            mock(InviteCodeService.class),
             mock(PasswordEncoder.class),
             authenticationManager,
             mock(JwtService.class),
-            mock(ProfessionalClientLinkRepository.class),
             mock(ApplicationTimeProvider.class),
-            mock(ApplicationEventPublisher.class)
+            mock(ApplicationEventPublisher.class),
+            mock(RegistrationPersistenceService.class),
+            new it.zuperman.support_trainer.common.security.UserReadinessValidator()
     );
 
     @Test

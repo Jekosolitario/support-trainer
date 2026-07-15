@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -198,6 +199,20 @@ class AvailabilityTemporalContractIntegrationTest {
                 .andExpect(jsonPath("$.updatedAt").isNotEmpty());
     }
 
+    @Test
+    void shouldReturnTheSameNotFoundContractForMissingAndUnlinkedProfessionalAvailability() throws Exception {
+        ClientProfile client = createClient();
+        String authorization = bearer(client);
+
+        Map<String, Object> missing = notFoundContract(Long.MAX_VALUE, authorization);
+        Map<String, Object> unlinked = notFoundContract(professional.getId(), authorization);
+
+        org.assertj.core.api.Assertions.assertThat(unlinked)
+                .containsEntry("status", missing.get("status"))
+                .containsEntry("code", missing.get("code"))
+                .containsEntry("message", missing.get("message"));
+    }
+
     private static Stream<Arguments> invalidSlotPayloads() {
         return Stream.of(
                 Arguments.of(slotPayload(
@@ -276,6 +291,24 @@ class AvailabilityTemporalContractIntegrationTest {
                 .authorities(user.getRole().name())
                 .build();
         return "Bearer " + jwtService.generateAccessToken(userDetails);
+    }
+
+    private Map<String, Object> notFoundContract(Long professionalId, String authorization) throws Exception {
+        String body = mockMvc.perform(get("/api/v1/professionals/{professionalId}/availability", professionalId)
+                        .header(HttpHeaders.AUTHORIZATION, authorization))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.code").value("PROFESSIONAL_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Professionista non trovato"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        return Map.of(
+                "status", com.jayway.jsonpath.JsonPath.read(body, "$.status"),
+                "code", com.jayway.jsonpath.JsonPath.read(body, "$.code"),
+                "message", com.jayway.jsonpath.JsonPath.read(body, "$.message")
+        );
     }
 
     private static String slotPayload(String startDateTime, String endDateTime) {

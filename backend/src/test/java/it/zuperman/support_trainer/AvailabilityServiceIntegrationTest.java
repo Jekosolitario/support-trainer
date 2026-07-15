@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -326,9 +327,19 @@ class AvailabilityServiceIntegrationTest {
                 asBusinessOffset(endDateTime.plusDays(1))
         );
 
-        assertThatThrownBy(() -> availabilityService.updateAvailabilitySlot(createdSlot.getId(), updateRequest))
-                .isInstanceOfSatisfying(AppException.class, exception ->
-                assertThat(exception.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_NOT_FOUND"));
+        AppException foreignSlot = catchThrowableOfType(
+                () -> availabilityService.updateAvailabilitySlot(createdSlot.getId(), updateRequest),
+                AppException.class
+        );
+        AppException missingSlot = catchThrowableOfType(
+                () -> availabilityService.updateAvailabilitySlot(Long.MAX_VALUE, updateRequest),
+                AppException.class
+        );
+        assertThat(foreignSlot).isNotNull();
+        assertThat(missingSlot).isNotNull();
+        assertThat(foreignSlot.getStatus()).isEqualTo(missingSlot.getStatus());
+        assertThat(foreignSlot.getErrorCode()).isEqualTo(missingSlot.getErrorCode());
+        assertThat(foreignSlot.getMessage()).isEqualTo(missingSlot.getMessage());
 
         assertThatThrownBy(() -> availabilityService.blockAvailabilitySlot(createdSlot.getId()))
                 .isInstanceOfSatisfying(AppException.class, exception ->

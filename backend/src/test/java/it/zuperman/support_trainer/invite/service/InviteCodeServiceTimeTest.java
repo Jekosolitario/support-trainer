@@ -52,7 +52,8 @@ class InviteCodeServiceTimeTest {
         InviteCodeService service = new InviteCodeService(
                 inviteCodeRepository,
                 professionalRepository,
-                fixedTimeProvider(fixedInstant)
+                fixedTimeProvider(fixedInstant),
+                new it.zuperman.support_trainer.common.security.UserReadinessValidator()
         );
 
         InviteCode inviteCode = service.createInviteCode("professional@example.com");

@@ -83,7 +83,7 @@ class AuthControllerLoginIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register/professional")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registrationRequestBody))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
 
         User savedUser = userRepository.findByEmail(email).orElseThrow();
         EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
@@ -141,7 +141,7 @@ class AuthControllerLoginIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register/professional")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registrationRequestBody))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
 
         User savedUser = userRepository.findByEmail(email).orElseThrow();
         EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
@@ -184,7 +184,7 @@ class AuthControllerLoginIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register/professional")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registrationRequestBody))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
 
         String loginRequestBody = """
                 {
@@ -214,7 +214,7 @@ class AuthControllerLoginIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register/professional")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registrationRequestBody))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
 
         User savedUser = userRepository.findByEmail(email).orElseThrow();
         EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()

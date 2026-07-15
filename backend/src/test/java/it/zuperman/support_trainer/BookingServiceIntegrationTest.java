@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -197,9 +198,21 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(clientB.getEmail(), "CLIENT");
 
-        assertThatThrownBy(() -> bookingService.cancelBookingRequest(booking.getId()))
-                .isInstanceOfSatisfying(AppException.class, exception ->
-                assertThat(exception.getErrorCode()).isEqualTo("BOOKING_REQUEST_ACCESS_DENIED"));
+        AppException foreignBookingCancellation = catchThrowableOfType(
+                () -> bookingService.cancelBookingRequest(booking.getId()),
+                AppException.class
+        );
+        AppException missingBookingCancellation = catchThrowableOfType(
+                () -> bookingService.cancelBookingRequest(Long.MAX_VALUE),
+                AppException.class
+        );
+        assertThat(foreignBookingCancellation).isNotNull();
+        assertThat(missingBookingCancellation).isNotNull();
+        assertThat(foreignBookingCancellation.getStatus()).isEqualTo(missingBookingCancellation.getStatus());
+        assertThat(foreignBookingCancellation.getErrorCode())
+                .isEqualTo(missingBookingCancellation.getErrorCode());
+        assertThat(foreignBookingCancellation.getMessage())
+                .isEqualTo(missingBookingCancellation.getMessage());
 
         BookingRequest unchangedBooking = bookingRequestRepository.findById(booking.getId())
                 .orElseThrow();
@@ -281,7 +294,32 @@ class BookingServiceIntegrationTest {
         );
 
         assertThatThrownBy(() -> bookingService.createBookingRequest(request))
-                .isInstanceOf(AppException.class);
+                .isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("Client con account attivo ma email non verificata non deve creare booking")
+    void shouldRejectBookingForClientWithoutVerifiedEmail() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+        client.setEmailVerified(false);
+        clientProfileRepository.saveAndFlush(client);
+        professionalClientLinkRepository.saveAndFlush(new ProfessionalClientLink(professional, client));
+
+        LocalDateTime startDateTime = LocalDateTime.now().plusDays(14).withNano(0);
+        AvailabilitySlot slot = availabilitySlotRepository.saveAndFlush(
+                new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(startDateTime.plusHours(1)))
+        );
+
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        assertThatThrownBy(() -> bookingService.createBookingRequest(new CreateBookingRequest(slot.getId(), null)))
+                .isInstanceOfSatisfying(AppException.class, exception -> {
+                    assertThat(exception.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
+                    assertThat(exception.getErrorCode()).isEqualTo("EMAIL_NOT_VERIFIED");
+                });
+        assertThat(bookingRequestRepository.findAll()).isEmpty();
     }
 
     @Test
@@ -594,8 +632,20 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(otherClient.getEmail(), "CLIENT");
 
-        assertThatThrownBy(() -> bookingService.getBookingRequestDetail(bookingResponse.getId()))
-                .isInstanceOf(AppException.class);
+        AppException foreignBooking = catchThrowableOfType(
+                () -> bookingService.getBookingRequestDetail(bookingResponse.getId()),
+                AppException.class
+        );
+        AppException missingBooking = catchThrowableOfType(
+                () -> bookingService.getBookingRequestDetail(Long.MAX_VALUE),
+                AppException.class
+        );
+
+        assertThat(foreignBooking).isNotNull();
+        assertThat(missingBooking).isNotNull();
+        assertThat(foreignBooking.getStatus()).isEqualTo(missingBooking.getStatus());
+        assertThat(foreignBooking.getErrorCode()).isEqualTo(missingBooking.getErrorCode());
+        assertThat(foreignBooking.getMessage()).isEqualTo(missingBooking.getMessage());
 
         authenticateAs(client.getEmail(), "CLIENT");
 

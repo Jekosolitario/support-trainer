@@ -1,7 +1,9 @@
 package it.zuperman.support_trainer;
 
 import java.nio.charset.StandardCharsets;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 
 import com.jayway.jsonpath.JsonPath;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,6 +28,7 @@ import it.zuperman.support_trainer.auth.token.EmailVerificationToken;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
+import it.zuperman.support_trainer.common.enums.Gender;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.invite.entity.InviteCode;
@@ -84,7 +87,8 @@ class AuthControllerRegistrationIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register/professional")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.message").isNotEmpty());
 
         assertThat(professionalProfileRepository.findByEmail(email)).isPresent();
     }
@@ -181,8 +185,8 @@ class AuthControllerRegistrationIntegrationTest {
     }
 
     @Test
-    @DisplayName("Non deve registrare due professionisti con la stessa email")
-    void shouldRejectProfessionalRegistrationWithDuplicateEmail() throws Exception {
+    @DisplayName("La registrazione Professional deve essere neutra per email già esistenti")
+    void shouldReturnSameNeutralProfessionalRegistrationResponseForDuplicateEmail() throws Exception {
         String requestBody = """
                 {
                   "firstName": "Marco",
@@ -193,16 +197,27 @@ class AuthControllerRegistrationIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/auth/register/professional")
+        MvcResult firstRegistration = mockMvc.perform(post("/api/v1/auth/register/professional")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted())
+                .andReturn();
 
-        mockMvc.perform(post("/api/v1/auth/register/professional")
+        long tokenCountAfterFirstRegistration = emailVerificationTokenRepository.count();
+        long professionalCountAfterFirstRegistration = professionalProfileRepository.count();
+
+        MvcResult secondRegistration = mockMvc.perform(post("/api/v1/auth/register/professional")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_REGISTERED"));
+                .andExpect(status().isAccepted())
+                .andReturn();
+
+        assertThat(secondRegistration.getResponse().getContentAsString())
+                .isEqualTo(firstRegistration.getResponse().getContentAsString());
+        assertThat(secondRegistration.getResponse().getContentAsString())
+                .isEqualTo("{\"message\":\"Se la registrazione può essere completata, riceverai le istruzioni per verificare l'indirizzo email\"}");
+        assertThat(professionalProfileRepository.count()).isEqualTo(professionalCountAfterFirstRegistration);
+        assertThat(emailVerificationTokenRepository.count()).isEqualTo(tokenCountAfterFirstRegistration);
     }
 
     @Test
@@ -272,11 +287,8 @@ class AuthControllerRegistrationIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register/client")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.email").value(clientEmail))
-                .andExpect(jsonPath("$.role").value("CLIENT"))
-                .andExpect(jsonPath("$.accessToken").isEmpty())
-                .andExpect(jsonPath("$.refreshToken").isEmpty());
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.message").isNotEmpty());
 
         Instant afterRegistration = timeProvider.nowInstant();
 
@@ -311,6 +323,114 @@ class AuthControllerRegistrationIntegrationTest {
     }
 
     @Test
+    @DisplayName("La registrazione Client non deve consumare l'invito per email già esistente")
+    void shouldKeepInviteUntouchedForExistingClientEmail() throws Exception {
+        String existingEmail = "existing.client.neutral@example.com";
+        ClientProfile existingClient = new ClientProfile(
+                "Giulia",
+                "Neri",
+                existingEmail,
+                "encoded-password",
+                LocalDate.of(1995, 1, 1),
+                BigDecimal.valueOf(170),
+                "Migliorare la forma fisica",
+                Gender.FEMALE
+        );
+        existingClient.setAccountStatus(AccountStatus.ACTIVE);
+        existingClient.setEmailVerified(true);
+        existingClient.setActive(true);
+        clientProfileRepository.saveAndFlush(existingClient);
+
+        ProfessionalProfile professional = new ProfessionalProfile(
+                "Andrea",
+                "Moretti",
+                "professional.neutral.client@example.com",
+                "encoded-password",
+                ProfessionalSpecialization.PERSONAL_TRAINER
+        );
+        professional.setAccountStatus(AccountStatus.ACTIVE);
+        professional.setEmailVerified(true);
+        professional.setActive(true);
+        professional = professionalProfileRepository.saveAndFlush(professional);
+
+        InviteCode inviteCode = inviteCodeRepository.saveAndFlush(new InviteCode(
+                "VALID-NEUTRAL-CLIENT-INVITE",
+                professional,
+                Instant.now().plusSeconds(86_400)
+        ));
+        long tokenCountBeforeRequest = emailVerificationTokenRepository.count();
+        long linkCountBeforeRequest = professionalClientLinkRepository.count();
+
+        String requestBody = """
+                {
+                  "firstName": "Giulia",
+                  "lastName": "Neri",
+                  "email": "%s",
+                  "password": "Password123!",
+                  "birthDate": "1995-01-01",
+                  "heightCm": 170.00,
+                  "primaryGoal": "Migliorare la forma fisica",
+                  "gender": "FEMALE",
+                  "inviteCode": "%s"
+                }
+                """.formatted(existingEmail, inviteCode.getCode());
+
+        MvcResult response = mockMvc.perform(post("/api/v1/auth/register/client")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andReturn();
+
+        assertThat(response.getResponse().getContentAsString())
+                .isEqualTo("{\"message\":\"Se la registrazione può essere completata, riceverai le istruzioni per verificare l'indirizzo email\"}");
+        InviteCode unchangedInvite = inviteCodeRepository.findByCode(inviteCode.getCode()).orElseThrow();
+        assertThat(unchangedInvite.getUsed()).isFalse();
+        assertThat(unchangedInvite.getUsedAt()).isNull();
+        assertThat(professionalClientLinkRepository.count()).isEqualTo(linkCountBeforeRequest);
+        assertThat(emailVerificationTokenRepository.count()).isEqualTo(tokenCountBeforeRequest);
+        assertThat(clientProfileRepository.findByEmail(existingEmail)).isPresent();
+    }
+
+    @Test
+    @DisplayName("La registrazione Client deve validare l'invito prima di neutralizzare un'email esistente")
+    void shouldRejectInvalidInviteBeforeCheckingExistingClientEmail() throws Exception {
+        String existingEmail = "existing.client.invalid.invite@example.com";
+        ClientProfile existingClient = new ClientProfile(
+                "Giulia",
+                "Neri",
+                existingEmail,
+                "encoded-password",
+                LocalDate.of(1995, 1, 1),
+                BigDecimal.valueOf(170),
+                "Migliorare la forma fisica",
+                Gender.FEMALE
+        );
+        existingClient.setAccountStatus(AccountStatus.ACTIVE);
+        existingClient.setEmailVerified(true);
+        existingClient.setActive(true);
+        clientProfileRepository.saveAndFlush(existingClient);
+
+        mockMvc.perform(post("/api/v1/auth/register/client")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "firstName": "Giulia",
+                                  "lastName": "Neri",
+                                  "email": "%s",
+                                  "password": "Password123!",
+                                  "birthDate": "1995-01-01",
+                                  "heightCm": 170.00,
+                                  "primaryGoal": "Migliorare la forma fisica",
+                                  "gender": "FEMALE",
+                                  "inviteCode": "INVITE-NOT-EXISTING"
+                                }
+                                """.formatted(existingEmail)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_FOUND"));
+    }
+
+    @Test
     @DisplayName("Non deve registrare un secondo cliente con un invito già usato")
     void shouldRejectSecondClientRegistrationWithUsedInviteCode() throws Exception {
         String professionalEmail = "professional.used.invite@example.com";
@@ -328,7 +448,7 @@ class AuthControllerRegistrationIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register/professional")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(professionalRegistrationRequestBody))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
 
         ProfessionalProfile savedProfessional = professionalProfileRepository
                 .findByEmail(professionalEmail)
@@ -389,7 +509,7 @@ class AuthControllerRegistrationIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register/client")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(firstClientRequestBody))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
 
         String secondClientRequestBody = """
                 {

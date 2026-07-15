@@ -205,7 +205,7 @@ class ClientEmailVerificationIntegrationTest {
                                   "specialization": "PERSONAL_TRAINER"
                                 }
                                 """.formatted(email, PASSWORD)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
 
         User professional = userRepository.findByEmail(email).orElseThrow();
         confirmEmail(findTokenFor(professional).getToken());
@@ -224,9 +224,10 @@ class ClientEmailVerificationIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register/client")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(clientRegistrationBody(inviteCode, email)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.accessToken").isEmpty())
-                .andExpect(jsonPath("$.refreshToken").isEmpty());
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist());
     }
 
     private void registerClientExpectingUsedInvite(String inviteCode, String email) throws Exception {

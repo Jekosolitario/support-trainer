@@ -109,7 +109,7 @@ class EmailVerificationSenderFailureIntegrationTest {
                                   "specialization":"PERSONAL_TRAINER"
                                 }
                                 """.formatted(EMAIL, PASSWORD)))
-                .andExpect(status().isCreated())
+                .andExpect(status().isAccepted())
                 .andReturn();
 
         User user = userRepository.findByEmail(EMAIL).orElseThrow();

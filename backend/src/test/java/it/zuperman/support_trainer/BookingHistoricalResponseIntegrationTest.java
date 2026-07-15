@@ -194,10 +194,10 @@ class BookingHistoricalResponseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
         mockMvc.perform(post("/api/v1/bookings")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(client))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"availabilitySlotId\":" + slot.getId() + "}"))
-                .andExpect(status().isForbidden());
+                .header(HttpHeaders.AUTHORIZATION, bearer(client))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"availabilitySlotId\":" + slot.getId() + "}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

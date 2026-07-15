@@ -72,16 +72,24 @@ class AuthServiceTimeTest {
     void setUp() {
         authService = new AuthService(
                 userRepository,
-                professionalProfileRepository,
                 emailVerificationTokenRepository,
-                clientProfileRepository,
-                inviteCodeService,
                 passwordEncoder,
                 authenticationManager,
                 jwtService,
-                professionalClientLinkRepository,
                 fixedTimeProvider(),
-                eventPublisher
+                eventPublisher,
+                new RegistrationPersistenceService(
+                        userRepository,
+                        professionalProfileRepository,
+                        clientProfileRepository,
+                        emailVerificationTokenRepository,
+                        inviteCodeService,
+                        professionalClientLinkRepository,
+                        fixedTimeProvider(),
+                        eventPublisher,
+                        new it.zuperman.support_trainer.common.security.UserReadinessValidator()
+                ),
+                new it.zuperman.support_trainer.common.security.UserReadinessValidator()
         );
         lenient().when(emailVerificationTokenRepository.save(any(EmailVerificationToken.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -96,7 +104,7 @@ class AuthServiceTimeTest {
                 "Password1!",
                 ProfessionalSpecialization.PERSONAL_TRAINER
         );
-        when(userRepository.findByEmail("mario.rossi@example.com")).thenReturn(Optional.empty());
+        when(userRepository.existsByEmail("mario.rossi@example.com")).thenReturn(false);
         when(passwordEncoder.encode("Password1!")).thenReturn("encoded-password");
         when(professionalProfileRepository.saveAndFlush(any(ProfessionalProfile.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -184,7 +192,7 @@ class AuthServiceTimeTest {
                 "Password1!",
                 ProfessionalSpecialization.PERSONAL_TRAINER
         );
-        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+        when(userRepository.existsByEmail(email)).thenReturn(false);
         when(passwordEncoder.encode("Password1!")).thenReturn("encoded-password");
         when(professionalProfileRepository.saveAndFlush(any(ProfessionalProfile.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -199,16 +207,24 @@ class AuthServiceTimeTest {
     private AuthService serviceWithClock(Instant instant) {
         return new AuthService(
                 userRepository,
-                professionalProfileRepository,
                 emailVerificationTokenRepository,
-                clientProfileRepository,
-                inviteCodeService,
                 passwordEncoder,
                 authenticationManager,
                 jwtService,
-                professionalClientLinkRepository,
                 fixedTimeProvider(instant),
-                eventPublisher
+                eventPublisher,
+                new RegistrationPersistenceService(
+                        userRepository,
+                        professionalProfileRepository,
+                        clientProfileRepository,
+                        emailVerificationTokenRepository,
+                        inviteCodeService,
+                        professionalClientLinkRepository,
+                        fixedTimeProvider(instant),
+                        eventPublisher,
+                        new it.zuperman.support_trainer.common.security.UserReadinessValidator()
+                ),
+                new it.zuperman.support_trainer.common.security.UserReadinessValidator()
         );
     }
 

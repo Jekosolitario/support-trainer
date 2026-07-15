@@ -88,6 +88,37 @@ class MeServiceIntegrationTest {
     }
 
     @Test
+    @DisplayName("Client ACTIVE senza email verificata deve essere bloccato anche nel self-service")
+    void shouldRejectActiveClientWithoutVerifiedEmail() {
+        ClientProfile client = createActiveClient();
+        client.setEmailVerified(false);
+        clientProfileRepository.saveAndFlush(client);
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        assertThatThrownBy(() -> meService.getMyAccount())
+                .isInstanceOfSatisfying(AppException.class, exception -> {
+                    assertThat(exception.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
+                    assertThat(exception.getErrorCode()).isEqualTo("EMAIL_NOT_VERIFIED");
+                });
+    }
+
+    @Test
+    @DisplayName("Self-service deve restare disponibile a un profilo inattivo con account pronto")
+    void shouldAllowSelfServiceForInactiveProfile() {
+        ClientProfile client = createActiveClient();
+        client.setActive(false);
+        clientProfileRepository.saveAndFlush(client);
+        authenticateAs(client.getEmail(), "CLIENT");
+
+        UpdateOperationalStatusRequest request = new UpdateOperationalStatusRequest();
+        request.setOperationalStatus("PAUSA");
+
+        MyProfileResponse response = meService.updateMyOperationalStatus(request);
+
+        assertThat(response.getOperationalStatus()).isEqualTo("PAUSA");
+    }
+
+    @Test
     @DisplayName("Professionista autenticato deve leggere il proprio profilo e account")
     void shouldReturnAuthenticatedProfessionalProfileAndAccount() {
         ProfessionalProfile professional = createActivePersonalTrainer();

@@ -254,7 +254,7 @@ class AuthControllerEmailVerificationIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register/professional")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
     }
 
     private EmailVerificationToken findTokenFor(User user) {

@@ -194,7 +194,7 @@ class EmailVerificationDeliveryIntegrationTest {
                                   "specialization":"PERSONAL_TRAINER"
                                 }
                                 """.formatted(email, PASSWORD)))
-                .andExpect(status().isCreated())
+                .andExpect(status().isAccepted())
                 .andReturn();
     }
 
@@ -214,7 +214,7 @@ class EmailVerificationDeliveryIntegrationTest {
                                   "gender":"MALE"
                                 }
                                 """.formatted(email, PASSWORD, inviteCode)))
-                .andExpect(status().isCreated())
+                .andExpect(status().isAccepted())
                 .andReturn();
     }
 

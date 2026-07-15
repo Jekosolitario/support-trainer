@@ -384,7 +384,7 @@ class AuthControllerEmailResendIntegrationTest {
                                   "specialization": "PERSONAL_TRAINER"
                                 }
                                 """.formatted(email, PASSWORD)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
     }
 
     private void registerClient(String inviteCode, String email) throws Exception {
@@ -403,7 +403,7 @@ class AuthControllerEmailResendIntegrationTest {
                                   "inviteCode": "%s"
                                 }
                                 """.formatted(email, PASSWORD, inviteCode)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
     }
 
     private String createInvite(String accessToken) throws Exception {

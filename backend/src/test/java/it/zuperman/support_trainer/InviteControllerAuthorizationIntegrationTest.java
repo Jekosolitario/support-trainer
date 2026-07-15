@@ -142,7 +142,7 @@ class InviteControllerAuthorizationIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register/professional")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registrationRequestBody))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
 
         User savedUser = userRepository.findByEmail(email).orElseThrow();
         EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
@@ -184,7 +184,7 @@ class InviteControllerAuthorizationIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register/client")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registrationRequestBody))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
 
         User savedClient = userRepository.findByEmail(email).orElseThrow();
         EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()

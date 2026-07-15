@@ -69,7 +69,8 @@ class BusinessFlowClockTest {
                 linkRepository,
                 bookingItemRepository,
                 fixedTimeProvider(),
-                businessDateTimeMapper()
+                businessDateTimeMapper(),
+                new it.zuperman.support_trainer.common.security.UserReadinessValidator()
         );
         CreateAvailabilitySlotRequest request = new CreateAvailabilitySlotRequest(
                 businessOffset(FIXED_BUSINESS_DATE_TIME),
@@ -95,9 +96,14 @@ class BusinessFlowClockTest {
         authenticate("client@example.com");
         when(userRepository.findByEmail("client@example.com")).thenReturn(Optional.of(client));
         when(client.getAccountStatus()).thenReturn(AccountStatus.ACTIVE);
+        when(client.getEmailVerified()).thenReturn(true);
         when(client.getActive()).thenReturn(true);
         when(client.getId()).thenReturn(2L);
-        when(slotRepository.findActiveByIdForUpdate(10L)).thenReturn(Optional.of(slot));
+        when(slotRepository.findActiveAccessibleByIdAndClientIdForUpdate(
+                10L,
+                2L,
+                AccountStatus.ACTIVE
+        )).thenReturn(Optional.of(slot));
         when(slot.getProfessional()).thenReturn(professional);
         when(slot.getStatus()).thenReturn(AvailabilitySlotStatus.AVAILABLE);
         when(slot.getStartDateTime()).thenReturn(FIXED_INSTANT);
@@ -106,15 +112,14 @@ class BusinessFlowClockTest {
         when(professional.getAccountStatus()).thenReturn(AccountStatus.ACTIVE);
         when(professional.getEmailVerified()).thenReturn(true);
         when(professional.getSpecialization()).thenReturn(ProfessionalSpecialization.PERSONAL_TRAINER);
-        when(linkRepository.existsByProfessional_IdAndClient_IdAndActiveTrue(1L, 2L)).thenReturn(true);
         BookingService service = new BookingService(
                 bookingRepository,
                 bookingItemRepository,
                 slotRepository,
-                linkRepository,
                 userRepository,
                 fixedTimeProvider(),
-                bookingResponseMapper()
+                bookingResponseMapper(),
+                new it.zuperman.support_trainer.common.security.UserReadinessValidator()
         );
 
         assertThatThrownBy(() -> service.createBookingRequest(new CreateBookingRequest(10L, null)))

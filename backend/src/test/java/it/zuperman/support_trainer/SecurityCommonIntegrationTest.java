@@ -71,6 +71,34 @@ class SecurityCommonIntegrationTest {
     }
 
     @Test
+    @DisplayName("Le superfici Swagger inattive non devono essere pubbliche")
+    void shouldRejectAnonymousSwaggerPaths() throws Exception {
+        mockMvc.perform(get("/swagger-ui/index.html"))
+                .andExpect(status().isUnauthorized())
+                .andExpectAll(errorResponse(401, "UNAUTHORIZED"));
+
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isUnauthorized())
+                .andExpectAll(errorResponse(401, "UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("Le superfici Swagger inattive devono restare 404 per utenti autenticati")
+    void shouldReturnNotFoundForAuthenticatedSwaggerPaths() throws Exception {
+        String accessToken = jwtService.generateAccessToken(createProfessionalUserDetails());
+
+        mockMvc.perform(get("/swagger-ui/index.html")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isNotFound())
+                .andExpectAll(errorResponse(404, "RESOURCE_NOT_FOUND"));
+
+        mockMvc.perform(get("/v3/api-docs")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isNotFound())
+                .andExpectAll(errorResponse(404, "RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
     @DisplayName("JWT alterato deve restituire invalid token")
     void shouldRejectAlteredJwt() throws Exception {
         UserDetails userDetails = createProfessionalUserDetails();
