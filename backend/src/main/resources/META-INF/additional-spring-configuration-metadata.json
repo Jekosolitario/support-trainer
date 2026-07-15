@@ -29,5 +29,67 @@
     "name": "app.email.verification-page-url",
     "type": "java.net.URI",
     "description": "Absolute frontend page URL used to build email verification links."
+  },
+  {
+    "name": "app.email.sender.address",
+    "type": "java.lang.String",
+    "description": "Required sender address when app.email.mode is SMTP."
+  },
+  {
+    "name": "app.email.sender.name",
+    "type": "java.lang.String",
+    "description": "Required display name for the SMTP sender."
+  },
+  {
+    "name": "app.email.sender.reply-to",
+    "type": "java.lang.String",
+    "description": "Optional reply-to address for SMTP verification messages."
+  },
+  {
+    "name": "app.email.smtp.host",
+    "type": "java.lang.String",
+    "description": "Required SMTP host when app.email.mode is SMTP."
+  },
+  {
+    "name": "app.email.smtp.port",
+    "type": "java.lang.Integer",
+    "description": "SMTP TCP port between 1 and 65535 when SMTP mode is active."
+  },
+  {
+    "name": "app.email.smtp.username",
+    "type": "java.lang.String",
+    "description": "SMTP username required only when app.email.smtp.auth is true."
+  },
+  {
+    "name": "app.email.smtp.password",
+    "type": "java.lang.String",
+    "description": "SMTP password required only when app.email.smtp.auth is true."
+  },
+  {
+    "name": "app.email.smtp.auth",
+    "type": "java.lang.Boolean",
+    "defaultValue": false,
+    "description": "Enables SMTP authentication."
+  },
+  {
+    "name": "app.email.smtp.start-tls",
+    "type": "java.lang.Boolean",
+    "defaultValue": false,
+    "description": "Enables STARTTLS for SMTP."
+  },
+  {
+    "name": "app.email.smtp.connect-timeout",
+    "type": "java.time.Duration",
+    "description": "Positive SMTP connection timeout when SMTP mode is active."
+  },
+  {
+    "name": "app.email.smtp.read-timeout",
+    "type": "java.time.Duration",
+    "description": "Positive SMTP read timeout when SMTP mode is active."
+  },
+  {
+    "name": "app.email.smtp.write-timeout",
+    "type": "java.time.Duration",
+    "description": "Positive SMTP write timeout when SMTP mode is active."
   }
 ]}

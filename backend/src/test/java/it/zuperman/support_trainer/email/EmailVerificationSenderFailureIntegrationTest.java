@@ -2,12 +2,12 @@ package it.zuperman.support_trainer.email;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Properties;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,6 +15,8 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.MailSendException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -26,8 +28,6 @@ import it.zuperman.support_trainer.auth.token.EmailVerificationToken;
 import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.repository.UserRepository;
-import it.zuperman.support_trainer.email.model.EmailVerificationMessage;
-import it.zuperman.support_trainer.email.port.EmailVerificationSender;
 import it.zuperman.support_trainer.email.support.EmailTestClockConfiguration;
 import it.zuperman.support_trainer.email.support.EmailTestClockConfiguration.MutableTestClock;
 import it.zuperman.support_trainer.invite.repository.InviteCodeRepository;
@@ -39,10 +39,23 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "app.email.mode=SMTP",
+        "app.email.verification-page-url=https://frontend.test/verify-email",
+        "app.email.sender.address=no-reply@example.test",
+        "app.email.sender.name=Support Trainer",
+        "app.email.smtp.host=smtp.example.test",
+        "app.email.smtp.port=2525",
+        "app.email.smtp.auth=false",
+        "app.email.smtp.start-tls=false",
+        "app.email.smtp.connect-timeout=5s",
+        "app.email.smtp.read-timeout=5s",
+        "app.email.smtp.write-timeout=5s"
+})
 @AutoConfigureMockMvc
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
@@ -67,13 +80,15 @@ class EmailVerificationSenderFailureIntegrationTest {
     private ProfessionalClientLinkRepository linkRepository;
 
     @MockitoBean
-    private EmailVerificationSender sender;
+    private JavaMailSender mailSender;
 
     @BeforeEach
     void setUp() {
         cleanDatabase();
         clock.setInstant(INITIAL_INSTANT);
-        doThrow(new IllegalStateException("delivery unavailable")).when(sender).send(any());
+        when(mailSender.createMimeMessage()).thenAnswer(invocation ->
+                new jakarta.mail.internet.MimeMessage(jakarta.mail.Session.getInstance(new Properties())));
+        doThrow(new MailSendException("delivery unavailable")).when(mailSender).send(any(jakarta.mail.internet.MimeMessage.class));
     }
 
     @AfterEach
@@ -99,8 +114,7 @@ class EmailVerificationSenderFailureIntegrationTest {
 
         User user = userRepository.findByEmail(EMAIL).orElseThrow();
         List<EmailVerificationToken> registrationTokens = tokensFor(user);
-        ArgumentCaptor<EmailVerificationMessage> captor = ArgumentCaptor.forClass(EmailVerificationMessage.class);
-        verify(sender, times(1)).send(captor.capture());
+        verify(mailSender, times(1)).send(any(jakarta.mail.internet.MimeMessage.class));
 
         assertThat(user.getAccountStatus()).isEqualTo(AccountStatus.PENDING_VERIFICATION);
         assertThat(user.getEmailVerified()).isFalse();
@@ -108,8 +122,8 @@ class EmailVerificationSenderFailureIntegrationTest {
         assertThat(registration.getResponse().getContentAsString(StandardCharsets.UTF_8))
                 .doesNotContain(registrationTokens.get(0).getToken());
         assertThat(output.getAll())
-                .contains(captor.getValue().correlationId().toString(), "REGISTRATION", "IllegalStateException")
-                .doesNotContain(EMAIL, registrationTokens.get(0).getToken(), captor.getValue().verificationUrl());
+                .contains("REGISTRATION", "EmailDeliveryException")
+                .doesNotContain(EMAIL, registrationTokens.get(0).getToken(), "https://frontend.test/verify-email");
 
         clock.setInstant(INITIAL_INSTANT.plusSeconds(60));
         mockMvc.perform(post("/api/v1/auth/email-verification/resend")
@@ -117,7 +131,7 @@ class EmailVerificationSenderFailureIntegrationTest {
                         .content("{\"email\":\"%s\"}".formatted(EMAIL)))
                 .andExpect(status().isAccepted());
 
-        verify(sender, times(2)).send(any());
+        verify(mailSender, times(2)).send(any(jakarta.mail.internet.MimeMessage.class));
         assertThat(tokensFor(user)).hasSize(2);
         assertThat(user.getAccountStatus()).isEqualTo(AccountStatus.PENDING_VERIFICATION);
     }
