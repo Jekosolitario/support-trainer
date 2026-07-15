@@ -73,7 +73,7 @@ Il refresh token viene generato durante il login, ma non è accettato come Beare
 
 Entrambi i ruoli nascono con account `PENDING_VERIFICATION` ed `emailVerified=false`, ricevono un token valido 24 ore e possono effettuare login soltanto dopo la conferma. Nella registrazione cliente il link professionale viene creato e l'invito consumato nella stessa transazione, ma il cliente pending non è visibile né operativo. Il precedente GET mutante è stato rimosso; token scaduti producono `410 Gone` e un secondo POST sul token già consumato restituisce successo soltanto se lo stato finale dell'utente è coerente.
 
-Il reinvio accetta l'email nel body, risponde sempre `202 Accepted` con lo stesso messaggio per ogni indirizzo sintatticamente valido e crea un token solo per profili attivi ancora pending. Il cooldown è di 60 secondi dal token più recente, con reinvio consentito al boundary esatto. Quando il reinvio è consentito, i precedenti token non usati vengono invalidati tecnicamente tramite `used=true` e `usedAt`, lasciando un solo token utilizzabile da 24 ore. Token, email, stato account e tempo residuo non sono esposti. Invito e link cliente-professionista restano invariati. Dopo il commit di registrazione o reinvio, un listener applicativo costruisce il link `{verification-page-url}#token={tokenEncoded}` e lo affida a una porta indipendente dal provider. Il default locale è `DISABLED`; i test usano il sender `IN_MEMORY` senza rete. Un errore del sender è assorbito dopo il commit e non cambia le risposte `201`/`202`, ma senza outbox la consegna non è garantita. Un adapter SMTP reale e il rate limiting distribuito non sono ancora implementati; i clienti già persistiti non vengono migrati.
+Il reinvio accetta l'email nel body, risponde sempre `202 Accepted` con lo stesso messaggio per ogni indirizzo sintatticamente valido e crea un token solo per profili attivi ancora pending. Il cooldown è di 60 secondi dal token più recente, con reinvio consentito al boundary esatto. Quando il reinvio è consentito, i precedenti token non usati vengono invalidati tecnicamente tramite `used=true` e `usedAt`, lasciando un solo token utilizzabile da 24 ore. Token, email, stato account e tempo residuo non sono esposti. Invito e link cliente-professionista restano invariati. Dopo il commit di registrazione o reinvio, un listener applicativo costruisce il link `{verification-page-url}#token={tokenEncoded}` e lo affida a una porta indipendente dal provider. Il default locale è `DISABLED`; i test usano il sender `IN_MEMORY` senza rete. In modalità `SMTP`, l'adapter invia un messaggio MIME `text/plain` UTF-8 in italiano con subject comune, URL visibile e scadenza nella zona business. Un errore del sender è assorbito dopo il commit e non cambia le risposte `201`/`202`, ma senza outbox o retry la consegna non è garantita. I clienti già persistiti non vengono migrati.
 
 ### Profilo e account
 
@@ -190,8 +190,15 @@ Non è richiesta un'installazione globale di Maven. Node.js non è ancora necess
    | `app.cors.allowed-origins` | `APP_CORS_ALLOWED_ORIGINS` | lista separata da virgole di origini esatte `http`/`https` |
    | `app.time.business-zone` | `APP_TIME_BUSINESS_ZONE` | `ZoneId` business; default `Europe/Rome` |
    | `app.time.clock-zone` | `APP_TIME_CLOCK_ZONE` | zona tecnica, deve rappresentare UTC |
-   | `app.email.mode` | `APP_EMAIL_MODE` | `DISABLED` (default locale sicuro) oppure `IN_MEMORY` |
-   | `app.email.verification-page-url` | `APP_EMAIL_VERIFICATION_PAGE_URL` | URL assoluto `http`/`https` della pagina, senza query o fragment |
+   | `app.email.mode` | `APP_EMAIL_MODE` | `DISABLED` (default locale sicuro), `IN_MEMORY` oppure `SMTP` |
+   | `app.email.verification-page-url` | `APP_EMAIL_VERIFICATION_PAGE_URL` | URL assoluto senza query/fragment; HTTPS per host remoti, HTTP solo loopback |
+   | `app.email.sender.address` | `APP_EMAIL_SENDER_ADDRESS` | indirizzo mittente obbligatorio in `SMTP` |
+   | `app.email.sender.name` | `APP_EMAIL_SENDER_NAME` | nome visualizzato obbligatorio in `SMTP` |
+   | `app.email.sender.reply-to` | `APP_EMAIL_SENDER_REPLY_TO` | indirizzo Reply-To SMTP facoltativo |
+   | `app.email.smtp.host` / `port` | `APP_EMAIL_SMTP_HOST` / `APP_EMAIL_SMTP_PORT` | host e porta (1–65535) obbligatori in `SMTP` |
+   | `app.email.smtp.username` / `password` | `APP_EMAIL_SMTP_USERNAME` / `APP_EMAIL_SMTP_PASSWORD` | obbligatori solo con `APP_EMAIL_SMTP_AUTH=true`; fornire solo tramite environment |
+   | `app.email.smtp.auth` / `start-tls` | `APP_EMAIL_SMTP_AUTH` / `APP_EMAIL_SMTP_START_TLS` | autenticazione e STARTTLS configurabili |
+   | `app.email.smtp.connect-timeout` / `read-timeout` / `write-timeout` | `APP_EMAIL_SMTP_CONNECT_TIMEOUT` / `APP_EMAIL_SMTP_READ_TIMEOUT` / `APP_EMAIL_SMTP_WRITE_TIMEOUT` | durate positive, ad esempio `5s` |
    | `app.security.jwt.secret` | `APP_SECURITY_JWT_SECRET` | Base64 di almeno 32 byte casuali |
    | `app.security.jwt.expiration` | `APP_SECURITY_JWT_EXPIRATION` | durata positiva |
    | `app.security.jwt.refresh-expiration` | `APP_SECURITY_JWT_REFRESH_EXPIRATION` | durata positiva e maggiore dell'access token |
@@ -202,7 +209,7 @@ Gli origin CORS non ammettono wildcard, path, query string o fragment: va indica
 
 La configurazione JWT e CORS è tipizzata e validata all'avvio. Proprietà assenti, valori non validi, secret troppo corto o origin non sicuri impediscono l'avvio senza stampare i valori sensibili. Il file `application.properties` resta escluso da Git.
 
-Anche `app.email` è tipizzata e fail-fast. `verification-page-url` rappresenta direttamente la futura pagina frontend e può includere un base path; il backend aggiunge il token codificato nel fragment `#token=...`. `DISABLED` è soltanto un default locale sicuro e non rende la configurazione pronta per produzione. `IN_MEMORY` conserva messaggi esclusivamente nel processo, non espone inbox HTTP e viene usato dal profilo `test`; non sono configurati host SMTP, credenziali o accessi di rete.
+Anche `app.email` è tipizzata e fail-fast. `verification-page-url` rappresenta direttamente la futura pagina frontend e può includere un base path; il backend aggiunge il token codificato nel fragment `#token=...`. `DISABLED` è soltanto un default locale sicuro e non rende la configurazione pronta per produzione. `IN_MEMORY` conserva messaggi esclusivamente nel processo, non espone inbox HTTP e viene usato dal profilo `test`; non sono configurati host SMTP, credenziali o accessi di rete. `SMTP` richiede mittente valido, host, porta, tre timeout positivi e, quando `auth=true`, username e password; applica UTF-8, `mail.smtp.auth`, STARTTLS e i timeout JavaMail in millisecondi. Nessuna connessione viene eseguita durante la validazione. Le combinazioni incoerenti impediscono l'avvio e password o credenziali non sono incluse nei `toString` o nei log.
 
 Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazione usa un unico `Clock` tecnico UTC; `ApplicationTimeProvider.nowInstant()` tronca, senza arrotondare, alla precisione canonica di sei cifre. Gli istanti persistiti e gli audit applicativi sono `Instant` su colonne `DATETIME(6)`, con `spring.jpa.properties.hibernate.jdbc.time_zone=UTC`; `Europe/Rome` resta soltanto la zona business. Spring Data JPA valorizza `createdAt` e `updatedAt`. Le scadenze email e invito sono rispettivamente 24 e 168 ore reali e sono esposte con `Z`. Sul confine HTTP gli orari degli slot restano `OffsetDateTime` al secondo, validati contro gap, overlap e offset di `Europe/Rome`. `ErrorResponse` resta intenzionalmente fuori da questa conversione.
 
@@ -235,6 +242,16 @@ Dalla cartella `backend`:
 ```
 
 Il server utilizza per impostazione predefinita la porta `8080`.
+
+### Profilo locale Mailpit
+
+Quando Mailpit è già disponibile localmente, è possibile avviare il backend senza modificare il file locale ignorato:
+
+```powershell
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--spring.profiles.active=mailpit"
+```
+
+Il profilo tracciato usa SMTP `localhost:1025`, mittente non reale, `auth=false`, `start-tls=false` e timeout brevi. L'interfaccia web tipica di Mailpit è `http://localhost:8025`. Mailpit non viene avviato né richiesto dalla suite di test.
 
 Per creare il package applicativo:
 
@@ -278,7 +295,7 @@ La suite include test relativi a:
 - richieste di prenotazione e relative transizioni;
 - JWT, ruoli, risposte 400/401/403 e gestione degli errori HTTP 404/405/415.
 
-L’ultima suite completa verificata contiene 257 test, senza failure, errori o test ignorati: 30 in più rispetto alla baseline approvata di 227 grazie alla copertura dell’infrastruttura email, del link nel fragment, degli adapter `DISABLED`/`IN_MEMORY`, del commit/rollback e del fallimento del sender.
+L’ultima suite completa verificata contiene 279 test in 43 suite, senza failure, errori o test ignorati: 22 in più rispetto ai 257 dello STEP 7C-B grazie alla copertura SMTP, della configurazione fail-fast, del composer, del profilo Mailpit e dell'isolamento dei fallimenti di consegna.
 
 ## 11. Profili Spring
 
@@ -305,6 +322,10 @@ Le classi di test principali attivano il profilo con `@ActiveProfiles("test")`.
 Le proprietà JWT e `app.cors.allowed-origins` sono definite direttamente nel profilo `test`; la suite non dipende quindi dall’`application.properties` locale, escluso da Git, da MySQL o da segreti reali. H2 resta la suite applicativa rapida, ma non certifica la sintassi DDL MySQL, i lock o l'esecuzione reale delle migrazioni: questi controlli richiedono un ambiente MySQL 8 isolato.
 
 Non sono attualmente presenti profili Spring dedicati a sviluppo, staging o produzione. La configurazione locale usa il file ignorato; i test usano il profilo tracciato `test`; un futuro ambiente di produzione deve fornire i valori esternamente tramite environment o altra sorgente di configurazione Spring, senza versionare segreti.
+
+### Profilo `mailpit`
+
+Il profilo tracciato `mailpit` è un aiuto manuale locale, non un profilo di produzione: abilita `SMTP` su `localhost:1025` e usa la pagina `http://localhost:5173/verify-email`. Si attiva soltanto in modo esplicito con `--spring.profiles.active=mailpit`; non contiene username, password o indirizzi personali reali.
 
 ## 12. Documentazione disponibile
 

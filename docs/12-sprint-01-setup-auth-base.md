@@ -71,4 +71,8 @@ Il reinvio è ora disponibile tramite `POST /api/v1/auth/email-verification/rese
 
 ## Stato successivo — remediation STEP 7C-B
 
-Le transazioni Auth pubblicano dopo la creazione del token un evento destinato alla consegna. Il listener sincrono parte soltanto `AFTER_COMMIT`, costruisce un URL con `#token=...` e delega a una porta indipendente dal provider. `DISABLED` è il default locale; `IN_MEMORY` è usato dai test senza rete. Il fallimento del sender non annulla registrazione o reinvio. L'adapter SMTP reale, il retry e l'outbox non fanno parte di questa fase.
+Le transazioni Auth pubblicano dopo la creazione del token un evento destinato alla consegna. Il listener sincrono parte soltanto `AFTER_COMMIT`, costruisce un URL con `#token=...` e delega a una porta indipendente dal provider. `DISABLED` è il default locale; `IN_MEMORY` è usato dai test senza rete. Il fallimento del sender non annulla registrazione o reinvio.
+
+## Stato successivo — remediation STEP 7C-C
+
+La consegna SMTP della verifica email è ora implementata senza modificare il contratto Auth: il sender usa JavaMail, un mittente configurabile e un messaggio MIME `text/plain` UTF-8 in italiano. L'attivazione `SMTP` richiede configurazione valida di mittente, host, porta e timeout; se l'autenticazione SMTP è attiva richiede anche credenziali esterne. Il profilo locale esplicito `mailpit` usa `localhost:1025` senza autenticazione né STARTTLS. La consegna resta successiva al commit, non modifica le response e non dispone ancora di outbox o retry.

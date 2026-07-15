@@ -263,7 +263,7 @@ Il flusso gestisce almeno questi casi:
 5. viene creato un solo nuovo token UUID v4 con durata esatta di 24 ore;
 6. ogni richiesta sintatticamente valida restituisce lo stesso `202 Accepted`, senza email, ruolo, stato, cooldown o token.
 
-Al boundary `now == latestToken.createdAt + 60 secondi` il reinvio è consentito. L'invalidazione tramite `used/usedAt` è un compromesso semantico dello schema esistente. Inviti e collegamenti non cambiano. Dopo la persistenza del token, Auth pubblica un evento immutabile nella transazione; il listener sincrono con `fallbackExecution=false` costruisce il link `#token=...` e chiama il sender soltanto `AFTER_COMMIT`. Rollback ed eventi senza transazione non producono invii. Gli errori sono assorbiti e registrati soltanto con correlation ID, motivo e tipo, senza email, token, URL o stack trace. Il sender reale SMTP, la consegna durevole, retry e rate limiting distribuito non sono implementati.
+Al boundary `now == latestToken.createdAt + 60 secondi` il reinvio è consentito. L'invalidazione tramite `used/usedAt` è un compromesso semantico dello schema esistente. Inviti e collegamenti non cambiano. Dopo la persistenza del token, Auth pubblica un evento immutabile nella transazione; il listener sincrono con `fallbackExecution=false` costruisce il link `#token=...` e chiama il sender soltanto `AFTER_COMMIT`. Rollback ed eventi senza transazione non producono invii. Gli errori sono assorbiti e registrati soltanto con correlation ID, motivo e tipo, senza email, token, URL o stack trace. Il sender SMTP reale usa JavaMail con credenziali esterne e trasforma i fallimenti di preparazione/consegna in un'eccezione sanitizzata; consegna durevole, retry e rate limiting distribuito non sono implementati.
 
 ---
 

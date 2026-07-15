@@ -139,11 +139,19 @@ La nuova suite `AuthControllerEmailResendIntegrationTest` contiene 9 test dedica
 
 ### 5.4 Infrastruttura applicativa email — remediation STEP 7C-B
 
-Registrazioni e reinvii idonei pubblicano ora, dopo la creazione del token e dentro la transazione Auth, un evento immutabile privo di entity. Un listener sincrono `AFTER_COMMIT` con fallback disabilitato costruisce `{verification-page-url}#token={tokenEncoded}` e chiama una porta specializzata. Il sender `DISABLED` è il default locale no-op; `IN_MEMORY` è thread-safe e consente test/CI senza rete. Rollback ed eventi senza transazione non inviano, mentre un errore del sender viene assorbito dopo il commit e non modifica le risposte `201`/`202`. I log contengono solo correlation ID, motivo e tipo di errore. Nessun endpoint espone inbox, destinatario, token o URL. SMTP reale, template, retry e outbox restano assenti; la consegna non è quindi durevole né garantita.
+Registrazioni e reinvii idonei pubblicano ora, dopo la creazione del token e dentro la transazione Auth, un evento immutabile privo di entity. Un listener sincrono `AFTER_COMMIT` con fallback disabilitato costruisce `{verification-page-url}#token={tokenEncoded}` e chiama una porta specializzata. Il sender `DISABLED` è il default locale no-op; `IN_MEMORY` è thread-safe e consente test/CI senza rete. Rollback ed eventi senza transazione non inviano, mentre un errore del sender viene assorbito dopo il commit e non modifica le risposte `201`/`202`. I log contengono solo correlation ID, motivo e tipo di errore. Nessun endpoint espone inbox, destinatario, token o URL. Lo STEP 7C-C ha poi aggiunto SMTP; template, retry e outbox restano assenti e la consegna non è quindi durevole né garantita.
 
 Il 15 luglio 2026 `.\mvnw.cmd clean verify` ha completato con 39 suite, 257 test, 0 failure, 0 errori e 0 skipped: 30 test in più della baseline di 227. La durata Maven è stata 41,668 secondi; è stato prodotto `support_trainer-0.0.1-SNAPSHOT.jar`.
 
-Il reinvio non modifica invito o collegamento cliente-professionista e non espone né registra email, token, stato account o tempo residuo. L'invio email reale, il rate limiting distribuito e una certificazione della concorrenza su MySQL restano fuori perimetro; i test H2 dimostrano sequenzialmente l'invariante di un solo token non usato, mentre il lock applicativo costituisce la protezione prevista per le richieste concorrenti.
+Il reinvio non modifica invito o collegamento cliente-professionista e non espone né registra email, token, stato account o tempo residuo. L'adapter SMTP non cambia queste garanzie; rate limiting distribuito e una certificazione della concorrenza su MySQL restano fuori perimetro. I test H2 dimostrano sequenzialmente l'invariante di un solo token non usato, mentre il lock applicativo costituisce la protezione prevista per le richieste concorrenti.
+
+### 5.5 Adapter SMTP e profilo locale Mailpit — remediation STEP 7C-C
+
+La porta di consegna dispone ora anche dell'adapter SMTP basato su Spring Mail/JavaMail. La modalità `SMTP` richiede in modo fail-fast mittente valido, host, porta, timeout positivi e, con autenticazione attiva, username e password; applica UTF-8, `mail.smtp.auth`, STARTTLS e timeout espressi in millisecondi. L'email è solo testuale, in italiano e neutra rispetto al ruolo; usa l'URL con token nel fragment e `expiresAt` nella zona business. Errori di preparazione MIME o di Spring Mail diventano `EmailDeliveryException` sanitizzata; il listener mantiene la precedente politica `AFTER_COMMIT` e registra soltanto correlation ID, motivo e tipo.
+
+Il profilo esplicito `mailpit` usa `localhost:1025`, `auth=false`, `start-tls=false` e una pagina frontend loopback. Non avvia né richiede Mailpit durante i test, che usano mock o `IN_MEMORY` senza rete; l'interfaccia locale tipica, quando il software è già disponibile, è `http://localhost:8025`. L'invio manuale Mailpit non fa parte della validazione automatica. Outbox, retry, HTML/template, provider API, policy production e affidabilità durevole restano fuori perimetro.
+
+Il 15 luglio 2026 `./mvnw.cmd clean verify` ha completato con 43 suite, 279 test, 0 failure, 0 errori e 0 skipped: 22 test in più rispetto ai 257 dello STEP 7C-B. La durata Maven è stata 49,078 secondi e la somma dei tempi Surefire 34,699 secondi; è stato prodotto `support_trainer-0.0.1-SNAPSHOT.jar`.
 
 ## 6. Pacchetti chiusi
 
@@ -151,7 +159,7 @@ Il reinvio non modifica invito o collegamento cliente-professionista e non espon
 
 - **Responsabilità**: registrazione pending dei due ruoli, conferma e reinvio email uniformi tramite POST, login e generazione dei token JWT dopo l'attivazione.
 - **Test principali**: `AuthControllerEmailVerificationIntegrationTest`, `AuthControllerEmailResendIntegrationTest`, `ClientEmailVerificationIntegrationTest`, `AuthControllerLoginIntegrationTest`, `AuthControllerRegistrationIntegrationTest`.
-- **Stato finale MVP**: il GET mutante è rimosso; la conferma è idempotente sullo stato coerente e la scadenza produce 410. Il reinvio usa una risposta uniforme 202, cooldown di 60 secondi e invalidazione dei token precedenti, senza modificare inviti o link. Invio email reale, rate limiting distribuito, reset password, logout e lifecycle completo del refresh token restano esclusi. I clienti già persistiti non sono migrati.
+- **Stato finale MVP**: il GET mutante è rimosso; la conferma è idempotente sullo stato coerente e la scadenza produce 410. Il reinvio usa una risposta uniforme 202, cooldown di 60 secondi e invalidazione dei token precedenti, senza modificare inviti o link. L'adapter SMTP è disponibile ma non rende la consegna durevole; rate limiting distribuito, reset password, logout e lifecycle completo del refresh token restano esclusi. I clienti già persistiti non sono migrati.
 
 ### Invite
 

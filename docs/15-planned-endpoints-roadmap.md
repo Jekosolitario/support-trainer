@@ -86,7 +86,7 @@ Questi endpoint erano stati ipotizzati nella documentazione iniziale, ma non ris
 
 ## 5. Endpoint pianificati — area security/account lifecycle
 
-L'infrastruttura applicativa di richiesta email è già presente: pubblicazione nella transazione, consegna sincrona `AFTER_COMMIT`, sender locale disabilitato e sender in-memory per test/CI. Non introduce endpoint. Restano futuri l'adapter SMTP o provider reale, i template, una convenzione production esplicita e, se richiesta affidabilità di consegna, outbox e retry.
+L'infrastruttura applicativa di richiesta email è già presente: pubblicazione nella transazione, consegna sincrona `AFTER_COMMIT`, sender locale disabilitato, sender in-memory per test/CI e adapter SMTP JavaMail configurabile. Non introduce endpoint. Restano futuri un provider API, template HTML, una convenzione production esplicita e, se richiesta affidabilità di consegna, outbox e retry.
 
 ### 5.1 Forgot password
 

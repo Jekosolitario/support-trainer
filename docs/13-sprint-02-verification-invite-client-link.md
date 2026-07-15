@@ -309,4 +309,8 @@ Il cliente pending e il professionista pending possono richiedere un reinvio uni
 
 ## Stato successivo — remediation STEP 7C-B
 
-La registrazione cliente pubblica la richiesta email solo dopo avere creato cliente, collegamento, consumo invito e token nella stessa transazione. Il listener la consegna esclusivamente dopo commit; il rollback non lascia né dati parziali né messaggi. La registrazione professionista e il reinvio seguono lo stesso contratto. Il sender locale è disabilitato, quello di test è in-memory e senza rete; un errore non cambia le risposte HTTP. SMTP reale e garanzia durevole tramite outbox restano futuri.
+La registrazione cliente pubblica la richiesta email solo dopo avere creato cliente, collegamento, consumo invito e token nella stessa transazione. Il listener la consegna esclusivamente dopo commit; il rollback non lascia né dati parziali né messaggi. La registrazione professionista e il reinvio seguono lo stesso contratto. Il sender locale è disabilitato, quello di test è in-memory e senza rete; un errore non cambia le risposte HTTP.
+
+## Stato successivo — remediation STEP 7C-C
+
+La stessa porta di consegna dispone ora dell'adapter SMTP JavaMail. L'email di verifica, comune a `CLIENT` e `PROFESSIONAL`, è testuale, UTF-8, neutra rispetto al ruolo, contiene il link con `#token=...` e la scadenza formattata nella zona business. I fallimenti SMTP sono sanitizzati e restano assorbiti dal listener `AFTER_COMMIT`: invito, cliente, collegamento e token già committati non vengono annullati. Non sono stati introdotti endpoint, retry, outbox o modifiche alle tabelle.

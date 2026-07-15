@@ -72,9 +72,9 @@ Note di flusso verificate:
 - le risposte di registrazione contengono identità e ruolo, ma `accessToken`, `refreshToken` e `tokenType` sono `null`; dopo la registrazione occorre passare dal login;
 - cliente e professionista nascono `PENDING_VERIFICATION`, con `emailVerified=false`, e non possono fare login prima della conferma;
 - per il cliente il link è già creato e l'invito consumato, ma il cliente pending non è visibile al professionista;
-- il backend genera e persiste per entrambi un token valido 24 ore e, dopo commit, affida un link con token nel fragment alla porta email; il default locale non invia e non esiste ancora un adapter SMTP reale;
+- il backend genera e persiste per entrambi un token valido 24 ore e, dopo commit, affida un link con token nel fragment alla porta email; `SMTP` è disponibile ma il default locale resta disabilitato;
 - la futura pagina deve leggere il fragment, rimuoverlo immediatamente dall'URL prima di avviare analytics, monitoring o altre integrazioni, conservarlo solo in memoria e non inserirlo in `localStorage`; invia quindi il POST, mostra la CTA login in caso di successo e il messaggio neutro di reinvio in caso di 410;
-- la pagina di verifica non deve usare `HashRouter`, perché il fragment è riservato al token, né trasmettere il token a strumenti di analytics o monitoring;
+- la pagina di verifica deve restare compatibile con `BrowserRouter` e non deve usare `HashRouter`, perché il fragment è riservato al token, né trasmettere il token a strumenti di analytics o monitoring;
 - l'azione “Invia di nuovo” usa l'email della registrazione, non mostra se l'account esiste e non invia email o token ad analytics; il frontend può disabilitare il pulsante per 60 secondi, ma il backend resta autoritativo e non espone il tempo residuo;
 - il codice invito è monouso, non è legato a una specifica email destinataria e scade dopo 7 giorni.
 
@@ -175,7 +175,7 @@ I path seguenti sono una convenzione frontend proposta: il repository non contie
 
 Flusso cliente consigliato: `/invite/validate` valida il codice e, in caso positivo, passa a `/register/client` conservando il codice. Non saltare la validazione lato server durante la registrazione: il backend la ripete correttamente.
 
-Dopo entrambe le registrazioni il frontend mostra “Controlla la tua email”. Il futuro link apre `/verify-email`, la pagina legge e rimuove il token dall'URL, effettua il POST e presenta la CTA login. Un secondo utilizzo coerente resta un successo. La stessa schermata offre “Invia di nuovo”: invia l'email al POST di resend, mostra sempre il messaggio neutro e applica un blocco UX di 60 secondi, senza sostituire il cooldown del backend. Il frontend applicativo e la consegna email non sono implementati in questo step.
+Dopo entrambe le registrazioni il frontend mostra “Controlla la tua email”. Il link apre `/verify-email`, la pagina legge e rimuove il token dall'URL, effettua il POST e presenta la CTA login. Un secondo utilizzo coerente resta un successo. La stessa schermata offre “Invia di nuovo”: invia l'email al POST di resend, mostra sempre il messaggio neutro e applica un blocco UX di 60 secondi, senza sostituire il cooldown del backend. Il frontend applicativo non è implementato in questo step; l'adapter SMTP backend invia un messaggio testuale con URL `#token=...`.
 
 ### Area cliente
 
@@ -414,7 +414,7 @@ Il backend resta la fonte autoritativa e ripete tutte le validazioni. Gli audit 
 
 Questi punti non impediscono la mappa funzionale, ma non sono determinabili come contratto frontend completo dal repository attuale:
 
-1. **Consegna verifica email:** registrazione e reinvio creano e salvano il token e, dopo commit, producono una richiesta di consegna; non esiste ancora l'adapter SMTP reale e il default locale è disabilitato. La porta in-memory è solo per test/debug e non è esposta via endpoint.
+1. **Consegna verifica email:** registrazione e reinvio creano e salvano il token e, dopo commit, usano una porta di consegna con adapter SMTP configurabile. Il default locale resta disabilitato; la porta in-memory è solo per test/debug e non è esposta via endpoint. L'URL frontend remoto deve essere HTTPS; HTTP è ammesso solo per loopback locale. Non sono presenti outbox o retry, quindi la consegna non è garantita.
 2. **Contratto temporale:** audit e scadenze account/booking/inviti arrivano come `Instant` UTC con `Z`; gli orari degli slot conservano l'offset esplicito `Europe/Rome` e le date civili restano `LocalDate`. La UI deve distinguere questi tre tipi e non applicare una timezone globale ai payload.
 3. **Storage auth:** il backend non prescrive dove conservare l'access token; la strategia va chiusa considerando sicurezza e assenza del refresh operativo.
 4. **URL pubblico dei link:** `app.email.verification-page-url` configura la pagina di verifica, ma il valore pubblico definitivo di ciascun ambiente non è ancora definito; i link invito restano separati.
