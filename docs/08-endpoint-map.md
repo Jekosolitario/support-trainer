@@ -365,6 +365,12 @@ Tutti gli altri endpoint richiedono autenticazione valida tramite JWT.
 - `GET /api/v1/bookings/{bookingRequestId}` → utente autenticato, con controllo accesso nel service
 - `PATCH /api/v1/bookings/{bookingRequestId}/cancel` → utente autenticato, con controllo accesso e transizione nel service
 
+### 11.4 Contratto uniforme degli errori
+
+Endpoint, filtro JWT, handler Security e fallback `/error` restituiscono lo stesso JSON: `timestamp` UTC, `status`, `code`, `message` e `path` senza query. Solo `VALIDATION_ERROR` aggiunge `fieldErrors`, lista ordinata di `{field, code, message}` che può contenere più errori sullo stesso campo o un errore globale senza `field`.
+
+I codici dominio 4xx restano invariati. I casi framework usano `MALFORMED_REQUEST`, `MISSING_REQUEST_PARAMETER`, `INVALID_REQUEST_PARAMETER`, `RESOURCE_NOT_FOUND`, `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE` e `UNSUPPORTED_MEDIA_TYPE`. Le 401 distinguono `UNAUTHORIZED`, `INVALID_TOKEN` e `TOKEN_EXPIRED` e includono `WWW-Authenticate: Bearer`; il login errato mantiene `AUTHENTICATION_ERROR`. Le 405 conservano `Allow`, le 415 i media type supportati quando disponibili. Ogni 500 è esposto come `INTERNAL_SERVER_ERROR` con messaggio generico e senza dettagli interni.
+
 ---
 
 ## 12. Nota metodologica

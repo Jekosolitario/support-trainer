@@ -213,14 +213,14 @@ La separazione delle risposte di sicurezza è:
 - **401 Unauthorized** per autenticazione assente o non valida, token scaduto/alterato, refresh token usato come Bearer o utente del token non trovato;
 - **403 Forbidden** per utente autenticato privo dell'autorità richiesta.
 
-`ErrorResponse` espone timestamp, status, tipo di errore, `errorCode`, messaggio ed eventuali errori di validazione. `AppException` trasporta stato HTTP, codice applicativo e messaggio. `GlobalExceptionHandler` gestisce le eccezioni applicative e i principali errori framework verificati:
+`ErrorResponse` espone sempre timestamp UTC, status, `code`, message e path; `fieldErrors` è una lista presente solo per la validazione. Non espone più `error`, `errorCode` o `validationErrors`. `AppException` trasporta stato HTTP, codice applicativo e messaggio; per gli errori 5xx il codice e il messaggio pubblici vengono sanitizzati. `GlobalExceptionHandler`, Security e `/error` condividono la stessa factory e lo stesso writer JSON e gestiscono i principali errori framework verificati:
 
 - body malformato e validazione DTO;
 - parametro obbligatorio mancante;
-- parametro di path di tipo errato;
+- parametri mancanti o non convertibili;
 - risorsa HTTP inesistente;
 - metodo HTTP non supportato;
-- media type non supportato;
+- metodo, rappresentazione o media type non supportati;
 - errore interno inatteso con messaggio non sensibile.
 
 I controlli di ruolo sono definiti in `SecurityConfig`; ownership, stato del profilo, specializzazione e coerenza delle risorse sono ulteriormente verificati nel service layer.

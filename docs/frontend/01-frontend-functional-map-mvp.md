@@ -263,44 +263,51 @@ Il contratto comune reale è `ErrorResponse`:
 
 ```json
 {
-  "timestamp": "2026-07-04T12:00:00",
+  "timestamp": "2026-07-15T12:00:00Z",
   "status": 400,
-  "error": "BAD_REQUEST",
-  "errorCode": "VALIDATION_ERROR",
-  "message": "Dati non validi",
-  "validationErrors": {
-    "email": "Formato email non valido"
-  }
+  "code": "VALIDATION_ERROR",
+  "message": "La richiesta contiene dati non validi",
+  "path": "/api/v1/auth/login",
+  "fieldErrors": [
+    {
+      "field": "email",
+      "code": "Email",
+      "message": "Formato email non valido"
+    }
+  ]
 }
 ```
 
 | Campo | Uso frontend |
 |---|---|
-| `timestamp` | Diagnostica; non necessario nel messaggio principale. |
+| `timestamp` | Istante UTC con `Z`, utile alla diagnostica ma non necessario nel messaggio principale. |
 | `status` | Comportamento HTTP generale. |
-| `error` | Nome standard dello stato HTTP. |
-| `errorCode` | Identificatore applicativo per comportamento e copy specifici. |
-| `message` | Messaggio generale mostrabile, con fallback frontend. |
-| `validationErrors` | Mappa `campo -> messaggio`; collegare gli errori ai controlli del form. Può essere `null`. |
+| `code` | Identificatore macchina per comportamento e copy specifici. |
+| `message` | Solo fallback leggibile: non usarlo per decidere la logica. |
+| `path` | URI della richiesta senza query, utile per diagnostica locale. |
+| `fieldErrors` | Presente solo per `VALIDATION_ERROR`: lista `{field?, code, message}`; può contenere più errori per campo e errori globali senza `field`. |
 
 | Status | Comportamento UX |
 |---|---|
 | `400 Bad Request` | Mostrare errori campo per `VALIDATION_ERROR`; per body, path o query malformati mostrare messaggio generale. Comprende anche alcune violazioni di stato/invito. |
-| `401 Unauthorized` | Login: errore credenziali. Area privata: sessione assente/scaduta/non valida e nuovo login. |
+| `401 Unauthorized` | Invalidare ogni sessione locale. Distinguere `TOKEN_EXPIRED` quando serve il copy UX; `UNAUTHORIZED` e `INVALID_TOKEN` restano errori di accesso. Il backend include `WWW-Authenticate: Bearer`. |
 | `403 Forbidden` | Utente autenticato ma il ruolo non consente l'endpoint, oppure un altro flusso business nega l'operazione. Non fare logout automatico. |
 | `404 Not Found` | Stato neutro “Risorsa non trovata”; offrire ritorno alla lista. Nei dettagli cliente/professionista include anche la risorsa fuori dal perimetro del principal e non deve essere interpretato per distinguere il motivo. |
 | `409 Conflict` | Dato già esistente o stato concorrente/obsoleto, per esempio email duplicata, slot sovrapposto o transizione booking non più valida. Mostrare messaggio e ricaricare la risorsa quando opportuno. |
+| `410 Gone` | Per `EMAIL_VERIFICATION_TOKEN_EXPIRED`, proporre il reinvio della verifica email. |
+| `405/406/415` | Errore di integrazione del client: non ritentare invariando metodo, `Accept` o `Content-Type`; 405 include `Allow`. |
 | `500 Internal Server Error` | Messaggio neutro, possibilità di riprovare e nessun dettaglio tecnico. |
 
-Il backend uniforma anche `405 Method Not Allowed` e `415 Unsupported Media Type`: normalmente indicano un errore d'integrazione del frontend e vanno loggati, presentando all'utente un fallback generico.
+Il client deve trattare separatamente gli errori di rete o CORS senza response HTTP. Un preflight CORS rifiutato prima del controller non garantisce un `ErrorResponse` leggibile dal browser.
 
 Regole pratiche:
 
-- usare `errorCode` per decidere il comportamento, senza basarsi sul testo italiano;
-- mostrare `validationErrors[field]` sotto il campo e un riepilogo accessibile a inizio form;
+- usare `code` per decidere il comportamento, senza basarsi sul testo italiano;
+- raggruppare `fieldErrors` per `field`, mostrando anche tutti gli errori globali; non assumere una sola violazione per campo;
 - se la risposta non rispetta `ErrorResponse` o la rete non risponde, usare un fallback come “Impossibile completare l'operazione. Riprova.”;
 - dopo un `409` su slot o booking, invalidare i dati locali e ricaricare lista/dettaglio;
-- non mostrare stack trace, payload tecnici o identificatori interni non necessari.
+- non mostrare stack trace, payload tecnici o identificatori interni non necessari;
+- non inviare proprietà JSON sconosciute: il backend le rifiuta deliberatamente.
 
 ## 10. Stati UI necessari
 

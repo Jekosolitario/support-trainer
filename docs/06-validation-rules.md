@@ -818,6 +818,10 @@ Le seguenti situazioni sono gestite o devono essere gestite tramite errori appli
 - transizione di stato non consentita;
 - cancellazione professionista di booking ancora `PENDING`.
 
+### Contratto HTTP per la validazione
+
+Le violazioni Bean Validation restituiscono `400 VALIDATION_ERROR` con messaggio generale e una lista `fieldErrors`. Ogni elemento contiene `field` (assente per un errore globale), `code` e `message`; i valori rifiutati, `objectName`, tipi Java e dettagli di binding non vengono esposti. Più violazioni sullo stesso campo sono preservate e ordinate in modo deterministico. Body JSON vuoto, sintatticamente invalido, con enum/data/tipo non leggibile, proprietà sconosciute, contenuto trailing o chiavi duplicate restituiscono invece `400 MALFORMED_REQUEST` senza dettagli del parser.
+
 ---
 
 ## 17. Decisioni confermate

@@ -649,7 +649,7 @@ Nel codice attuale **non** risulta ancora implementato un token applicativo per:
 
 La configurazione applicativa di esempio richiede `APP_CORS_ALLOWED_ORIGINS`; il file locale ignorato può continuare a definire direttamente la proprietà e il profilo `test` usa un origin fittizio autonomo. Ogni ambiente deve fornire l'origine esatta del proprio frontend, inclusa l'eventuale porta. Un preflight proveniente da un'origine non configurata viene rifiutato.
 
-Questa configurazione supporta un frontend separato senza usare wildcard e resta sovrascrivibile tramite le normali sorgenti esterne di Spring. Non sono introdotti profili di deploy né valori di produzione nel repository.
+Questa configurazione supporta un frontend separato senza usare wildcard e resta sovrascrivibile tramite le normali sorgenti esterne di Spring. Non sono introdotti profili di deploy né valori di produzione nel repository. Un rifiuto CORS avviene prima di controller e contract error HTTP: il browser non può quindi trattare il suo eventuale body come `ErrorResponse` consumabile.
 
 ---
 
@@ -765,6 +765,6 @@ Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti
 
 ## 26. Riferimento temporale dei flussi di sicurezza
 
-JWT, verifica email, inviti e timestamp delle risposte di errore usano l'unica fonte temporale applicativa. Il `Clock` tecnico opera in UTC; JWT converte esplicitamente l'`Instant` in `Date` mantenendo invariati claim, algoritmo e durate. Le scadenze di verifica email e invito sono ora `Instant` persistiti in UTC e durano rispettivamente 24 e 168 ore reali. Il timestamp non persistito di `ErrorResponse` resta intenzionalmente nel precedente contratto civile.
+JWT, verifica email, inviti e timestamp delle risposte di errore usano l'unica fonte temporale applicativa. Il `Clock` tecnico opera in UTC; JWT converte esplicitamente l'`Instant` in `Date` mantenendo invariati claim, algoritmo e durate. Le scadenze di verifica email e invito sono ora `Instant` persistiti in UTC e durano rispettivamente 24 e 168 ore reali. Il timestamp di `ErrorResponse` usa `ApplicationTimeProvider.nowInstant()` ed è serializzato in UTC con `Z`.
 
 I test di sicurezza possono sostituire il bean con `Clock.fixed`, rendendo deterministici issued-at, expiration, consumo dei token e timestamp 401/403. Le scadenze esposte per gli inviti sono serializzate in ISO-8601 UTC con `Z`; endpoint e messaggi restano invariati.
