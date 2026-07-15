@@ -50,7 +50,7 @@ Devono essere mantenuti in un documento separato dedicato agli endpoint pianific
 
 ### 4.1 Registrazione professionista
 **POST** `/api/v1/auth/register/professional`  
-Registra un nuovo professionista.
+Valida una nuova registrazione professionista e restituisce sempre `202 Accepted` con un DTO neutro. Lo stesso status e payload vengono restituiti per un'email già esistente: non sono esposti ID, ruolo, email, token o `EMAIL_ALREADY_REGISTERED`. Solo una nuova email crea profilo pending, token e richiesta email after-commit.
 
 ### 4.2 Login
 **POST** `/api/v1/auth/login`  
@@ -64,7 +64,7 @@ Conferma l’account professionista o cliente tramite body JSON `{"token":"..."}
 **POST** `/api/v1/auth/email-verification/resend`
 Accetta `{"email":"utente@example.com"}` e restituisce sempre `202 Accepted` con messaggio neutro per richieste sintatticamente valide. Supporta entrambi i ruoli senza rivelare esistenza, stato, cooldown o creazione del token. Solo account pending, non verificati e con profilo attivo generano un nuovo token; il cooldown è 60 secondi dal token più recente e termina al boundary esatto. I precedenti token non usati vengono invalidati tramite `used/usedAt`, lasciando un solo token utilizzabile per 24 ore. Nessun token viene restituito o registrato; invito e link restano invariati.
 
-Per registrazione professionista, registrazione cliente e reinvio idoneo, il backend pubblica la richiesta di consegna dentro la transazione e la esegue soltanto dopo il commit. Il link destinato al frontend ha forma `{verification-page-url}#token={tokenEncoded}`. Un errore del sender non cambia `201 Created` o `202 Accepted`; non esiste alcun endpoint per consultare i messaggi in-memory.
+Per registrazione professionista, registrazione cliente e reinvio idoneo, il backend pubblica la richiesta di consegna dentro la transazione e la esegue soltanto dopo il commit. Il link destinato al frontend ha forma `{verification-page-url}#token={tokenEncoded}`. Un errore del sender non cambia il `202 Accepted`; non esiste alcun endpoint per consultare i messaggi in-memory.
 
 ### 4.5 Validazione codice invito cliente
 **POST** `/api/v1/auth/register/client/validate-invite`  
@@ -72,7 +72,7 @@ Verifica che il codice invito esista, sia attivo, non sia scaduto e non sia già
 
 ### 4.6 Registrazione cliente con invito
 **POST** `/api/v1/auth/register/client`  
-Completa la registrazione cliente usando un codice invito valido. La risposta resta `201` senza JWT; cliente, link, consumo invito e token email sono atomici, mentre il login resta vietato fino alla conferma.
+Completa la registrazione cliente usando un codice invito valido e restituisce sempre lo stesso `202 Accepted` neutro. L'invito viene validato prima del controllo email; per un'email già esistente, con invito ancora valido, non vengono creati profilo, link, token o messaggio e l'invito non viene consumato. Per una nuova email cliente, link, consumo invito e token email sono atomici; il login resta vietato fino alla conferma.
 
 ---
 
@@ -196,6 +196,8 @@ Restituisce gli slot di disponibilità del professionista autenticato.
 **GET** `/api/v1/professionals/{professionalId}/availability`  
 Restituisce al cliente collegato gli slot realmente prenotabili di un professionista.
 
+Professional inesistente, inattivo, non verificato o non collegato al Client producono lo stesso `404 PROFESSIONAL_NOT_FOUND`; il ruolo errato o uno stato non idoneo del principal resta `403`.
+
 Vengono restituiti solo slot:
 
 - attivi;
@@ -235,6 +237,7 @@ Le operazioni Availability applicano i seguenti controlli:
 - solo il professionista autenticato può creare e gestire i propri slot
 - il professionista deve avere account attivo, email verificata e profilo attivo
 - un cliente può leggere gli slot disponibili solo di un professionista a lui collegato
+- slot inesistente e slot di altro Professional producono lo stesso `404 AVAILABILITY_SLOT_NOT_FOUND` sulle mutate; la query scoped acquisisce il lock solo dopo aver applicato la ownership
 - l’intervallo temporale deve essere valido
 - l'offset è obbligatorio e deve essere coerente con `Europe/Rome`;
 - gap e overlap DST sono rifiutati, senza normalizzazione o scelta automatica dell'offset;
@@ -259,6 +262,8 @@ Le liste restituiscono `BookingSummaryResponse`; create, dettaglio e mutazioni r
 ### 10.1 Creazione richiesta prenotazione
 **POST** `/api/v1/bookings`  
 Permette al cliente autenticato di creare una richiesta di prenotazione su uno slot disponibile di un professionista collegato.
+
+Slot inesistente, non collegato o non visibile al Client producono lo stesso `404 AVAILABILITY_SLOT_NOT_FOUND`; gli stati reali dello slot, come blocco, scadenza o conflitto, conservano i rispettivi errori business.
 
 Regole attuali:
 
@@ -293,7 +298,7 @@ Restituisce le richieste di prenotazione ricevute dal professionista autenticato
 
 ### 10.4 Dettaglio richiesta prenotazione
 **GET** `/api/v1/bookings/{bookingRequestId}`  
-Restituisce il dettaglio di una richiesta solo se l’utente autenticato è autorizzato.
+Restituisce il dettaglio solo a Client o Professional partecipanti. Booking inesistente e booking di un estraneo producono lo stesso `404 BOOKING_REQUEST_NOT_FOUND`, anche per la cancellazione; lo storico resta accessibile ai partecipanti dopo la disattivazione del link.
 
 ### 10.5 Conferma richiesta prenotazione
 **PATCH** `/api/v1/bookings/{bookingRequestId}/confirm`  

@@ -162,7 +162,7 @@ Uno slot rimasto `AVAILABLE` ma ormai scaduto non è prenotabile.
 
 ### 8.2.1 Protezione da richieste concorrenti
 
-La creazione di una richiesta booking protegge lo slot selezionato tramite lock pessimista in scrittura.
+La creazione di una richiesta booking protegge lo slot selezionato tramite lock pessimista in scrittura. Il recupero applica già ID slot, Client autenticato, link attivo e stato leggibile del Professional: slot inesistente e slot non accessibile producono lo stesso `404`, senza acquisire un lock globale su una risorsa fuori perimetro.
 
 Durante la transazione di creazione:
 
@@ -254,7 +254,7 @@ Gli stati implementati sono:
 
 ### 8.6.1 Protezione delle transizioni concorrenti
 
-Le operazioni che modificano lo stato di una richiesta booking proteggono la richiesta tramite lock pessimista in scrittura.
+Le operazioni che modificano lo stato di una richiesta booking proteggono la richiesta tramite lock pessimista in scrittura. Dettaglio e cancellazione caricano la richiesta già scoped al partecipante; inesistente ed estraneo producono lo stesso `404`, mentre la conferma e il rifiuto sono già scoped al Professional proprietario.
 
 Sono protette in questo modo le operazioni di:
 

@@ -60,16 +60,16 @@ Gli endpoint sotto `/api/v1/auth/**` sono pubblici.
 |---|---|---|---|
 | Home / landing | Pagina statica di ingresso. Nessun endpoint richiesto. CTA verso login e registrazione professionista; l'accesso cliente parte da un invito. | Contenuto pronto, eventuale fallback contenuti | Nessun errore API |
 | Login | Autenticare cliente o professionista con `POST /api/v1/auth/login`. Campi: email e password. | Idle, invio, successo e redirect per ruolo, errore credenziali, account non attivo | `400` validazione/body, `401 AUTHENTICATION_ERROR`, `403 ACCOUNT_NOT_ACTIVE`, `EMAIL_NOT_VERIFIED`, profilo non attivo |
-| Registrazione professionista | Creare un account con `POST /api/v1/auth/register/professional`. Campi: nome, cognome, email, password, specializzazione `PERSONAL_TRAINER` o `NUTRITIONIST`. | Form, validazione, invio, `201`, istruzione di verifica email | `400 VALIDATION_ERROR`, `409 EMAIL_ALREADY_REGISTERED` |
+| Registrazione professionista | Inviare `POST /api/v1/auth/register/professional`. Campi: nome, cognome, email, password, specializzazione `PERSONAL_TRAINER` o `NUTRITIONIST`. | Form, validazione, invio, `202` neutro, istruzione di verifica email | `400 VALIDATION_ERROR`; non cercare `EMAIL_ALREADY_REGISTERED` |
 | Verifica email | Ricevere `/verify-email#token=...`, rimuovere subito il fragment e inviare `POST /api/v1/auth/email-verification/confirm` con body `token`. | Verifica in corso, verificata, non valido o scaduto; secondo utilizzo idempotente; CTA al login dopo successo | `400` body/validazione, `404 EMAIL_VERIFICATION_TOKEN_NOT_FOUND`, `410 EMAIL_VERIFICATION_TOKEN_EXPIRED` |
 | Reinvio verifica | Dalla schermata “Controlla la tua email”, inviare `POST /api/v1/auth/email-verification/resend` con body `email`. | Messaggio sempre neutro; azione “Invia di nuovo”; pulsante UX disabilitato 60 secondi, senza assumere che il backend abbia creato un token | `400` validazione/body, `415` media type; ogni email valida riceve `202` identico |
 | Validazione invito | Verificare il codice prima di mostrare il form cliente con `POST /api/v1/auth/register/client/validate-invite`. Body: `code`. | Form codice, validazione, valido con scadenza, non valido/scaduto/usato, retry | `400 VALIDATION_ERROR` e codici `INVITE_CODE_*`; `404 INVITE_CODE_NOT_FOUND` |
-| Registrazione cliente | Creare l'account con `POST /api/v1/auth/register/client` dopo validazione invito. Campi: nome, cognome, email, password, codice, data di nascita, altezza, obiettivo, genere; note mediche/infortuni/generali facoltative. | Form multi-sezione, validazione campo, invio, `201`, schermata “Controlla la tua email” | `400` validazione o invito non più valido, `403` professionista non utilizzabile, `409 EMAIL_ALREADY_REGISTERED` |
+| Registrazione cliente | Inviare `POST /api/v1/auth/register/client` dopo validazione invito. Campi: nome, cognome, email, password, codice, data di nascita, altezza, obiettivo, genere; note mediche/infortuni/generali facoltative. | Form multi-sezione, validazione campo, invio, `202` neutro, schermata “Controlla la tua email” | `400` validazione o invito non più valido, `403` professionista non utilizzabile; nessun `EMAIL_ALREADY_REGISTERED` |
 | Pagine informative statiche | Eventuali pagine legali o informative non richiedono backend, ma vanno create solo quando contenuti e requisiti sono definiti. | Contenuto e pagina non trovata frontend | Nessun errore API |
 
 Note di flusso verificate:
 
-- le risposte di registrazione contengono identità e ruolo, ma `accessToken`, `refreshToken` e `tokenType` sono `null`; dopo la registrazione occorre passare dal login;
+- entrambe le registrazioni restituiscono sempre lo stesso `202 Accepted` con messaggio neutro: il frontend non deve dedurre che l'account sia stato creato né cercare `EMAIL_ALREADY_REGISTERED`; deve invitare a controllare la posta o usare resend;
 - cliente e professionista nascono `PENDING_VERIFICATION`, con `emailVerified=false`, e non possono fare login prima della conferma;
 - per il cliente il link è già creato e l'invito consumato, ma il cliente pending non è visibile al professionista;
 - il backend genera e persiste per entrambi un token valido 24 ore e, dopo commit, affida un link con token nel fragment alla porta email; `SMTP` è disponibile ma il default locale resta disabilitato;
@@ -291,9 +291,9 @@ Il contratto comune reale è `ErrorResponse`:
 |---|---|
 | `400 Bad Request` | Mostrare errori campo per `VALIDATION_ERROR`; per body, path o query malformati mostrare messaggio generale. Comprende anche alcune violazioni di stato/invito. |
 | `401 Unauthorized` | Invalidare ogni sessione locale. Distinguere `TOKEN_EXPIRED` quando serve il copy UX; `UNAUTHORIZED` e `INVALID_TOKEN` restano errori di accesso. Il backend include `WWW-Authenticate: Bearer`. |
-| `403 Forbidden` | Utente autenticato ma il ruolo non consente l'endpoint, oppure un altro flusso business nega l'operazione. Non fare logout automatico. |
-| `404 Not Found` | Stato neutro “Risorsa non trovata”; offrire ritorno alla lista. Nei dettagli cliente/professionista include anche la risorsa fuori dal perimetro del principal e non deve essere interpretato per distinguere il motivo. |
-| `409 Conflict` | Dato già esistente o stato concorrente/obsoleto, per esempio email duplicata, slot sovrapposto o transizione booking non più valida. Mostrare messaggio e ricaricare la risorsa quando opportuno. |
+| `403 Forbidden` | Ruolo, account, email o profilo non idonei, oppure altra regola business non legata a una risorsa enumerabile. Non fare logout automatico. |
+| `404 Not Found` | Stato neutro “Risorsa non trovata”; offrire ritorno alla lista. Include risorsa inesistente, non collegata o non appartenente al principal: Availability non collegata e Booking estraneo non vanno distinti nella UI. |
+| `409 Conflict` | Stato concorrente/obsoleto, slot sovrapposto o transizione booking non più valida. Non usare più questo status per email duplicata. Mostrare messaggio e ricaricare la risorsa quando opportuno. |
 | `410 Gone` | Per `EMAIL_VERIFICATION_TOKEN_EXPIRED`, proporre il reinvio della verifica email. |
 | `405/406/415` | Errore di integrazione del client: non ritentare invariando metodo, `Accept` o `Content-Type`; 405 include `Allow`. |
 | `500 Internal Server Error` | Messaggio neutro, possibilità di riprovare e nessun dettaglio tecnico. |

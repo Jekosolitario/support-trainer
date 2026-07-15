@@ -99,9 +99,7 @@ Solo dopo verifica email:
 - `emailVerified = true`
 
 ## 5.3 Blocco operativo
-Finché l'utente non è attivo e verificato non può completare correttamente il login. Il professionista inoltre:
-- non può generare codici invito
-- non può usare le funzionalità operative che richiedono profilo attivo e verificato
+Finché l'utente non è attivo e verificato non può completare correttamente il login né usare endpoint operativi. Il controllo `emailVerified=true` è esplicito sia per `CLIENT` sia per `PROFESSIONAL`; il profilo attivo è richiesto per Availability, Booking, inviti e letture relazionali. Gli endpoint self-service `/api/v1/me/**` richiedono comunque account attivo ed email verificata, ma non bloccano la consultazione o l'aggiornamento dello stato operativo del proprio profilo quando `active=false`.
 
 ## 5.4 Cliente
 Il cliente può registrarsi solo tramite codice invito valido. La registrazione crea subito link e token e consuma l'invito, ma l'account resta pending e il professionista non può leggerlo fino alla conferma. La nuova regola riguarda le nuove registrazioni e non migra i clienti già salvati.
@@ -180,9 +178,9 @@ In base al codice attuale, gli endpoint pubblici effettivamente implementati son
 ## 7.2 Regola generale in SecurityConfig
 Nel codice, Spring Security consente pubblicamente:
 - `/error`
-- `/swagger-ui/**`
-- `/v3/api-docs/**`
 - `/api/v1/auth/**`
+
+Swagger UI e OpenAPI non sono pubblici: senza JWT rispondono `401`; con un JWT valido, non essendo esposti dall'applicazione, rispondono con il `404` uniforme.
 
 ## 7.3 Endpoint protetti
 Tutti gli altri endpoint richiedono autenticazione valida tramite JWT, salvo regole più specifiche sui ruoli.
@@ -194,12 +192,11 @@ Tutti gli altri endpoint richiedono autenticazione valida tramite JWT, salvo reg
 ## 8.1 Step principali
 1. il professionista invia richiesta di registrazione
 2. il backend valida i dati
-3. il sistema verifica che l’email non sia già registrata
-4. il sistema crea il professionista con stato `PENDING_VERIFICATION`
-5. il sistema genera un token di verifica email
-6. il token viene salvato
-7. la registrazione restituisce una `AuthResponse` senza token di login
-8. il professionista deve poi verificare l’email tramite endpoint dedicato
+3. il sistema verifica in modo neutro se l’email sia già registrata
+4. solo per una nuova email crea il professionista con stato `PENDING_VERIFICATION`, token e richiesta email after-commit
+5. per un’email già esistente non muta account, profilo o token
+6. la registrazione restituisce sempre `202 Accepted` con lo stesso DTO neutro, senza token di login, ID, ruolo o email
+7. il professionista deve poi verificare l’email tramite endpoint dedicato oppure usare resend
 
 ## 8.2 Regola importante
 Prima della verifica email:
@@ -213,15 +210,16 @@ Prima della verifica email:
 ## 9.1 Step principali
 1. il cliente invia i dati di registrazione insieme al codice invito
 2. il backend acquisisce e valida con lock il codice invito
-3. il backend verifica il professionista associato e l'unicità dell'email
-4. il backend crea l’account cliente
-5. il cliente viene impostato come:
+3. il backend verifica il professionista associato e solo dopo controlla l'email in modo neutro
+4. per un'email già esistente, con invito valido, restituisce `202` senza consumare invito, creare link, token o messaggio
+5. per una nuova email il backend crea l’account cliente
+6. il cliente viene impostato come:
    - `PENDING_VERIFICATION`
    - `emailVerified = false`
-6. il backend crea il collegamento `ProfessionalClientLink`
-7. il backend marca il codice invito come usato
-8. il backend crea il token email da 24 ore
-9. la registrazione restituisce una `AuthResponse` senza token di login
+7. il backend crea il collegamento `ProfessionalClientLink`
+8. il backend marca il codice invito come usato
+9. il backend crea il token email da 24 ore
+10. la registrazione restituisce `202 Accepted` con il DTO neutro
 
 ## 9.2 Regola importante
 La registrazione cliente può essere completata solo con codice invito:
@@ -576,9 +574,9 @@ Il controllo ownership sulle risorse viene fatto nei service specifici:
 - `AvailabilityService`
 - `BookingService`
 
-Se il collegamento non esiste o l’utente non è autorizzato:
+Per una risorsa identificata da ID, la policy è `404` indistinguibile quando la risorsa è inesistente, non collegata, non appartenente al principal o non visibile. In particolare vale per availability di un Professional non collegato, slot non accessibili in creazione Booking, dettaglio/cancellazione Booking di un estraneo e mutate Availability di un altro Professional. Le query mutate applicano prima lo scope di ownership o partecipazione e solo poi acquisiscono il lock pessimista.
 
-- viene restituito errore `403 FORBIDDEN`
+`403` resta riservato a ruolo errato, account non attivo, email non verificata, profilo non operativo, specializzazione non ammessa o conflitto/stato business dopo il recupero di una risorsa accessibile.
 
 Questa regola sul collegamento vale per le operazioni che richiedono una relazione attiva, non per la consultazione dello storico di una prenotazione già creata.
 
