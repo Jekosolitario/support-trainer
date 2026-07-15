@@ -14,6 +14,7 @@ Stato sintetico:
 
 - backend Spring Boot presente;
 - API per i flussi principali implementate;
+- 29 endpoint applicativi documentati; `/error` resta un fallback tecnico separato;
 - autenticazione e autorizzazione per ruolo presenti;
 - test di integrazione per auth, inviti, access control, profili, availability, booking e Security / Common presenti;
 - database applicativo previsto: MySQL;
@@ -217,11 +218,11 @@ Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazi
 
 La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle nove tabelle runtime tramite `classpath:db/migration`.
 
-Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true`. Dopo V1, V2 e `V3_1`–`V3_9`, la migrazione Java V4 prepara e verifica atomicamente la conversione dei 23 valori temporali legacy da `Europe/Rome` a UTC, interrompendosi prima del primo aggiornamento in presenza di gap, overlap o schema inatteso. Le migrazioni SQL `V5_1`–`V5_9` rimuovono default e `ON UPDATE` dagli audit: i timestamp ombra di `professional_profiles` e `client_profiles` diventano nullable e restano congelati. La migrazione Java V6 aggiunge gli snapshot storici Booking e ne esegue il backfill verificato. V1–V5_9 restano immutabili.
+Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true`. Le 22 migrazioni runtime sono V1, V2, `V3_1`–`V3_9`, V4, `V5_1`–`V5_9` e V6. V4 prepara e verifica atomicamente la conversione dei 23 valori temporali legacy da `Europe/Rome` a UTC; V5 trasferisce l'auditing all'applicazione; V6 aggiunge e verifica il backfill degli snapshot storici Booking. Tutti gli istanti runtime usano `DATETIME(6)` e Hibernate valida il contratto con `ddl-auto=validate`.
 
-Un database esistente non deve essere avviato direttamente con le migrazioni abilitate: prima sono obbligatori backup, clone di verifica, confronto dello schema e baseline manuale esplicitamente approvata. L'intera sequenza è stata validata su MySQL 8.0.44 sia da database vuoto (`V1` → `V6`) sia da clone legacy (`BASELINE 1` → `V2` → `V5.9` → `V6`), seguita con successo da Hibernate `ddl-auto=validate`. Sul clone V4 ha convertito da `Europe/Rome` a UTC 70 valori valorizzati; i due valori nulli e i cinque timestamp con microsecondi preesistenti sono stati preservati, insieme a dati, vincoli e indici. V6 ha inoltre verificato il backfill degli snapshot Booking, compresi microsecondi e timeline legacy. Sono stati verificati anche il mapping `Instant`, l'auditing applicativo e l'interruzione prima del primo DML in presenza di gap, overlap o schema inatteso.
+Esiste evidenza precedente di una validazione su MySQL 8.0.44, sia da database vuoto (`V1` → `V6`) sia da clone legacy (`BASELINE 1` → `V2` → `V5.9` → `V6`), conclusa con Hibernate `ddl-auto=validate`. L'audit conclusivo non ha ripetuto quella prova. Prima del trasferimento operativo è obbligatorio creare un **nuovo** schema MySQL isolato, senza riusare o eliminare schemi temporanei precedenti, e ripetere migrazione completa, secondo avvio Flyway, Hibernate validate e controlli UTC/DATETIME(6). Il database destinatario, incluso l'originale, non deve essere usato come prova.
 
-Queste verifiche hanno usato esclusivamente database isolati. Il database locale reale `support_trainer` non è stato baselinato o migrato e non ha quindi ricevuto la conversione UTC o gli snapshot Booking. Il deploy operativo deve coordinare nella stessa finestra approvata il nuovo backend, la configurazione JDBC/Hibernate UTC e le migrazioni V4, `V5_1`–`V5_9` e V6, dopo le verifiche su backup e clone. Il comando Flyway `clean` resta vietato sugli ambienti persistenti.
+V2 è stata modificata storicamente: un ambiente che avesse già applicato una versione differente può avere un checksum Flyway incompatibile. Prima di ogni migrazione reale occorre controllare `flyway_schema_history`; non usare `flyway repair` né modifiche manuali senza analisi e autorizzazione. Il rischio riguarda gli ambienti già migrati, non le installazioni pulite validate da zero. Il comando Flyway `clean` resta vietato sugli ambienti persistenti.
 
 Le tredici tabelle legacy relative a refresh/reset token, workout, nutrition, feedback e misurazioni non sono governate dalle migrazioni correnti e non vengono create, modificate o eliminate. Il perimetro completo è descritto nella [documentazione del database](docs/10-database-schema.md).
 
@@ -297,6 +298,10 @@ La suite include test relativi a:
 - richieste di prenotazione e relative transizioni;
 - JWT, ruoli, risposte 400/401/403 e gestione uniforme degli errori HTTP 404/405/406/409/410/415/500.
 
+### Baseline certificata
+
+L'ultimo `clean verify` certificato ha prodotto il JAR e completato **50 suite, 312 test, 0 failure, 0 error e 1 skipped previsto**: `BookingHistoricalSnapshotMySqlIntegrationTest`, opt-in tramite `it.mysql.enabled=true`. La pipeline [`backend-ci.yml`](.github/workflows/backend-ci.yml) usa il Maven Wrapper con Temurin 21 su Ubuntu e Windows, esegue `clean verify`, verifica il JAR, usa `contents: read`, concurrency e timeout di 20 minuti; non richiede MySQL locale né segreti reali.
+
 Le risposte di errore usano il contratto `ErrorResponse`: `timestamp` UTC, `status`, `code`, `message` e `path` senza query; `fieldErrors` è una lista presente solo per `VALIDATION_ERROR`. Il client deve decidere il comportamento tramite `code`, non tramite `message`. La configurazione Java centralizzata `JacksonConfiguration` rende il parser JSON stretto: rifiuta proprietà sconosciute, contenuto trailing e chiavi duplicate. Le risposte 401 espongono `WWW-Authenticate: Bearer`; le 405 preservano `Allow`; le 415 preservano i media type supportati quando Spring li fornisce. Gli errori 500 sono sanitizzati e anche `/error` restituisce lo stesso formato. Non sono ancora previsti correlation ID, request ID o header proprietari. I rifiuti CORS che avvengono prima del controller non costituiscono invece un contratto JSON consumabile dal browser.
 
 ## 11. Profili Spring
@@ -345,19 +350,19 @@ La cartella `docs` contiene la documentazione funzionale e tecnica. I riferiment
 - [Security Flow](docs/09-security-flow.md)
 - [Database Schema](docs/10-database-schema.md)
 - [Backend Implementation Roadmap](docs/11-backend-implementation-roadmap.md)
+- [Certificazione tecnica finale](docs/final-audit-mvp.md)
 - [Sprint Availability](docs/16-sprint-04-availability.md)
 - [Sprint Bookings](docs/17-sprint-05-bookings.md)
 - [Copertura test backend MVP](docs/codex/2026-06-28-codex-auth-test-coverage.md)
 
 ## 13. Roadmap sintetica
 
-1. consolidare test e configurazione riproducibile;
+1. integrare il frontend con i 29 endpoint applicativi esistenti;
 2. completare il lifecycle account e il flusso refresh token;
-3. integrare il frontend con le API esistenti;
-4. implementare le schede di allenamento;
-5. implementare i piani alimentari;
-6. aggiungere feedback, misurazioni e progressi;
-7. completare la preparazione tecnica al deploy.
+3. implementare le schede di allenamento;
+4. implementare i piani alimentari;
+5. aggiungere feedback, misurazioni e progressi;
+6. completare la preparazione tecnica al deploy, inclusa la validazione MySQL isolata prima della migrazione reale.
 
 La roadmap dettagliata è disponibile in [docs/11-backend-implementation-roadmap.md](docs/11-backend-implementation-roadmap.md) e [docs/15-planned-endpoints-roadmap.md](docs/15-planned-endpoints-roadmap.md).
 

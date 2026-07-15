@@ -51,16 +51,17 @@ Alla data attuale risultano già implementati:
 
 Availability e Bookings non devono più essere considerati endpoint pianificati.
 
+La stabilizzazione backend, i test, la documentazione, il Wrapper, la CI e Flyway sono stati certificati sulla baseline applicativa `3cf48902b6c193c5f25740eab7e774ce26e3dcc3`. Prima della migrazione reale restano obbligatori il controllo di `flyway_schema_history` e una nuova validazione MySQL su schema isolato.
+
 I prossimi blocchi da valutare sono:
 
-1. stabilizzazione backend, test e documentazione
-2. integrazione frontend reale sugli endpoint già pronti
-3. modulo workout
-4. modulo nutrition
-5. feedback
-6. measurements
-7. password reset / refresh token / logout
-8. preparazione deploy
+1. integrazione frontend reale sui 29 endpoint applicativi già pronti
+2. modulo workout
+3. modulo nutrition
+4. feedback
+5. measurements
+6. password reset / refresh token / logout
+7. preparazione deploy
 
 ---
 

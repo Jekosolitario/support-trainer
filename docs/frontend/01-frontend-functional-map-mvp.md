@@ -22,7 +22,9 @@ La mappa distingue sempre tre stati:
 | **Futuro / non attivo** | La UX può prevederne la posizione, ma non deve presentarlo come funzionante. |
 | **Non presente** | Non deve comparire come azione attiva né generare chiamate API. |
 
-La presenza di una pagina frontend non implica necessariamente un endpoint dedicato: una landing statica non ne richiede uno, mentre una dashboard MVP deve comporre dati restituiti da endpoint già esistenti. Nel backend risultano implementati **28 endpoint**.
+La presenza di una pagina frontend non implica necessariamente un endpoint dedicato: una landing statica non ne richiede uno, mentre una dashboard MVP deve comporre dati restituiti da endpoint già esistenti. Nel backend risultano implementati **29 endpoint applicativi**: Auth 6, Me 4, Client 2, Professional 3, Invite 2, Availability 5 e Booking 7. `/error` è un fallback tecnico separato e non va trattato come endpoint funzionale.
+
+La baseline certificata richiede inoltre che il client usi la risposta neutra `202` per entrambe le registrazioni, non cerchi `EMAIL_ALREADY_REGISTERED`, gestisca `ErrorResponse` tramite `code` e tratti gli orari Availability e gli snapshot Booking come `OffsetDateTime` con offset autorevole. Le sezioni successive dettagliano questi contratti.
 
 ## 2. Stato del frontend
 

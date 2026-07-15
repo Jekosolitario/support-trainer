@@ -41,6 +41,8 @@ Regola generale:
 ## 3. Stato del documento
 Questo file include **solo endpoint realmente presenti nel codice attuale**.
 
+Il conteggio è di **29 endpoint applicativi**: Auth 6, Me 4, Client 2, Professional 3, Invite 2, Availability 5 e Booking 7. `/error` è un endpoint tecnico di fallback e non è contato fra le API funzionali.
+
 Gli endpoint futuri o ancora da definire non vengono elencati qui.  
 Devono essere mantenuti in un documento separato dedicato agli endpoint pianificati.
 

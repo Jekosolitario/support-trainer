@@ -952,7 +952,10 @@ Le risorse versionate sono applicate in questo ordine:
 18. `V5_6__transfer_email_token_audit_ownership_to_application.sql`;
 19. `V5_7__transfer_availability_audit_ownership_to_application.sql`;
 20. `V5_8__transfer_booking_request_audit_ownership_to_application.sql`;
-21. `V5_9__transfer_booking_item_audit_ownership_to_application.sql`.
+21. `V5_9__transfer_booking_item_audit_ownership_to_application.sql`;
+22. `V6__add_booking_historical_snapshots`.
+
+Le risorse sono 22 in totale: V1, V2, nove V3, V4, nove V5 e V6.
 
 La V1 crea esclusivamente le nove tabelle runtime, con PK, FK restrittive, unique, nullability, default, precisioni, engine, charset, collation e indici dello schema legacy. Non contiene dati applicativi.
 
@@ -967,6 +970,8 @@ Le nove V3 contengono esclusivamente un `ALTER TABLE` ciascuna. Portano a `DATET
 
 Il passaggio strutturale delle sole V3 da `DATETIME(0)` a `DATETIME(6)` mantiene invariati anno, mese, giorno, ora, minuto e secondo e aggiunge una frazione zero. Le V3 non usano `CONVERT_TZ` e non convertono i valori da `Europe/Rome` a UTC: questa responsabilità appartiene alla successiva V4, mentre le V5 trasferiscono l'ownership degli audit all'applicazione.
 
+La V4 Java verifica schema, precisione, gap/overlap e dati prima di convertire i datetime legacy `Europe/Rome` verso UTC. Le V5 rimuovono default e `ON UPDATE` dagli audit, trasferendone l'ownership a Spring Data JPA; i timestamp ombra dei profili diventano nullable e congelati. La V6 Java aggiunge gli snapshot storici Booking e ne esegue il backfill dopo preflight, senza inventare dati o orari.
+
 ### 12.2 Indici di convergenza
 
 - `invite_codes(professional_id, created_at)` supporta la lista inviti del professionista ordinata per creazione.
@@ -980,16 +985,18 @@ Non viene introdotta una unique su `professional_client_links(professional_id, c
 
 ### 12.3 Database vuoto
 
-Su MySQL 8.0.44 è stato verificato con successo il percorso da schema nuovo e vuoto `V1` → `V5.9`, seguito da Hibernate `ddl-auto=validate`. La verifica ha incluso nullability, default, `ON UPDATE`, indici, foreign key, check e mapping `Instant`/JDBC UTC.
+Esiste evidenza precedente su MySQL 8.0.44 per il percorso da schema nuovo e vuoto `V1` → `V6`, seguito da Hibernate `ddl-auto=validate`. Ha incluso nullability, default, `ON UPDATE`, indici, foreign key, check, mapping `Instant`/JDBC UTC e snapshot Booking. L'audit conclusivo non ha ripetuto questa prova.
 
 ### 12.4 Database esistente
 
-Non è ammessa la baseline automatica. Prima di registrare manualmente uno schema esistente alla versione 1 sono obbligatori backup, clone isolato, confronto con la V1, prova dell'intera sequenza da V2 a `V5.9`, verifica dei dati e approvazione esplicita. Su MySQL 8.0.44 il percorso da clone legacy `BASELINE 1` → `V2` → `V5.9` ha convertito 70 valori valorizzati da `Europe/Rome` a UTC, preservando due null, cinque timestamp con microsecondi, dati, vincoli e indici.
+Non è ammessa la baseline automatica. Prima di registrare manualmente uno schema esistente alla versione 1 sono obbligatori backup, clone isolato, confronto con la V1, verifica dei dati e approvazione esplicita. Esiste evidenza precedente su MySQL 8.0.44 del percorso da clone legacy `BASELINE 1` → `V2` → `V5.9` → `V6`, con conversione UTC, conservazione di dati, vincoli, indici e precisione microsecondi; l'audit conclusivo non ha ripetuto la prova.
+
+V2 risulta modificata storicamente. Un ambiente che abbia applicato una versione differente può avere un checksum Flyway incompatibile: prima di ogni migrazione reale è obbligatorio controllare `flyway_schema_history`. Il rischio riguarda gli ambienti già migrati, non le installazioni pulite validate da zero. Non usare `flyway repair` o modifiche manuali della history senza analisi e autorizzazione.
 
 `baseline-on-migrate` deve rimanere `false`. Flyway `clean` è vietato sugli ambienti persistenti ed è disabilitato dalla configurazione. Le tabelle legacy future restano fuori dalla history finché i relativi moduli non saranno progettati e approvati.
 
 ### 12.5 Immutabilità e rollback
 
-V1, V2 e V3 sono immutabili, così come ogni migrazione dopo la prima applicazione. Le correzioni successive usano nuove migrazioni forward-only. La V4 contiene soltanto DML transazionale e non effettua commit manuali; ogni V5 contiene il solo DDL della propria tabella per circoscrivere i commit impliciti MySQL. Il recupero resta basato su backup verificato e ripristino controllato, non sulla cancellazione automatica dello schema.
+Tutte le risorse nella baseline corrente devono rimanere immutabili dopo la loro applicazione; le correzioni future usano nuove migrazioni forward-only. La modifica storica di V2 è un'eccezione già avvenuta e richiede il controllo della history prima di migrare ambienti esistenti. V4 contiene DML transazionale e non effettua commit manuali; ogni V5 circoscrive il proprio DDL. Il recupero resta basato su backup verificato e ripristino controllato, non sulla cancellazione automatica dello schema.
 
-V4 e V5 sono state validate su database MySQL isolati sia da schema vuoto sia da clone legacy. Le prove negative hanno confermato che gap, overlap o schema inatteso interrompono V4 prima del primo DML; sono stati verificati anche auditing applicativo, mapping `Instant` e conservazione della precisione a microsecondi. Il database locale reale `support_trainer` non è stato baselinato o migrato. Il rilascio deve coordinare backend, configurazione JDBC/Hibernate UTC e migrazioni V4/V5 nella stessa finestra approvata.
+Le evidenze precedenti riguardano V4, V5 e V6 su database MySQL isolati, sia da schema vuoto sia da clone legacy. Le prove negative hanno confermato che gap, overlap o schema inatteso interrompono V4 prima del primo DML; sono stati verificati auditing applicativo, mapping `Instant`, precisione microsecondi e snapshot Booking. Prima del trasferimento operativo occorre creare un nuovo schema isolato e ripetere migrazione completa, secondo avvio Flyway, Hibernate validate e verifica UTC/DATETIME(6); il database originale non deve essere usato per questa prova e gli schemi temporanei precedenti non devono essere riutilizzati o eliminati.

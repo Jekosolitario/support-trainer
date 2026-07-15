@@ -642,14 +642,18 @@ L’ordine consigliato definitivo aggiornato è:
 8. relazioni clienti/professionisti read — completato
 9. availability — completato
 10. bookings — completato
-11. stabilizzazione backend Availability / Bookings, test e documentazione — completata, in attesa di validazione conclusiva aggiornata
-12. frontend integration oppure workout module — da decidere dopo validazione conclusiva
+11. stabilizzazione backend Availability / Bookings, test e documentazione — completata e certificata sulla baseline applicativa
+12. frontend integration oppure workout module — da decidere separatamente
 13. nutrition module
 14. feedback
 15. measurements
 16. password reset
 17. hardening finale e preparazione deploy
 
-## Stato successivo — remediation STEP 7C-B
+## Stato certificato — audit conclusivo
 
-Registrazione professionista, registrazione cliente e reinvio idoneo pubblicano ora una richiesta email immutabile dentro la transazione Auth. Un listener sincrono `AFTER_COMMIT`, senza fallback, costruisce il link frontend con token nel fragment e usa una porta indipendente dal provider. Il default locale `DISABLED` non effettua invii; il profilo test usa `IN_MEMORY` senza rete. La modalità `SMTP` usa JavaMail, mittente e timeout tipizzati per inviare un messaggio testuale UTF-8 in italiano. Gli errori di consegna non annullano il commit né cambiano `201`/`202`. Template HTML, retry e outbox sono una fase futura distinta; finché manca l'outbox la consegna non è garantita.
+La baseline applicativa `3cf48902b6c193c5f25740eab7e774ce26e3dcc3` ha completato `clean verify` con 50 suite, 312 test, 0 failure, 0 error e un solo skipped MySQL opt-in. Il backend espone 29 endpoint applicativi; `/error` è un fallback tecnico separato. Il Wrapper Maven, la CI su Ubuntu/Windows, la configurazione tipizzata, Flyway, UTC, autorizzazioni scoped, privacy, email verification/SMTP, Booking storico e il contratto uniforme degli errori risultano chiusi per il perimetro MVP.
+
+Registrazione professionista, registrazione cliente e reinvio idoneo pubblicano una richiesta email immutabile nella transazione Auth. Un listener sincrono `AFTER_COMMIT`, senza fallback, costruisce il link frontend con token nel fragment e usa una porta indipendente dal provider. Il default locale `DISABLED` non effettua invii; il profilo test usa `IN_MEMORY` senza rete. La modalità `SMTP` usa JavaMail, mittente e timeout tipizzati per un messaggio testuale UTF-8 in italiano. Gli errori di consegna non annullano il commit né cambiano le risposte neutre `202`. Template HTML, retry e outbox restano una fase futura distinta; senza outbox la consegna non è garantita.
+
+Prima di una migrazione su database reale sono obbligatori il controllo di `flyway_schema_history` e una nuova prova MySQL su schema isolato. Non usare `flyway repair`, il database originale o schemi temporanei precedenti senza analisi e autorizzazione.

@@ -357,8 +357,11 @@ Il modulo Bookings è composto da:
 ### API layer
 
 - `CreateBookingRequest`
-- `BookingRequestResponse`
-- `BookingRequestItemResponse`
+- `BookingSummaryResponse`
+- `BookingDetailResponse`
+- `BookingParticipantResponse`
+- `BookingItemResponse`
+- `BookingResponseMapper`
 - `BookingController`
 - `BookingService`
 
