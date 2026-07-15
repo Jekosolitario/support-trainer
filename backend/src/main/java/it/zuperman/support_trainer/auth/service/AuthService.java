@@ -3,8 +3,10 @@ package it.zuperman.support_trainer.auth.service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -20,23 +22,19 @@ import it.zuperman.support_trainer.auth.dto.request.LoginRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterClientRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterProfessionalRequest;
 import it.zuperman.support_trainer.auth.dto.response.AuthResponse;
+import it.zuperman.support_trainer.auth.dto.response.RegistrationAcceptedResponse;
 import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
 import it.zuperman.support_trainer.auth.token.EmailVerificationToken;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
-import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.common.security.UserReadinessValidator;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.email.event.EmailVerificationRequestedEvent;
 import it.zuperman.support_trainer.email.model.EmailVerificationReason;
-import it.zuperman.support_trainer.invite.entity.InviteCode;
-import it.zuperman.support_trainer.invite.service.InviteCodeService;
-import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
-import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
-import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
 import it.zuperman.support_trainer.security.jwt.JwtService;
 import it.zuperman.support_trainer.security.password.BcryptPasswordPolicy;
 
@@ -47,54 +45,39 @@ public class AuthService {
     private static final Duration EMAIL_VERIFICATION_RESEND_COOLDOWN = Duration.ofSeconds(60);
 
     private final UserRepository userRepository;
-    private final ProfessionalProfileRepository professionalProfileRepository;
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
-    private final ClientProfileRepository clientProfileRepository;
-    private final InviteCodeService inviteCodeService;
-    private final ProfessionalClientLinkRepository professionalClientLinkRepository;
     private final ApplicationTimeProvider timeProvider;
     private final ApplicationEventPublisher eventPublisher;
+    private final RegistrationPersistenceService registrationPersistenceService;
+    private final UserReadinessValidator userReadinessValidator;
 
     public AuthService(
             UserRepository userRepository,
-            ProfessionalProfileRepository professionalProfileRepository,
             EmailVerificationTokenRepository emailVerificationTokenRepository,
-            ClientProfileRepository clientProfileRepository,
-            InviteCodeService inviteCodeService,
             PasswordEncoder passwordEncoder,
             AuthenticationManager authenticationManager,
             JwtService jwtService,
-            ProfessionalClientLinkRepository professionalClientLinkRepository,
             ApplicationTimeProvider timeProvider,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            RegistrationPersistenceService registrationPersistenceService,
+            UserReadinessValidator userReadinessValidator
     ) {
         this.userRepository = userRepository;
-        this.professionalProfileRepository = professionalProfileRepository;
         this.emailVerificationTokenRepository = emailVerificationTokenRepository;
-        this.clientProfileRepository = clientProfileRepository;
-        this.inviteCodeService = inviteCodeService;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
-        this.professionalClientLinkRepository = professionalClientLinkRepository;
         this.timeProvider = timeProvider;
         this.eventPublisher = eventPublisher;
+        this.registrationPersistenceService = registrationPersistenceService;
+        this.userReadinessValidator = userReadinessValidator;
     }
 
-    @Transactional
-    public AuthResponse registerProfessional(RegisterProfessionalRequest request) {
+    public RegistrationAcceptedResponse registerProfessional(RegisterProfessionalRequest request) {
         String normalizedEmail = normalizeEmail(request.getEmail());
-
-        if (userRepository.findByEmail(normalizedEmail).isPresent()) {
-            throw new AppException(
-                    HttpStatus.CONFLICT,
-                    "EMAIL_ALREADY_REGISTERED",
-                    "Email già registrata"
-            );
-        }
 
         ProfessionalProfile professional = new ProfessionalProfile(
                 request.getFirstName().trim(),
@@ -104,43 +87,17 @@ public class AuthService {
                 request.getSpecialization()
         );
 
-        ProfessionalProfile savedProfessional;
         try {
-            savedProfessional = professionalProfileRepository.saveAndFlush(professional);
+            registrationPersistenceService.registerProfessional(professional);
         } catch (DataIntegrityViolationException ex) {
-            throw new AppException(
-                    HttpStatus.CONFLICT,
-                    "EMAIL_ALREADY_REGISTERED",
-                    "Email già registrata"
-            );
+            return handleEmailUniqueCollision(ex);
         }
 
-        EmailVerificationToken verificationToken = createEmailVerificationToken(savedProfessional);
-        publishEmailVerificationRequested(
-                savedProfessional,
-                verificationToken,
-                EmailVerificationReason.REGISTRATION
-        );
-
-        return buildRegistrationResponse(savedProfessional);
+        return RegistrationAcceptedResponse.neutral();
     }
 
-    @Transactional
-    public AuthResponse registerClient(RegisterClientRequest request) {
+    public RegistrationAcceptedResponse registerClient(RegisterClientRequest request) {
         String normalizedEmail = normalizeEmail(request.getEmail());
-
-        InviteCode inviteCode = inviteCodeService.validateInviteCodeForRegistration(request.getInviteCode());
-        ProfessionalProfile professional = inviteCode.getProfessional();
-
-        validateProfessionalCanLinkClients(professional);
-
-        if (userRepository.findByEmail(normalizedEmail).isPresent()) {
-            throw new AppException(
-                    HttpStatus.CONFLICT,
-                    "EMAIL_ALREADY_REGISTERED",
-                    "Email già registrata"
-            );
-        }
 
         ClientProfile client = new ClientProfile(
                 request.getFirstName().trim(),
@@ -160,30 +117,13 @@ public class AuthService {
         client.setAccountStatus(AccountStatus.PENDING_VERIFICATION);
         client.setEmailVerified(false);
 
-        ClientProfile savedClient;
         try {
-            savedClient = clientProfileRepository.saveAndFlush(client);
+            registrationPersistenceService.registerClient(client, request.getInviteCode());
         } catch (DataIntegrityViolationException ex) {
-            throw new AppException(
-                    HttpStatus.CONFLICT,
-                    "EMAIL_ALREADY_REGISTERED",
-                    "Email già registrata"
-            );
+            return handleEmailUniqueCollision(ex);
         }
 
-        createProfessionalClientLink(professional, savedClient);
-
-        inviteCode.setUsed(true);
-        inviteCode.setUsedAt(timeProvider.nowInstant());
-
-        EmailVerificationToken verificationToken = createEmailVerificationToken(savedClient);
-        publishEmailVerificationRequested(savedClient, verificationToken, EmailVerificationReason.REGISTRATION);
-
-        return buildRegistrationResponse(savedClient);
-    }
-
-    private EmailVerificationToken createEmailVerificationToken(User user) {
-        return createEmailVerificationToken(user, timeProvider.nowInstant());
+        return RegistrationAcceptedResponse.neutral();
     }
 
     private EmailVerificationToken createEmailVerificationToken(User user, Instant issuedAt) {
@@ -208,70 +148,6 @@ public class AuthService {
                 reason,
                 UUID.randomUUID()
         ));
-    }
-
-    private void validateProfessionalCanLinkClients(ProfessionalProfile professional) {
-        if (!Boolean.TRUE.equals(professional.getActive())) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "PROFESSIONAL_NOT_ACTIVE",
-                    "Il profilo professionista non è attivo"
-            );
-        }
-
-        if (!Boolean.TRUE.equals(professional.getEmailVerified())) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "EMAIL_NOT_VERIFIED",
-                    "Il professionista non ha verificato l'email"
-            );
-        }
-
-        if (professional.getAccountStatus() != AccountStatus.ACTIVE) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "ACCOUNT_NOT_ACTIVE",
-                    "L'account del professionista non è attivo"
-            );
-        }
-    }
-
-    private void createProfessionalClientLink(ProfessionalProfile professional, ClientProfile client) {
-        if (professional.getId().equals(client.getId())) {
-            throw new AppException(
-                    HttpStatus.BAD_REQUEST,
-                    "SELF_LINK_NOT_ALLOWED",
-                    "Non è possibile creare un collegamento verso se stessi"
-            );
-        }
-
-        boolean activeLinkAlreadyExists
-                = professionalClientLinkRepository.existsByProfessional_IdAndClient_IdAndActiveTrue(
-                        professional.getId(),
-                        client.getId()
-                );
-
-        if (activeLinkAlreadyExists) {
-            throw new AppException(
-                    HttpStatus.CONFLICT,
-                    "PROFESSIONAL_CLIENT_LINK_ALREADY_EXISTS",
-                    "Esiste già un collegamento attivo tra professionista e cliente"
-            );
-        }
-
-        long activeProfessionalCount
-                = professionalClientLinkRepository.countByClient_IdAndActiveTrue(client.getId());
-
-        if (activeProfessionalCount >= 3) {
-            throw new AppException(
-                    HttpStatus.BAD_REQUEST,
-                    "CLIENT_MAX_PROFESSIONALS_REACHED",
-                    "Il cliente ha già raggiunto il numero massimo di professionisti attivi"
-            );
-        }
-
-        ProfessionalClientLink link = new ProfessionalClientLink(professional, client);
-        professionalClientLinkRepository.save(link);
     }
 
     @Transactional
@@ -438,53 +314,72 @@ public class AuthService {
     }
 
     private void validateLoginAccess(User user) {
-        if (user.getAccountStatus() != AccountStatus.ACTIVE) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "ACCOUNT_NOT_ACTIVE",
-                    "Account non ancora attivo"
-            );
-        }
-
-        if (user instanceof ProfessionalProfile professionalProfile) {
-            if (Boolean.FALSE.equals(user.getEmailVerified())) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "EMAIL_NOT_VERIFIED",
-                        "Email non ancora verificata"
-                );
-            }
-
-            if (Boolean.FALSE.equals(professionalProfile.getActive())) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "PROFESSIONAL_NOT_ACTIVE",
-                        "Profilo professionista non attivo"
-                );
-            }
-        }
-
-        if (user instanceof ClientProfile clientProfile) {
-            if (Boolean.FALSE.equals(clientProfile.getActive())) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "CLIENT_NOT_ACTIVE",
-                        "Profilo cliente non attivo"
-                );
-            }
-        }
+        userReadinessValidator.validateOperationalUser(user);
     }
 
-    private AuthResponse buildRegistrationResponse(User user) {
-        AuthResponse response = new AuthResponse(
-                null,
-                null,
-                user.getId(),
-                user.getEmail(),
-                user.getRole().name()
-        );
-        response.setTokenType(null);
-        return response;
+    private RegistrationAcceptedResponse handleEmailUniqueCollision(DataIntegrityViolationException ex) {
+        if (isUsersEmailUniqueViolation(ex)) {
+            return RegistrationAcceptedResponse.neutral();
+        }
+
+        throw ex;
+    }
+
+    private boolean isUsersEmailUniqueViolation(DataIntegrityViolationException ex) {
+        Throwable cause = ex;
+        boolean structuredConstraintNameFound = false;
+        boolean usersEmailConstraintFound = false;
+        boolean differentStructuredConstraintFound = false;
+
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException constraintViolationException) {
+                String constraintName = constraintViolationException.getConstraintName();
+                if (constraintName != null && !constraintName.isBlank()) {
+                    structuredConstraintNameFound = true;
+                    if (isUsersEmailConstraintName(constraintName)) {
+                        usersEmailConstraintFound = true;
+                    } else {
+                        differentStructuredConstraintFound = true;
+                    }
+                }
+            }
+            cause = cause.getCause();
+        }
+
+        if (structuredConstraintNameFound) {
+            return usersEmailConstraintFound && !differentStructuredConstraintFound;
+        }
+
+        return containsUsersEmailConstraintInMessage(ex);
+    }
+
+    private boolean isUsersEmailConstraintName(String constraintName) {
+        String normalizedConstraintName = constraintName.trim()
+                .replace("`", "")
+                .replace("\"", "")
+                .replace("'", "")
+                .replace("[", "")
+                .replace("]", "");
+        int qualifierSeparator = normalizedConstraintName.lastIndexOf('.');
+        String unqualifiedConstraintName = qualifierSeparator >= 0
+                ? normalizedConstraintName.substring(qualifierSeparator + 1)
+                : normalizedConstraintName;
+
+        return "uk_users_email".equalsIgnoreCase(unqualifiedConstraintName.trim());
+    }
+
+    private boolean containsUsersEmailConstraintInMessage(Throwable exception) {
+        Throwable cause = exception;
+
+        while (cause != null) {
+            String message = cause.getMessage();
+            if (message != null && message.toLowerCase(Locale.ROOT).contains("uk_users_email")) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+
+        return false;
     }
 
     private AuthResponse buildAuthResponse(User user, String accessToken, String refreshToken) {

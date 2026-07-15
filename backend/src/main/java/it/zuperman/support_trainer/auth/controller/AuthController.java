@@ -16,6 +16,7 @@ import it.zuperman.support_trainer.auth.dto.request.RegisterClientRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterProfessionalRequest;
 import it.zuperman.support_trainer.auth.dto.request.ResendEmailVerificationRequest;
 import it.zuperman.support_trainer.auth.dto.response.AuthResponse;
+import it.zuperman.support_trainer.auth.dto.response.RegistrationAcceptedResponse;
 import it.zuperman.support_trainer.auth.service.AuthService;
 import it.zuperman.support_trainer.invite.dto.request.ValidateInviteCodeRequest;
 import it.zuperman.support_trainer.invite.dto.response.ValidateInviteCodeResponse;
@@ -37,19 +38,19 @@ public class AuthController {
     }
 
     @PostMapping("/register/professional")
-    public ResponseEntity<AuthResponse> registerProfessional(
+    public ResponseEntity<RegistrationAcceptedResponse> registerProfessional(
             @Valid @RequestBody RegisterProfessionalRequest request
     ) {
-        AuthResponse response = authService.registerProfessional(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        RegistrationAcceptedResponse response = authService.registerProfessional(request);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }
 
     @PostMapping("/register/client")
-    public ResponseEntity<AuthResponse> registerClient(
+    public ResponseEntity<RegistrationAcceptedResponse> registerClient(
             @Valid @RequestBody RegisterClientRequest request
     ) {
-        AuthResponse response = authService.registerClient(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        RegistrationAcceptedResponse response = authService.registerClient(request);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }
 
     @PostMapping("/email-verification/confirm")
