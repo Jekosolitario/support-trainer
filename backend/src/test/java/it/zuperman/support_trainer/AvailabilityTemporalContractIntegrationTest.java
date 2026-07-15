@@ -190,9 +190,9 @@ class AvailabilityTemporalContractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"availabilitySlotId\":" + slot.getId() + "}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.items[0].startDateTime")
+                .andExpect(jsonPath("$.items[0].scheduledStart")
                         .value("2026-07-20T17:30:00+02:00"))
-                .andExpect(jsonPath("$.items[0].endDateTime")
+                .andExpect(jsonPath("$.items[0].scheduledEnd")
                         .value("2026-07-20T18:30:00+02:00"))
                 .andExpect(jsonPath("$.createdAt").isNotEmpty())
                 .andExpect(jsonPath("$.updatedAt").isNotEmpty());

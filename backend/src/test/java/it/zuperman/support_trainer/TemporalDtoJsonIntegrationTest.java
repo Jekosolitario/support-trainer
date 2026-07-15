@@ -15,8 +15,9 @@ import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import it.zuperman.support_trainer.booking.dto.response.BookingRequestItemResponse;
-import it.zuperman.support_trainer.booking.dto.response.BookingRequestResponse;
+import it.zuperman.support_trainer.booking.dto.response.BookingDetailResponse;
+import it.zuperman.support_trainer.booking.dto.response.BookingItemResponse;
+import it.zuperman.support_trainer.booking.dto.response.BookingParticipantResponse;
 import it.zuperman.support_trainer.invite.dto.response.InviteCodeResponse;
 import it.zuperman.support_trainer.invite.dto.response.ValidateInviteCodeResponse;
 import it.zuperman.support_trainer.profile.dto.response.MyAccountResponse;
@@ -50,21 +51,38 @@ class TemporalDtoJsonIntegrationTest {
     }
 
     @Test
-    void shouldKeepBookingSlotOffsetWhileSerializingBookingAuditAsUtc() throws Exception {
-        BookingRequestItemResponse item = new BookingRequestItemResponse(
+    void shouldKeepBookingSnapshotOffsetWhileSerializingBookingAuditAsUtc() throws Exception {
+        BookingItemResponse item = new BookingItemResponse(
                 10L,
                 20L,
                 OffsetDateTime.parse("2026-07-13T17:30:00+02:00"),
                 OffsetDateTime.parse("2026-07-13T18:30:00+02:00"),
-                "AVAILABLE"
+                60
         );
-        BookingRequestResponse booking = new BookingRequestResponse(
-                30L, 40L, 50L, "PENDING", null, true, INSTANT, INSTANT, List.of(item)
+        BookingParticipantResponse client = new BookingParticipantResponse(40L, "Luigi Bianchi", null, null);
+        BookingParticipantResponse professional = new BookingParticipantResponse(
+                50L, "Mario Rossi", null, "PERSONAL_TRAINER"
+        );
+        BookingDetailResponse booking = new BookingDetailResponse(
+                30L,
+                "PENDING",
+                client,
+                professional,
+                OffsetDateTime.parse("2026-07-13T17:30:00+02:00"),
+                OffsetDateTime.parse("2026-07-13T18:30:00+02:00"),
+                60,
+                null,
+                INSTANT,
+                INSTANT,
+                null,
+                null,
+                null,
+                List.of(item)
         );
 
         JsonNode json = objectMapper.readTree(objectMapper.writeValueAsString(booking));
         assertThat(json.get("createdAt").stringValue()).isEqualTo("2026-07-13T15:30:45.123456Z");
-        assertThat(json.at("/items/0/startDateTime").stringValue()).isEqualTo("2026-07-13T17:30:00+02:00");
+        assertThat(json.at("/items/0/scheduledStart").stringValue()).isEqualTo("2026-07-13T17:30:00+02:00");
     }
 
     @Test

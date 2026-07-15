@@ -1,7 +1,11 @@
 package it.zuperman.support_trainer.booking.entity;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.common.entity.BaseEntity;
@@ -44,6 +48,29 @@ public class BookingRequest extends BaseEntity {
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 
+    @Setter(AccessLevel.NONE)
+    @Column(name = "client_display_name", nullable = false, length = 201)
+    private String clientDisplayName;
+
+    @Setter(AccessLevel.NONE)
+    @Column(name = "professional_display_name", nullable = false, length = 201)
+    private String professionalDisplayName;
+
+    @Setter(AccessLevel.NONE)
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
+    @Column(name = "confirmed_at", columnDefinition = "DATETIME(6)")
+    private Instant confirmedAt;
+
+    @Setter(AccessLevel.NONE)
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
+    @Column(name = "rejected_at", columnDefinition = "DATETIME(6)")
+    private Instant rejectedAt;
+
+    @Setter(AccessLevel.NONE)
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
+    @Column(name = "cancelled_at", columnDefinition = "DATETIME(6)")
+    private Instant cancelledAt;
+
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
@@ -57,12 +84,37 @@ public class BookingRequest extends BaseEntity {
     public BookingRequest(
             ClientProfile client,
             ProfessionalProfile professional,
-            String note
+            String note,
+            String clientDisplayName,
+            String professionalDisplayName
     ) {
         this.client = client;
         this.professional = professional;
         this.note = note;
+        this.clientDisplayName = clientDisplayName;
+        this.professionalDisplayName = professionalDisplayName;
         this.status = BookingRequestStatus.PENDING;
         this.active = true;
+    }
+
+    public void confirm(Instant confirmedAt) {
+        if (this.confirmedAt == null) {
+            this.confirmedAt = confirmedAt;
+        }
+        this.status = BookingRequestStatus.CONFIRMED;
+    }
+
+    public void reject(Instant rejectedAt) {
+        if (this.rejectedAt == null) {
+            this.rejectedAt = rejectedAt;
+        }
+        this.status = BookingRequestStatus.REJECTED;
+    }
+
+    public void cancel(Instant cancelledAt) {
+        if (this.cancelledAt == null) {
+            this.cancelledAt = cancelledAt;
+        }
+        this.status = BookingRequestStatus.CANCELLED;
     }
 }

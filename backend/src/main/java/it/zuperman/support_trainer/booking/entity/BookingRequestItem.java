@@ -1,7 +1,13 @@
 package it.zuperman.support_trainer.booking.entity;
 
+import java.time.Instant;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.common.entity.BaseEntity;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
@@ -27,11 +33,25 @@ public class BookingRequestItem extends BaseEntity {
     @JoinColumn(name = "availability_slot_id", nullable = false)
     private AvailabilitySlot availabilitySlot;
 
+    @Setter(AccessLevel.NONE)
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
+    @Column(name = "scheduled_start", nullable = false, columnDefinition = "DATETIME(6)")
+    private Instant scheduledStart;
+
+    @Setter(AccessLevel.NONE)
+    @JdbcTypeCode(SqlTypes.TIMESTAMP)
+    @Column(name = "scheduled_end", nullable = false, columnDefinition = "DATETIME(6)")
+    private Instant scheduledEnd;
+
     public BookingRequestItem(
             BookingRequest bookingRequest,
-            AvailabilitySlot availabilitySlot
+            AvailabilitySlot availabilitySlot,
+            Instant scheduledStart,
+            Instant scheduledEnd
     ) {
         this.bookingRequest = bookingRequest;
         this.availabilitySlot = availabilitySlot;
+        this.scheduledStart = scheduledStart;
+        this.scheduledEnd = scheduledEnd;
     }
 }

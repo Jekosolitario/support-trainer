@@ -12,9 +12,11 @@ import org.springframework.transaction.annotation.Transactional;
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
 import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
-import it.zuperman.support_trainer.booking.dto.response.BookingRequestResponse;
+import it.zuperman.support_trainer.booking.dto.response.BookingDetailResponse;
+import it.zuperman.support_trainer.booking.dto.response.BookingSummaryResponse;
 import it.zuperman.support_trainer.booking.entity.BookingRequest;
 import it.zuperman.support_trainer.booking.entity.BookingRequestItem;
+import it.zuperman.support_trainer.booking.mapper.BookingResponseMapper;
 import it.zuperman.support_trainer.booking.repository.BookingRequestItemRepository;
 import it.zuperman.support_trainer.booking.repository.BookingRequestRepository;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
@@ -26,7 +28,6 @@ import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
-import it.zuperman.support_trainer.common.time.BusinessDateTimeMapper;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 
@@ -39,7 +40,7 @@ public class BookingService {
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
     private final UserRepository userRepository;
     private final ApplicationTimeProvider timeProvider;
-    private final BusinessDateTimeMapper businessDateTimeMapper;
+    private final BookingResponseMapper bookingResponseMapper;
 
     public BookingService(
             BookingRequestRepository bookingRequestRepository,
@@ -48,7 +49,7 @@ public class BookingService {
             ProfessionalClientLinkRepository professionalClientLinkRepository,
             UserRepository userRepository,
             ApplicationTimeProvider timeProvider,
-            BusinessDateTimeMapper businessDateTimeMapper
+            BookingResponseMapper bookingResponseMapper
     ) {
         this.bookingRequestRepository = bookingRequestRepository;
         this.bookingRequestItemRepository = bookingRequestItemRepository;
@@ -56,11 +57,11 @@ public class BookingService {
         this.professionalClientLinkRepository = professionalClientLinkRepository;
         this.userRepository = userRepository;
         this.timeProvider = timeProvider;
-        this.businessDateTimeMapper = businessDateTimeMapper;
+        this.bookingResponseMapper = bookingResponseMapper;
     }
 
     @Transactional
-    public BookingRequestResponse createBookingRequest(CreateBookingRequest request) {
+    public BookingDetailResponse createBookingRequest(CreateBookingRequest request) {
         ClientProfile client = getAuthenticatedClient();
 
         AvailabilitySlot slot = availabilitySlotRepository.findActiveByIdForUpdate(request.getAvailabilitySlotId())
@@ -81,52 +82,50 @@ public class BookingService {
         BookingRequest bookingRequest = new BookingRequest(
                 client,
                 professional,
-                normalizeNote(request.getNote())
+                normalizeNote(request.getNote()),
+                displayName(client.getFirstName(), client.getLastName()),
+                displayName(professional.getFirstName(), professional.getLastName())
         );
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
 
         BookingRequestItem bookingRequestItem = new BookingRequestItem(
                 savedBookingRequest,
-                slot
+                slot,
+                slot.getStartDateTime(),
+                slot.getEndDateTime()
         );
 
         BookingRequestItem savedItem = bookingRequestItemRepository.save(bookingRequestItem);
         savedBookingRequest.getItems().add(savedItem);
 
-        return BookingRequestResponse.fromEntity(savedBookingRequest, businessDateTimeMapper);
+        return bookingResponseMapper.toDetail(savedBookingRequest);
     }
 
     @Transactional(readOnly = true)
-    public List<BookingRequestResponse> getClientBookingRequests() {
+    public List<BookingSummaryResponse> getClientBookingRequests() {
         ClientProfile client = getAuthenticatedClient();
 
         return bookingRequestRepository
-                .findAllByClient_IdAndActiveTrueOrderByCreatedAtDesc(client.getId())
+                .findAllByClient_IdAndActiveTrueOrderByCreatedAtDescIdDesc(client.getId())
                 .stream()
-                .map(bookingRequest -> BookingRequestResponse.fromEntity(
-                        bookingRequest,
-                        businessDateTimeMapper
-                ))
+                .map(bookingResponseMapper::toClientSummary)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<BookingRequestResponse> getProfessionalBookingRequests() {
+    public List<BookingSummaryResponse> getProfessionalBookingRequests() {
         ProfessionalProfile professional = getAuthenticatedProfessional();
 
         return bookingRequestRepository
-                .findAllByProfessional_IdAndActiveTrueOrderByCreatedAtDesc(professional.getId())
+                .findAllByProfessional_IdAndActiveTrueOrderByCreatedAtDescIdDesc(professional.getId())
                 .stream()
-                .map(bookingRequest -> BookingRequestResponse.fromEntity(
-                        bookingRequest,
-                        businessDateTimeMapper
-                ))
+                .map(bookingResponseMapper::toProfessionalSummary)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public BookingRequestResponse getBookingRequestDetail(Long bookingRequestId) {
+    public BookingDetailResponse getBookingRequestDetail(Long bookingRequestId) {
         User user = getAuthenticatedUser();
 
         BookingRequest bookingRequest = bookingRequestRepository.findByIdAndActiveTrue(bookingRequestId)
@@ -138,11 +137,11 @@ public class BookingService {
 
         validateBookingRequestVisibility(user, bookingRequest);
 
-        return BookingRequestResponse.fromEntity(bookingRequest, businessDateTimeMapper);
+        return bookingResponseMapper.toDetail(bookingRequest);
     }
 
     @Transactional
-    public BookingRequestResponse confirmBookingRequest(Long bookingRequestId) {
+    public BookingDetailResponse confirmBookingRequest(Long bookingRequestId) {
         ProfessionalProfile professional = getAuthenticatedProfessional();
 
         BookingRequest bookingRequest = getActiveBookingRequestForProfessional(
@@ -155,15 +154,15 @@ public class BookingService {
         List<AvailabilitySlot> slotsToBook
                 = lockAndValidateSlotsCanBeConfirmed(bookingRequest);
 
-        bookingRequest.setStatus(BookingRequestStatus.CONFIRMED);
+        bookingRequest.confirm(timeProvider.nowInstant());
         markSlotsAsBooked(slotsToBook);
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
-        return BookingRequestResponse.fromEntity(savedBookingRequest, businessDateTimeMapper);
+        return bookingResponseMapper.toDetail(savedBookingRequest);
     }
 
     @Transactional
-    public BookingRequestResponse rejectBookingRequest(Long bookingRequestId) {
+    public BookingDetailResponse rejectBookingRequest(Long bookingRequestId) {
         ProfessionalProfile professional = getAuthenticatedProfessional();
 
         BookingRequest bookingRequest = getActiveBookingRequestForProfessional(
@@ -173,15 +172,15 @@ public class BookingService {
 
         validateBookingRequestIsPending(bookingRequest);
 
-        bookingRequest.setStatus(BookingRequestStatus.REJECTED);
+        bookingRequest.reject(timeProvider.nowInstant());
         releaseSlotsAfterNegativeOutcome(bookingRequest);
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
-        return BookingRequestResponse.fromEntity(savedBookingRequest, businessDateTimeMapper);
+        return bookingResponseMapper.toDetail(savedBookingRequest);
     }
 
     @Transactional
-    public BookingRequestResponse cancelBookingRequest(Long bookingRequestId) {
+    public BookingDetailResponse cancelBookingRequest(Long bookingRequestId) {
         User user = getAuthenticatedUser();
 
         BookingRequest bookingRequest = bookingRequestRepository.findActiveByIdForUpdate(bookingRequestId)
@@ -194,11 +193,11 @@ public class BookingService {
         validateBookingRequestVisibility(user, bookingRequest);
         validateCancellationAllowed(user, bookingRequest);
 
-        bookingRequest.setStatus(BookingRequestStatus.CANCELLED);
+        bookingRequest.cancel(timeProvider.nowInstant());
         releaseSlotsAfterNegativeOutcome(bookingRequest);
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
-        return BookingRequestResponse.fromEntity(savedBookingRequest, businessDateTimeMapper);
+        return bookingResponseMapper.toDetail(savedBookingRequest);
     }
 
     private String normalizeNote(String note) {
@@ -213,6 +212,21 @@ public class BookingService {
         }
 
         return normalizedNote;
+    }
+
+    private String displayName(String firstName, String lastName) {
+        String normalizedFirstName = firstName == null ? "" : firstName.trim();
+        String normalizedLastName = lastName == null ? "" : lastName.trim();
+
+        if (normalizedFirstName.isBlank() || normalizedLastName.isBlank()) {
+            throw new AppException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "BOOKING_PARTICIPANT_NAME_INVALID",
+                    "I dati della prenotazione non sono disponibili"
+            );
+        }
+
+        return normalizedFirstName + " " + normalizedLastName;
     }
 
     private BookingRequest getActiveBookingRequestForProfessional(

@@ -14,7 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
-import it.zuperman.support_trainer.booking.dto.response.BookingRequestResponse;
+import it.zuperman.support_trainer.booking.dto.response.BookingDetailResponse;
+import it.zuperman.support_trainer.booking.dto.response.BookingSummaryResponse;
 import it.zuperman.support_trainer.booking.service.BookingService;
 import jakarta.validation.Valid;
 
@@ -30,54 +31,54 @@ public class BookingController {
     }
 
     @PostMapping
-    public ResponseEntity<BookingRequestResponse> createBookingRequest(
+    public ResponseEntity<BookingDetailResponse> createBookingRequest(
             @Valid @RequestBody CreateBookingRequest request
     ) {
-        BookingRequestResponse response = bookingService.createBookingRequest(request);
+        BookingDetailResponse response = bookingService.createBookingRequest(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/client")
-    public ResponseEntity<List<BookingRequestResponse>> getClientBookingRequests() {
-        List<BookingRequestResponse> response = bookingService.getClientBookingRequests();
+    public ResponseEntity<List<BookingSummaryResponse>> getClientBookingRequests() {
+        List<BookingSummaryResponse> response = bookingService.getClientBookingRequests();
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/professional")
-    public ResponseEntity<List<BookingRequestResponse>> getProfessionalBookingRequests() {
-        List<BookingRequestResponse> response = bookingService.getProfessionalBookingRequests();
+    public ResponseEntity<List<BookingSummaryResponse>> getProfessionalBookingRequests() {
+        List<BookingSummaryResponse> response = bookingService.getProfessionalBookingRequests();
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{bookingRequestId}")
-    public ResponseEntity<BookingRequestResponse> getBookingRequestDetail(
+    public ResponseEntity<BookingDetailResponse> getBookingRequestDetail(
             @PathVariable Long bookingRequestId
     ) {
-        BookingRequestResponse response = bookingService.getBookingRequestDetail(bookingRequestId);
+        BookingDetailResponse response = bookingService.getBookingRequestDetail(bookingRequestId);
         return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{bookingRequestId}/confirm")
-    public ResponseEntity<BookingRequestResponse> confirmBookingRequest(
+    public ResponseEntity<BookingDetailResponse> confirmBookingRequest(
             @PathVariable Long bookingRequestId
     ) {
-        BookingRequestResponse response = bookingService.confirmBookingRequest(bookingRequestId);
+        BookingDetailResponse response = bookingService.confirmBookingRequest(bookingRequestId);
         return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{bookingRequestId}/reject")
-    public ResponseEntity<BookingRequestResponse> rejectBookingRequest(
+    public ResponseEntity<BookingDetailResponse> rejectBookingRequest(
             @PathVariable Long bookingRequestId
     ) {
-        BookingRequestResponse response = bookingService.rejectBookingRequest(bookingRequestId);
+        BookingDetailResponse response = bookingService.rejectBookingRequest(bookingRequestId);
         return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{bookingRequestId}/cancel")
-    public ResponseEntity<BookingRequestResponse> cancelBookingRequest(
+    public ResponseEntity<BookingDetailResponse> cancelBookingRequest(
             @PathVariable Long bookingRequestId
     ) {
-        BookingRequestResponse response = bookingService.cancelBookingRequest(bookingRequestId);
+        BookingDetailResponse response = bookingService.cancelBookingRequest(bookingRequestId);
         return ResponseEntity.ok(response);
     }
 }

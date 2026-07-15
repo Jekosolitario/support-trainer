@@ -18,6 +18,7 @@ import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
 import it.zuperman.support_trainer.availability.service.AvailabilityService;
 import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
+import it.zuperman.support_trainer.booking.mapper.BookingResponseMapper;
 import it.zuperman.support_trainer.booking.repository.BookingRequestItemRepository;
 import it.zuperman.support_trainer.booking.repository.BookingRequestRepository;
 import it.zuperman.support_trainer.booking.service.BookingService;
@@ -113,7 +114,7 @@ class BusinessFlowClockTest {
                 linkRepository,
                 userRepository,
                 fixedTimeProvider(),
-                businessDateTimeMapper()
+                bookingResponseMapper()
         );
 
         assertThatThrownBy(() -> service.createBookingRequest(new CreateBookingRequest(10L, null)))
@@ -136,6 +137,10 @@ class BusinessFlowClockTest {
 
     private static BusinessDateTimeMapper businessDateTimeMapper() {
         return new BusinessDateTimeMapper(timeProperties());
+    }
+
+    private static BookingResponseMapper bookingResponseMapper() {
+        return new BookingResponseMapper(businessDateTimeMapper());
     }
 
     private static TimeProperties timeProperties() {

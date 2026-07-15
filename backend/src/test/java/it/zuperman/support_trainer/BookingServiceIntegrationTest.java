@@ -25,7 +25,7 @@ import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
 import it.zuperman.support_trainer.availability.service.AvailabilityService;
 import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
-import it.zuperman.support_trainer.booking.dto.response.BookingRequestResponse;
+import it.zuperman.support_trainer.booking.dto.response.BookingDetailResponse;
 import it.zuperman.support_trainer.booking.entity.BookingRequest;
 import it.zuperman.support_trainer.booking.entity.BookingRequestItem;
 import it.zuperman.support_trainer.booking.repository.BookingRequestItemRepository;
@@ -101,17 +101,17 @@ class BookingServiceIntegrationTest {
                 " Vorrei prenotare questo slot. "
         );
 
-        BookingRequestResponse response = bookingService.createBookingRequest(request);
+        BookingDetailResponse response = bookingService.createBookingRequest(request);
 
         assertThat(response).isNotNull();
         assertThat(response.getId()).isNotNull();
-        assertThat(response.getClientId()).isEqualTo(client.getId());
-        assertThat(response.getProfessionalId()).isEqualTo(professional.getId());
+        assertThat(response.getClient().getId()).isEqualTo(client.getId());
+        assertThat(response.getProfessional().getId()).isEqualTo(professional.getId());
         assertThat(response.getStatus()).isEqualTo("PENDING");
         assertThat(response.getNote()).isEqualTo("Vorrei prenotare questo slot.");
         assertThat(response.getItems()).hasSize(1);
         assertThat(response.getItems().get(0).getAvailabilitySlotId()).isEqualTo(slot.getId());
-        assertThat(response.getItems().get(0).getSlotStatus()).isEqualTo("AVAILABLE");
+        assertThat(response.getItems().get(0).getAvailabilitySlotId()).isEqualTo(slot.getId());
     }
 
     @Test
@@ -136,18 +136,18 @@ class BookingServiceIntegrationTest {
         );
 
         authenticateAs(clientA.getEmail(), "CLIENT");
-        BookingRequestResponse bookingA = bookingService.createBookingRequest(
+        BookingDetailResponse bookingA = bookingService.createBookingRequest(
                 new CreateBookingRequest(slotA.getId(), "Richiesta coppia A.")
         );
 
         authenticateAs(clientB.getEmail(), "CLIENT");
-        BookingRequestResponse bookingB = bookingService.createBookingRequest(
+        BookingDetailResponse bookingB = bookingService.createBookingRequest(
                 new CreateBookingRequest(slotB.getId(), "Richiesta coppia B.")
         );
 
         authenticateAs(clientA.getEmail(), "CLIENT");
         List<Long> clientBookingIds = bookingService.getClientBookingRequests().stream()
-                .map(BookingRequestResponse::getId)
+                .map(response -> response.getId())
                 .toList();
 
         assertThat(clientBookingIds)
@@ -156,7 +156,7 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(professionalA.getEmail(), "PROFESSIONAL");
         List<Long> professionalBookingIds = bookingService.getProfessionalBookingRequests().stream()
-                .map(BookingRequestResponse::getId)
+                .map(response -> response.getId())
                 .toList();
 
         assertThat(professionalBookingIds)
@@ -181,7 +181,7 @@ class BookingServiceIntegrationTest {
         );
 
         authenticateAs(clientA.getEmail(), "CLIENT");
-        BookingRequestResponse booking = bookingService.createBookingRequest(
+        BookingDetailResponse booking = bookingService.createBookingRequest(
                 new CreateBookingRequest(slot.getId(), "Richiesta coppia A.")
         );
 
@@ -332,7 +332,7 @@ class BookingServiceIntegrationTest {
         );
 
         authenticateAs(client.getEmail(), "CLIENT");
-        BookingRequestResponse pendingBooking = bookingService.createBookingRequest(
+        BookingDetailResponse pendingBooking = bookingService.createBookingRequest(
                 new CreateBookingRequest(slot.getId(), "Prima richiesta.")
         );
 
@@ -377,16 +377,15 @@ class BookingServiceIntegrationTest {
                 "Vorrei prenotare questo slot."
         );
 
-        BookingRequestResponse pendingResponse = bookingService.createBookingRequest(request);
+        BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
         authenticateAs(professional.getEmail(), "PROFESSIONAL");
 
-        BookingRequestResponse confirmedResponse
+        BookingDetailResponse confirmedResponse
                 = bookingService.confirmBookingRequest(pendingResponse.getId());
 
         assertThat(confirmedResponse.getStatus()).isEqualTo("CONFIRMED");
         assertThat(confirmedResponse.getItems()).hasSize(1);
-        assertThat(confirmedResponse.getItems().get(0).getSlotStatus()).isEqualTo("BOOKED");
 
         AvailabilitySlot updatedSlot = availabilitySlotRepository.findById(slot.getId())
                 .orElseThrow();
@@ -418,16 +417,15 @@ class BookingServiceIntegrationTest {
                 "Vorrei prenotare questo slot."
         );
 
-        BookingRequestResponse pendingResponse = bookingService.createBookingRequest(request);
+        BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
         authenticateAs(professional.getEmail(), "PROFESSIONAL");
 
-        BookingRequestResponse rejectedResponse
+        BookingDetailResponse rejectedResponse
                 = bookingService.rejectBookingRequest(pendingResponse.getId());
 
         assertThat(rejectedResponse.getStatus()).isEqualTo("REJECTED");
         assertThat(rejectedResponse.getItems()).hasSize(1);
-        assertThat(rejectedResponse.getItems().get(0).getSlotStatus()).isEqualTo("AVAILABLE");
 
         AvailabilitySlot updatedSlot = availabilitySlotRepository.findById(slot.getId())
                 .orElseThrow();
@@ -459,14 +457,13 @@ class BookingServiceIntegrationTest {
                 "Vorrei prenotare questo slot."
         );
 
-        BookingRequestResponse pendingResponse = bookingService.createBookingRequest(request);
+        BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
-        BookingRequestResponse cancelledResponse
+        BookingDetailResponse cancelledResponse
                 = bookingService.cancelBookingRequest(pendingResponse.getId());
 
         assertThat(cancelledResponse.getStatus()).isEqualTo("CANCELLED");
         assertThat(cancelledResponse.getItems()).hasSize(1);
-        assertThat(cancelledResponse.getItems().get(0).getSlotStatus()).isEqualTo("AVAILABLE");
 
         AvailabilitySlot updatedSlot = availabilitySlotRepository.findById(slot.getId())
                 .orElseThrow();
@@ -498,24 +495,22 @@ class BookingServiceIntegrationTest {
                 "Vorrei prenotare questo slot."
         );
 
-        BookingRequestResponse pendingResponse = bookingService.createBookingRequest(request);
+        BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
         authenticateAs(professional.getEmail(), "PROFESSIONAL");
 
-        BookingRequestResponse confirmedResponse
+        BookingDetailResponse confirmedResponse
                 = bookingService.confirmBookingRequest(pendingResponse.getId());
 
         assertThat(confirmedResponse.getStatus()).isEqualTo("CONFIRMED");
-        assertThat(confirmedResponse.getItems().get(0).getSlotStatus()).isEqualTo("BOOKED");
 
         authenticateAs(client.getEmail(), "CLIENT");
 
-        BookingRequestResponse cancelledResponse
+        BookingDetailResponse cancelledResponse
                 = bookingService.cancelBookingRequest(confirmedResponse.getId());
 
         assertThat(cancelledResponse.getStatus()).isEqualTo("CANCELLED");
         assertThat(cancelledResponse.getItems()).hasSize(1);
-        assertThat(cancelledResponse.getItems().get(0).getSlotStatus()).isEqualTo("AVAILABLE");
 
         AvailabilitySlot updatedSlot = availabilitySlotRepository.findById(slot.getId())
                 .orElseThrow();
@@ -547,7 +542,7 @@ class BookingServiceIntegrationTest {
                 "Vorrei prenotare questo slot."
         );
 
-        BookingRequestResponse pendingResponse = bookingService.createBookingRequest(request);
+        BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
         authenticateAs(professional.getEmail(), "PROFESSIONAL");
 
@@ -557,12 +552,11 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client.getEmail(), "CLIENT");
 
-        BookingRequestResponse detailResponse
+        BookingDetailResponse detailResponse
                 = bookingService.getBookingRequestDetail(pendingResponse.getId());
 
         assertThat(detailResponse.getStatus()).isEqualTo("PENDING");
         assertThat(detailResponse.getItems()).hasSize(1);
-        assertThat(detailResponse.getItems().get(0).getSlotStatus()).isEqualTo("AVAILABLE");
 
         AvailabilitySlot updatedSlot = availabilitySlotRepository.findById(slot.getId())
                 .orElseThrow();
@@ -595,7 +589,7 @@ class BookingServiceIntegrationTest {
                 "Vorrei prenotare questo slot."
         );
 
-        BookingRequestResponse bookingResponse
+        BookingDetailResponse bookingResponse
                 = bookingService.createBookingRequest(request);
 
         authenticateAs(otherClient.getEmail(), "CLIENT");
@@ -605,12 +599,12 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client.getEmail(), "CLIENT");
 
-        BookingRequestResponse detailResponse
+        BookingDetailResponse detailResponse
                 = bookingService.getBookingRequestDetail(bookingResponse.getId());
 
         assertThat(detailResponse.getStatus()).isEqualTo("PENDING");
-        assertThat(detailResponse.getClientId()).isEqualTo(client.getId());
-        assertThat(detailResponse.getProfessionalId()).isEqualTo(professional.getId());
+        assertThat(detailResponse.getClient().getId()).isEqualTo(client.getId());
+        assertThat(detailResponse.getProfessional().getId()).isEqualTo(professional.getId());
     }
 
     @Test
@@ -710,7 +704,7 @@ class BookingServiceIntegrationTest {
                 "Vorrei prenotare questo slot."
         );
 
-        BookingRequestResponse pendingResponse
+        BookingDetailResponse pendingResponse
                 = bookingService.createBookingRequest(request);
 
         slot.setStartDateTime(asBusinessInstant(LocalDateTime.now().minusHours(2).withNano(0)));
@@ -755,11 +749,22 @@ class BookingServiceIntegrationTest {
         );
 
         BookingRequest bookingRequest = bookingRequestRepository.save(
-                new BookingRequest(client, nutritionist, "Richiesta anomala preesistente.")
+                new BookingRequest(
+                        client,
+                        nutritionist,
+                        "Richiesta anomala preesistente.",
+                        "Luigi Bianchi",
+                        "Anna Verdi"
+                )
         );
 
         BookingRequestItem bookingRequestItem = bookingRequestItemRepository.save(
-                new BookingRequestItem(bookingRequest, invalidSlot)
+                new BookingRequestItem(
+                        bookingRequest,
+                        invalidSlot,
+                        invalidSlot.getStartDateTime(),
+                        invalidSlot.getEndDateTime()
+                )
         );
 
         bookingRequest.getItems().add(bookingRequestItem);
