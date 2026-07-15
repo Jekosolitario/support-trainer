@@ -21,6 +21,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import db.migration.V4__convert_runtime_datetimes_from_rome_to_utc;
+import db.migration.V6__add_booking_historical_snapshots;
 
 class FlywayMigrationResourcesTest {
 
@@ -230,6 +231,35 @@ class FlywayMigrationResourcesTest {
                 .doesNotContain("DatabaseMetaData")
                 .doesNotContainIgnoringCase("CONVERT_TZ")
                 .doesNotContainPattern("(?i)\\b(CREATE|ALTER|DROP|TRUNCATE)\\s+TABLE\\b")
+                .doesNotContain(".commit(");
+    }
+
+    @Test
+    void v6JavaMigrationShouldHaveExplicitStableChecksumAndHistoricalSnapshotContract() throws IOException {
+        V6__add_booking_historical_snapshots first = new V6__add_booking_historical_snapshots();
+        V6__add_booking_historical_snapshots second = new V6__add_booking_historical_snapshots();
+        String source = Files.readString(
+                Path.of("src/main/java/db/migration/V6__add_booking_historical_snapshots.java"),
+                StandardCharsets.UTF_8
+        );
+
+        assertThat(first.getVersion().toString()).isEqualTo("6");
+        assertThat(first.getChecksum()).isNotNull().isEqualTo(second.getChecksum());
+        assertThat(first.canExecuteInTransaction()).isFalse();
+        assertThat(source)
+                .contains("client_display_name")
+                .contains("professional_display_name")
+                .contains("scheduled_start")
+                .contains("scheduled_end")
+                .contains("DATETIME(6)")
+                .contains("CONFIRMED")
+                .contains("REJECTED")
+                .contains("CANCELLED")
+                .contains("has no items to snapshot")
+                .doesNotContain("Sconosciuto")
+                .doesNotContain("N/D")
+                .doesNotContain("Instant.now")
+                .doesNotContain("LocalDateTime.now")
                 .doesNotContain(".commit(");
     }
 
