@@ -2,13 +2,13 @@ package it.zuperman.support_trainer.security.config;
 
 import java.io.IOException;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
-import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
+import it.zuperman.support_trainer.common.response.ErrorResponseWriter;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -16,10 +16,10 @@ import jakarta.servlet.http.HttpServletResponse;
 @Component
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
-    private final ApplicationTimeProvider timeProvider;
+    private final ErrorResponseWriter errorResponseWriter;
 
-    public RestAuthenticationEntryPoint(ApplicationTimeProvider timeProvider) {
-        this.timeProvider = timeProvider;
+    public RestAuthenticationEntryPoint(ErrorResponseWriter errorResponseWriter) {
+        this.errorResponseWriter = errorResponseWriter;
     }
 
     @Override
@@ -28,35 +28,7 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
             HttpServletResponse response,
             AuthenticationException authException
     ) throws IOException, ServletException {
-
-        String body = buildErrorResponse(
-                HttpStatus.UNAUTHORIZED,
-                "UNAUTHORIZED",
-                "Utente non autenticato"
-        );
-
-        response.setStatus(HttpStatus.UNAUTHORIZED.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
-        response.getWriter().write(body);
-    }
-
-    private String buildErrorResponse(HttpStatus status, String errorCode, String message) {
-        return """
-                {
-                  "timestamp": "%s",
-                  "status": %d,
-                  "error": "%s",
-                  "errorCode": "%s",
-                  "message": "%s",
-                  "validationErrors": null
-                }
-                """.formatted(
-                timeProvider.nowBusinessDateTime(),
-                status.value(),
-                status.name(),
-                errorCode,
-                message
-        );
+        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+        errorResponseWriter.write(request, response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Utente non autenticato");
     }
 }

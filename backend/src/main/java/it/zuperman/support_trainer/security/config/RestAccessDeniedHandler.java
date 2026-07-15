@@ -3,12 +3,11 @@ package it.zuperman.support_trainer.security.config;
 import java.io.IOException;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
-import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
+import it.zuperman.support_trainer.common.response.ErrorResponseWriter;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -16,10 +15,10 @@ import jakarta.servlet.http.HttpServletResponse;
 @Component
 public class RestAccessDeniedHandler implements AccessDeniedHandler {
 
-    private final ApplicationTimeProvider timeProvider;
+    private final ErrorResponseWriter errorResponseWriter;
 
-    public RestAccessDeniedHandler(ApplicationTimeProvider timeProvider) {
-        this.timeProvider = timeProvider;
+    public RestAccessDeniedHandler(ErrorResponseWriter errorResponseWriter) {
+        this.errorResponseWriter = errorResponseWriter;
     }
 
     @Override
@@ -28,35 +27,6 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
             HttpServletResponse response,
             AccessDeniedException accessDeniedException
     ) throws IOException, ServletException {
-
-        String body = buildErrorResponse(
-                HttpStatus.FORBIDDEN,
-                "ACCESS_DENIED",
-                "Accesso negato"
-        );
-
-        response.setStatus(HttpStatus.FORBIDDEN.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
-        response.getWriter().write(body);
-    }
-
-    private String buildErrorResponse(HttpStatus status, String errorCode, String message) {
-        return """
-                {
-                  "timestamp": "%s",
-                  "status": %d,
-                  "error": "%s",
-                  "errorCode": "%s",
-                  "message": "%s",
-                  "validationErrors": null
-                }
-                """.formatted(
-                timeProvider.nowBusinessDateTime(),
-                status.value(),
-                status.name(),
-                errorCode,
-                message
-        );
+        errorResponseWriter.write(request, response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Accesso negato");
     }
 }
