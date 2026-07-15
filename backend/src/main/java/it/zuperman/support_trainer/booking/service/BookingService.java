@@ -28,7 +28,7 @@ import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
-import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
+import it.zuperman.support_trainer.common.security.UserReadinessValidator;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 
 @Service
@@ -37,34 +37,38 @@ public class BookingService {
     private final BookingRequestRepository bookingRequestRepository;
     private final BookingRequestItemRepository bookingRequestItemRepository;
     private final AvailabilitySlotRepository availabilitySlotRepository;
-    private final ProfessionalClientLinkRepository professionalClientLinkRepository;
     private final UserRepository userRepository;
     private final ApplicationTimeProvider timeProvider;
     private final BookingResponseMapper bookingResponseMapper;
+    private final UserReadinessValidator userReadinessValidator;
 
     public BookingService(
             BookingRequestRepository bookingRequestRepository,
             BookingRequestItemRepository bookingRequestItemRepository,
             AvailabilitySlotRepository availabilitySlotRepository,
-            ProfessionalClientLinkRepository professionalClientLinkRepository,
             UserRepository userRepository,
             ApplicationTimeProvider timeProvider,
-            BookingResponseMapper bookingResponseMapper
+            BookingResponseMapper bookingResponseMapper,
+            UserReadinessValidator userReadinessValidator
     ) {
         this.bookingRequestRepository = bookingRequestRepository;
         this.bookingRequestItemRepository = bookingRequestItemRepository;
         this.availabilitySlotRepository = availabilitySlotRepository;
-        this.professionalClientLinkRepository = professionalClientLinkRepository;
         this.userRepository = userRepository;
         this.timeProvider = timeProvider;
         this.bookingResponseMapper = bookingResponseMapper;
+        this.userReadinessValidator = userReadinessValidator;
     }
 
     @Transactional
     public BookingDetailResponse createBookingRequest(CreateBookingRequest request) {
         ClientProfile client = getAuthenticatedClient();
 
-        AvailabilitySlot slot = availabilitySlotRepository.findActiveByIdForUpdate(request.getAvailabilitySlotId())
+        AvailabilitySlot slot = availabilitySlotRepository.findActiveAccessibleByIdAndClientIdForUpdate(
+                        request.getAvailabilitySlotId(),
+                        client.getId(),
+                        AccountStatus.ACTIVE
+                )
                 .orElseThrow(() -> new AppException(
                 HttpStatus.NOT_FOUND,
                 "AVAILABILITY_SLOT_NOT_FOUND",
@@ -73,9 +77,7 @@ public class BookingService {
 
         ProfessionalProfile professional = slot.getProfessional();
 
-        validateReadableProfessional(professional);
         validateBookableProfessionalSpecialization(professional);
-        validateProfessionalAccess(client.getId(), professional.getId());
         validateBookableSlot(slot);
         validateNoPendingBookingOnSlot(slot.getId());
 
@@ -128,14 +130,15 @@ public class BookingService {
     public BookingDetailResponse getBookingRequestDetail(Long bookingRequestId) {
         User user = getAuthenticatedUser();
 
-        BookingRequest bookingRequest = bookingRequestRepository.findByIdAndActiveTrue(bookingRequestId)
+        BookingRequest bookingRequest = bookingRequestRepository.findActiveByIdAndParticipantId(
+                        bookingRequestId,
+                        user.getId()
+                )
                 .orElseThrow(() -> new AppException(
                 HttpStatus.NOT_FOUND,
                 "BOOKING_REQUEST_NOT_FOUND",
                 "Richiesta di prenotazione non trovata"
         ));
-
-        validateBookingRequestVisibility(user, bookingRequest);
 
         return bookingResponseMapper.toDetail(bookingRequest);
     }
@@ -183,14 +186,16 @@ public class BookingService {
     public BookingDetailResponse cancelBookingRequest(Long bookingRequestId) {
         User user = getAuthenticatedUser();
 
-        BookingRequest bookingRequest = bookingRequestRepository.findActiveByIdForUpdate(bookingRequestId)
+        BookingRequest bookingRequest = bookingRequestRepository.findActiveByIdAndParticipantIdForUpdate(
+                        bookingRequestId,
+                        user.getId()
+                )
                 .orElseThrow(() -> new AppException(
                 HttpStatus.NOT_FOUND,
                 "BOOKING_REQUEST_NOT_FOUND",
                 "Richiesta di prenotazione non trovata"
         ));
 
-        validateBookingRequestVisibility(user, bookingRequest);
         validateCancellationAllowed(user, bookingRequest);
 
         bookingRequest.cancel(timeProvider.nowInstant());
@@ -393,18 +398,6 @@ public class BookingService {
         }
     }
 
-    private void validateReadableProfessional(ProfessionalProfile professional) {
-        if (!Boolean.TRUE.equals(professional.getActive())
-                || professional.getAccountStatus() != AccountStatus.ACTIVE
-                || !Boolean.TRUE.equals(professional.getEmailVerified())) {
-            throw new AppException(
-                    HttpStatus.NOT_FOUND,
-                    "PROFESSIONAL_NOT_FOUND",
-                    "Professionista non trovato"
-            );
-        }
-    }
-
     private void validateBookableProfessionalSpecialization(ProfessionalProfile professional) {
         if (professional.getSpecialization() != ProfessionalSpecialization.PERSONAL_TRAINER) {
             throw new AppException(
@@ -413,53 +406,6 @@ public class BookingService {
                     "Lo slot selezionato non è prenotabile per questo professionista"
             );
         }
-    }
-
-    private void validateProfessionalAccess(Long clientId, Long professionalId) {
-        boolean linked = professionalClientLinkRepository.existsByProfessional_IdAndClient_IdAndActiveTrue(
-                professionalId,
-                clientId
-        );
-
-        if (!linked) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "PROFESSIONAL_ACCESS_DENIED",
-                    "Non puoi prenotare slot di questo professionista"
-            );
-        }
-    }
-
-    private void validateBookingRequestVisibility(User user, BookingRequest bookingRequest) {
-        if (user instanceof ClientProfile clientProfile) {
-            if (!bookingRequest.getClient().getId().equals(clientProfile.getId())) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "BOOKING_REQUEST_ACCESS_DENIED",
-                        "Non puoi accedere a questa richiesta di prenotazione"
-                );
-            }
-
-            return;
-        }
-
-        if (user instanceof ProfessionalProfile professionalProfile) {
-            if (!bookingRequest.getProfessional().getId().equals(professionalProfile.getId())) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "BOOKING_REQUEST_ACCESS_DENIED",
-                        "Non puoi accedere a questa richiesta di prenotazione"
-                );
-            }
-
-            return;
-        }
-
-        throw new AppException(
-                HttpStatus.FORBIDDEN,
-                "ROLE_NOT_ALLOWED",
-                "Solo cliente o professionista possono accedere a questa risorsa"
-        );
     }
 
     private ClientProfile getAuthenticatedClient() {
@@ -500,7 +446,7 @@ public class BookingService {
                 "Utente autenticato non trovato"
         ));
 
-        validateAuthenticatedUserAccess(user);
+        userReadinessValidator.validateOperationalUser(user);
         return user;
     }
 
@@ -521,41 +467,4 @@ public class BookingService {
         return authentication.getName().trim().toLowerCase();
     }
 
-    private void validateAuthenticatedUserAccess(User user) {
-        if (user.getAccountStatus() != AccountStatus.ACTIVE) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "ACCOUNT_NOT_ACTIVE",
-                    "Account non attivo"
-            );
-        }
-
-        if (user instanceof ClientProfile clientProfile) {
-            if (!Boolean.TRUE.equals(clientProfile.getActive())) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "CLIENT_NOT_ACTIVE",
-                        "Profilo cliente non attivo"
-                );
-            }
-        }
-
-        if (user instanceof ProfessionalProfile professionalProfile) {
-            if (!Boolean.TRUE.equals(professionalProfile.getEmailVerified())) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "EMAIL_NOT_VERIFIED",
-                        "Email non verificata"
-                );
-            }
-
-            if (!Boolean.TRUE.equals(professionalProfile.getActive())) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "PROFESSIONAL_NOT_ACTIVE",
-                        "Profilo professionista non attivo"
-                );
-            }
-        }
-    }
 }

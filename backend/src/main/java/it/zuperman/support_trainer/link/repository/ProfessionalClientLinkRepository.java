@@ -31,6 +31,7 @@ public interface ProfessionalClientLinkRepository extends JpaRepository<Professi
               AND link.active = true
               AND client.active = true
               AND client.accountStatus = :accountStatus
+              AND client.emailVerified = true
             """)
     Optional<ClientProfile> findAccessibleClient(
             @Param("professionalId") Long professionalId,

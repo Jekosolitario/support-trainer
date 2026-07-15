@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
+import it.zuperman.support_trainer.common.security.UserReadinessValidator;
 import it.zuperman.support_trainer.invite.entity.InviteCode;
 import it.zuperman.support_trainer.invite.repository.InviteCodeRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
@@ -26,15 +27,18 @@ public class InviteCodeService {
     private final InviteCodeRepository inviteCodeRepository;
     private final ProfessionalProfileRepository professionalProfileRepository;
     private final ApplicationTimeProvider timeProvider;
+    private final UserReadinessValidator userReadinessValidator;
 
     public InviteCodeService(
             InviteCodeRepository inviteCodeRepository,
             ProfessionalProfileRepository professionalProfileRepository,
-            ApplicationTimeProvider timeProvider
+            ApplicationTimeProvider timeProvider,
+            UserReadinessValidator userReadinessValidator
     ) {
         this.inviteCodeRepository = inviteCodeRepository;
         this.professionalProfileRepository = professionalProfileRepository;
         this.timeProvider = timeProvider;
+        this.userReadinessValidator = userReadinessValidator;
     }
 
     @Transactional
@@ -141,29 +145,7 @@ public class InviteCodeService {
                 "Solo i professionisti possono usare questa funzionalità"
         ));
 
-        if (!Boolean.TRUE.equals(professional.getActive())) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "PROFESSIONAL_NOT_ACTIVE",
-                    "Il profilo professionista non è attivo"
-            );
-        }
-
-        if (!Boolean.TRUE.equals(professional.getEmailVerified())) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "EMAIL_NOT_VERIFIED",
-                    "Devi verificare l'email prima di generare codici invito"
-            );
-        }
-
-        if (professional.getAccountStatus() != AccountStatus.ACTIVE) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "ACCOUNT_NOT_ACTIVE",
-                    "L'account non è attivo"
-            );
-        }
+        userReadinessValidator.validateOperationalUser(professional);
 
         return professional;
     }

@@ -16,15 +16,26 @@ import jakarta.persistence.LockModeType;
 public interface BookingRequestRepository extends JpaRepository<BookingRequest, Long> {
 
     @EntityGraph(attributePaths = {"client", "professional", "items", "items.availabilitySlot"})
-    Optional<BookingRequest> findByIdAndActiveTrue(Long bookingRequestId);
+    @Query("SELECT bookingRequest FROM BookingRequest bookingRequest "
+            + "WHERE bookingRequest.id = :bookingRequestId "
+            + "AND bookingRequest.active = true "
+            + "AND (bookingRequest.client.id = :participantId "
+            + "OR bookingRequest.professional.id = :participantId)")
+    Optional<BookingRequest> findActiveByIdAndParticipantId(
+            @Param("bookingRequestId") Long bookingRequestId,
+            @Param("participantId") Long participantId
+    );
 
     @EntityGraph(attributePaths = {"client", "professional", "items", "items.availabilitySlot"})
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT bookingRequest FROM BookingRequest bookingRequest "
             + "WHERE bookingRequest.id = :bookingRequestId "
-            + "AND bookingRequest.active = true")
-    Optional<BookingRequest> findActiveByIdForUpdate(
-            @Param("bookingRequestId") Long bookingRequestId
+            + "AND bookingRequest.active = true "
+            + "AND (bookingRequest.client.id = :participantId "
+            + "OR bookingRequest.professional.id = :participantId)")
+    Optional<BookingRequest> findActiveByIdAndParticipantIdForUpdate(
+            @Param("bookingRequestId") Long bookingRequestId,
+            @Param("participantId") Long participantId
     );
 
     @EntityGraph(attributePaths = {"client", "professional", "items", "items.availabilitySlot"})

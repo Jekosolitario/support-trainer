@@ -15,6 +15,7 @@ import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.common.security.UserReadinessValidator;
 import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
@@ -24,13 +25,16 @@ public class ClientService {
 
     private final UserRepository userRepository;
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
+    private final UserReadinessValidator userReadinessValidator;
 
     public ClientService(
             UserRepository userRepository,
-            ProfessionalClientLinkRepository professionalClientLinkRepository
+            ProfessionalClientLinkRepository professionalClientLinkRepository,
+            UserReadinessValidator userReadinessValidator
     ) {
         this.userRepository = userRepository;
         this.professionalClientLinkRepository = professionalClientLinkRepository;
+        this.userReadinessValidator = userReadinessValidator;
     }
 
     @Transactional(readOnly = true)
@@ -49,7 +53,8 @@ public class ClientService {
 
     private boolean isReadableClient(ClientProfile client) {
         return Boolean.TRUE.equals(client.getActive())
-                && client.getAccountStatus() == AccountStatus.ACTIVE;
+                && client.getAccountStatus() == AccountStatus.ACTIVE
+                && Boolean.TRUE.equals(client.getEmailVerified());
     }
 
     @Transactional(readOnly = true)
@@ -70,44 +75,6 @@ public class ClientService {
                 "CLIENT_NOT_FOUND",
                 "Cliente non trovato"
         ));
-    }
-
-    private void validateAuthenticatedUserAccess(User user) {
-        if (user.getAccountStatus() != AccountStatus.ACTIVE) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "ACCOUNT_NOT_ACTIVE",
-                    "Account non attivo"
-            );
-        }
-
-        if (user instanceof ProfessionalProfile professionalProfile) {
-            if (!professionalProfile.getEmailVerified()) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "EMAIL_NOT_VERIFIED",
-                        "Email non verificata"
-                );
-            }
-
-            if (!professionalProfile.getActive()) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "PROFESSIONAL_NOT_ACTIVE",
-                        "Profilo professionista non attivo"
-                );
-            }
-        }
-
-        if (user instanceof ClientProfile clientProfile) {
-            if (!clientProfile.getActive()) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "CLIENT_NOT_ACTIVE",
-                        "Profilo cliente non attivo"
-                );
-            }
-        }
     }
 
     private ProfessionalProfile getAuthenticatedProfessional() {
@@ -134,7 +101,7 @@ public class ClientService {
                 "Utente autenticato non trovato"
         ));
 
-        validateAuthenticatedUserAccess(user);
+        userReadinessValidator.validateOperationalUser(user);
         return user;
     }
 

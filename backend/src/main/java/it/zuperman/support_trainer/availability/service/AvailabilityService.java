@@ -23,6 +23,7 @@ import it.zuperman.support_trainer.common.enums.BookingRequestStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.common.security.UserReadinessValidator;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.common.time.BusinessDateTimeMapper;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
@@ -39,6 +40,7 @@ public class AvailabilityService {
     private final BookingRequestItemRepository bookingRequestItemRepository;
     private final ApplicationTimeProvider timeProvider;
     private final BusinessDateTimeMapper businessDateTimeMapper;
+    private final UserReadinessValidator userReadinessValidator;
 
     public AvailabilityService(
             AvailabilitySlotRepository availabilitySlotRepository,
@@ -47,7 +49,8 @@ public class AvailabilityService {
             ProfessionalClientLinkRepository professionalClientLinkRepository,
             BookingRequestItemRepository bookingRequestItemRepository,
             ApplicationTimeProvider timeProvider,
-            BusinessDateTimeMapper businessDateTimeMapper
+            BusinessDateTimeMapper businessDateTimeMapper,
+            UserReadinessValidator userReadinessValidator
     ) {
         this.availabilitySlotRepository = availabilitySlotRepository;
         this.userRepository = userRepository;
@@ -56,6 +59,7 @@ public class AvailabilityService {
         this.bookingRequestItemRepository = bookingRequestItemRepository;
         this.timeProvider = timeProvider;
         this.businessDateTimeMapper = businessDateTimeMapper;
+        this.userReadinessValidator = userReadinessValidator;
     }
 
     @Transactional
@@ -166,7 +170,7 @@ public class AvailabilityService {
         ProfessionalProfile professional = getAuthenticatedProfessional();
         validateAvailabilitySpecialization(professional);
 
-        AvailabilitySlot slot = getOwnedActiveSlot(slotId, professional.getId());
+        AvailabilitySlot slot = getOwnedActiveSlotForUpdate(slotId, professional.getId());
 
         if (slot.getStatus() != AvailabilitySlotStatus.BLOCKED) {
             throw new AppException(
@@ -288,32 +292,13 @@ public class AvailabilityService {
         }
     }
 
-    private AvailabilitySlot getOwnedActiveSlot(Long slotId, Long professionalId) {
-        return availabilitySlotRepository.findByIdAndProfessional_IdAndActiveTrue(slotId, professionalId)
-                .orElseThrow(() -> new AppException(
-                HttpStatus.NOT_FOUND,
-                "AVAILABILITY_SLOT_NOT_FOUND",
-                "Slot disponibilità non trovato"
-        ));
-    }
-
     private AvailabilitySlot getOwnedActiveSlotForUpdate(Long slotId, Long professionalId) {
-        AvailabilitySlot slot = availabilitySlotRepository.findActiveByIdForUpdate(slotId)
+        return availabilitySlotRepository.findActiveByIdAndProfessionalIdForUpdate(slotId, professionalId)
                 .orElseThrow(() -> new AppException(
                 HttpStatus.NOT_FOUND,
                 "AVAILABILITY_SLOT_NOT_FOUND",
                 "Slot disponibilità non trovato"
         ));
-
-        if (!slot.getProfessional().getId().equals(professionalId)) {
-            throw new AppException(
-                    HttpStatus.NOT_FOUND,
-                    "AVAILABILITY_SLOT_NOT_FOUND",
-                    "Slot disponibilità non trovato"
-            );
-        }
-
-        return slot;
     }
 
     private void validateNoPendingBookingOnSlot(Long slotId) {
@@ -381,44 +366,15 @@ public class AvailabilityService {
     }
 
     private ProfessionalProfile getAccessibleProfessionalForClient(Long clientId, Long professionalId) {
-        ProfessionalProfile professional = professionalProfileRepository.findById(professionalId)
-                .orElseThrow(() -> new AppException(
+        return professionalClientLinkRepository.findAccessibleProfessional(
+                clientId,
+                professionalId,
+                AccountStatus.ACTIVE
+        ).orElseThrow(() -> new AppException(
                 HttpStatus.NOT_FOUND,
                 "PROFESSIONAL_NOT_FOUND",
                 "Professionista non trovato"
         ));
-
-        if (!isReadableProfessional(professional)) {
-            throw new AppException(
-                    HttpStatus.NOT_FOUND,
-                    "PROFESSIONAL_NOT_FOUND",
-                    "Professionista non trovato"
-            );
-        }
-
-        validateProfessionalAccess(clientId, professionalId);
-        return professional;
-    }
-
-    private boolean isReadableProfessional(ProfessionalProfile professional) {
-        return Boolean.TRUE.equals(professional.getActive())
-                && professional.getAccountStatus() == AccountStatus.ACTIVE
-                && Boolean.TRUE.equals(professional.getEmailVerified());
-    }
-
-    private void validateProfessionalAccess(Long clientId, Long professionalId) {
-        boolean linked = professionalClientLinkRepository.existsByProfessional_IdAndClient_IdAndActiveTrue(
-                professionalId,
-                clientId
-        );
-
-        if (!linked) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "PROFESSIONAL_ACCESS_DENIED",
-                    "Non puoi accedere a questo professionista"
-            );
-        }
     }
 
     private ProfessionalProfile getAuthenticatedProfessional() {
@@ -445,7 +401,7 @@ public class AvailabilityService {
                 "Utente autenticato non trovato"
         ));
 
-        validateAuthenticatedUserAccess(user);
+        userReadinessValidator.validateOperationalUser(user);
         return user;
     }
 
@@ -466,41 +422,4 @@ public class AvailabilityService {
         return authentication.getName().trim().toLowerCase();
     }
 
-    private void validateAuthenticatedUserAccess(User user) {
-        if (user.getAccountStatus() != AccountStatus.ACTIVE) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "ACCOUNT_NOT_ACTIVE",
-                    "Account non attivo"
-            );
-        }
-
-        if (user instanceof ProfessionalProfile professionalProfile) {
-            if (!Boolean.TRUE.equals(professionalProfile.getEmailVerified())) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "EMAIL_NOT_VERIFIED",
-                        "Email non verificata"
-                );
-            }
-
-            if (!Boolean.TRUE.equals(professionalProfile.getActive())) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "PROFESSIONAL_NOT_ACTIVE",
-                        "Profilo professionista non attivo"
-                );
-            }
-        }
-
-        if (user instanceof ClientProfile clientProfile) {
-            if (!Boolean.TRUE.equals(clientProfile.getActive())) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "CLIENT_NOT_ACTIVE",
-                        "Profilo cliente non attivo"
-                );
-            }
-        }
-    }
 }

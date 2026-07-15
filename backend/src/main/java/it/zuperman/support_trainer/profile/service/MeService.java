@@ -14,6 +14,7 @@ import it.zuperman.support_trainer.common.enums.ClientOperationalStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalOperationalStatus;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.common.security.UserReadinessValidator;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
 import it.zuperman.support_trainer.profile.dto.request.UpdateMyProfileRequest;
@@ -27,15 +28,18 @@ public class MeService {
     private final UserRepository userRepository;
     private final ProfessionalProfileRepository professionalProfileRepository;
     private final ClientProfileRepository clientProfileRepository;
+    private final UserReadinessValidator userReadinessValidator;
 
     public MeService(
             UserRepository userRepository,
             ProfessionalProfileRepository professionalProfileRepository,
-            ClientProfileRepository clientProfileRepository
+            ClientProfileRepository clientProfileRepository,
+            UserReadinessValidator userReadinessValidator
     ) {
         this.userRepository = userRepository;
         this.professionalProfileRepository = professionalProfileRepository;
         this.clientProfileRepository = clientProfileRepository;
+        this.userReadinessValidator = userReadinessValidator;
     }
 
     @Transactional(readOnly = true)
@@ -109,44 +113,6 @@ public class MeService {
                     "PROFILE_FIELDS_NOT_ALLOWED",
                     "Questi campi non sono modificabili per un professionista"
             );
-        }
-    }
-
-    private void validateAuthenticatedUserAccess(User user) {
-        if (user.getAccountStatus() != AccountStatus.ACTIVE) {
-            throw new AppException(
-                    HttpStatus.FORBIDDEN,
-                    "ACCOUNT_NOT_ACTIVE",
-                    "Account non attivo"
-            );
-        }
-
-        if (user instanceof ProfessionalProfile professionalProfile) {
-            if (!professionalProfile.getEmailVerified()) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "EMAIL_NOT_VERIFIED",
-                        "Email non verificata"
-                );
-            }
-
-            if (!professionalProfile.getActive()) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "PROFESSIONAL_NOT_ACTIVE",
-                        "Profilo professionista non attivo"
-                );
-            }
-        }
-
-        if (user instanceof ClientProfile clientProfile) {
-            if (!clientProfile.getActive()) {
-                throw new AppException(
-                        HttpStatus.FORBIDDEN,
-                        "CLIENT_NOT_ACTIVE",
-                        "Profilo cliente non attivo"
-                );
-            }
         }
     }
 
@@ -266,7 +232,7 @@ public class MeService {
                 "Utente autenticato non trovato"
         ));
 
-        validateAuthenticatedUserAccess(user);
+        userReadinessValidator.validateAccountAndEmail(user);
         return user;
     }
 
