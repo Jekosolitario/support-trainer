@@ -107,7 +107,7 @@ class AuthControllerEmailVerificationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(tokenBody("inesistente")))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("EMAIL_VERIFICATION_TOKEN_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_TOKEN_NOT_FOUND"));
     }
 
     @Test
@@ -116,7 +116,7 @@ class AuthControllerEmailVerificationIntegrationTest {
         mockMvc.perform(post(CONFIRM_ENDPOINT)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("MALFORMED_REQUEST"));
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
     }
 
     @Test
@@ -146,7 +146,7 @@ class AuthControllerEmailVerificationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("MALFORMED_REQUEST"));
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
     }
 
     @Test
@@ -156,7 +156,7 @@ class AuthControllerEmailVerificationIntegrationTest {
                         .contentType(MediaType.APPLICATION_XML)
                         .content("<token>value</token>"))
                 .andExpect(status().isUnsupportedMediaType())
-                .andExpect(jsonPath("$.errorCode").value("UNSUPPORTED_MEDIA_TYPE"));
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
     }
 
     @Test
@@ -173,7 +173,7 @@ class AuthControllerEmailVerificationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(tokenBody(token.getToken())))
                 .andExpect(status().isGone())
-                .andExpect(jsonPath("$.errorCode").value("EMAIL_VERIFICATION_TOKEN_EXPIRED"));
+                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_TOKEN_EXPIRED"));
 
         assertThat(user.getAccountStatus()).isEqualTo(AccountStatus.PENDING_VERIFICATION);
         assertThat(user.getEmailVerified()).isFalse();
@@ -194,7 +194,7 @@ class AuthControllerEmailVerificationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(tokenBody(token.getToken())))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("EMAIL_VERIFICATION_TOKEN_ALREADY_USED"));
+                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_TOKEN_ALREADY_USED"));
     }
 
     @Test
@@ -211,7 +211,7 @@ class AuthControllerEmailVerificationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(tokenBody(token.getToken())))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("PROFESSIONAL_NOT_ACTIVE"));
+                .andExpect(jsonPath("$.code").value("PROFESSIONAL_NOT_ACTIVE"));
 
         assertThat(professional.getActive()).isFalse();
         assertThat(professional.getEmailVerified()).isFalse();
@@ -278,8 +278,8 @@ class AuthControllerEmailVerificationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.validationErrors.token").exists());
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[?(@.field == 'token')]").isNotEmpty());
     }
 
     private String tokenBody(String token) {

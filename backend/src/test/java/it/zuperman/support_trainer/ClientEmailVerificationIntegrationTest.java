@@ -102,7 +102,7 @@ class ClientEmailVerificationIntegrationTest {
         mockMvc.perform(get("/api/v1/clients/{clientId}", client.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("CLIENT_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("CLIENT_NOT_FOUND"));
 
         confirmEmail(clientVerificationToken.getToken());
         Instant firstUsedAt = clientVerificationToken.getUsedAt();
@@ -153,7 +153,7 @@ class ClientEmailVerificationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(tokenBody(token.getToken())))
                 .andExpect(status().isGone())
-                .andExpect(jsonPath("$.errorCode").value("EMAIL_VERIFICATION_TOKEN_EXPIRED"));
+                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_TOKEN_EXPIRED"));
 
         assertThat(client.getAccountStatus()).isEqualTo(AccountStatus.PENDING_VERIFICATION);
         assertThat(client.getEmailVerified()).isFalse();
@@ -183,7 +183,7 @@ class ClientEmailVerificationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(clientRegistrationBody(inviteCode, clientEmail)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("PROFESSIONAL_NOT_ACTIVE"));
+                .andExpect(jsonPath("$.code").value("PROFESSIONAL_NOT_ACTIVE"));
 
         InviteCode invite = inviteCodeRepository.findByCode(inviteCode).orElseThrow();
         assertThat(invite.getUsed()).isFalse();
@@ -234,7 +234,7 @@ class ClientEmailVerificationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(clientRegistrationBody(inviteCode, email)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_ALREADY_USED"));
+                .andExpect(jsonPath("$.code").value("INVITE_CODE_ALREADY_USED"));
         assertThat(userRepository.findByEmail(email)).isEmpty();
     }
 
@@ -259,7 +259,7 @@ class ClientEmailVerificationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody(email)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_NOT_ACTIVE"));
+                .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_ACTIVE"));
     }
 
     private String login(String email) throws Exception {

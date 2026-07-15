@@ -120,7 +120,7 @@ class AuthControllerLoginIntegrationTest {
         mockMvc.perform(get("/api/v1/me/account")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + refreshToken))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("INVALID_TOKEN"));
+                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
     }
 
     @Test
@@ -163,7 +163,7 @@ class AuthControllerLoginIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginRequestBody))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("AUTHENTICATION_ERROR"));
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_ERROR"));
     }
 
     @Test
@@ -197,7 +197,7 @@ class AuthControllerLoginIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginRequestBody))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_NOT_ACTIVE"));
+                .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_ACTIVE"));
     }
 
     private void registerAndVerifyProfessional(String email, String password) throws Exception {
@@ -248,8 +248,7 @@ class AuthControllerLoginIntegrationTest {
                         .content(loginRequestBody))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
-                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"))
-                .andExpect(jsonPath("$.errorCode").value("AUTHENTICATION_ERROR"))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_ERROR"))
                 .andExpect(jsonPath("$.message").value("Credenziali non valide"));
     }
 }

@@ -66,7 +66,8 @@ class SecurityCommonIntegrationTest {
     void shouldRejectMissingJwtWithUnauthorizedErrorResponse() throws Exception {
         mockMvc.perform(get(PROTECTED_ENDPOINT))
                 .andExpect(status().isUnauthorized())
-                .andExpectAll(errorResponse(401, "UNAUTHORIZED", "UNAUTHORIZED"));
+                .andExpectAll(errorResponse(401, "UNAUTHORIZED"))
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"));
     }
 
     @Test
@@ -78,7 +79,8 @@ class SecurityCommonIntegrationTest {
         mockMvc.perform(get(PROTECTED_ENDPOINT)
                         .header(HttpHeaders.AUTHORIZATION, bearer(alteredToken)))
                 .andExpect(status().isUnauthorized())
-                .andExpectAll(errorResponse(401, "UNAUTHORIZED", "INVALID_TOKEN"));
+                .andExpectAll(errorResponse(401, "INVALID_TOKEN"))
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"));
     }
 
     @Test
@@ -90,7 +92,8 @@ class SecurityCommonIntegrationTest {
         mockMvc.perform(get(PROTECTED_ENDPOINT)
                         .header(HttpHeaders.AUTHORIZATION, bearer(expiredToken)))
                 .andExpect(status().isUnauthorized())
-                .andExpectAll(errorResponse(401, "UNAUTHORIZED", "TOKEN_EXPIRED"));
+                .andExpectAll(errorResponse(401, "TOKEN_EXPIRED"))
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"));
     }
 
     @Test
@@ -102,7 +105,8 @@ class SecurityCommonIntegrationTest {
         mockMvc.perform(get(PROTECTED_ENDPOINT)
                         .header(HttpHeaders.AUTHORIZATION, bearer(refreshToken)))
                 .andExpect(status().isUnauthorized())
-                .andExpectAll(errorResponse(401, "UNAUTHORIZED", "INVALID_TOKEN"));
+                .andExpectAll(errorResponse(401, "INVALID_TOKEN"))
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"));
     }
 
     @Test
@@ -114,7 +118,7 @@ class SecurityCommonIntegrationTest {
         mockMvc.perform(get(ROLE_PROTECTED_ENDPOINT)
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
                 .andExpect(status().isForbidden())
-                .andExpectAll(errorResponse(403, "FORBIDDEN", "ACCESS_DENIED"));
+                .andExpectAll(errorResponse(403, "ACCESS_DENIED"));
     }
 
     @Test
@@ -123,7 +127,7 @@ class SecurityCommonIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/email-verification/confirm")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
-                .andExpectAll(errorResponse(400, "BAD_REQUEST", "MALFORMED_REQUEST"));
+                .andExpectAll(errorResponse(400, "MALFORMED_REQUEST"));
     }
 
     @Test
@@ -135,7 +139,7 @@ class SecurityCommonIntegrationTest {
         mockMvc.perform(get("/api/v1/endpoint-not-found")
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
                 .andExpect(status().isNotFound())
-                .andExpectAll(errorResponse(404, "NOT_FOUND", "RESOURCE_NOT_FOUND"));
+                .andExpectAll(errorResponse(404, "RESOURCE_NOT_FOUND"));
     }
 
     @Test
@@ -147,7 +151,8 @@ class SecurityCommonIntegrationTest {
         mockMvc.perform(put(PROTECTED_ENDPOINT)
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
                 .andExpect(status().isMethodNotAllowed())
-                .andExpectAll(errorResponse(405, "METHOD_NOT_ALLOWED", "METHOD_NOT_ALLOWED"));
+                .andExpectAll(errorResponse(405, "METHOD_NOT_ALLOWED"))
+                .andExpect(header().exists(HttpHeaders.ALLOW));
     }
 
     @Test
@@ -157,7 +162,8 @@ class SecurityCommonIntegrationTest {
                         .contentType(MediaType.APPLICATION_XML)
                         .content("<login/>"))
                 .andExpect(status().isUnsupportedMediaType())
-                .andExpectAll(errorResponse(415, "UNSUPPORTED_MEDIA_TYPE", "UNSUPPORTED_MEDIA_TYPE"));
+                .andExpectAll(errorResponse(415, "UNSUPPORTED_MEDIA_TYPE"))
+                .andExpect(header().exists(HttpHeaders.ACCEPT));
     }
 
     @Test
@@ -251,13 +257,17 @@ class SecurityCommonIntegrationTest {
         return "Bearer " + token;
     }
 
-    private ResultMatcher[] errorResponse(int expectedStatus, String expectedError, String expectedErrorCode) {
+    private ResultMatcher[] errorResponse(int expectedStatus, String expectedCode) {
         return new ResultMatcher[]{
             jsonPath("$.timestamp").isNotEmpty(),
             jsonPath("$.status").value(expectedStatus),
-            jsonPath("$.error").value(expectedError),
-            jsonPath("$.errorCode").value(expectedErrorCode),
-            jsonPath("$.message").isNotEmpty()
+            jsonPath("$.code").value(expectedCode),
+            jsonPath("$.message").isNotEmpty(),
+            jsonPath("$.path").isNotEmpty(),
+            jsonPath("$.error").doesNotExist(),
+            jsonPath("$.errorCode").doesNotExist(),
+            jsonPath("$.validationErrors").doesNotExist(),
+            jsonPath("$.fieldErrors").doesNotExist()
         };
     }
 }

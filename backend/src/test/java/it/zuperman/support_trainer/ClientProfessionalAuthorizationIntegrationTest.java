@@ -70,11 +70,11 @@ class ClientProfessionalAuthorizationIntegrationTest {
 
         mockMvc.perform(get("/api/v1/clients/{clientId}", Long.MAX_VALUE))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
         mockMvc.perform(get("/api/v1/professionals/{professionalId}", Long.MAX_VALUE))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 
     @Test
@@ -108,12 +108,12 @@ class ClientProfessionalAuthorizationIntegrationTest {
         mockMvc.perform(get("/api/v1/clients/{clientId}", clientId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(clientToken)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         mockMvc.perform(get("/api/v1/professionals/{professionalId}", professionalId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
     @Test
@@ -326,7 +326,7 @@ class ClientProfessionalAuthorizationIntegrationTest {
         mockMvc.perform(get("/api/v1/clients/{clientId}", clientAId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(professionalBToken)))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("CLIENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.code").value("CLIENT_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Cliente non trovato"));
     }
 
@@ -414,7 +414,7 @@ class ClientProfessionalAuthorizationIntegrationTest {
         mockMvc.perform(get("/api/v1/professionals/{professionalId}", professionalAId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(clientBToken)))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("PROFESSIONAL_NOT_FOUND"))
+                .andExpect(jsonPath("$.code").value("PROFESSIONAL_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Professionista non trovato"));
     }
 
@@ -493,12 +493,13 @@ class ClientProfessionalAuthorizationIntegrationTest {
                 "$"
         ));
         payload.remove("timestamp");
+        payload.remove("path");
         return payload;
     }
 
     private void assertUniformNotFoundPayload(
             List<Map<String, Object>> payloads,
-            String errorCode,
+            String code,
             String message
     ) {
         Map<String, Object> expectedPayload = payloads.get(0);
@@ -506,10 +507,9 @@ class ClientProfessionalAuthorizationIntegrationTest {
         assertThat(payloads).allMatch(expectedPayload::equals);
         assertThat(expectedPayload)
                 .containsEntry("status", 404)
-                .containsEntry("error", "NOT_FOUND")
-                .containsEntry("errorCode", errorCode)
-                .containsEntry("message", message);
-        assertThat(expectedPayload.get("validationErrors")).isNull();
+                .containsEntry("code", code)
+                .containsEntry("message", message)
+                .doesNotContainKeys("error", "errorCode", "validationErrors", "fieldErrors");
     }
 
     private ClientProfile saveActiveClient(String email) {

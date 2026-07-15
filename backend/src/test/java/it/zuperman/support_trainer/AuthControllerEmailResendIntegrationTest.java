@@ -329,13 +329,13 @@ class AuthControllerEmailResendIntegrationTest {
     void shouldRejectMissingOrMalformedBody() throws Exception {
         mockMvc.perform(post(RESEND_ENDPOINT).contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("MALFORMED_REQUEST"));
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
 
         mockMvc.perform(post(RESEND_ENDPOINT)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("MALFORMED_REQUEST"));
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
     }
 
     @Test
@@ -356,7 +356,7 @@ class AuthControllerEmailResendIntegrationTest {
                         .contentType(MediaType.APPLICATION_XML)
                         .content("<email>user@example.com</email>"))
                 .andExpect(status().isUnsupportedMediaType())
-                .andExpect(jsonPath("$.errorCode").value("UNSUPPORTED_MEDIA_TYPE"));
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
     }
 
     private MvcResult resend(String email) throws Exception {
@@ -427,7 +427,7 @@ class AuthControllerEmailResendIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(tokenBody(token)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("EMAIL_VERIFICATION_TOKEN_ALREADY_USED"));
+                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_TOKEN_ALREADY_USED"));
     }
 
     private String login(String email) throws Exception {
@@ -450,7 +450,7 @@ class AuthControllerEmailResendIntegrationTest {
         mockMvc.perform(get("/api/v1/clients/{clientId}", clientId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("CLIENT_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("CLIENT_NOT_FOUND"));
     }
 
     private void assertClientVisible(String professionalToken, Long clientId) throws Exception {
@@ -469,8 +469,8 @@ class AuthControllerEmailResendIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.validationErrors.email").exists());
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[?(@.field == 'email')]").isNotEmpty());
     }
 
     private List<EmailVerificationToken> findTokensFor(User user) {

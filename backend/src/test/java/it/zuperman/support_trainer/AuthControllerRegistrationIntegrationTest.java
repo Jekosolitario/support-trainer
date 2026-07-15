@@ -111,9 +111,10 @@ class AuthControllerRegistrationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.message").value("Dati non validi"))
-                .andExpect(jsonPath("$.validationErrors.password")
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("La richiesta contiene dati non validi"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("password"))
+                .andExpect(jsonPath("$.fieldErrors[0].message")
                         .value("La password non può superare 72 byte in codifica UTF-8"));
 
         assertThat(professionalProfileRepository.findByEmail(email)).isEmpty();
@@ -145,8 +146,9 @@ class AuthControllerRegistrationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.validationErrors.password")
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("password"))
+                .andExpect(jsonPath("$.fieldErrors[0].message")
                         .value("La password non può superare 72 byte in codifica UTF-8"));
 
         assertThat(clientProfileRepository.findByEmail(email)).isEmpty();
@@ -170,8 +172,9 @@ class AuthControllerRegistrationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.validationErrors.password")
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("password"))
+                .andExpect(jsonPath("$.fieldErrors[0].message")
                         .value("La password deve contenere almeno 8 caratteri"));
 
         assertThat(professionalProfileRepository.findByEmail(email)).isEmpty();
@@ -199,7 +202,7 @@ class AuthControllerRegistrationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("EMAIL_ALREADY_REGISTERED"));
+                .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_REGISTERED"));
     }
 
     @Test
@@ -223,7 +226,7 @@ class AuthControllerRegistrationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_FOUND"));
     }
 
     @Test

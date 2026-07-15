@@ -83,7 +83,7 @@ class AuthControllerInviteValidationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_NOT_FOUND"));
+                .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_FOUND"));
     }
 
     @Test
@@ -108,7 +108,7 @@ class AuthControllerInviteValidationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_ALREADY_USED"));
+                .andExpect(jsonPath("$.code").value("INVITE_CODE_ALREADY_USED"));
     }
 
     @Test
@@ -132,7 +132,7 @@ class AuthControllerInviteValidationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_EXPIRED"));
+                .andExpect(jsonPath("$.code").value("INVITE_CODE_EXPIRED"));
     }
 
     @Test
@@ -156,7 +156,7 @@ class AuthControllerInviteValidationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_NOT_ACTIVE"));
+                .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_ACTIVE"));
     }
 
     @Test
@@ -181,7 +181,7 @@ class AuthControllerInviteValidationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_NOT_ACTIVE"));
+                .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_ACTIVE"));
     }
 
     @Test
@@ -206,7 +206,7 @@ class AuthControllerInviteValidationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_NOT_ACTIVE"));
+                .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_ACTIVE"));
     }
 
     @Test
@@ -231,7 +231,7 @@ class AuthControllerInviteValidationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("INVITE_CODE_NOT_ACTIVE"));
+                .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_ACTIVE"));
     }
 
     private InviteCode createValidInvite(String code, String professionalEmail) {

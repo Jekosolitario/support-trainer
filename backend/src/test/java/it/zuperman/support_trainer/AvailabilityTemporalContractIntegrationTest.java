@@ -156,11 +156,11 @@ class AvailabilityTemporalContractIntegrationTest {
                         .content(payload))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.errorCode").value(expectedErrorCode))
+                .andExpect(jsonPath("$.code").value(expectedErrorCode))
                 .andExpect(jsonPath("$.message").isNotEmpty());
 
         if ("VALIDATION_ERROR".equals(expectedErrorCode)) {
-            result.andExpect(jsonPath("$.validationErrors.startDateTime").isNotEmpty());
+            result.andExpect(jsonPath("$.fieldErrors[?(@.field == 'startDateTime')]").isNotEmpty());
         }
     }
 
@@ -172,7 +172,7 @@ class AvailabilityTemporalContractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(slotPayload(start, end)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
     @Test
