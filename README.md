@@ -102,7 +102,7 @@ Il reinvio accetta l'email nel body, risponde sempre `202 Accepted` con lo stess
 
 Il modulo Availability è attualmente riservato ai professionisti con specializzazione `PERSONAL_TRAINER`.
 
-Gli orari business degli slot usano un contratto ISO-8601 con offset obbligatorio e zona server `Europe/Rome`: per esempio `2026-07-13T17:30:00+02:00` in estate e `2026-01-13T17:30:00+01:00` in inverno. Il backend rifiuta valori senza offset, `Z` o offset incoerenti, orari nel gap primaverile, orari ambigui nell'overlap autunnale e frazioni di secondo non nulle. Le response Availability e gli orari dello slot inclusi nelle response Booking espongono lo stesso formato.
+Gli orari business degli slot usano un contratto ISO-8601 con offset obbligatorio e zona server `Europe/Rome`: per esempio `2026-07-13T17:30:00+02:00` in estate e `2026-01-13T17:30:00+01:00` in inverno. Il backend rifiuta valori senza offset, `Z` o offset incoerenti, orari nel gap primaverile, orari ambigui nell'overlap autunnale e frazioni di secondo non nulle. Le response Booking espongono gli stessi orari con offset, ma li leggono dallo snapshot storico e non dallo slot live.
 
 ### Bookings
 
@@ -112,6 +112,8 @@ Gli orari business degli slot usano un contratto ISO-8601 con offset obbligatori
 - conferma e rifiuto da parte del professionista;
 - cancellazione secondo le transizioni consentite;
 - aggiornamento coerente dello stato dello slot.
+
+Le liste usano un riepilogo autosufficiente e create, dettaglio e transizioni restituiscono il dettaglio completo. Nome delle parti e orari sono snapshot storici persistiti; immagini profilo e specializzazione del professionista sono invece valori correnti e opzionali. Le response non espongono `primaryGoal`, dati sanitari o `slotStatus` live. Uno storico già creato resta leggibile dai partecipanti originari anche dopo la disattivazione del collegamento, mentre un collegamento attivo resta necessario per creare una nuova prenotazione. Le liste sono ordinate per creazione decrescente e id decrescente; paginazione, filtri e motivazioni di rifiuto/annullamento sono rinviati.
 
 ## 5. Funzionalità pianificate / non ancora implementate
 
@@ -215,11 +217,11 @@ Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazi
 
 La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle nove tabelle runtime tramite `classpath:db/migration`.
 
-Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true`. Dopo V1, V2 e `V3_1`–`V3_9`, la migrazione Java V4 prepara e verifica atomicamente la conversione dei 23 valori temporali legacy da `Europe/Rome` a UTC, interrompendosi prima del primo aggiornamento in presenza di gap, overlap o schema inatteso. Le migrazioni SQL `V5_1`–`V5_9` rimuovono default e `ON UPDATE` dagli audit: i timestamp ombra di `professional_profiles` e `client_profiles` diventano nullable e restano congelati. V1, V2 e V3 sono immutabili.
+Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true`. Dopo V1, V2 e `V3_1`–`V3_9`, la migrazione Java V4 prepara e verifica atomicamente la conversione dei 23 valori temporali legacy da `Europe/Rome` a UTC, interrompendosi prima del primo aggiornamento in presenza di gap, overlap o schema inatteso. Le migrazioni SQL `V5_1`–`V5_9` rimuovono default e `ON UPDATE` dagli audit: i timestamp ombra di `professional_profiles` e `client_profiles` diventano nullable e restano congelati. La migrazione Java V6 aggiunge gli snapshot storici Booking e ne esegue il backfill verificato. V1–V5_9 restano immutabili.
 
-Un database esistente non deve essere avviato direttamente con le migrazioni abilitate: prima sono obbligatori backup, clone di verifica, confronto dello schema e baseline manuale esplicitamente approvata. L'intera sequenza è stata validata su MySQL 8.0.44 sia da database vuoto (`V1` → `V5.9`) sia da clone legacy (`BASELINE 1` → `V2` → `V5.9`), seguita con successo da Hibernate `ddl-auto=validate`. Sul clone V4 ha convertito da `Europe/Rome` a UTC 70 valori valorizzati; i due valori nulli e i cinque timestamp con microsecondi preesistenti sono stati preservati, insieme a dati, vincoli e indici. Sono stati verificati anche il mapping `Instant`, l'auditing applicativo e l'interruzione prima del primo DML in presenza di gap, overlap o schema inatteso.
+Un database esistente non deve essere avviato direttamente con le migrazioni abilitate: prima sono obbligatori backup, clone di verifica, confronto dello schema e baseline manuale esplicitamente approvata. L'intera sequenza è stata validata su MySQL 8.0.44 sia da database vuoto (`V1` → `V6`) sia da clone legacy (`BASELINE 1` → `V2` → `V5.9` → `V6`), seguita con successo da Hibernate `ddl-auto=validate`. Sul clone V4 ha convertito da `Europe/Rome` a UTC 70 valori valorizzati; i due valori nulli e i cinque timestamp con microsecondi preesistenti sono stati preservati, insieme a dati, vincoli e indici. V6 ha inoltre verificato il backfill degli snapshot Booking, compresi microsecondi e timeline legacy. Sono stati verificati anche il mapping `Instant`, l'auditing applicativo e l'interruzione prima del primo DML in presenza di gap, overlap o schema inatteso.
 
-Queste verifiche hanno usato esclusivamente database isolati. Il database locale reale `support_trainer` non è stato baselinato o migrato e non ha quindi ricevuto la conversione UTC. Il deploy operativo deve coordinare nella stessa finestra approvata il nuovo backend, la configurazione JDBC/Hibernate UTC e le migrazioni V4 e `V5_1`–`V5_9`, dopo le verifiche su backup e clone. Il comando Flyway `clean` resta vietato sugli ambienti persistenti.
+Queste verifiche hanno usato esclusivamente database isolati. Il database locale reale `support_trainer` non è stato baselinato o migrato e non ha quindi ricevuto la conversione UTC o gli snapshot Booking. Il deploy operativo deve coordinare nella stessa finestra approvata il nuovo backend, la configurazione JDBC/Hibernate UTC e le migrazioni V4, `V5_1`–`V5_9` e V6, dopo le verifiche su backup e clone. Il comando Flyway `clean` resta vietato sugli ambienti persistenti.
 
 Le tredici tabelle legacy relative a refresh/reset token, workout, nutrition, feedback e misurazioni non sono governate dalle migrazioni correnti e non vengono create, modificate o eliminate. Il perimetro completo è descritto nella [documentazione del database](docs/10-database-schema.md).
 

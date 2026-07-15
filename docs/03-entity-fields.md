@@ -285,12 +285,17 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 | `id`           | `Long`                     |           Sì |       No | auto        | Identificativo univoco         |
 | `client`       | `ClientProfile`            |           Sì |       No | —           | Cliente richiedente            |
 | `professional` | `ProfessionalProfile`      |           Sì |       No | —           | Professionista destinatario    |
+| `clientDisplayName` | `String`               |           Sì |       No | —           | Snapshot storico, max 201 caratteri |
+| `professionalDisplayName` | `String`         |           Sì |       No | —           | Snapshot storico, max 201 caratteri |
 | `status`       | `Enum`                     |           Sì |       No | `PENDING`   | Stato richiesta                |
 | `note`         | `String` / `Text`          |           No |       Sì | `null`      | Nota facoltativa del cliente   |
 | `active`       | `Boolean`                  |           Sì |       No | `true`      | Flag logico di attivazione     |
 | `items`        | `List<BookingRequestItem>` |           Sì |       No | lista vuota | Slot collegati alla richiesta  |
 | `createdAt`    | `Instant`                  |           Sì |       No | audit app   | Istante UTC creazione          |
 | `updatedAt`    | `Instant`                  |           Sì |       No | audit app   | Istante UTC aggiornamento      |
+| `confirmedAt`  | `Instant`                  |           No |       Sì | `null`      | Istante UTC della conferma     |
+| `rejectedAt`   | `Instant`                  |           No |       Sì | `null`      | Istante UTC del rifiuto        |
+| `cancelledAt`  | `Instant`                  |           No |       Sì | `null`      | Istante UTC dell'annullamento  |
 
 ### Note
 
@@ -304,6 +309,9 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 - una `note` vuota dopo la normalizzazione viene trattata come assente;
 - la `note` non può superare `1000` caratteri;
 - la struttura con `items` mantiene il modello estendibile a scenari multi-slot futuri.
+- i display name sono costruiti al momento della creazione con nome e cognome normalizzati, trim e un solo spazio; non cambiano quando cambia il profilo;
+- per i record legacy i display name vengono ricostruiti dai profili correnti durante V6: non provano il nome originario;
+- i timestamp di transizione sono assegnati dal clock applicativo; il backfill legacy usa `updatedAt` solo per lo stato finale e non inventa stati intermedi.
 
 ---
 
@@ -314,12 +322,15 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 | `id`               | `Long`             |           Sì |       No | auto    | Identificativo univoco         |
 | `bookingRequest`   | `BookingRequest`   |           Sì |       No | —       | Richiesta principale           |
 | `availabilitySlot` | `AvailabilitySlot` |           Sì |       No | —       | Slot richiesto                 |
+| `scheduledStart`   | `Instant`          |           Sì |       No | —       | Snapshot UTC dell'inizio       |
+| `scheduledEnd`     | `Instant`          |           Sì |       No | —       | Snapshot UTC della fine        |
 | `createdAt`        | `Instant`          |           Sì |       No | audit app | Istante UTC creazione          |
 | `updatedAt`        | `Instant`          |           Sì |       No | audit app | Istante UTC aggiornamento      |
 
 ### Note
 
 - ogni item punta a uno slot specifico;
+- gli orari snapshot sono `DATETIME(6)` in UTC e restano la fonte autorevole per lo storico Booking;
 - nel contratto API attuale ogni booking creato contiene un solo item;
 - il modello resta predisposto per un’eventuale evoluzione multi-slot futura.
 

@@ -567,7 +567,7 @@ Un professionista può:
 
 ## 18.3 Dove viene controllata
 
-Il controllo sulla relazione cliente-professionista viene fatto tramite verifica dell’esistenza di un `ProfessionalClientLink` attivo tra le due parti.
+Il controllo sulla relazione cliente-professionista viene fatto tramite verifica dell’esistenza di un `ProfessionalClientLink` attivo tra le due parti quando si crea un nuovo booking o si consulta Availability. Il link non è un filtro dello storico Booking: dopo la sua disattivazione, i partecipanti originari che restano autenticati e attivi possono leggere il dettaglio e le proprie liste e conservano le transizioni già consentite dal dominio.
 
 Il controllo ownership sulle risorse viene fatto nei service specifici:
 
@@ -579,6 +579,8 @@ Il controllo ownership sulle risorse viene fatto nei service specifici:
 Se il collegamento non esiste o l’utente non è autorizzato:
 
 - viene restituito errore `403 FORBIDDEN`
+
+Questa regola sul collegamento vale per le operazioni che richiedono una relazione attiva, non per la consultazione dello storico di una prenotazione già creata.
 
 ---
 

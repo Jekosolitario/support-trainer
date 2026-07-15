@@ -301,7 +301,11 @@ Nel backend attuale una richiesta booking viene creata a partire da:
 
 Il modello con `BookingRequestItem` resta estendibile a scenari multi-slot futuri, ma l’API attuale opera su un solo slot per richiesta.
 
-Gli item delle response Booking espongono gli orari dello slot con offset `Europe/Rome`, secondo lo stesso contratto Availability. Gli audit `createdAt` e `updatedAt` della richiesta sono invece `Instant` UTC serializzati con `Z`; i confronti di validità degli slot avvengono direttamente sugli istanti.
+La risposta delle liste è `BookingSummaryResponse`: `id`, `status`, controparte, inizio/fine complessivi, durata, nota e `createdAt`. Create, dettaglio e transizioni restituiscono `BookingDetailResponse`, che aggiunge le due parti, `updatedAt`, gli istanti `confirmedAt`/`rejectedAt`/`cancelledAt` e gli item. Ogni item espone `availabilitySlotId`, `scheduledStart`, `scheduledEnd` e durata.
+
+Nomi delle parti e orari sono snapshot persistiti: gli orari non vengono letti dallo slot live. Sono salvati in UTC con precisione microsecondi e sono resi come `OffsetDateTime` nell'offset coerente con `Europe/Rome`; audit e timestamp di transizione restano `Instant` UTC serializzati con `Z`. La durata è la somma delle durate degli item snapshot, in minuti completi; gli item sono ordinati per inizio e id crescenti.
+
+`profileImageUrl` è opzionale e corrente, mentre la specializzazione corrente è esposta solo per il professionista. Il contratto non espone `primaryGoal`, dati sanitari, campi interni dei profili, `active` o `slotStatus` live.
 
 ### Regole principali implementate
 
@@ -310,6 +314,7 @@ Gli item delle response Booking espongono gli orari dello slot con offset `Europ
 - non può esistere una richiesta `PENDING` duplicata sullo stesso slot;
 - la nota è facoltativa, normalizzata e limitata a `1000` caratteri;
 - il dettaglio booking è visibile solo agli utenti coinvolti;
+- il collegamento attivo è richiesto per creare una nuova richiesta, ma non filtra lo storico: i partecipanti originari attivi possono continuare a consultarlo dopo la disattivazione del link;
 - un booking pending con slot ormai scaduto non può essere confermato.
 - una richiesta `PENDING` riserva logicamente lo slot;
 - finché una richiesta è `PENDING`, lo slot non viene più esposto come disponibilità prenotabile agli altri clienti;
@@ -332,6 +337,10 @@ Gli item delle response Booking espongono gli orari dello slot con offset `Europ
 | cancel | cliente coinvolto | `PENDING -> CANCELLED` | resta `AVAILABLE` |
 | cancel | cliente coinvolto | `CONFIRMED -> CANCELLED` | `BOOKED -> AVAILABLE` |
 | cancel | professionista coinvolto | `CONFIRMED -> CANCELLED` | `BOOKED -> AVAILABLE` |
+
+Le transizioni assegnano una sola volta il rispettivo timestamp applicativo e restituiscono il dettaglio completo aggiornato. Per i record legacy, V6 usa `updatedAt` solo come timestamp dello stato finale noto; per esempio un record `CANCELLED` non riceve un `confirmedAt` inferito.
+
+Le liste sono ordinate per `createdAt DESC, id DESC`. Paginazione, filtri temporali e motivazioni di rifiuto o annullamento non fanno parte di questo contratto.
 
 ---
 

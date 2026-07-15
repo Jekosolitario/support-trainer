@@ -520,6 +520,14 @@ Questa miglioria non è inclusa nello Sprint 05 attuale, ma va considerata una f
 
 La creazione e la conferma di un booking verificano che lo slot sia futuro confrontando direttamente il suo `Instant` con il `Clock` applicativo UTC. I controlli sono indipendenti dalla timezone della macchina e possono essere riprodotti con `Clock.fixed`.
 
-Le copie di `startDateTime` ed `endDateTime` presenti negli item delle response Booking sono `OffsetDateTime` e includono l'offset coerente con `Europe/Rome`. Il modulo non introduce uno snapshot temporale aggiuntivo: continua a leggere l'intervallo dall'entity Availability, ora `Instant`, e lo converte al confine HTTP tramite il componente condiviso.
+Gli item Booking mantengono gli snapshot persistiti `scheduledStart` e `scheduledEnd`, `Instant` UTC su `DATETIME(6)`, creati insieme alla richiesta. Le response li convertono in `OffsetDateTime` con l'offset coerente con `Europe/Rome`; non leggono l'intervallo dallo slot live. L'aggregato usa minimo inizio, massimo fine e somma delle durate degli item; gli item sono ordinati per inizio e id.
 
 Gli audit Booking `createdAt` e `updatedAt` sono `Instant` UTC, governati da Spring Data JPA Auditing e serializzati con `Z`. Gap e overlap riguardano soltanto la validazione delle ore civili ricevute per gli slot; gli istanti persistiti sono univoci.
+
+## Contratto storico delle response
+
+Le liste usano `BookingSummaryResponse`; creazione, dettaglio e transizioni usano `BookingDetailResponse`. Il primo contiene la controparte, stato, aggregati temporali, durata, nota e `createdAt`; il secondo include entrambi i partecipanti, audit, timestamp di transizione e gli item. I nomi visualizzati sono snapshot storici, mentre `profileImageUrl` è corrente e opzionale e la specializzazione corrente è esposta solo per il professionista. `primaryGoal`, dati sanitari e `slotStatus` live non appartengono al contratto.
+
+La migrazione V6 ricostruisce per gli elementi legacy i nomi dai profili e gli orari dallo slot referenziato dopo preflight completo. I nomi legacy fotografano il valore al momento della migrazione, non il nome originale; `updatedAt` popola soltanto il timestamp dello stato finale noto, quindi una richiesta `CANCELLED` legacy non riceve un'ipotetica conferma precedente. La migrazione fallisce invece di usare placeholder o valori temporali inventati.
+
+Lo storico è consultabile dai partecipanti originari anche quando il `ProfessionalClientLink` è stato disattivato; il link attivo resta necessario solo per una nuova richiesta. Le liste hanno ordine stabile `createdAt DESC, id DESC`, con fetch plan verificato senza N+1 nella lista testata. Paginazione, filtri e motivazioni di rifiuto o annullamento restano fuori scope.

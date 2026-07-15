@@ -254,7 +254,7 @@ Le operazioni Availability applicano i seguenti controlli:
 
 ## 10. Modulo Bookings
 
-Gli oggetti `items` delle response Booking riportano `startDateTime` ed `endDateTime` con l'offset `Europe/Rome`. I campi audit `createdAt` e `updatedAt` sono invece `Instant` ISO-8601 UTC con `Z`.
+Le liste restituiscono `BookingSummaryResponse`; create, dettaglio e mutazioni restituiscono `BookingDetailResponse`. I rispettivi orari `scheduledStart` e `scheduledEnd` sono snapshot storici, convertiti in `OffsetDateTime` con l'offset `Europe/Rome`; audit e timestamp di transizione sono `Instant` ISO-8601 UTC con `Z`. Nessuna response Booking dipende da `slotStatus` live.
 
 ### 10.1 Creazione richiesta prenotazione
 **POST** `/api/v1/bookings`  
@@ -273,6 +273,15 @@ Regole attuali:
 Quando uno slot viene utilizzato in una richiesta booking, il relativo intervallo temporale diventa parte dello storico della richiesta.
 
 Anche in caso di booking successivamente `REJECTED` o `CANCELLED`, lo slot non può essere modificato in data o ora. Può eventualmente ricevere nuove richieste sul medesimo intervallo, se ancora prenotabile.
+
+### Contratto response
+
+- `BookingSummaryResponse` contiene `id`, `status`, `counterparty`, `scheduledStart`, `scheduledEnd`, `durationMinutes`, `note` e `createdAt`.
+- `BookingDetailResponse` contiene `id`, `status`, partecipanti, aggregati temporali, `note`, audit, timestamp di transizione e `items`.
+- Un partecipante ha `id`, `displayName` storico, `profileImageUrl` corrente opzionale e, solo per il professionista, `specialization` corrente.
+- Un item ha `id`, `availabilitySlotId`, orari snapshot e durata. I nomi, gli orari e la nota rendono la response autosufficiente; non sono esposti `primaryGoal`, dati sanitari, email, telefono o campi operativi dei profili.
+
+Le liste sono ordinate per `createdAt DESC, id DESC`; paginazione, filtri e ricerca sono rinviati. Lo storico creato resta leggibile dai partecipanti originari anche dopo la disattivazione del `ProfessionalClientLink`, che resta invece obbligatorio per creare nuove richieste.
 
 ### 10.2 Elenco prenotazioni del cliente autenticato
 **GET** `/api/v1/bookings/client`  
@@ -293,6 +302,7 @@ Permette al professionista proprietario dello slot di confermare una richiesta `
 Quando la richiesta viene confermata:
 - la booking passa a `CONFIRMED`
 - lo slot collegato passa a `BOOKED`
+- `confirmedAt` viene valorizzato e la response restituisce il dettaglio completo
 
 ### 10.6 Rifiuto richiesta prenotazione
 **PATCH** `/api/v1/bookings/{bookingRequestId}/reject`  
@@ -301,6 +311,7 @@ Permette al professionista proprietario dello slot di rifiutare una richiesta `P
 Quando la richiesta viene rifiutata:
 - la booking passa a `REJECTED`
 - lo slot resta disponibile se non era già occupato
+- `rejectedAt` viene valorizzato e la response restituisce il dettaglio completo
 
 ### 10.7 Cancellazione richiesta prenotazione
 **PATCH** `/api/v1/bookings/{bookingRequestId}/cancel`  
@@ -314,6 +325,8 @@ Regole attuali:
 Quando una richiesta `CONFIRMED` viene cancellata:
 - la booking passa a `CANCELLED`
 - lo slot collegato torna `AVAILABLE`
+
+Ogni cancellazione consentita valorizza `cancelledAt`, conserva un eventuale `confirmedAt` già presente e restituisce il dettaglio completo. Non sono ancora previsti motivo o autore della cancellazione.
 
 ---
 

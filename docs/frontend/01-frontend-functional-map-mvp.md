@@ -101,8 +101,8 @@ Nel `PATCH` profilo professionista, `instagramUrl` e `websiteUrl` seguono un con
 | Dettaglio professionista | `GET /api/v1/professionals/{professionalId}` | Implementabile ora | Accessibile soltanto con collegamento attivo. Un `404 PROFESSIONAL_NOT_FOUND` non permette di distinguere professionista inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista. |
 | Disponibilità professionista | `GET /api/v1/professionals/{professionalId}/availability` | Implementabile ora solo per personal trainer collegato | Mostrare solo slot restituiti dal server. Per un nutrizionista l'area non va offerta. Empty state distinto da errore. |
 | Crea booking | `POST /api/v1/bookings` | Implementabile ora | Body: un solo `availabilitySlotId` e nota facoltativa fino a 1000 caratteri. Confermare data/ora e professionista prima dell'invio. |
-| Lista booking | `GET /api/v1/bookings/client` | Implementabile ora | Stati: `PENDING`, `CONFIRMED`, `REJECTED`, `CANCELLED`. Nessun filtro server documentato. |
-| Dettaglio booking | `GET /api/v1/bookings/{bookingRequestId}` | Implementabile ora | Solo utenti coinvolti. Mostrare intervallo storico restituito in `items`. |
+| Lista booking | `GET /api/v1/bookings/client` | Implementabile ora | Usa `BookingSummaryResponse`: controparte, stato, intervallo e durata sono già disponibili senza chiamate aggiuntive. Ordine iniziale: creazione decrescente e id decrescente; paginazione e filtri sono futuri. |
+| Dettaglio booking | `GET /api/v1/bookings/{bookingRequestId}` | Implementabile ora | Usa `BookingDetailResponse`. Solo utenti coinvolti, anche dopo chiusura del collegamento: mostra nome storico, intervallo snapshot, stato, nota e item senza dipendere da `slotStatus`. |
 | Cancella booking | `PATCH /api/v1/bookings/{bookingRequestId}/cancel` | Implementabile ora | Il cliente può cancellare `PENDING` o `CONFIRMED`; usare conferma esplicita e aggiornare lo stato dalla risposta. |
 
 ### 5.3 Professionista: funzionalità comuni
@@ -124,16 +124,27 @@ Nel `PATCH` profilo professionista, `instagramUrl` e `websiteUrl` seguono un con
 | Crea slot | `POST /api/v1/availability` | Implementabile ora | Inizio e fine futuri, fine successiva all'inizio, nessuna sovrapposizione. |
 | Modifica slot | `PATCH /api/v1/availability/{slotId}` | Implementabile ora con vincoli | Solo slot `AVAILABLE`, mai coinvolti in booking e senza booking `PENDING`. Il `PATCH` è parziale. |
 | Blocca/sblocca slot | `PATCH .../{slotId}/block`, `PATCH .../{slotId}/unblock` | Implementabile ora | Azioni visibili solo negli stati coerenti. Uno slot con booking pending non è bloccabile. |
-| Lista booking ricevuti | `GET /api/v1/bookings/professional` | Implementabile ora | Mostrare richieste in ordine recente e stato. Nessun filtro server documentato. |
-| Dettaglio booking | `GET /api/v1/bookings/{bookingRequestId}` | Implementabile ora | Mostrare cliente, nota, stato e intervallo. |
+| Lista booking ricevuti | `GET /api/v1/bookings/professional` | Implementabile ora | Usa `BookingSummaryResponse`: mostra richieste in ordine recente, stato, cliente e intervallo; nessuna chiamata aggiuntiva. |
+| Dettaglio booking | `GET /api/v1/bookings/{bookingRequestId}` | Implementabile ora | Usa `BookingDetailResponse`: mostra cliente, nota, stato, intervallo snapshot e timestamp della transizione quando presente. |
 | Conferma/rifiuta | `PATCH .../{id}/confirm`, `PATCH .../{id}/reject` | Implementabile ora | Solo da `PENDING`. Il rifiuto non accetta un motivo: non mostrare un campo motivo attivo. |
 | Cancella | `PATCH .../{id}/cancel` | Implementabile ora | Il professionista può cancellare soltanto un booking `CONFIRMED`. |
 
-### 5.5 Nutrizionista
+### 5.5 Contratto Booking per il frontend
+
+`BookingSummaryResponse` è il contratto delle liste; `BookingDetailResponse` è il contratto per creazione, dettaglio e mutazioni. Il frontend non deve richiedere Availability o profili per mostrare nome, data, ora e stato di una prenotazione.
+
+- `displayName` dei partecipanti è storico e resta invariato se il profilo cambia;
+- `profileImageUrl` è opzionale e corrente: se assente usare un fallback solo visivo, senza inventare URL;
+- la specializzazione è corrente e disponibile solo sul partecipante professionista;
+- non sono presenti `primaryGoal`, dati sanitari, email, telefono, note private o `slotStatus` live;
+- le mutazioni restituiscono il dettaglio completo aggiornato, quindi la UI aggiorna lo stato dalla response;
+- uno storico esistente resta consultabile dopo la chiusura del collegamento; la chiusura impedisce soltanto nuove prenotazioni.
+
+### 5.6 Nutrizionista
 
 Il nutrizionista usa le funzionalità comuni del professionista, ma non dispone di un modulo Nutrition attivo. Availability e Booking tramite slot sono bloccati nel service layer. Dashboard e navigazione devono quindi limitarsi a profilo/account, clienti e inviti. Una voce Nutrition può comparire solo in wireframe futuro o, se davvero utile alla comunicazione, disabilitata con badge “In arrivo”; nell'MVP operativo è preferibile nasconderla.
 
-### 5.6 Contratto frontend del profilo cliente condiviso
+### 5.7 Contratto frontend del profilo cliente condiviso
 
 - PT e nutrizionista usano temporaneamente lo stesso contratto minimo;
 - la lista non deve mostrare o conservare `primaryGoal`, `operationalStatus` o altri campi assenti;
@@ -406,7 +417,7 @@ Un controllo HTML `datetime-local` non produce alcun offset. Per creare o modifi
 - non aggiungere `Z` a una data locale e non inviare il precedente formato senza offset;
 - impedire o segnalare gli orari nel gap primaverile e nell'overlap autunnale;
 - inviare precisione massima al secondo, senza frazioni non nulle;
-- trattare l'offset delle response Availability e degli item Booking come già autorevole, senza una seconda conversione silenziosa.
+- trattare l'offset delle response Availability e degli orari snapshot Booking come già autorevole, senza una seconda conversione silenziosa.
 
 Il backend resta la fonte autoritativa e ripete tutte le validazioni. Gli audit `createdAt`/`updatedAt` fanno parte del contratto come `Instant` ISO-8601 UTC con `Z`.
 
@@ -415,8 +426,8 @@ Il backend resta la fonte autoritativa e ripete tutte le validazioni. Gli audit 
 Questi punti non impediscono la mappa funzionale, ma non sono determinabili come contratto frontend completo dal repository attuale:
 
 1. **Consegna verifica email:** registrazione e reinvio creano e salvano il token e, dopo commit, usano una porta di consegna con adapter SMTP configurabile. Il default locale resta disabilitato; la porta in-memory è solo per test/debug e non è esposta via endpoint. L'URL frontend remoto deve essere HTTPS; HTTP è ammesso solo per loopback locale. Non sono presenti outbox o retry, quindi la consegna non è garantita.
-2. **Contratto temporale:** audit e scadenze account/booking/inviti arrivano come `Instant` UTC con `Z`; gli orari degli slot conservano l'offset esplicito `Europe/Rome` e le date civili restano `LocalDate`. La UI deve distinguere questi tre tipi e non applicare una timezone globale ai payload.
+2. **Contratto temporale:** audit e scadenze account/booking/inviti arrivano come `Instant` UTC con `Z`; gli orari degli slot e gli snapshot Booking arrivano con offset esplicito `Europe/Rome`, mentre le date civili restano `LocalDate`. La UI deve distinguere questi tre tipi e non applicare una timezone globale ai payload.
 3. **Storage auth:** il backend non prescrive dove conservare l'access token; la strategia va chiusa considerando sicurezza e assenza del refresh operativo.
 4. **URL pubblico dei link:** `app.email.verification-page-url` configura la pagina di verifica, ma il valore pubblico definitivo di ciascun ambiente non è ancora definito; i link invito restano separati.
-5. **Liste:** non esistono paginazione e filtri API per clienti, professionisti, inviti, slot o booking; la prima UI non deve dipenderne.
+5. **Liste:** non esistono paginazione e filtri API per clienti, professionisti, inviti, slot o booking; la prima UI non deve dipenderne. Per Booking l'ordine iniziale è `createdAt DESC, id DESC`.
 6. **Dashboard:** non esiste un contratto aggregato; contenuti e metriche devono restare una composizione minima dei dati già disponibili.

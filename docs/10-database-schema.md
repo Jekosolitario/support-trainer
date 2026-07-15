@@ -292,11 +292,16 @@ Richieste di prenotazione create dai clienti.
 - `id`
 - `client_id`
 - `professional_id`
+- `client_display_name`
+- `professional_display_name`
 - `status`
 - `note`
 - `active`
 - `created_at`
 - `updated_at`
+- `confirmed_at`
+- `rejected_at`
+- `cancelled_at`
 
 ### Foreign key
 
@@ -307,8 +312,11 @@ Richieste di prenotazione create dai clienti.
 
 - `client_id` `NOT NULL`
 - `professional_id` `NOT NULL`
+- `client_display_name VARCHAR(201) NOT NULL`
+- `professional_display_name VARCHAR(201) NOT NULL`
 - `status` `NOT NULL`
 - `active` `NOT NULL DEFAULT TRUE`
+- i timestamp di transizione sono `DATETIME(6)` nullable e persistiti UTC
 
 ### Stati gestiti
 
@@ -334,6 +342,8 @@ Regole applicative attualmente implementate:
 - conferma consentita solo se lo slot è ancora disponibile, futuro e coerente con la specializzazione prevista;
 - protezione delle transizioni tramite lock pessimista;
 - conservazione dell’intervallo temporale originario dello slot anche dopo `REJECTED` o `CANCELLED`.
+- V6 esegue il backfill dei display name dai profili correnti dopo preflight: per il legacy non sono una prova del nome originario;
+- V6 usa `updated_at` solo per il timestamp dello stato finale legacy e non inferisce stati intermedi non ricostruibili.
 
 ---
 
@@ -346,6 +356,8 @@ Dettaglio degli slot collegati a una richiesta booking.
 - `id`
 - `booking_request_id`
 - `availability_slot_id`
+- `scheduled_start`
+- `scheduled_end`
 - `created_at`
 - `updated_at`
 
@@ -359,11 +371,15 @@ Dettaglio degli slot collegati a una richiesta booking.
 - `booking_request_id` `NOT NULL`
 - `availability_slot_id` `NOT NULL`
 - coppia (`booking_request_id`, `availability_slot_id`) `UNIQUE`
+- `scheduled_start DATETIME(6) NOT NULL`
+- `scheduled_end DATETIME(6) NOT NULL`
 - `updated_at DATETIME(6) NOT NULL` dopo il backfill conservativo della V2
 
 ### Note
 
 Nel backend attuale ogni booking creato tramite API contiene un solo item.
+
+`scheduled_start` e `scheduled_end` sono snapshot UTC dell'intervallo al momento della prenotazione e non vengono aggiornati se lo slot cambia. V6 ricostruisce i valori legacy dallo slot referenziato solo dopo averne verificato esistenza, ordine e precisione microsecondi; il migration fallisce se il backfill non è deterministico.
 
 `DATETIME(6)` è il contratto canonico temporaneo di `updated_at` per preservare esattamente i valori legacy non nulli. La V2 valorizza soltanto gli eventuali null; la definizione di una precisione temporale globale resta rinviata all'intervento CM-05.
 
