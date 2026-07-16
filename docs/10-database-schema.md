@@ -1047,13 +1047,13 @@ Questi conteggi descrivono la baseline certificata del 16 luglio 2026 e non cost
 
 I warning non bloccanti sono stati MySQL 1681 sulla display width degli interi durante V1, un'API deprecata usata in `AvailabilityServiceIntegrationTest`, il caricamento dinamico dell'agente Mockito/Byte Buddy e un primo tentativo Maven bloccato dalla policy di rete seguito da esecuzione riuscita. Non costituiscono difetti funzionali o vulnerabilità accertate.
 
-### 12.6 Database esistente e rischio V2
+### 12.6 Database esistente, baseline V1 e rischio V2
 
 Non è ammessa la baseline automatica. Per uno schema esistente sono obbligatori backup verificato, clone isolato, confronto materiale con V1, verifica dei dati e approvazione esplicita. La registrazione deve essere eseguita tramite Flyway, mai con `INSERT` manuali nella history.
 
-Il database originale `support_trainer` è stato successivamente verificato in sola lettura: contiene 22 tabelle, 181 colonne, non contiene `flyway_schema_history` e coincide materialmente con V1 per struttura, conteggi e aggregati. Il rehearsal completo sul clone fedele è riuscito; questo non autorizza un avvio accidentale sull'originale, ma rende disponibile la procedura controllata della sezione 12.12.
+Prima della migrazione, il database originale `support_trainer` è stato verificato in sola lettura: conteneva 22 tabelle, 181 colonne, 27 record applicativi, non conteneva `flyway_schema_history` e coincideva materialmente con V1 per struttura, conteggi e aggregati. Il rehearsal completo sul clone fedele è riuscito e ha costituito il prerequisito per la procedura controllata poi eseguita sull'originale.
 
-V2 risulta modificata storicamente, ma il rischio di incompatibilità con una variante già registrata non si applica alla fotografia corrente dell'originale perché la history è assente. Il checksum da attendere dopo il migrate resta `-602898647`. Non usare `flyway repair`, modifiche manuali della history o l'avvio del backend aggiornato prima della baseline e delle verifiche. `baseline-on-migrate` deve rimanere `false`. Flyway `clean` è vietato sugli ambienti persistenti ed è disabilitato dalla configurazione. Le tabelle legacy future restano fuori dalla history finché i relativi moduli non saranno progettati e approvati.
+V2 risulta modificata storicamente, ma il rischio di incompatibilità con una variante già registrata non si applicava alla fotografia dell'originale perché la history era assente. Dopo la baseline V1, V2 è stata registrata con checksum `-602898647` e tutte le migrazioni fino a V6 sono riuscite. `baseline-on-migrate` resta `false`; non eseguire nuovamente la baseline sullo schema corrente. Flyway `repair`, modifiche manuali della history e `clean` restano vietati. Le tabelle legacy future restano fuori dalla history finché i relativi moduli non saranno progettati e approvati.
 
 ### 12.7 Immutabilità e rollback
 
@@ -1197,7 +1197,7 @@ Il backfill ha preservato 5 Booking e 5 item, valorizzato 5 snapshot Client, 5 s
 - zero duplicati request/slot;
 - nessuno stato parziale.
 
-V6 è non transazionale: il rehearsal completo e il backup immediatamente precedente sono obbligatori prima di eseguirla sull'originale.
+V6 è non transazionale: il rehearsal completo e il backup immediatamente precedente sono stati prerequisiti obbligatori per l'esecuzione sull'originale. Le stesse cautele restano necessarie per eventuali future migrazioni non transazionali.
 
 ### 12.11 Struttura finale, Hibernate, UTC e test
 
@@ -1250,96 +1250,60 @@ Warning non bloccanti:
 
 Questi warning non sono difetti applicativi.
 
-Il database originale `support_trainer` è rimasto invariato:
+### 12.12 Migrazione controllata eseguita sul database originale
 
-- 22 tabelle;
-- 181 colonne;
+Il 16 luglio 2026 il runbook provato sul clone è stato eseguito sul database originale `support_trainer`, durante una finestra controllata e dopo un nuovo backup verificato. Il riferimento completo del backup, inclusi dimensione e SHA-256, è registrato in [Certificazione tecnica finale](final-audit-mvp.md).
+
+Lo stato iniziale confermato era:
+
+- MySQL 8.0.44;
+- 22 tabelle e 181 colonne;
+- 27 record applicativi;
 - `flyway_schema_history` assente;
-- 0 viste;
-- 0 trigger;
-- 0 routine;
-- 0 eventi;
-- conteggi esatti invariati.
+- struttura materiale V1;
+- zero viste, trigger, routine ed eventi.
 
-Nessuna istruzione di scrittura ha avuto come destinazione il database originale.
+Flyway ha registrato una sola riga `BASELINE` versione 1, checksum nullo e successo, senza rieseguire V1. Il dump runtime prima e dopo la baseline era identico. Sono state quindi applicate esattamente 21 migrazioni da V2 a V6.
 
-### 12.12 Runbook controllato per il database originale
+Lo stato finale certificato è:
 
-#### Prerequisiti
+- 23 tabelle totali e 198 colonne totali;
+- 22 tabelle applicative e 188 colonne applicative;
+- 22 righe history: 1 baseline e 21 migrazioni;
+- 22 successi, 0 failed e V6 finale;
+- checksum V2 `-602898647` e V6 `-840301506`;
+- 27 record applicativi preservati;
+- zero record orfani o duplicazioni request/slot;
+- 28 colonne runtime `DATETIME(6)`, senza precisioni inferiori;
+- zero default temporali DB, clausole `ON UPDATE` o trigger runtime.
 
-1. Fermare tutte le istanze del backend.
-2. Verificare che nessun client o processo stia scrivendo.
-3. Predisporre una finestra di manutenzione.
-4. Creare un nuovo backup immediatamente prima della migrazione.
-5. Verificare e registrare hash e dimensione del nuovo backup.
-6. Conservare anche il backup verificato del 13 luglio 2026 senza modificarlo o sovrascriverlo.
-7. Riconfermare in sola lettura 22 tabelle, 181 colonne, history assente, struttura materiale V1, conteggi esatti e preflight aggregati.
-8. Fermarsi se la fotografia differisce dal rehearsal.
+V4 ha convertito 70 valori su 23 colonne, 9 tabelle e 27 righe, preservando 2 null e 5 valori frazionari. V6 ha valorizzato 5 snapshot Client, 5 snapshot Professional e 5 intervalli storici, con zero campi obbligatori null e zero timeline incoerenti.
 
-#### Migrazione
+`Flyway validate` è riuscito e il secondo `migrate` non ha applicato operazioni. Hibernate `ddl-auto=validate`, la sessione JDBC UTC e lo startup controllato con email `DISABLED` sono riusciti; il backend è stato arrestato con shutdown grazioso.
 
-1. Registrare tramite Flyway la baseline versione 1, con `baselineOnMigrate=false`.
-2. Verificare la riga `BASELINE` prima del migrate.
-3. Applicare esclusivamente V2 → V6.
-4. Non interrompere V6.
-5. Non usare `flyway repair`.
-6. Non modificare manualmente `flyway_schema_history`.
-7. Non eseguire Flyway `clean`.
+Lo schema corrente è già baselinato e migrato: non ripetere la baseline e non applicare istruzioni pensate per una fotografia legacy priva di history. Le evoluzioni future devono usare esclusivamente nuove migrazioni forward-only.
 
-#### Verifiche post-migrazione
-
-1. Verificare 22 righe history, 22 successi e V6 finale.
-2. Verificare i checksum attesi di V2 e V6.
-3. Eseguire `Flyway validate`.
-4. Eseguire un secondo `migrate` e confermare zero operazioni.
-5. Verificare 23 tabelle e 198 colonne totali.
-6. Riconfermare tutti i conteggi applicativi.
-7. Verificare digest e conteggi V4.
-8. Verificare snapshot e timeline V6.
-9. Verificare sessione UTC.
-10. Eseguire Hibernate `ddl-auto=validate`.
-11. Avviare il backend in modo controllato, inizialmente con email `DISABLED`.
-12. Eseguire smoke test API non distruttivi.
-
-#### Condizioni di arresto
-
-Non avviare il backend e interrompere la procedura se:
-
-- la struttura iniziale differisce da V1;
-- la history è già presente o contiene valori inattesi;
-- un checksum non coincide;
-- un conteggio iniziale o finale differisce;
-- V4 rileva gap o overlap DST;
-- V4 fallisce digest, conteggi o conversione;
-- V6 fallisce il preflight o il backfill;
-- `Flyway validate` fallisce;
-- Hibernate `ddl-auto=validate` fallisce;
-- i dati o gli oggetti finali divergono dal rehearsal.
-
-#### Ripristino
+#### Regole di recupero ancora valide
 
 Poiché V4 modifica dati e V6 è non transazionale:
 
 1. non tentare rollback SQL manuali;
 2. non usare `flyway repair`;
-3. arrestare l'applicazione;
-4. conservare il database fallito per l'analisi;
-5. ripristinare il backup verificato in un nuovo schema;
-6. validare struttura, conteggi, hash e aggregati del ripristino;
-7. riconfigurare il backend soltanto dopo la verifica;
+3. non modificare manualmente `flyway_schema_history`;
+4. non eseguire Flyway `clean`;
+5. in caso di errore futuro, arrestare l'applicazione e conservare lo schema per l'analisi;
+6. ripristinare un backup verificato esclusivamente in un nuovo schema;
+7. validare struttura, conteggi, hash e aggregati prima di riconfigurare il backend;
 8. non sovrascrivere o eliminare i backup precedenti.
 
-Questo ripristino non è ancora stato eseguito sul database originale.
+#### Trasferimento dei file completato
 
-#### Trasferimento dei file
+Il trasferimento verso il progetto originale ha:
 
-Il trasferimento verso il progetto originale deve:
-
-- copiare soltanto file tracciati;
-- escludere `frontend/` non tracciata;
-- escludere `backend/target/`;
-- escludere `application.properties` locale;
-- escludere schemi, dump e backup;
-- preservare la storia Git del progetto originale;
-- essere verificato tramite confronto dei file e `clean verify`;
-- non avviare automaticamente il backend contro `support_trainer`.
+- copiato soltanto file tracciati;
+- escluso `frontend/` non tracciata, `backend/target/` e `application.properties` locale;
+- escluso schemi, dump e backup;
+- preservato 37 commit lineari senza merge commit;
+- allineato `main`, HEAD e `origin/main` al commit certificato;
+- verificato il contenuto trasferito tramite confronto dei file e `clean verify`;
+- evitato avvii automatici contro `support_trainer`; lo startup è stato eseguito separatamente e in modo controllato dopo la migrazione.

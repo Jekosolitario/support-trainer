@@ -8,7 +8,7 @@ Il repository contiene il backend Spring Boot e la documentazione funzionale e t
 
 ## 2. Stato attuale del progetto
 
-Il backend MVP è implementato e comprende API REST protette tramite JWT, persistenza JPA e test automatici con database H2 in memoria.
+Il backend MVP è implementato e validato: comprende API REST protette tramite JWT, persistenza JPA, migrazioni Flyway applicate al database MySQL locale e test automatici standard con database H2 in memoria.
 
 Stato sintetico:
 
@@ -17,7 +17,7 @@ Stato sintetico:
 - 29 endpoint applicativi documentati; `/error` resta un fallback tecnico separato;
 - autenticazione e autorizzazione per ruolo presenti;
 - test di integrazione per auth, inviti, access control, profili, availability, booking e Security / Common presenti;
-- database applicativo previsto: MySQL;
+- database applicativo MySQL migrato e validato a Flyway V6;
 - frontend non ancora implementato;
 - pipeline CI GitHub Actions per build, test e package del backend presente; deploy non configurato;
 - progetto non ancora considerato production-ready.
@@ -214,6 +214,8 @@ La configurazione JWT e CORS è tipizzata e validata all'avvio. Proprietà assen
 
 Anche `app.email` è tipizzata e fail-fast. `verification-page-url` rappresenta direttamente la futura pagina frontend e può includere un base path; il backend aggiunge il token codificato nel fragment `#token=...`. `DISABLED` è soltanto un default locale sicuro e non rende la configurazione pronta per produzione. `IN_MEMORY` conserva messaggi esclusivamente nel processo, non espone inbox HTTP e viene usato dal profilo `test`; non sono configurati host SMTP, credenziali o accessi di rete. `SMTP` richiede mittente valido, host, porta, tre timeout positivi e, quando `auth=true`, username e password; applica UTF-8, `mail.smtp.auth`, STARTTLS e i timeout JavaMail in millisecondi. Nessuna connessione viene eseguita durante la validazione. Le combinazioni incoerenti impediscono l'avvio e password o credenziali non sono incluse nei `toString` o nei log.
 
+La configurazione locale validata usa `app.email.verification-page-url=http://localhost:5173/verify-email`. La pagina frontend prevista è `/verify-email`; il backend aggiunge il token nel fragment e il frontend deve leggerlo e rimuoverlo prima di inviare la conferma al backend. Lo startup controllato è stato eseguito con email `DISABLED`, senza invii SMTP reali.
+
 Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazione usa un unico `Clock` tecnico UTC; `ApplicationTimeProvider.nowInstant()` tronca, senza arrotondare, alla precisione canonica di sei cifre. Gli istanti persistiti e gli audit applicativi sono `Instant` su colonne `DATETIME(6)`, con `spring.jpa.properties.hibernate.jdbc.time_zone=UTC`; `Europe/Rome` resta soltanto la zona business. Spring Data JPA valorizza `createdAt` e `updatedAt`. Le scadenze email e invito sono rispettivamente 24 e 168 ore reali e sono esposte con `Z`. Sul confine HTTP gli orari degli slot restano `OffsetDateTime` al secondo, validati contro gap, overlap e offset di `Europe/Rome`. Anche il timestamp di `ErrorResponse` è un `Instant` UTC serializzato con `Z`.
 
 La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle nove tabelle runtime tramite `classpath:db/migration`.
@@ -222,13 +224,13 @@ Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true`. L
 
 La validazione conclusiva del 16 luglio 2026 su MySQL 8.0.44 ha prodotto il verdetto **MYSQL VALIDATION PASSED WITH WARNINGS**. Gli schemi isolati `support_trainer_audit_empty_20260716_101232` e `support_trainer_audit_legacy_20260716_101232` hanno certificato i percorsi da schema vuoto e legacy simulato. Sono rimasti presenti e non devono essere eliminati senza autorizzazione.
 
-Successivamente è stato completato il rehearsal sul clone reale `support_trainer_rehearsal_legacy_20260716_105457`, con verdetto **DATABASE MIGRATION REHEARSAL PASSED WITH WARNINGS**. Il backup `C:\Users\96and\AppData\Local\Temp\support_trainer_backup_20260713_151823\support_trainer_backup_20260713_151823.sql`, pari a 30.731 byte e SHA-256 `763763FD276A8D972CD520525E187CBC454455DB22C4F2BC986221A58F5F3EE7`, è stato verificato prima e dopo l'importazione senza variazioni. Il dump contiene 22 `CREATE TABLE` e 9 `INSERT INTO`, senza selezione o creazione di database, trigger, routine, eventi, `LOAD DATA` o comandi esterni, ed è stato importato esclusivamente nel clone.
+Successivamente è stato completato il rehearsal sul clone reale `support_trainer_rehearsal_legacy_20260716_105457`, con verdetto **DATABASE MIGRATION REHEARSAL PASSED WITH WARNINGS**. Il backup usato dal rehearsal è stato verificato prima e dopo l'importazione senza variazioni; il dump conteneva 22 `CREATE TABLE` e 9 `INSERT INTO`, senza selezione o creazione di database, trigger, routine, eventi, `LOAD DATA` o comandi esterni, ed è stato importato esclusivamente nel clone.
 
 Il clone ripristinato coincideva con la fotografia originale V1: 22 tabelle, 181 colonne, 13 tabelle legacy/future vuote e `flyway_schema_history` assente. Flyway Maven Plugin 11.14.1 ha registrato una baseline esplicita versione 1, tipo `BASELINE`, senza rieseguire V1 e senza modifiche manuali della history; ha poi applicato le 21 migrazioni V2 → V6. La history finale contiene 22 righe, 22 successi, 0 failed e V6 finale; V2 ha checksum `-602898647` e V6 `-840301506`. Il secondo `migrate` non ha applicato operazioni e `validate` è riuscito.
 
 V4 ha convertito 70 valori legacy `Europe/Rome` in UTC, preservando 2 null e 5 frazioni microsecondo, con digest e conteggi pre/post coincidenti. V6, non transazionale, ha completato il backfill di 5 Booking e 5 item senza stato parziale. Il clone finale conserva 22 tabelle applicative, aggiunge soltanto la history, contiene 188 colonne applicative e 198 totali; le nove tabelle runtime sono identiche allo schema pulito certificato. Hibernate `ddl-auto=validate`, l'avvio web controllato e la sessione JDBC UTC sono riusciti senza DDL Hibernate né processi residui.
 
-Il database originale `support_trainer` è rimasto invariato: 22 tabelle, 181 colonne, history assente, zero viste, trigger, routine ed eventi e conteggi originari preservati. Il backend trasferito non deve essere avviato accidentalmente contro l'originale: baseline e migrazione reale richiedono una finestra di manutenzione, un backup immediatamente precedente e l'applicazione integrale del runbook in [Database Schema](docs/10-database-schema.md). Sono vietati `flyway repair`, modifiche manuali della history e Flyway `clean` sugli ambienti persistenti.
+Il database originale `support_trainer`, inizialmente legacy compatibile con V1 e privo di history, è stato migrato nella finestra controllata. Dopo il backup pre-migrazione verificato, Flyway ha registrato la baseline V1 e applicato esattamente 21 migrazioni da V2 a V6. Lo stato finale contiene 22 righe history tutte riuscite, V6 come ultima versione, 27 record applicativi preservati e zero record orfani. `Flyway validate`, il secondo `migrate` idempotente, Hibernate `ddl-auto=validate` e lo startup controllato sono riusciti. Restano vietati `flyway repair`, modifiche manuali della history e Flyway `clean` sugli ambienti persistenti.
 
 Le tredici tabelle legacy relative a refresh/reset token, workout, nutrition, feedback e misurazioni non sono governate dalle migrazioni correnti e non vengono create, modificate o eliminate. Il perimetro completo è descritto nella [documentazione del database](docs/10-database-schema.md).
 
@@ -308,6 +310,8 @@ La suite include test relativi a:
 
 L'ultimo `clean verify` certificato ha prodotto il JAR e completato **50 suite, 312 test, 0 failure, 0 error e 1 skipped previsto**: `BookingHistoricalSnapshotMySqlIntegrationTest`, opt-in tramite `it.mysql.enabled=true`. Lo stesso test è stato eseguito separatamente contro MySQL 8.0.44 con **1 test, 0 failure, 0 error, 0 skipped e BUILD SUCCESS**. La pipeline [`backend-ci.yml`](.github/workflows/backend-ci.yml) usa il Maven Wrapper con Temurin 21 su Ubuntu e Windows, esegue `clean verify`, verifica il JAR, usa `contents: read`, concurrency e timeout di 20 minuti; non richiede MySQL locale né segreti reali.
 
+La correzione conclusiva ha reso deterministico `EmailVerificationTransactionIntegrationTest`: la precedente scadenza assoluta è stata sostituita con scadenze relative al `MutableTestClock` fornito da `EmailTestClockConfiguration`. Il codice di produzione non è cambiato e il test non dipende più da data corrente, timezone host o orologio reale.
+
 Le risposte di errore usano il contratto `ErrorResponse`: `timestamp` UTC, `status`, `code`, `message` e `path` senza query; `fieldErrors` è una lista presente solo per `VALIDATION_ERROR`. Il client deve decidere il comportamento tramite `code`, non tramite `message`. La configurazione Java centralizzata `JacksonConfiguration` rende il parser JSON stretto: rifiuta proprietà sconosciute, contenuto trailing e chiavi duplicate. Le risposte 401 espongono `WWW-Authenticate: Bearer`; le 405 preservano `Allow`; le 415 preservano i media type supportati quando Spring li fornisce. Gli errori 500 sono sanitizzati e anche `/error` restituisce lo stesso formato. Non sono ancora previsti correlation ID, request ID o header proprietari. I rifiuti CORS che avvengono prima del controller non costituiscono invece un contratto JSON consumabile dal browser.
 
 ## 11. Profili Spring
@@ -368,7 +372,7 @@ La cartella `docs` contiene la documentazione funzionale e tecnica. I riferiment
 3. implementare le schede di allenamento;
 4. implementare i piani alimentari;
 5. aggiungere feedback, misurazioni e progressi;
-6. completare la preparazione tecnica al deploy ed eseguire, solo durante una finestra autorizzata, il runbook già provato per backup, baseline V1, migrazione V2 → V6, verifiche e avvio controllato del database originale.
+6. completare hardening, osservabilità e preparazione tecnica al deploy, mantenendo le future evoluzioni dello schema esclusivamente forward-only.
 
 La roadmap dettagliata è disponibile in [docs/11-backend-implementation-roadmap.md](docs/11-backend-implementation-roadmap.md) e [docs/15-planned-endpoints-roadmap.md](docs/15-planned-endpoints-roadmap.md).
 

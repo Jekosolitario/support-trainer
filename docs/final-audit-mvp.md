@@ -1,17 +1,18 @@
 # Certificazione tecnica finale — Support Trainer Backend MVP
 
-Data della certificazione: 15 luglio 2026
-Validazione MySQL e rehearsal conclusivo: 16 luglio 2026
-Integration branch: `remediation/backend-audit`
-Commit applicativo certificato: `3cf48902b6c193c5f25740eab7e774ce26e3dcc3`
+Data della certificazione conclusiva: 16 luglio 2026
+Branch di revisione: `remediation/backend-audit`
+Repository originale: branch `main`
+Commit finale certificato: `b94936bf535f83fd012ac8490ec9d9792ed6613b`
+Commit finale: `test: rende deterministica la scadenza dell'invito nel test transazionale`
 
-Eventuali commit successivi esclusivamente documentali non cambiano questa baseline applicativa. Il branch usato per l'audit non è un branch operativo definitivo.
+Il trasferimento dalla copia alla repository originale ha preservato integralmente 37 commit lineari, senza merge commit. Al termine HEAD e `origin/main` coincidono con il commit certificato e il working tree dell'originale è pulito.
 
 ## Verdetto
 
-**READY WITH NON-BLOCKING LIMITS**
+**BACKEND MVP VALIDATED — READY FOR FRONTEND**
 
-Il backend MVP è idoneo alla fase frontend e al successivo trasferimento controllato nell'originale. L'installazione pulita MySQL, il percorso legacy simulato e il rehearsal sul clone fedele del database originale sono certificati. Il database originale è risultato materialmente V1 e privo di `flyway_schema_history`; il suo upgrade resta subordinato all'esecuzione del runbook durante una finestra di manutenzione autorizzata. Il verdetto non equivale a production readiness: restano limiti MVP esplicitamente accettati.
+Il backend MVP è trasferito nella repository originale, validato e idoneo all'avvio della fase frontend. Build, suite standard H2, test MySQL opt-in, schema pulito, percorso legacy, rehearsal e migrazione controllata del database originale sono certificati. Il verdetto non equivale a production readiness: restano limiti MVP esplicitamente accettati.
 
 ## Baseline verificata
 
@@ -19,16 +20,23 @@ Il backend MVP è idoneo alla fase frontend e al successivo trasferimento contro
 |---|---|
 | Runtime | Java 21, Spring Boot 4.0.5 |
 | Build | Maven Wrapper 3.3.4 con Apache Maven 3.9.12 |
-| Verifica locale | `clean verify` riuscito |
-| Test | 50 suite, 312 test, 0 failure, 0 error |
+| Verifica locale | `clean verify`: `BUILD SUCCESS` |
+| Suite standard | H2, 50 suite, 312 test, 0 failure, 0 error |
 | Skipped previsto | 1: `BookingHistoricalSnapshotMySqlIntegrationTest`, opt-in con `it.mysql.enabled=true` |
-| Test MySQL opt-in | 1 test, 0 failure, 0 error, 0 skipped, `BUILD SUCCESS` |
+| Test MySQL opt-in | Non eseguito nella suite standard; esecuzione separata: 1 test, 0 failure, 0 error, 0 skipped |
 | Validazione MySQL | `MYSQL VALIDATION PASSED WITH WARNINGS` su MySQL 8.0.44 |
 | Rehearsal database legacy | `DATABASE MIGRATION REHEARSAL PASSED WITH WARNINGS` |
+| Database originale | Baseline V1, 21 migrazioni V2 → V6, 22 righe history tutte riuscite |
 | Artefatto | `support_trainer-0.0.1-SNAPSHOT.jar` generato |
 | CI | GitHub Actions su Ubuntu e Windows con Temurin 21 e Maven Wrapper |
 
 La CI è definita in `.github/workflows/backend-ci.yml`: esegue `clean verify`, verifica il JAR, usa `contents: read`, cache Maven, concurrency con cancellazione delle esecuzioni precedenti e timeout di 20 minuti. Non installa Maven globalmente, non richiede MySQL locale e non usa segreti applicativi reali.
+
+## Trasferimento Git e correzione temporale conclusiva
+
+La repository originale usa `main` con HEAD e `origin/main` al commit `b94936bf535f83fd012ac8490ec9d9792ed6613b`. La sequenza importata è composta da 37 commit lineari e non contiene merge commit.
+
+Durante la prima validazione nell'originale, `EmailVerificationTransactionIntegrationTest` è fallito perché una fixture usava una scadenza assoluta ormai trascorsa. La produzione si è comportata correttamente considerando l'invito scaduto. Il test è stato corretto senza modificare codice applicativo: importa `EmailTestClockConfiguration`, usa il relativo `MutableTestClock`, lo reimposta su `INITIAL_INSTANT` e calcola le scadenze tramite durate esplicite. Il test non dipende più dalla data corrente, dalla timezone host o dall'orologio reale.
 
 ## Perimetro API corrente
 
@@ -72,7 +80,7 @@ Le registrazioni pubbliche restituiscono sempre `202 Accepted` neutro. La collis
 
 Gli istanti persistiti sono `Instant` UTC su `DATETIME(6)`. Gli orari civili Availability e gli snapshot Booking sono esposti come `OffsetDateTime` con offset coerente con `Europe/Rome`; gap, overlap, offset incoerenti e frazioni non nulle sono rifiutati.
 
-Le email di verifica usano un link con token nel fragment, sono inviate solo dopo il commit e non espongono token o destinatari nei log. SMTP è disponibile, ma la consegna non è durevole senza outbox o retry.
+Le email di verifica usano un link con token nel fragment, sono inviate solo dopo il commit e non espongono token o destinatari nei log. La pagina locale validata è `http://localhost:5173/verify-email`, coerente con la rotta frontend `/verify-email`; il frontend legge e rimuove il fragment prima di inviare il token al backend. Lo startup conclusivo ha usato email mode `DISABLED` e non ha inviato email SMTP reali. SMTP è disponibile, ma la consegna non è durevole senza outbox o retry.
 
 Booking restituisce `BookingSummaryResponse` nelle liste e `BookingDetailResponse` per creazione, dettaglio e transizioni. Nomi e orari sono snapshot storici; `profileImageUrl` e specializzazione sono valori correnti opzionali. Paginazione e filtri non sono ancora implementati.
 
@@ -125,7 +133,26 @@ La connessione applicativa usava `session.time_zone=+00:00`, `connectionTimeZone
 
 I warning non bloccanti del rehearsal sono un'API deprecata in `AvailabilityServiceIntegrationTest`, il self-attach Mockito/Byte Buddy, un primo tentativo Maven limitato dalla policy di rete e una prima osservazione incompleta dello shutdown, seguita da arresto verificato tramite Spring Admin MBean. Non sono difetti applicativi.
 
-Il database originale `support_trainer` è rimasto invariato: 22 tabelle, 181 colonne, history assente, zero viste, trigger, routine ed eventi e conteggi originari invariati. Nessuna istruzione di scrittura lo ha avuto come destinazione. La procedura reale deve seguire il runbook in [Database Schema](10-database-schema.md), con `baseline-on-migrate=false`, senza `flyway repair`, modifiche manuali della history o Flyway `clean`.
+### Migrazione controllata del database originale
+
+Prima della migrazione è stato creato il backup definitivo:
+
+`C:\Users\96and\AppData\Local\Temp\support_trainer_backup_pre_migration_20260716_225159\support_trainer_backup_pre_migration_20260716_225159.sql`
+
+- dimensione: 27.171 byte;
+- SHA-256: `529E691F35B2AA66E86065BC0B0C4D2752F1362CACFC67260209FB2A6E7E8E49`;
+- 22 `CREATE TABLE`, 9 `INSERT INTO` e 27 tuple complessive;
+- nessun dato personale del dump è riportato in questa certificazione.
+
+Il database reale `support_trainer` partiva dallo schema legacy compatibile con V1: 22 tabelle, 181 colonne, 27 record applicativi e `flyway_schema_history` assente. Flyway ha registrato una baseline esplicita versione 1, senza rieseguire V1, e ha poi applicato esattamente 21 migrazioni: V2, V3.1–V3.9, V4, V5.1–V5.9 e V6.
+
+La history finale contiene 22 righe, una baseline e 21 migrazioni, tutte con `success=true`, senza rank o versioni duplicate e con V6 finale. I checksum sono V2 `-602898647` e V6 `-840301506`. `Flyway validate` è riuscito; un secondo `migrate` ha applicato zero operazioni.
+
+V4 ha convertito i datetime legacy `Europe/Rome` in UTC su 9 tabelle, 27 righe e 23 colonne: 70 valori convertiti, 2 null e 5 valori frazionari preservati. V6 ha valorizzato 5 snapshot Client, 5 snapshot Professional e 5 intervalli storici; non risultano campi obbligatori null o timeline incoerenti.
+
+Lo stato conclusivo contiene 23 tabelle totali, 198 colonne totali e gli stessi 27 record applicativi. Non risultano perdite di dati, record orfani o duplicazioni inattese. Hibernate `ddl-auto=validate`, la sessione JDBC UTC e lo startup su porta effimera sono riusciti; Flyway non ha applicato migrazioni durante lo startup e il processo è stato arrestato con shutdown grazioso.
+
+Il primo tentativo di startup post-migrazione ha evidenziato che la configurazione locale ignorata, precedente all'introduzione di `app.email`, non conteneva `app.email.verification-page-url`. Lo schema era già stato validato correttamente da Flyway e Hibernate. La configurazione locale è stata poi allineata alla URL versionata `http://localhost:5173/verify-email`; test mirati e startup senza override della URL sono riusciti. Non sono stati modificati file versionati né esposti segreti.
 
 ## Limiti accettati
 
@@ -137,7 +164,8 @@ Il database originale `support_trainer` è rimasto invariato: 22 tabelle, 181 co
 - nessun multi-slot operativo;
 - nessuna lifecycle API dedicata al link Professional–Client;
 - timing side-channel residuo nella registrazione neutra;
-- avvio sul database originale consentito soltanto dopo il runbook di backup, baseline, migrazione e verifiche nella finestra autorizzata.
+- configurazione locale e backup restano esterni a Git e richiedono gestione operativa sicura;
+- le future evoluzioni dello schema devono essere forward-only, senza `repair`, modifiche manuali della history o `clean`.
 
 ## Funzionalità differite
 

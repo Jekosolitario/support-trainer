@@ -924,7 +924,7 @@ Uno schema esistente non deve essere migrato automaticamente. Prima della baseli
 
 La suite ordinaria usa H2 con Flyway disabilitato e `ddl-auto=create-drop`. È una verifica rapida del comportamento applicativo, non una certificazione del DDL MySQL.
 
-MySQL 8 è il riferimento per migrazioni, charset, collation, foreign key, indici, precisione temporale e lock. Su MySQL 8.0.44 sono riusciti sia il percorso da database vuoto `V1` → `V5.9` sia quello da clone legacy `BASELINE 1` → `V2` → `V5.9`, inclusa la successiva validazione Hibernate. Timestamp e microsecondi, dati, vincoli e indici sono stati preservati.
+MySQL 8 è il riferimento per migrazioni, charset, collation, foreign key, indici, precisione temporale e lock. Su MySQL 8.0.44 sono riusciti sia il percorso da database vuoto `V1` → `V6` sia quello da clone legacy `BASELINE 1` → `V2` → `V6`, inclusa la successiva validazione Hibernate. Timestamp e microsecondi, dati, vincoli e indici sono stati preservati.
 
 ## 24. Modello temporale UTC
 
@@ -932,6 +932,6 @@ I flussi applicativi leggono il tempo tramite un unico `ApplicationTimeProvider`
 
 Gli istanti runtime mappati sono ora `Instant`, normalizzati ai microsecondi e associati a `DATETIME(6)` senza `TIMESTAMP WITH TIME ZONE`. Hibernate usa `hibernate.jdbc.time_zone=UTC`; la connessione MySQL deve impostare la sessione a `+00:00`. Non è configurata una timezone Jackson globale: gli audit e le scadenze sono serializzati con `Z`, mentre gli slot restano `OffsetDateTime` `Europe/Rome` al confine HTTP.
 
-La V4 Java converte i 23 campi legacy da `Europe/Rome` a UTC dopo una preflight completa; le V5 rimuovono default e `ON UPDATE`, trasferendo l'ownership all'applicazione. I timestamp ombra dei profili vengono convertiti e poi congelati come nullable. La validazione MySQL ha convertito 70 valori valorizzati sul clone legacy, preservando due null e cinque valori con microsecondi, e ha verificato che gap, overlap o schema inatteso interrompano V4 prima del primo DML. Il mapping `Instant` e l'auditing basato sul `Clock` applicativo sono stati verificati con Hibernate `ddl-auto=validate`. Il database locale reale `support_trainer` non è stato baselinato o migrato.
+La V4 Java converte i 23 campi legacy da `Europe/Rome` a UTC dopo una preflight completa; le V5 rimuovono default e `ON UPDATE`, trasferendo l'ownership all'applicazione. I timestamp ombra dei profili vengono convertiti e poi congelati come nullable. Sul database originale la V4 ha convertito 70 valori in 9 tabelle e 27 righe, preservando due null e cinque valori con microsecondi. Il database locale reale `support_trainer` è stato baselinato a V1, migrato con le 21 versioni V2 → V6 e validato con Hibernate `ddl-auto=validate`, senza perdita di dati o record orfani.
 
 ---
