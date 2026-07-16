@@ -1,7 +1,7 @@
 # Certificazione tecnica finale — Support Trainer Backend MVP
 
 Data della certificazione: 15 luglio 2026
-Validazione MySQL conclusiva: 16 luglio 2026
+Validazione MySQL e rehearsal conclusivo: 16 luglio 2026
 Integration branch: `remediation/backend-audit`
 Commit applicativo certificato: `3cf48902b6c193c5f25740eab7e774ce26e3dcc3`
 
@@ -11,7 +11,7 @@ Eventuali commit successivi esclusivamente documentali non cambiano questa basel
 
 **READY WITH NON-BLOCKING LIMITS**
 
-Il backend MVP è idoneo alla fase frontend e al successivo trasferimento controllato nell'originale. L'installazione pulita MySQL e il percorso legacy simulato sono certificati; l'avvio sul database originale resta subordinato al controllo dedicato e autorizzato della sua eventuale `flyway_schema_history`. Il verdetto non equivale a production readiness: restano limiti MVP esplicitamente accettati.
+Il backend MVP è idoneo alla fase frontend e al successivo trasferimento controllato nell'originale. L'installazione pulita MySQL, il percorso legacy simulato e il rehearsal sul clone fedele del database originale sono certificati. Il database originale è risultato materialmente V1 e privo di `flyway_schema_history`; il suo upgrade resta subordinato all'esecuzione del runbook durante una finestra di manutenzione autorizzata. Il verdetto non equivale a production readiness: restano limiti MVP esplicitamente accettati.
 
 ## Baseline verificata
 
@@ -24,6 +24,7 @@ Il backend MVP è idoneo alla fase frontend e al successivo trasferimento contro
 | Skipped previsto | 1: `BookingHistoricalSnapshotMySqlIntegrationTest`, opt-in con `it.mysql.enabled=true` |
 | Test MySQL opt-in | 1 test, 0 failure, 0 error, 0 skipped, `BUILD SUCCESS` |
 | Validazione MySQL | `MYSQL VALIDATION PASSED WITH WARNINGS` su MySQL 8.0.44 |
+| Rehearsal database legacy | `DATABASE MIGRATION REHEARSAL PASSED WITH WARNINGS` |
 | Artefatto | `support_trainer-0.0.1-SNAPSHOT.jar` generato |
 | CI | GitHub Actions su Ubuntu e Windows con Temurin 21 e Maven Wrapper |
 
@@ -79,12 +80,14 @@ Booking restituisce `BookingSummaryResponse` nelle liste e `BookingDetailRespons
 
 Flyway governa 22 migrazioni runtime: V1, V2, `V3_1`–`V3_9`, V4, `V5_1`–`V5_9` e V6. V4 converte i valori legacy da `Europe/Rome` a UTC dopo preflight; V5 trasferisce l'ownership dell'auditing all'applicazione; V6 aggiunge e verifica gli snapshot storici Booking.
 
+### Validazione isolata
+
 Il 16 luglio 2026 la validazione conclusiva ha prodotto il verdetto **MYSQL VALIDATION PASSED WITH WARNINGS** su MySQL 8.0.44. Sono stati creati nuovi e usati esclusivamente per questa prova:
 
 - `support_trainer_audit_empty_20260716_101232`;
 - `support_trainer_audit_legacy_20260716_101232`.
 
-Entrambi usano charset `utf8mb4` e collation `utf8mb4_0900_ai_ci`, sono rimasti presenti al termine e non devono essere eliminati senza autorizzazione. Il database originale `support_trainer` non è stato interrogato o modificato.
+Entrambi usano charset `utf8mb4` e collation `utf8mb4_0900_ai_ci`, sono rimasti presenti al termine e non devono essere eliminati senza autorizzazione. Durante questa prima validazione il database originale `support_trainer` non è stato interrogato o modificato.
 
 Il percorso empty è partito da schema vuoto e ha applicato V1 → V6. Il percorso legacy simulato ha applicato le migrazioni fino a V5.9, inserito fixture controllate dal test e applicato V6: il backfill ha popolato gli snapshot dei nomi, l'intervallo storico e `cancelled_at` a precisione microsecondi; `confirmed_at` e `rejected_at` sono rimasti null per il caso testato. I nomi delle fixture non rappresentano dati reali.
 
@@ -98,11 +101,31 @@ Le colonne Booking V6 `client_display_name`, `professional_display_name`, `sched
 
 `BookingHistoricalSnapshotMySqlIntegrationTest` è stato eseguito separatamente con 1 test, 0 failure, 0 error, 0 skipped e `BUILD SUCCESS`. Il successivo `clean verify` ordinario, basato su H2, ha prodotto il JAR con 50 suite, 312 test, 0 failure, 0 error e il solo test MySQL skipped perché opt-in.
 
-I warning non bloccanti osservati sono: MySQL 1681 sulla display width degli interi durante V1, uso di API deprecata in `AvailabilityServiceIntegrationTest`, warning Mockito/Byte Buddy sul caricamento dinamico dell'agente e un primo tentativo Maven bloccato dalla policy di rete seguito da esecuzione riuscita. Non sono stati classificati come difetti funzionali o vulnerabilità.
+### Restore e rehearsal del database originale
 
-V2 è stata modificata storicamente. Il checksum corrente `-602898647`, verificato sui due nuovi schemi, non dimostra la compatibilità con una history reale più vecchia. Prima di qualsiasi migrazione o avvio del backend aggiornato sul database originale è obbligatorio controllare, con autorizzazione dedicata, la sua eventuale `flyway_schema_history`. Non usare `flyway repair`, baseline automatica o modifiche manuali della history; non è stato accertato se il database originale possieda o meno tale tabella.
+Il backup usato per il rehearsal è `C:\Users\96and\AppData\Local\Temp\support_trainer_backup_20260713_151823\support_trainer_backup_20260713_151823.sql`, pari a 30.731 byte e SHA-256 `763763FD276A8D972CD520525E187CBC454455DB22C4F2BC986221A58F5F3EE7`. Dimensione e hash sono stati verificati prima e dopo l'importazione e sono rimasti invariati. L'analisi strutturale ha rilevato 22 `CREATE TABLE` e 9 `INSERT INTO`, senza `CREATE DATABASE`, `DROP DATABASE`, `USE`, trigger, routine, eventi, `LOAD DATA` o comandi esterni. Nessun valore degli `INSERT` è stato riportato.
 
-`baseline-on-migrate=false` e Flyway `clean` resta vietato sugli ambienti persistenti.
+Il dump è stato importato esclusivamente in `support_trainer_rehearsal_legacy_20260716_105457`. Lo stato iniziale del clone coincideva con l'originale: MySQL 8.0.44, `utf8mb4`, `utf8mb4_0900_ai_ci`, 22 tabelle, 181 colonne, zero viste, trigger, routine ed eventi, history assente, struttura materiale V1 e conteggi coincidenti. Il clone è rimasto presente ed è ora migrato a V6.
+
+La baseline è stata creata tramite Flyway Maven Plugin 11.14.1, senza modificare `pom.xml`, con versione 1, descrizione `Legacy schema V1 verified`, `baselineOnMigrate=false` e `cleanDisabled=true`. La prima riga della history ha `installed_rank=1`, versione 1, tipo `BASELINE`, checksum nullo e successo. V1 non è stata rieseguita: lo schema era già materialmente presente nel backup. Non è stata eseguita alcuna `INSERT` manuale nella history.
+
+Sono state applicate 21 migrazioni effettive: V2, V3.1–V3.9, V4, V5.1–V5.9 e V6. La durata osservata, non trasferibile come SLA ad altri ambienti o volumi, è stata 3.321 ms: V2 403 ms, V3.1–V3.9 1.370 ms, V4 79 ms, V5.1–V5.9 478 ms e V6 991 ms. La history finale contiene 22 righe, una baseline e 21 migrazioni, 22 successi, 0 failed, 22 versioni distinte, nessun duplicato e V6 finale. I checksum verificati sono V2 `-602898647` e V6 `-840301506`.
+
+V2 ha ampliato `primary_goal` a `VARCHAR(255)`, reso `booking_request_items.updated_at` `DATETIME(6) NOT NULL` e aggiunto i quattro indici runtime previsti, senza modificare conteggi o vincoli. Le V3 hanno convertito 22 colonne da `DATETIME(0)` a `DATETIME(6)`; una colonna era già a precisione 6. Dopo V6 le colonne temporali runtime sono 28, tutte a precisione 6.
+
+Il preflight V4 ha controllato 9 tabelle, 27 righe e 72 celle temporali: 70 valori non nulli e 2 null, nessun gap o overlap DST, digest atteso e finale coincidenti, nessuna riga persa e nessuna perdita di microsecondi. Cinque valori frazionari sono stati preservati; 13 valori hanno applicato lo scarto Europe/Rome di un'ora e 57 quello di due ore.
+
+V5 ha lasciato zero default temporali DB, zero clausole `ON UPDATE` e zero trigger, trasferendo l'auditing all'applicazione con nullability coerente. V6, non transazionale, ha aggiunto le sette colonne Booking e completato integralmente il backfill: 5 Booking, 5 item, 5 snapshot Client, 5 snapshot Professional e 5 intervalli storici. Le timeline risultano 3 `CANCELLED` con solo `cancelled_at`, 1 `CONFIRMED` con solo `confirmed_at` e 1 `REJECTED` con solo `rejected_at`; zero timestamp non pertinenti, orphan, duplicati request/slot o stato parziale.
+
+Il clone finale contiene 22 tabelle applicative preservate, incluse le 13 legacy/future ancora vuote, più `flyway_schema_history`: 23 tabelle, 188 colonne applicative, 198 totali e 22 righe history. Le nove tabelle runtime coincidono con `support_trainer_audit_empty_20260716_101232`: 85 colonne, 41 indici, 25 constraint, 11 foreign key e un check, con zero differenze.
+
+Il secondo `migrate` non ha applicato operazioni né aggiunto righe. `Flyway validate` è riuscito senza pending, failed o risorse incoerenti; Flyway ha indicato 23 elementi validati perché considera anche V1 rispetto alla baseline, mentre la history contiene correttamente 22 righe. Hibernate `ddl-auto=validate` ha inizializzato l'`EntityManagerFactory` senza `CREATE`, `ALTER` o `DROP`; Flyway non ha applicato nulla durante l'avvio web su porta effimera. Email era `DISABLED`, lo shutdown è stato controllato e non sono rimasti processi Java.
+
+La connessione applicativa usava `session.time_zone=+00:00`, `connectionTimeZone=+00:00`, `forceConnectionTimeZoneToSession=true` e `hibernate.jdbc.time_zone=UTC`; `NOW(6)`, `CURRENT_TIMESTAMP(6)` e `UTC_TIMESTAMP(6)` coincidevano con differenza zero microsecondi. Il successivo `clean verify` H2 ha prodotto il JAR con 50 suite, 312 test, 0 failure, 0 error e il solo test MySQL opt-in skipped.
+
+I warning non bloccanti del rehearsal sono un'API deprecata in `AvailabilityServiceIntegrationTest`, il self-attach Mockito/Byte Buddy, un primo tentativo Maven limitato dalla policy di rete e una prima osservazione incompleta dello shutdown, seguita da arresto verificato tramite Spring Admin MBean. Non sono difetti applicativi.
+
+Il database originale `support_trainer` è rimasto invariato: 22 tabelle, 181 colonne, history assente, zero viste, trigger, routine ed eventi e conteggi originari invariati. Nessuna istruzione di scrittura lo ha avuto come destinazione. La procedura reale deve seguire il runbook in [Database Schema](10-database-schema.md), con `baseline-on-migrate=false`, senza `flyway repair`, modifiche manuali della history o Flyway `clean`.
 
 ## Limiti accettati
 
@@ -114,7 +137,7 @@ V2 è stata modificata storicamente. Il checksum corrente `-602898647`, verifica
 - nessun multi-slot operativo;
 - nessuna lifecycle API dedicata al link Professional–Client;
 - timing side-channel residuo nella registrazione neutra;
-- avvio sul database originale subordinato al controllo autorizzato della sua eventuale history Flyway.
+- avvio sul database originale consentito soltanto dopo il runbook di backup, baseline, migrazione e verifiche nella finestra autorizzata.
 
 ## Funzionalità differite
 

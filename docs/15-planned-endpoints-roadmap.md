@@ -51,7 +51,7 @@ Alla data attuale risultano già implementati:
 
 Availability e Bookings non devono più essere considerati endpoint pianificati.
 
-La stabilizzazione backend, i test, la documentazione, il Wrapper, la CI e Flyway sono stati certificati sulla baseline applicativa `3cf48902b6c193c5f25740eab7e774ce26e3dcc3`. Prima della migrazione reale restano obbligatori il controllo di `flyway_schema_history` e una nuova validazione MySQL su schema isolato.
+La stabilizzazione backend, i test, la documentazione, il Wrapper, la CI e Flyway sono stati certificati sulla baseline applicativa `3cf48902b6c193c5f25740eab7e774ce26e3dcc3`. Il restore del backup originale e il rehearsal sul clone legacy hanno prodotto **DATABASE MIGRATION REHEARSAL PASSED WITH WARNINGS**: l'originale è materialmente V1, privo di history e invariato. La migrazione reale deve essere eseguita soltanto nella finestra autorizzata, seguendo il runbook di `10-database-schema.md`, prima di avviare il backend trasferito.
 
 I prossimi blocchi da valutare sono:
 
