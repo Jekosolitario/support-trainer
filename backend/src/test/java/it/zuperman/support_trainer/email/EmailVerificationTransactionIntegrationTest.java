@@ -1,7 +1,7 @@
 package it.zuperman.support_trainer.email;
 
 import java.math.BigDecimal;
-import java.time.Instant;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -28,17 +29,21 @@ import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.email.adapter.InMemoryEmailVerificationSender;
 import it.zuperman.support_trainer.email.event.EmailVerificationRequestedEvent;
 import it.zuperman.support_trainer.email.model.EmailVerificationReason;
+import it.zuperman.support_trainer.email.support.EmailTestClockConfiguration;
+import it.zuperman.support_trainer.email.support.EmailTestClockConfiguration.MutableTestClock;
 import it.zuperman.support_trainer.invite.entity.InviteCode;
 import it.zuperman.support_trainer.invite.repository.InviteCodeRepository;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
 
+import static it.zuperman.support_trainer.email.support.EmailTestClockConfiguration.INITIAL_INSTANT;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
+@Import(EmailTestClockConfiguration.class)
 class EmailVerificationTransactionIntegrationTest {
 
     private static final String PASSWORD = "Password123!";
@@ -63,6 +68,8 @@ class EmailVerificationTransactionIntegrationTest {
     private ProfessionalClientLinkRepository linkRepository;
     @Autowired
     private PlatformTransactionManager transactionManager;
+    @Autowired
+    private MutableTestClock clock;
 
     private TransactionTemplate transactionTemplate;
 
@@ -70,6 +77,7 @@ class EmailVerificationTransactionIntegrationTest {
     void setUp() {
         transactionTemplate = new TransactionTemplate(transactionManager);
         cleanDatabase();
+        clock.setInstant(INITIAL_INSTANT);
     }
 
     @AfterEach
@@ -117,7 +125,7 @@ class EmailVerificationTransactionIntegrationTest {
             return inviteRepository.saveAndFlush(new InviteCode(
                     "INV-ROLLBACK",
                     savedProfessional,
-                    Instant.parse("2026-07-16T10:00:00Z")
+                    INITIAL_INSTANT.plus(Duration.ofDays(7))
             ));
         });
         RegisterClientRequest request = new RegisterClientRequest(
@@ -161,7 +169,7 @@ class EmailVerificationTransactionIntegrationTest {
         return new EmailVerificationRequestedEvent(
                 recipient,
                 "event-token",
-                Instant.parse("2026-07-16T10:00:00Z"),
+                INITIAL_INSTANT.plus(Duration.ofHours(24)),
                 EmailVerificationReason.REGISTRATION,
                 UUID.randomUUID()
         );
