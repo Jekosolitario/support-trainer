@@ -1,6 +1,7 @@
 # Certificazione tecnica finale — Support Trainer Backend MVP
 
 Data della certificazione: 15 luglio 2026
+Validazione MySQL conclusiva: 16 luglio 2026
 Integration branch: `remediation/backend-audit`
 Commit applicativo certificato: `3cf48902b6c193c5f25740eab7e774ce26e3dcc3`
 
@@ -10,7 +11,7 @@ Eventuali commit successivi esclusivamente documentali non cambiano questa basel
 
 **READY WITH NON-BLOCKING LIMITS**
 
-Il backend MVP è idoneo alla fase frontend e al successivo trasferimento controllato nell'originale. Il verdetto non equivale a production readiness: restano azioni obbligatorie prima di una migrazione su un database reale e limiti MVP esplicitamente accettati.
+Il backend MVP è idoneo alla fase frontend e al successivo trasferimento controllato nell'originale. L'installazione pulita MySQL e il percorso legacy simulato sono certificati; l'avvio sul database originale resta subordinato al controllo dedicato e autorizzato della sua eventuale `flyway_schema_history`. Il verdetto non equivale a production readiness: restano limiti MVP esplicitamente accettati.
 
 ## Baseline verificata
 
@@ -21,6 +22,8 @@ Il backend MVP è idoneo alla fase frontend e al successivo trasferimento contro
 | Verifica locale | `clean verify` riuscito |
 | Test | 50 suite, 312 test, 0 failure, 0 error |
 | Skipped previsto | 1: `BookingHistoricalSnapshotMySqlIntegrationTest`, opt-in con `it.mysql.enabled=true` |
+| Test MySQL opt-in | 1 test, 0 failure, 0 error, 0 skipped, `BUILD SUCCESS` |
+| Validazione MySQL | `MYSQL VALIDATION PASSED WITH WARNINGS` su MySQL 8.0.44 |
 | Artefatto | `support_trainer-0.0.1-SNAPSHOT.jar` generato |
 | CI | GitHub Actions su Ubuntu e Windows con Temurin 21 e Maven Wrapper |
 
@@ -76,19 +79,30 @@ Booking restituisce `BookingSummaryResponse` nelle liste e `BookingDetailRespons
 
 Flyway governa 22 migrazioni runtime: V1, V2, `V3_1`–`V3_9`, V4, `V5_1`–`V5_9` e V6. V4 converte i valori legacy da `Europe/Rome` a UTC dopo preflight; V5 trasferisce l'ownership dell'auditing all'applicazione; V6 aggiunge e verifica gli snapshot storici Booking.
 
-Esiste evidenza precedente di validazione su MySQL 8.0.44 sia da installazione vuota sia da clone legacy, con Hibernate `ddl-auto=validate`. Questa certificazione non ha ripetuto la prova MySQL: la suite ordinaria usa H2 e il test MySQL è opt-in/skipped.
+Il 16 luglio 2026 la validazione conclusiva ha prodotto il verdetto **MYSQL VALIDATION PASSED WITH WARNINGS** su MySQL 8.0.44. Sono stati creati nuovi e usati esclusivamente per questa prova:
 
-V2 è stata modificata storicamente. Un ambiente che abbia già applicato una versione differente può avere un checksum Flyway incompatibile. Il rischio riguarda gli ambienti già migrati, non le installazioni pulite validate da zero.
+- `support_trainer_audit_empty_20260716_101232`;
+- `support_trainer_audit_legacy_20260716_101232`.
 
-Prima di qualsiasi migrazione reale sono obbligatori:
+Entrambi usano charset `utf8mb4` e collation `utf8mb4_0900_ai_ci`, sono rimasti presenti al termine e non devono essere eliminati senza autorizzazione. Il database originale `support_trainer` non è stato interrogato o modificato.
 
-1. controllo di `flyway_schema_history` del database destinatario;
-2. backup e clone sottoposti ad analisi approvata, se il database è già esistente;
-3. creazione di un nuovo schema MySQL isolato, senza usare il database originale né riusare/eliminare schemi temporanei precedenti;
-4. migrazione completa, secondo avvio Flyway e Hibernate `ddl-auto=validate`;
-5. verifica UTC, `DATETIME(6)`, dati, vincoli e indici.
+Il percorso empty è partito da schema vuoto e ha applicato V1 → V6. Il percorso legacy simulato ha applicato le migrazioni fino a V5.9, inserito fixture controllate dal test e applicato V6: il backfill ha popolato gli snapshot dei nomi, l'intervallo storico e `cancelled_at` a precisione microsecondi; `confirmed_at` e `rejected_at` sono rimasti null per il caso testato. I nomi delle fixture non rappresentano dati reali.
 
-Non usare `flyway repair`, baseline automatica o modifiche manuali della history senza analisi e autorizzazione. `baseline-on-migrate=false` e Flyway `clean` resta vietato sugli ambienti persistenti.
+In ciascuno schema `flyway_schema_history` contiene 22 righe versionate, 22 successi, 0 failed, nessun duplicato e V6 come ultima versione. Il secondo `migrate` non ha eseguito operazioni e un secondo avvio sullo schema empty non ha aggiunto righe. I checksum osservati e coincidenti sono V2 `-602898647` e V6 `-840301506`.
+
+Hibernate `ddl-auto=validate` è riuscito senza generare DDL. La sessione applicativa ha riportato `session.time_zone=+00:00`; `NOW(6)`, `CURRENT_TIMESTAMP(6)` e `UTC_TIMESTAMP(6)` coincidevano, con differenza di 0 microsecondi. La configurazione verificata usa `connectionTimeZone=+00:00`, `forceConnectionTimeZoneToSession=true` e `hibernate.jdbc.time_zone=UTC`.
+
+Nello schema empty non risultano colonne temporali applicative con precisione diversa da `DATETIME(6)`, trigger, default temporali DB o clausole temporali `ON UPDATE`. La fotografia della baseline comprende 9 tabelle applicative, 1 tabella history, 85 colonne applicative, 95 colonne totali, 4 unique constraint, 11 foreign key e 1 check constraint. Le foreign key usano `ON UPDATE RESTRICT` e `ON DELETE RESTRICT`. Questi conteggi descrivono la validazione corrente e non sono requisiti rigidi per evoluzioni future.
+
+Le colonne Booking V6 `client_display_name`, `professional_display_name`, `scheduled_start`, `scheduled_end`, `confirmed_at`, `rejected_at` e `cancelled_at` sono state verificate come coerenti tra migrazione, entity, DTO, test MySQL e test H2.
+
+`BookingHistoricalSnapshotMySqlIntegrationTest` è stato eseguito separatamente con 1 test, 0 failure, 0 error, 0 skipped e `BUILD SUCCESS`. Il successivo `clean verify` ordinario, basato su H2, ha prodotto il JAR con 50 suite, 312 test, 0 failure, 0 error e il solo test MySQL skipped perché opt-in.
+
+I warning non bloccanti osservati sono: MySQL 1681 sulla display width degli interi durante V1, uso di API deprecata in `AvailabilityServiceIntegrationTest`, warning Mockito/Byte Buddy sul caricamento dinamico dell'agente e un primo tentativo Maven bloccato dalla policy di rete seguito da esecuzione riuscita. Non sono stati classificati come difetti funzionali o vulnerabilità.
+
+V2 è stata modificata storicamente. Il checksum corrente `-602898647`, verificato sui due nuovi schemi, non dimostra la compatibilità con una history reale più vecchia. Prima di qualsiasi migrazione o avvio del backend aggiornato sul database originale è obbligatorio controllare, con autorizzazione dedicata, la sua eventuale `flyway_schema_history`. Non usare `flyway repair`, baseline automatica o modifiche manuali della history; non è stato accertato se il database originale possieda o meno tale tabella.
+
+`baseline-on-migrate=false` e Flyway `clean` resta vietato sugli ambienti persistenti.
 
 ## Limiti accettati
 
@@ -100,7 +114,7 @@ Non usare `flyway repair`, baseline automatica o modifiche manuali della history
 - nessun multi-slot operativo;
 - nessuna lifecycle API dedicata al link Professional–Client;
 - timing side-channel residuo nella registrazione neutra;
-- validazione MySQL finale da ripetere prima del trasferimento operativo.
+- avvio sul database originale subordinato al controllo autorizzato della sua eventuale history Flyway.
 
 ## Funzionalità differite
 

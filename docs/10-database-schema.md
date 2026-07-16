@@ -809,10 +809,11 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 
 ## 9. Unique constraints principali
 
-## 9.1 Da confermare come vincoli SQL nello schema attualmente integrato
-- `users.email`
-- `invite_codes.code`
-- `email_verification_tokens.token`
+## 9.1 Vincoli SQL confermati nello schema attualmente integrato
+- `users.email` tramite `uk_users_email`
+- `invite_codes.code` tramite `uk_invite_codes_code`
+- `email_verification_tokens.token` tramite `uk_email_verification_tokens_token`
+- coppia `booking_request_items(booking_request_id, availability_slot_id)` tramite `uk_booking_request_items_request_slot`
 
 ## 9.2 Tabelle già presenti nel DB ma non ancora integrate
 - `refresh_tokens.token`
@@ -983,20 +984,77 @@ Gli indici legacy con prefissi parzialmente sovrapposti vengono preservati nella
 
 Non viene introdotta una unique su `professional_client_links(professional_id, client_id, active)`: impedirebbe di conservare più record storici inattivi della stessa coppia.
 
-### 12.3 Database vuoto
+### 12.3 Validazione conclusiva MySQL 8
 
-Esiste evidenza precedente su MySQL 8.0.44 per il percorso da schema nuovo e vuoto `V1` → `V6`, seguito da Hibernate `ddl-auto=validate`. Ha incluso nullability, default, `ON UPDATE`, indici, foreign key, check, mapping `Instant`/JDBC UTC e snapshot Booking. L'audit conclusivo non ha ripetuto questa prova.
+Il 16 luglio 2026 la validazione conclusiva su MySQL 8.0.44 ha prodotto il verdetto **MYSQL VALIDATION PASSED WITH WARNINGS**. Sono stati creati nuovi i due schemi isolati:
 
-### 12.4 Database esistente
+- `support_trainer_audit_empty_20260716_101232`;
+- `support_trainer_audit_legacy_20260716_101232`.
 
-Non è ammessa la baseline automatica. Prima di registrare manualmente uno schema esistente alla versione 1 sono obbligatori backup, clone isolato, confronto con la V1, verifica dei dati e approvazione esplicita. Esiste evidenza precedente su MySQL 8.0.44 del percorso da clone legacy `BASELINE 1` → `V2` → `V5.9` → `V6`, con conversione UTC, conservazione di dati, vincoli, indici e precisione microsecondi; l'audit conclusivo non ha ripetuto la prova.
+Entrambi usano charset `utf8mb4` e collation `utf8mb4_0900_ai_ci`. Sono rimasti presenti al termine e non devono essere eliminati senza autorizzazione. Il database originale `support_trainer` non è stato interrogato o modificato.
 
-V2 risulta modificata storicamente. Un ambiente che abbia applicato una versione differente può avere un checksum Flyway incompatibile: prima di ogni migrazione reale è obbligatorio controllare `flyway_schema_history`. Il rischio riguarda gli ambienti già migrati, non le installazioni pulite validate da zero. Non usare `flyway repair` o modifiche manuali della history senza analisi e autorizzazione.
+In entrambi gli schemi la history finale contiene 22 righe versionate, 22 successi, 0 failed, nessuna versione duplicata e V6 come ultima versione. Non risultano migrazioni pending; il secondo avvio sullo schema empty non ha eseguito nuove migrazioni o aggiunto righe. I checksum osservati e coincidenti sono:
 
-`baseline-on-migrate` deve rimanere `false`. Flyway `clean` è vietato sugli ambienti persistenti ed è disabilitato dalla configurazione. Le tabelle legacy future restano fuori dalla history finché i relativi moduli non saranno progettati e approvati.
+- V2: `-602898647`;
+- V6: `-840301506`.
 
-### 12.5 Immutabilità e rollback
+### 12.4 Percorsi empty e legacy simulato
+
+Lo schema empty è partito vuoto e ha applicato l'intera sequenza V1 → V6. Hibernate `ddl-auto=validate` ha accettato il contratto risultante senza produrre DDL e ha verificato anche la struttura Booking V6.
+
+Lo schema legacy ha applicato le migrazioni fino a V5.9, ricevuto esclusivamente dati fixture controllati da `BookingHistoricalSnapshotMySqlIntegrationTest` e applicato V6. Il backfill ha popolato:
+
+- `client_display_name`;
+- `professional_display_name`;
+- `scheduled_start`;
+- `scheduled_end`;
+- `cancelled_at` con precisione microsecondi.
+
+Per il caso testato `confirmed_at` e `rejected_at` sono rimasti null. I nomi presenti nelle fixture non sono dati reali. Un secondo `migrate` sul percorso legacy non ha eseguito operazioni.
+
+Le sette colonne Booking V6 sono risultate coerenti tra migrazione Java, entity, DTO, test MySQL e test H2:
+
+- `client_display_name`;
+- `professional_display_name`;
+- `scheduled_start`;
+- `scheduled_end`;
+- `confirmed_at`;
+- `rejected_at`;
+- `cancelled_at`.
+
+### 12.5 UTC, precisione e fotografia strutturale
+
+La connessione applicativa ha operato con `session.time_zone=+00:00`. `NOW(6)`, `CURRENT_TIMESTAMP(6)` e `UTC_TIMESTAMP(6)` coincidevano, con differenza rilevata di 0 microsecondi. La configurazione verificata usa:
+
+- `connectionTimeZone=+00:00`;
+- `forceConnectionTimeZoneToSession=true`;
+- `hibernate.jdbc.time_zone=UTC`.
+
+Nello schema empty non sono state rilevate colonne temporali applicative con precisione diversa da `DATETIME(6)`, trigger, default temporali DB o clausole temporali `ON UPDATE`.
+
+La fotografia strutturale osservata durante questa validazione comprende:
+
+- 9 tabelle applicative e 1 `flyway_schema_history`, 10 totali;
+- 85 colonne applicative e 95 totali includendo la history;
+- 4 unique constraint;
+- 11 foreign key;
+- 1 check constraint;
+- foreign key con `ON UPDATE RESTRICT` e `ON DELETE RESTRICT`.
+
+Questi conteggi descrivono la baseline certificata del 16 luglio 2026 e non costituiscono requisiti rigidi: le evoluzioni future devono avvenire tramite nuove migrazioni forward-only.
+
+`BookingHistoricalSnapshotMySqlIntegrationTest` è stato eseguito come test opt-in con 1 test, 0 failure, 0 error, 0 skipped e `BUILD SUCCESS`. Il successivo `clean verify` ordinario su H2 ha prodotto il JAR con 50 suite, 312 test, 0 failure, 0 error e 1 skipped previsto: il test MySQL, che resta opt-in.
+
+I warning non bloccanti sono stati MySQL 1681 sulla display width degli interi durante V1, un'API deprecata usata in `AvailabilityServiceIntegrationTest`, il caricamento dinamico dell'agente Mockito/Byte Buddy e un primo tentativo Maven bloccato dalla policy di rete seguito da esecuzione riuscita. Non costituiscono difetti funzionali o vulnerabilità accertate.
+
+### 12.6 Database esistente e rischio V2
+
+Non è ammessa la baseline automatica. Prima di registrare manualmente uno schema esistente alla versione 1 sono obbligatori backup, clone isolato, confronto con la V1, verifica dei dati e approvazione esplicita.
+
+V2 risulta modificata storicamente. Il checksum corrente `-602898647`, verificato sui due nuovi schemi, non dimostra la compatibilità con una `flyway_schema_history` reale che contenga una variante precedente. Prima di migrare o avviare il backend aggiornato sul database originale è obbligatorio controllare, con autorizzazione dedicata, la sua eventuale history. Questa validazione non ha accertato se il database originale possieda o meno `flyway_schema_history`.
+
+Non usare `flyway repair`, modifiche manuali della history o l'avvio del backend aggiornato sul database originale prima del controllo. `baseline-on-migrate` deve rimanere `false`. Flyway `clean` è vietato sugli ambienti persistenti ed è disabilitato dalla configurazione. Le tabelle legacy future restano fuori dalla history finché i relativi moduli non saranno progettati e approvati.
+
+### 12.7 Immutabilità e rollback
 
 Tutte le risorse nella baseline corrente devono rimanere immutabili dopo la loro applicazione; le correzioni future usano nuove migrazioni forward-only. La modifica storica di V2 è un'eccezione già avvenuta e richiede il controllo della history prima di migrare ambienti esistenti. V4 contiene DML transazionale e non effettua commit manuali; ogni V5 circoscrive il proprio DDL. Il recupero resta basato su backup verificato e ripristino controllato, non sulla cancellazione automatica dello schema.
-
-Le evidenze precedenti riguardano V4, V5 e V6 su database MySQL isolati, sia da schema vuoto sia da clone legacy. Le prove negative hanno confermato che gap, overlap o schema inatteso interrompono V4 prima del primo DML; sono stati verificati auditing applicativo, mapping `Instant`, precisione microsecondi e snapshot Booking. Prima del trasferimento operativo occorre creare un nuovo schema isolato e ripetere migrazione completa, secondo avvio Flyway, Hibernate validate e verifica UTC/DATETIME(6); il database originale non deve essere usato per questa prova e gli schemi temporanei precedenti non devono essere riutilizzati o eliminati.

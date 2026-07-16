@@ -220,7 +220,11 @@ La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hiber
 
 Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true`. Le 22 migrazioni runtime sono V1, V2, `V3_1`–`V3_9`, V4, `V5_1`–`V5_9` e V6. V4 prepara e verifica atomicamente la conversione dei 23 valori temporali legacy da `Europe/Rome` a UTC; V5 trasferisce l'auditing all'applicazione; V6 aggiunge e verifica il backfill degli snapshot storici Booking. Tutti gli istanti runtime usano `DATETIME(6)` e Hibernate valida il contratto con `ddl-auto=validate`.
 
-Esiste evidenza precedente di una validazione su MySQL 8.0.44, sia da database vuoto (`V1` → `V6`) sia da clone legacy (`BASELINE 1` → `V2` → `V5.9` → `V6`), conclusa con Hibernate `ddl-auto=validate`. L'audit conclusivo non ha ripetuto quella prova. Prima del trasferimento operativo è obbligatorio creare un **nuovo** schema MySQL isolato, senza riusare o eliminare schemi temporanei precedenti, e ripetere migrazione completa, secondo avvio Flyway, Hibernate validate e controlli UTC/DATETIME(6). Il database destinatario, incluso l'originale, non deve essere usato come prova.
+La validazione conclusiva del 16 luglio 2026 su MySQL 8.0.44 ha prodotto il verdetto **MYSQL VALIDATION PASSED WITH WARNINGS**. Sono stati creati gli schemi isolati `support_trainer_audit_empty_20260716_101232` e `support_trainer_audit_legacy_20260716_101232`, entrambi `utf8mb4` con collation `utf8mb4_0900_ai_ci`, e sono stati lasciati presenti al termine: non devono essere eliminati senza autorizzazione. Il database originale `support_trainer` non è stato interrogato o modificato.
+
+Il percorso empty ha applicato V1 → V6 da schema vuoto; il percorso legacy simulato ha applicato le migrazioni fino a V5.9, inserito fixture controllate e applicato V6 con backfill Booking. In entrambi gli schemi la history contiene 22 righe versionate, 22 successi, 0 failed, nessun duplicato e V6 come ultima versione; un secondo avvio non ha applicato nuove migrazioni. I checksum osservati coincidono: V2 `-602898647`, V6 `-840301506`. Hibernate `ddl-auto=validate` è riuscito senza DDL.
+
+La connessione applicativa ha usato `session.time_zone=+00:00`: `NOW(6)`, `CURRENT_TIMESTAMP(6)` e `UTC_TIMESTAMP(6)` coincidevano, con differenza di 0 microsecondi. Non sono state rilevate colonne temporali applicative con precisione diversa da `DATETIME(6)`, trigger, default temporali DB o clausole temporali `ON UPDATE`. La fotografia dello schema validato comprende nove tabelle applicative più `flyway_schema_history`, 85 colonne applicative, 95 totali, quattro unique constraint, undici foreign key restrittive e un check constraint; questi conteggi descrivono la baseline certificata e non impediscono evoluzioni future tramite nuove migrazioni.
 
 V2 è stata modificata storicamente: un ambiente che avesse già applicato una versione differente può avere un checksum Flyway incompatibile. Prima di ogni migrazione reale occorre controllare `flyway_schema_history`; non usare `flyway repair` né modifiche manuali senza analisi e autorizzazione. Il rischio riguarda gli ambienti già migrati, non le installazioni pulite validate da zero. Il comando Flyway `clean` resta vietato sugli ambienti persistenti.
 
@@ -300,7 +304,7 @@ La suite include test relativi a:
 
 ### Baseline certificata
 
-L'ultimo `clean verify` certificato ha prodotto il JAR e completato **50 suite, 312 test, 0 failure, 0 error e 1 skipped previsto**: `BookingHistoricalSnapshotMySqlIntegrationTest`, opt-in tramite `it.mysql.enabled=true`. La pipeline [`backend-ci.yml`](.github/workflows/backend-ci.yml) usa il Maven Wrapper con Temurin 21 su Ubuntu e Windows, esegue `clean verify`, verifica il JAR, usa `contents: read`, concurrency e timeout di 20 minuti; non richiede MySQL locale né segreti reali.
+L'ultimo `clean verify` certificato ha prodotto il JAR e completato **50 suite, 312 test, 0 failure, 0 error e 1 skipped previsto**: `BookingHistoricalSnapshotMySqlIntegrationTest`, opt-in tramite `it.mysql.enabled=true`. Lo stesso test è stato eseguito separatamente contro MySQL 8.0.44 con **1 test, 0 failure, 0 error, 0 skipped e BUILD SUCCESS**. La pipeline [`backend-ci.yml`](.github/workflows/backend-ci.yml) usa il Maven Wrapper con Temurin 21 su Ubuntu e Windows, esegue `clean verify`, verifica il JAR, usa `contents: read`, concurrency e timeout di 20 minuti; non richiede MySQL locale né segreti reali.
 
 Le risposte di errore usano il contratto `ErrorResponse`: `timestamp` UTC, `status`, `code`, `message` e `path` senza query; `fieldErrors` è una lista presente solo per `VALIDATION_ERROR`. Il client deve decidere il comportamento tramite `code`, non tramite `message`. La configurazione Java centralizzata `JacksonConfiguration` rende il parser JSON stretto: rifiuta proprietà sconosciute, contenuto trailing e chiavi duplicate. Le risposte 401 espongono `WWW-Authenticate: Bearer`; le 405 preservano `Allow`; le 415 preservano i media type supportati quando Spring li fornisce. Gli errori 500 sono sanitizzati e anche `/error` restituisce lo stesso formato. Non sono ancora previsti correlation ID, request ID o header proprietari. I rifiuti CORS che avvengono prima del controller non costituiscono invece un contratto JSON consumabile dal browser.
 
@@ -362,7 +366,7 @@ La cartella `docs` contiene la documentazione funzionale e tecnica. I riferiment
 3. implementare le schede di allenamento;
 4. implementare i piani alimentari;
 5. aggiungere feedback, misurazioni e progressi;
-6. completare la preparazione tecnica al deploy, inclusa la validazione MySQL isolata prima della migrazione reale.
+6. completare la preparazione tecnica al deploy e controllare, con procedura dedicata e autorizzata, l'eventuale `flyway_schema_history` del database destinatario prima di avviare il backend aggiornato.
 
 La roadmap dettagliata è disponibile in [docs/11-backend-implementation-roadmap.md](docs/11-backend-implementation-roadmap.md) e [docs/15-planned-endpoints-roadmap.md](docs/15-planned-endpoints-roadmap.md).
 
