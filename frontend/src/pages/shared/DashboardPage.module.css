@@ -1,0 +1,39 @@
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: 1.15rem;
+}
+
+.operationalList,
+.futureList {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.operationalLink {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.55rem;
+  color: var(--color-primary);
+  background: var(--color-background-elevated);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (min-width: 48rem) {
+  .operationalList,
+  .futureList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
