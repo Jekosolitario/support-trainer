@@ -8,6 +8,8 @@ export default defineConfig({
     globals: true,
     maxWorkers: 1,
     pool: 'threads',
+    fileParallelism: false,
+    isolate: false,
     setupFiles: './src/test/setup.ts',
     css: true,
   },
