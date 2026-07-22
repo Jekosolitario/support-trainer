@@ -1,6 +1,7 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
 import { Branding } from '../../components/branding/Branding';
+import { HomeFooter } from '../../components/home/HomeFooter';
 import styles from './PublicLayout.module.css';
 
 const publicNavigation = [
@@ -10,8 +11,13 @@ const publicNavigation = [
 ];
 
 export function PublicLayout() {
+  const { pathname } = useLocation();
+
   return (
     <div className={styles.layout}>
+      <a className={styles.skipLink} href="#main-content">
+        Vai al contenuto
+      </a>
       <header className={styles.header}>
         <Branding linkTo="/" />
         <nav className={styles.navigation} aria-label="Navigazione pubblica">
@@ -27,6 +33,7 @@ export function PublicLayout() {
       <main className={styles.main} id="main-content">
         <Outlet />
       </main>
+      {pathname === '/' ? <HomeFooter /> : null}
     </div>
   );
 }

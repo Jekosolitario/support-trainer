@@ -13,6 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource/bruno-ace-sc": "^5.3.0",
+    "@fontsource/saira-condensed": "^5.3.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1"

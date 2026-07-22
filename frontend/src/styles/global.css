@@ -12,6 +12,149 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 
+  /* Fondazioni tipografiche disponibili per prove circoscritte */
+  --font-display: 'Bruno Ace SC', system-ui, sans-serif;
+  --font-body: 'Saira Condensed', system-ui, sans-serif;
+  --font-weight-body: 400;
+  --font-weight-interface: 600;
+  --font-weight-emphasis: 700;
+  --font-weight-strong: 800;
+  --tracking-display: 0.012em;
+  --tracking-micro-label: 0.08em;
+
+  /* Palette del brand */
+  --palette-indigo-deep: #122155;
+  --palette-indigo-medium: #7a84d7;
+  --palette-indigo-pale: #a1ade9;
+  --palette-indigo-surface: #eff1fa;
+  --palette-violet-deep: #371b4a;
+  --palette-violet-medium: #ad82c9;
+  --palette-violet-pale: #d8b4f1;
+  --palette-violet-surface: #f6efff;
+  --palette-teal-deep: #165a50;
+  --palette-teal-medium: #78d4c6;
+  --palette-teal-pale: #b7e7e2;
+
+  /* Fondazioni dark-tech della superficie pubblica */
+  --palette-canvas: #07131e;
+  --palette-canvas-deep: #040c13;
+  --palette-panel: #0d1b2a;
+  --palette-panel-elevated: #101c42;
+
+  /* Token semantici del brand e della home pubblica */
+  --color-brand-primary: var(--palette-indigo-deep);
+  --color-brand-secondary: var(--palette-violet-deep);
+  --color-accent-functional: var(--palette-teal-medium);
+  --color-accent-violet: var(--palette-violet-pale);
+  --color-canvas: var(--palette-canvas);
+  --color-canvas-deep: var(--palette-canvas-deep);
+  --color-panel: var(--palette-panel);
+  --color-panel-elevated: var(--palette-panel-elevated);
+  --color-panel-glass: color-mix(
+    in srgb,
+    var(--palette-panel-elevated) 72%,
+    transparent
+  );
+  --color-text-primary: var(--palette-indigo-surface);
+  --color-text-secondary: var(--palette-indigo-pale);
+  --color-text-subtle: color-mix(
+    in srgb,
+    var(--palette-indigo-pale) 84%,
+    var(--palette-panel)
+  );
+  --color-heading-primary: var(--palette-violet-surface);
+  --color-heading-secondary: var(--palette-violet-pale);
+  --color-surface-indigo: color-mix(
+    in srgb,
+    var(--palette-panel) 76%,
+    var(--palette-indigo-deep)
+  );
+  --color-surface-violet: color-mix(
+    in srgb,
+    var(--palette-panel) 78%,
+    var(--palette-violet-deep)
+  );
+  --color-surface-teal: color-mix(
+    in srgb,
+    var(--palette-panel) 78%,
+    var(--palette-teal-deep)
+  );
+  --color-surface-elevated: var(--palette-panel-elevated);
+  --color-border-subtle: color-mix(
+    in srgb,
+    var(--palette-indigo-pale) 28%,
+    transparent
+  );
+  --color-border-emphasis: color-mix(
+    in srgb,
+    var(--palette-violet-pale) 48%,
+    transparent
+  );
+  --color-border-informative: color-mix(
+    in srgb,
+    var(--palette-teal-pale) 48%,
+    transparent
+  );
+  --color-glow-indigo: color-mix(
+    in srgb,
+    var(--palette-indigo-medium) 24%,
+    transparent
+  );
+  --color-glow-violet: color-mix(
+    in srgb,
+    var(--palette-violet-medium) 22%,
+    transparent
+  );
+  --color-glow-teal: color-mix(
+    in srgb,
+    var(--palette-teal-medium) 22%,
+    transparent
+  );
+  --color-grid-line: color-mix(
+    in srgb,
+    var(--palette-indigo-pale) 12%,
+    transparent
+  );
+  --color-cta-primary-background: var(--palette-teal-medium);
+  --color-cta-primary-text: var(--palette-canvas-deep);
+  --color-cta-primary-hover: var(--palette-teal-pale);
+  --color-cta-secondary-background: color-mix(
+    in srgb,
+    var(--palette-indigo-deep) 44%,
+    transparent
+  );
+  --color-cta-secondary-text: var(--palette-indigo-surface);
+  --color-cta-secondary-border: var(--palette-indigo-medium);
+  --color-cta-secondary-hover: var(--palette-indigo-deep);
+  --color-link: var(--palette-teal-pale);
+  --color-link-hover: var(--palette-violet-pale);
+  --color-hover-surface: color-mix(
+    in srgb,
+    var(--palette-violet-deep) 48%,
+    transparent
+  );
+  --color-focus-ring: var(--palette-teal-pale);
+  --color-focus-on-dark: var(--palette-teal-pale);
+  --color-info-background: color-mix(
+    in srgb,
+    var(--palette-teal-deep) 34%,
+    var(--palette-panel)
+  );
+  --color-info-border: var(--palette-teal-medium);
+  --color-info-text: var(--palette-teal-pale);
+  --color-footer-background: var(--palette-canvas-deep);
+  --color-footer-text: var(--palette-indigo-surface);
+  --color-footer-text-muted: var(--color-text-subtle);
+  --color-footer-heading: var(--palette-violet-pale);
+  --color-footer-link: var(--palette-teal-pale);
+  --color-footer-hover: color-mix(
+    in srgb,
+    var(--palette-violet-deep) 58%,
+    var(--palette-canvas-deep)
+  );
+  --color-footer-border: var(--color-border-subtle);
+
+  /* Token tecnici legacy usati dalle aree applicative */
   --color-primary: #243a62;
   --color-surface: #f1e3d2;
   --color-accent: #c73673;
@@ -36,12 +179,10 @@
 }
 
 html {
-  min-width: 20rem;
   min-height: 100%;
 }
 
 body {
-  min-width: 20rem;
   min-height: 100vh;
   margin: 0;
   line-height: 1.5;

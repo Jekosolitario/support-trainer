@@ -2,9 +2,9 @@
 
 ## 1. Descrizione
 
-Support Trainer è un progetto backend per la gestione del rapporto tra professionisti del benessere e clienti. L'MVP attuale copre autenticazione, profili, inviti, collegamenti professionista-cliente, disponibilità e richieste di prenotazione.
+Support Trainer è un progetto full stack per la gestione del rapporto tra professionisti del benessere e clienti. Il backend MVP copre autenticazione, profili, inviti, collegamenti professionista-cliente, disponibilità e richieste di prenotazione. Il frontend dispone di una fondazione React e di una home pubblica implementata.
 
-Il repository contiene il backend Spring Boot e la documentazione funzionale e tecnica. Il frontend è pianificato, ma non è ancora implementato.
+Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Le route e i layout frontend di base sono presenti, ma le pagine applicative sono ancora prevalentemente placeholder e non esistono ancora integrazione API, autenticazione JWT o sessione frontend.
 
 ## 2. Stato attuale del progetto
 
@@ -18,7 +18,9 @@ Stato sintetico:
 - autenticazione e autorizzazione per ruolo presenti;
 - test di integrazione per auth, inviti, access control, profili, availability, booking e Security / Common presenti;
 - database applicativo MySQL migrato e validato a Flyway V6;
-- frontend non ancora implementato;
+- fondazione frontend con routing, layout, navigazione per ruolo, pagine di errore e test automatici presente;
+- home pubblica responsive/mobile-first implementata sulla route `/`;
+- pagine applicative prevalentemente placeholder e integrazione con API, JWT e sessione frontend non ancora implementata;
 - pipeline CI GitHub Actions per build, test e package del backend presente; deploy non configurato;
 - progetto non ancora considerato production-ready.
 
@@ -46,11 +48,15 @@ Stato sintetico:
 - Spring Test e MockMvc
 - AssertJ
 
-### Frontend pianificato
+### Frontend
 
 - React
 - TypeScript
 - Vite
+- React Router
+- CSS Modules
+- Vitest e React Testing Library
+- Fontsource per gli asset tipografici locali della home
 
 ## 4. Funzionalità backend implementate
 
@@ -146,8 +152,11 @@ support_trainer/
 │   ├── pom.xml
 │   ├── mvnw
 │   └── mvnw.cmd
-├── docs/                    # Analisi, API, modello e roadmap
-├── frontend/                # Pianificato, non ancora implementato
+├── docs/                    # Analisi, API, modello, frontend e roadmap
+├── frontend/
+│   ├── src/                 # Routing, layout, componenti, pagine, stili e test
+│   ├── package.json
+│   └── package-lock.json
 ├── LICENSE
 └── README.md
 ```
@@ -158,10 +167,12 @@ Il backend è organizzato per dominio nei package `auth`, `profile`, `client`, `
 
 - JDK 21
 - MySQL
+- Node.js
+- npm
 - Git
-- connessione Internet al primo utilizzo del Maven Wrapper, necessaria per scaricare Maven e le dipendenze
+- connessione Internet al primo utilizzo del Maven Wrapper e durante `npm ci`, necessaria per scaricare gli strumenti e le dipendenze
 
-Non è richiesta un'installazione globale di Maven. Node.js non è ancora necessario perché il frontend non è stato implementato.
+Non è richiesta un'installazione globale di Maven. Il progetto frontend non dichiara attualmente una versione minima specifica di Node.js o npm: l'ambiente usato deve essere compatibile con le dipendenze definite in `frontend/package.json` e bloccate in `frontend/package-lock.json`.
 
 ## 8. Configurazione ambiente
 
@@ -278,7 +289,42 @@ Il JAR generato può essere avviato con:
 java -jar target/support_trainer-0.0.1-SNAPSHOT.jar
 ```
 
-## 10. Esecuzione dei test
+## 10. Installazione e comandi frontend
+
+Dalla cartella `frontend`, installare le dipendenze esattamente come registrate nel lockfile:
+
+```powershell
+npm ci
+```
+
+Avviare il server di sviluppo Vite:
+
+```powershell
+npm run dev
+```
+
+Eseguire i controlli statici e di formattazione:
+
+```powershell
+npm run lint
+npm run format:check
+```
+
+Eseguire i test frontend con Vitest e ambiente `jsdom`:
+
+```powershell
+npm run test
+```
+
+Creare la build frontend di produzione, comprensiva del controllo TypeScript:
+
+```powershell
+npm run build
+```
+
+L'output della build viene generato in `frontend/dist`. I comandi verificano la fondazione e la home implementata, ma non implicano che le pagine placeholder siano integrate con il backend.
+
+## 11. Esecuzione dei test backend
 
 Dalla cartella `backend`:
 
@@ -314,7 +360,7 @@ La correzione conclusiva ha reso deterministico `EmailVerificationTransactionInt
 
 Le risposte di errore usano il contratto `ErrorResponse`: `timestamp` UTC, `status`, `code`, `message` e `path` senza query; `fieldErrors` è una lista presente solo per `VALIDATION_ERROR`. Il client deve decidere il comportamento tramite `code`, non tramite `message`. La configurazione Java centralizzata `JacksonConfiguration` rende il parser JSON stretto: rifiuta proprietà sconosciute, contenuto trailing e chiavi duplicate. Le risposte 401 espongono `WWW-Authenticate: Bearer`; le 405 preservano `Allow`; le 415 preservano i media type supportati quando Spring li fornisce. Gli errori 500 sono sanitizzati e anche `/error` restituisce lo stesso formato. Non sono ancora previsti correlation ID, request ID o header proprietari. I rifiuti CORS che avvengono prima del controller non costituiscono invece un contratto JSON consumabile dal browser.
 
-## 11. Profili Spring
+## 12. Profili Spring
 
 ### Profilo predefinito
 
@@ -344,7 +390,7 @@ Non sono attualmente presenti profili Spring dedicati a sviluppo, staging o prod
 
 Il profilo tracciato `mailpit` è un aiuto manuale locale, non un profilo di produzione: abilita `SMTP` su `localhost:1025` e usa la pagina `http://localhost:5173/verify-email`. Si attiva soltanto in modo esplicito con `--spring.profiles.active=mailpit`; non contiene username, password o indirizzi personali reali.
 
-## 12. Documentazione disponibile
+## 13. Documentazione disponibile
 
 La cartella `docs` contiene la documentazione funzionale e tecnica. I riferimenti principali sono:
 
@@ -364,10 +410,12 @@ La cartella `docs` contiene la documentazione funzionale e tecnica. I riferiment
 - [Sprint Availability](docs/16-sprint-04-availability.md)
 - [Sprint Bookings](docs/17-sprint-05-bookings.md)
 - [Copertura test backend MVP](docs/codex/2026-06-28-codex-auth-test-coverage.md)
+- [Frontend Functional Map MVP](docs/frontend/01-frontend-functional-map-mvp.md)
+- [Public Home Implementation](docs/frontend/02-public-home-implementation.md)
 
-## 13. Roadmap sintetica
+## 14. Roadmap sintetica
 
-1. integrare il frontend con i 29 endpoint applicativi esistenti;
+1. integrare la fondazione frontend esistente con i 29 endpoint applicativi;
 2. completare il lifecycle account e il flusso refresh token;
 3. implementare le schede di allenamento;
 4. implementare i piani alimentari;
@@ -376,14 +424,21 @@ La cartella `docs` contiene la documentazione funzionale e tecnica. I riferiment
 
 La roadmap dettagliata è disponibile in [docs/11-backend-implementation-roadmap.md](docs/11-backend-implementation-roadmap.md) e [docs/15-planned-endpoints-roadmap.md](docs/15-planned-endpoints-roadmap.md).
 
-## 14. Frontend pianificato
+## 15. Stato del frontend
 
-La cartella `frontend` è attualmente vuota. Il frontend web è pianificato con:
+La cartella `frontend` contiene una fondazione web basata su React, TypeScript e Vite. Sono presenti:
 
-- React;
-- TypeScript;
-- Vite;
-- interfaccia responsive e mobile-first;
-- comunicazione con il backend tramite API REST JSON.
+- routing con React Router;
+- layout pubblico, autenticato e di errore;
+- navigazione differenziata per cliente, personal trainer e nutrizionista;
+- home pubblica completa sulla route `/`;
+- pagine pubbliche e private di base;
+- CSS Modules e token globali;
+- test con Vitest, React Testing Library e `jsdom`;
+- lint, controllo di formattazione e build TypeScript/Vite.
 
-Non sono ancora presenti componenti UI, configurazione npm, comandi frontend o integrazione con le API. Una futura evoluzione mobile con React Native ed Expo è solo un'ipotesi progettuale e non fa parte dell'MVP attuale.
+La home è responsive/mobile-first e usa una direzione visuale dark-tech circoscritta al layout pubblico. Le aree autenticate mantengono attualmente il tema legacy.
+
+Le route di login, registrazione, validazione invito, verifica email e delle aree private sono registrate, ma le relative pagine sono ancora prevalentemente placeholder. API client, chiamate al backend, autenticazione JWT, stato della sessione e guard basate sul principal non sono implementati.
+
+Le funzionalità realmente disponibili nel backend e quelle future restano definite nella documentazione funzionale. La struttura e le decisioni della home sono descritte in [Public Home Implementation](docs/frontend/02-public-home-implementation.md). Una possibile evoluzione mobile con React Native ed Expo resta fuori dall'MVP corrente.

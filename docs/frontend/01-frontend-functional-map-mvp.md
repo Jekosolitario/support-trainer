@@ -2,7 +2,7 @@
 
 ## 1. Obiettivo del documento
 
-Questo documento traduce il backend MVP reale di Support Trainer in una mappa funzionale per UX/UI, prototipazione Figma e futura implementazione web con React. Non definisce nuove API e non amplia il perimetro del prodotto.
+Questo documento traduce il backend MVP reale di Support Trainer in una mappa funzionale per UX/UI, prototipazione Figma e implementazione web con React. Non definisce nuove API e non amplia il perimetro del prodotto.
 
 Le fonti verificate sono:
 
@@ -28,12 +28,15 @@ La baseline certificata richiede inoltre che il client usi la risposta neutra `2
 
 ## 2. Stato del frontend
 
-- La directory `frontend/` è vuota: il frontend non è ancora implementato.
-- La direzione tecnica scelta è **React + TypeScript + Vite**.
-- Non esistono ancora routing, componenti, API client, gestione dello stato auth o design system.
-- Il web frontend dovrà comunicare con API REST JSON sotto il prefisso `/api/v1`.
+- La fondazione frontend è implementata con **React + TypeScript + Vite**.
+- React Router registra le route pubbliche, le aree cliente e professionista, le pagine di errore e una preview tecnica disponibile soltanto in sviluppo.
+- Sono presenti layout pubblico, autenticato e di errore, navigazione differenziata per ruolo, componenti condivisi e test automatici.
+- La home pubblica sulla route `/` è implementata; struttura, contenuto, sistema visuale e verifiche sono descritti in [Public Home Implementation](./02-public-home-implementation.md).
+- Le altre pagine pubbliche e private sono ancora prevalentemente placeholder: le route sono raggiungibili, ma non costituiscono flussi applicativi completi.
+- Non sono ancora presenti API client, gestione dello stato auth, JWT o sessione frontend e integrazione con il backend.
+- Il web frontend dovrà comunicare con API REST JSON sotto il prefisso `/api/v1`, senza codificare origini di produzione nel sorgente.
 - Un'app mobile con React Native + Expo è una possibile evoluzione futura, fuori dall'MVP.
-- Questa fase produce solo documentazione: non avvia il progetto React e non modifica il backend.
+- L'implementazione corrente non modifica il contratto backend descritto in questa mappa.
 
 ## 3. Ruoli utente
 
@@ -173,7 +176,7 @@ Sono inoltre non presenti e da non esporre come attivi: cambio password autentic
 
 ## 7. Sitemap MVP
 
-I path seguenti sono una convenzione frontend proposta: il repository non contiene ancora un router. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
+I path seguenti sono registrati nel router frontend. La loro presenza non implica che la pagina sia già integrata con il backend: al momento la home `/` è implementata, mentre molte altre destinazioni rendono ancora contenuti placeholder. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
 
 ### Pubblico
 
@@ -188,7 +191,7 @@ I path seguenti sono una convenzione frontend proposta: il repository non contie
 
 Flusso cliente consigliato: `/invite/validate` valida il codice e, in caso positivo, passa a `/register/client` conservando il codice. Non saltare la validazione lato server durante la registrazione: il backend la ripete correttamente.
 
-Dopo entrambe le registrazioni il frontend mostra “Controlla la tua email”. Il link apre `/verify-email`, la pagina legge e rimuove il token dall'URL, effettua il POST e presenta la CTA login. Un secondo utilizzo coerente resta un successo. La stessa schermata offre “Invia di nuovo”: invia l'email al POST di resend, mostra sempre il messaggio neutro e applica un blocco UX di 60 secondi, senza sostituire il cooldown del backend. Il frontend applicativo non è implementato in questo step; l'adapter SMTP backend invia un messaggio testuale con URL `#token=...`.
+Il contratto previsto dopo entrambe le registrazioni è mostrare “Controlla la tua email”. Il link apre `/verify-email`, la pagina dovrà leggere e rimuovere il token dall'URL, effettuare il POST e presentare la CTA login. Un secondo utilizzo coerente resta un successo. La stessa schermata dovrà offrire “Invia di nuovo”, mostrare sempre il messaggio neutro e applicare un blocco UX di 60 secondi, senza sostituire il cooldown del backend. La route e gli stati descrittivi sono presenti, ma lettura del token, invio API e reinvio non sono ancora implementati. L'adapter SMTP backend invia un messaggio testuale con URL `#token=...`.
 
 ### Area cliente
 
@@ -228,6 +231,8 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 - Rotte `PROFESSIONAL + PERSONAL_TRAINER`: availability e booking professionista.
 
 Le guard frontend migliorano navigazione e chiarezza, ma non sostituiscono l'autorizzazione backend.
+
+Nella fondazione corrente le route e i layout differenziati per ruolo sono registrati, ma non esistono ancora bootstrap della sessione, guard collegate a un principal autenticato o redirect basati su JWT. La classificazione seguente resta il contratto da applicare quando verrà introdotto lo stato auth.
 
 ### 8.2 Access token e bootstrap
 
@@ -328,20 +333,18 @@ Ogni pagina privata deve prevedere anche gli stati trasversali `unauthorized` e 
 
 ## 11. Priorità implementazione React
 
-Ordine pragmatico suggerito per la futura fase di sviluppo:
+La fondazione corrente ha completato il setup React/Vite/TypeScript, il routing, i layout di base, le pagine 404/403 e la home pubblica. L'ordine pragmatico residuo è:
 
-1. setup React + Vite + TypeScript e configurazione ambiente API;
-2. routing, layout pubblico/privato e pagine 404/403;
-3. API client tipizzato e normalizzazione `ErrorResponse`;
-4. auth state, persistenza sessione, guard per ruolo e specializzazione;
-5. login e logout locale;
-6. bootstrap con `/me/account` e `/me/profile`, poi profilo/account;
-7. dashboard base composte, senza analytics;
-8. flusso professionista comune: clienti e inviti;
-9. flusso cliente: professionisti collegati e dettaglio;
-10. availability e booking del personal trainer, poi booking cliente;
-11. registrazione professionista, verifica email e registrazione cliente tramite invito;
-12. hardening di errori, accessibilità, responsive e test dei flussi.
+1. configurazione ambiente e API client tipizzato con normalizzazione `ErrorResponse`;
+2. auth state, persistenza sessione, guard per ruolo e specializzazione;
+3. login e logout locale;
+4. bootstrap con `/me/account` e `/me/profile`, poi profilo/account;
+5. dashboard base composte, senza analytics;
+6. flusso professionista comune: clienti e inviti;
+7. flusso cliente: professionisti collegati e dettaglio;
+8. availability e booking del personal trainer, poi booking cliente;
+9. registrazione professionista, verifica email e registrazione cliente tramite invito;
+10. hardening di errori, accessibilità, responsive e test dei flussi applicativi.
 
 Login e bootstrap vanno completati prima delle aree business. Availability e Booking vanno sviluppati insieme sul piano UX perché le transizioni booking modificano la disponibilità degli slot.
 

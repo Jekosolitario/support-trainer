@@ -71,6 +71,12 @@ professionista registrato e verificato
 -> richiesta booking
 -> conferma / rifiuto / cancellazione
 
+### Fondazione frontend implementata
+
+Il repository contiene una fondazione frontend basata su React, TypeScript e Vite. Sono implementati React Router, layout pubblico e autenticato, navigazione differenziata per ruolo, pagine di errore, test automatici e una home pubblica responsive/mobile-first.
+
+La presenza delle route non equivale a integrazione applicativa completa: API client, autenticazione JWT e stato di sessione frontend non sono ancora implementati. Login, registrazioni e pagine private restano prevalentemente placeholder.
+
 ---
 
 ## 4. Problema che risolve
@@ -212,7 +218,7 @@ Per evitare di rendere la prima versione troppo complessa, queste funzionalità 
 
 ---
 
-## 9. Stack tecnologico previsto
+## 9. Stack tecnologico
 
 ### Backend
 - Java
@@ -222,12 +228,15 @@ Per evitare di rendere la prima versione troppo complessa, queste funzionalità 
 - Spring Security
 - MySQL
 
-### Frontend web previsto
+### Frontend web adottato
 - React
 - TypeScript
 - Vite
-- CSS modulare o approccio equivalente da decidere in fase frontend
-- comunicazione con backend tramite API REST JSON
+- React Router
+- CSS Modules
+- Vitest
+- React Testing Library
+- futura comunicazione con backend tramite API REST JSON
 
 ### Strategia mobile futura
 - possibile evoluzione con React Native + Expo;
@@ -274,19 +283,22 @@ Il backend gestisce:
 
 ### Frontend web
 
-Il frontend web sarà sviluppato come applicazione separata dal backend, con:
+Il frontend web è sviluppato come applicazione separata dal backend, con:
 
 - React;
 - TypeScript;
 - Vite;
-- progettazione UI responsive/mobile-first;
-- CSS modulare o approccio equivalente da decidere in fase frontend;
-- consumo delle API REST JSON esposte dal backend.
+- React Router;
+- CSS Modules;
+- Vitest e React Testing Library;
+- progettazione UI responsive/mobile-first già applicata alla home pubblica.
+
+La fondazione include routing e layout di base, ma non consuma ancora le API REST JSON esposte dal backend. Le pagine applicative restano prevalentemente placeholder e non sono presenti autenticazione JWT o sessione frontend.
 
 La futura evoluzione mobile potrà essere valutata con React Native + Expo, ma non fa parte dello sprint frontend iniziale.  
 Questa possibilità non implica il riuso automatico dei componenti React web su mobile; tuttavia flussi, logica applicativa e organizzazione API dovranno essere progettati in modo il più possibile riutilizzabile.
 
-Nell’audit attuale non sono stati analizzati file frontend integrati al backend: il lavoro verificato riguarda codice backend, configurazione, test e documentazione.
+La home pubblica e la fondazione frontend sono documentate separatamente dalla certificazione backend. L'integrazione tra i due livelli resta un obiettivo successivo.
 
 ---
 
