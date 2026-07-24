@@ -59,11 +59,18 @@ class BookingHistoricalSnapshotMigrationTest {
                 .baselineVersion("5.9")
                 .load();
 
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(2);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
 
         try (Connection connection = DriverManager.getConnection(JDBC_URL, "sa", "");
                 Statement statement = connection.createStatement()) {
+            try (ResultSet resultSet = statement.executeQuery(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
+                            + "WHERE UPPER(TABLE_NAME) IN ('SPRING_SESSION', 'SPRING_SESSION_ATTRIBUTES')"
+            )) {
+                assertThat(resultSet.next()).isTrue();
+                assertThat(resultSet.getInt(1)).isEqualTo(2);
+            }
             try (ResultSet resultSet = statement.executeQuery(
                     "SELECT client_display_name, professional_display_name, confirmed_at, rejected_at, cancelled_at "
                             + "FROM booking_requests WHERE id = 13"

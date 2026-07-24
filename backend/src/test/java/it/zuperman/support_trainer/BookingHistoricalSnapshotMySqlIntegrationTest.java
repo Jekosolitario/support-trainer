@@ -32,7 +32,7 @@ class BookingHistoricalSnapshotMySqlIntegrationTest {
         migrateToV59(legacySchema, password);
         seedLegacyBooking(legacySchema, password);
         Flyway latest = flyway(legacySchema, password, null);
-        assertThat(latest.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(latest.migrate().migrationsExecuted).isEqualTo(2);
         assertThat(latest.migrate().migrationsExecuted).isZero();
         assertLegacySnapshot(legacySchema, password);
         assertSnapshotColumns(legacySchema, password);

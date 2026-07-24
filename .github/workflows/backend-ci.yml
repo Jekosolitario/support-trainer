@@ -84,3 +84,45 @@ jobs:
           if (-not (Test-Path 'target/support_trainer-0.0.1-SNAPSHOT.jar' -PathType Leaf)) {
             throw 'Packaged JAR not found'
           }
+
+  certify-mysql-session-schema:
+    name: Certify Spring Session MySQL schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: test
+          MYSQL_DATABASE: support_trainer_session_test_placeholder
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptest"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Temurin JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Certify Flyway V7 and Spring Session JDBC on MySQL
+        env:
+          MYSQL_PWD: test
+        run: >
+          bash ./mvnw --batch-mode --no-transfer-progress
+          -Dit.mysql.enabled=true
+          -Dit.mysql.empty-schema=support_trainer_session_test_empty
+          -Dit.mysql.v6-schema=support_trainer_session_test_from_v6
+          -Dtest=SpringSessionJdbcMySqlIntegrationTest
+          test
