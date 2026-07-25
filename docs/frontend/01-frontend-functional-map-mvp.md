@@ -22,7 +22,7 @@ La mappa distingue sempre tre stati:
 | **Futuro / non attivo** | La UX può prevederne la posizione, ma non deve presentarlo come funzionante. |
 | **Non presente** | Non deve comparire come azione attiva né generare chiamate API. |
 
-La presenza di una pagina frontend non implica necessariamente un endpoint dedicato: una landing statica non ne richiede uno, mentre una dashboard MVP deve comporre dati restituiti da endpoint già esistenti. Nel backend risultano implementati **29 endpoint applicativi**: Auth 6, Me 4, Client 2, Professional 3, Invite 2, Availability 5 e Booking 7. `/error` è un fallback tecnico separato e non va trattato come endpoint funzionale.
+La presenza di una pagina frontend non implica necessariamente un endpoint dedicato: una landing statica non ne richiede uno, mentre una dashboard MVP deve comporre dati restituiti da endpoint già esistenti. Nel backend risultano implementati **31 endpoint applicativi**: Auth 8, Me 4, Client 2, Professional 3, Invite 2, Availability 5 e Booking 7. `/error` è un fallback tecnico separato e non va trattato come endpoint funzionale.
 
 La baseline certificata richiede inoltre che il client usi la risposta neutra `202` per entrambe le registrazioni, non cerchi `EMAIL_ALREADY_REGISTERED`, gestisca `ErrorResponse` tramite `code` e tratti gli orari Availability e gli snapshot Booking come `OffsetDateTime` con offset autorevole. Le sezioni successive dettagliano questi contratti.
 
@@ -33,10 +33,10 @@ La baseline certificata richiede inoltre che il client usi la risposta neutra `2
 - Sono presenti layout pubblico, autenticato e di errore, navigazione differenziata per ruolo, componenti condivisi e test automatici.
 - La home pubblica sulla route `/` è implementata; struttura, contenuto, sistema visuale e verifiche sono descritti in [Public Home Implementation](./02-public-home-implementation.md).
 - Le altre pagine pubbliche e private sono ancora prevalentemente placeholder: le route sono raggiungibili, ma non costituiscono flussi applicativi completi.
-- Non sono ancora presenti API client, gestione dello stato auth, JWT o sessione frontend e integrazione con il backend.
-- Il web frontend dovrà comunicare con API REST JSON sotto il prefisso `/api/v1`, senza codificare origini di produzione nel sorgente.
+- Non sono ancora presenti API client, gestione dello stato auth di sessione/CSRF né integrazione con il backend. **L’auth di sessione frontend non è implementata**: le sezioni seguenti descrivono il contratto che il FE dovrà adottare.
+- Il web frontend dovrà comunicare con API REST JSON sotto il prefisso `/api/v1`. In produzione la topologia è same-origin dietro reverse proxy (`/` frontend, `/api/v1/**` backend): non è richiesto CORS browser per l’auth.
 - Un'app mobile con React Native + Expo è una possibile evoluzione futura, fuori dall'MVP.
-- L'implementazione corrente non modifica il contratto backend descritto in questa mappa.
+- L'implementazione corrente del frontend non modifica il contratto backend descritto in questa mappa.
 
 ## 3. Ruoli utente
 
@@ -64,7 +64,7 @@ Gli endpoint sotto `/api/v1/auth/**` sono pubblici.
 | Schermata | Scopo ed endpoint | Stati UI necessari | Errori principali |
 |---|---|---|---|
 | Home / landing | Pagina statica di ingresso. Nessun endpoint richiesto. CTA verso login e registrazione professionista; l'accesso cliente parte da un invito. | Contenuto pronto, eventuale fallback contenuti | Nessun errore API |
-| Login | Autenticare cliente o professionista con `POST /api/v1/auth/login`. Campi: email e password. | Idle, invio, successo e redirect per ruolo, errore credenziali, account non attivo | `400` validazione/body, `401 AUTHENTICATION_ERROR`, `403 ACCOUNT_NOT_ACTIVE`, `EMAIL_NOT_VERIFIED`, profilo non attivo |
+| Login | Ottenere CSRF (`GET /api/v1/auth/csrf`), poi autenticare con `POST /api/v1/auth/login` + header CSRF. Campi: email e password. Risposta `204` senza token; il browser conserva il cookie HttpOnly. Dopo successo: nuovo `GET /csrf`, poi bootstrap `/me/account` e `/me/profile`. | Idle, invio, successo e redirect per ruolo, errore credenziali, account non attivo / email non verificata | `400` validazione/body, `401 AUTHENTICATION_ERROR`, `403 ACCOUNT_NOT_ACTIVE` / `EMAIL_NOT_VERIFIED`, `403 CSRF_VALIDATION_FAILED`. `profile.active=false` non blocca il login |
 | Registrazione professionista | Inviare `POST /api/v1/auth/register/professional`. Campi: nome, cognome, email, password, specializzazione `PERSONAL_TRAINER` o `NUTRITIONIST`. | Form, validazione, invio, `202` neutro, istruzione di verifica email | `400 VALIDATION_ERROR`; non cercare `EMAIL_ALREADY_REGISTERED` |
 | Verifica email | Ricevere `/verify-email#token=...`, rimuovere subito il fragment e inviare `POST /api/v1/auth/email-verification/confirm` con body `token`. | Verifica in corso, verificata, non valido o scaduto; secondo utilizzo idempotente; CTA al login dopo successo | `400` body/validazione, `404 EMAIL_VERIFICATION_TOKEN_NOT_FOUND`, `410 EMAIL_VERIFICATION_TOKEN_EXPIRED` |
 | Reinvio verifica | Dalla schermata “Controlla la tua email”, inviare `POST /api/v1/auth/email-verification/resend` con body `email`. | Messaggio sempre neutro; azione “Invia di nuovo”; pulsante UX disabilitato 60 secondi, senza assumere che il backend abbia creato un token | `400` validazione/body, `415` media type; ogni email valida riceve `202` identico |
@@ -74,6 +74,7 @@ Gli endpoint sotto `/api/v1/auth/**` sono pubblici.
 
 Note di flusso verificate:
 
+- tutte le mutazioni Auth (login, registrazioni, confirm/resend, validate-invite, logout) richiedono CSRF: prima `GET /api/v1/auth/csrf`, poi header `headerName` (tipicamente `X-CSRF-TOKEN`); il token va solo in memoria;
 - entrambe le registrazioni restituiscono sempre lo stesso `202 Accepted` con messaggio neutro: il frontend non deve dedurre che l'account sia stato creato né cercare `EMAIL_ALREADY_REGISTERED`; deve invitare a controllare la posta o usare resend;
 - cliente e professionista nascono `PENDING_VERIFICATION`, con `emailVerified=false`, e non possono fare login prima della conferma;
 - per il cliente il link è già creato e l'invito consumato, ma il cliente pending non è visibile al professionista;
@@ -89,7 +90,7 @@ Note di flusso verificate:
 
 | Area | Endpoint | Stato MVP | Note UX |
 |---|---|---|---|
-| Bootstrap sessione | `GET /api/v1/me/account`, `GET /api/v1/me/profile` | Implementabile ora | Confermare ruolo, stato account, specializzazione e dati profilo dopo il login o il reload. Non ricavare il ruolo dal JWT: non è presente nei claim. |
+| Bootstrap sessione | `GET /api/v1/me/account`, `GET /api/v1/me/profile` | Contratto backend pronto; FE non implementato | Confermare ruolo, stato account, specializzazione e dati profilo dopo il login o il reload. Il ruolo non è nel cookie: va letto da `/me`. |
 | Profilo/account | stessi endpoint di lettura; `PATCH /api/v1/me/profile` | Implementabile ora | Un'unica pagina può avere sezioni “Profilo” e “Account”. Mostrare campi diversi per cliente e professionista. |
 | Stato operativo | `PATCH /api/v1/me/profile/operational-status` | Implementabile ora | Cliente: `ATTIVO`, `INFORTUNATO`, `PAUSA`. Professionista: `DISPONIBILE`, `ASSENTE`, `FERIE`, `MALATTIA`. |
 | Immagine profilo | Campo `profileImageUrl` in lettura | Solo visualizzazione se già valorizzato | Nessun upload o update immagine: usare iniziali/avatar di fallback e non mostrare un controllo file attivo. |
@@ -167,8 +168,7 @@ Il nutrizionista usa le funzionalità comuni del professionista, ma non dispone 
 | Feedback | Dettaglio futuro di workout/nutrition o area progressi | Nascosto: non esistono endpoint né dati. |
 | Measurements | Profilo/progressi cliente | Nascosta; niente grafici o inserimento misure. |
 | Reset password | Login / recupero account | Non mostrare un link attivo. Può apparire disabilitato solo in prototipi esplicitamente futuri. |
-| Logout backend | Menu utente | È possibile un'azione locale “Esci” che cancella la sessione frontend, ma non deve chiamare o promettere revoca server: l'endpoint non esiste. |
-| Refresh automatico token | API client/auth state | Non attivare. Alla scadenza dell'access token richiedere un nuovo login. |
+| Logout | Menu utente | Contratto backend pronto: `POST /api/v1/auth/logout` con CSRF → `204`. Il FE deve ancora implementarlo: scartare CSRF in memoria e tornare allo stato anonimo. |
 | Upload immagine profilo | Profilo | Mostrare immagine esistente o avatar fallback; nessun controllo upload attivo. |
 | App mobile | Fuori dalla web app | Nessun elemento nell'MVP web. React Native + Expo resta un'evoluzione separata. |
 
@@ -232,37 +232,35 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 
 Le guard frontend migliorano navigazione e chiarezza, ma non sostituiscono l'autorizzazione backend.
 
-Nella fondazione corrente le route e i layout differenziati per ruolo sono registrati, ma non esistono ancora bootstrap della sessione, guard collegate a un principal autenticato o redirect basati su JWT. La classificazione seguente resta il contratto da applicare quando verrà introdotto lo stato auth.
+Nella fondazione corrente le route e i layout differenziati per ruolo sono registrati, ma non esistono ancora bootstrap della sessione, CSRF client, guard collegate a un principal autenticato o redirect basati sulla sessione. La classificazione seguente resta il contratto da applicare quando verrà introdotto lo stato auth.
 
-### 8.2 Access token e bootstrap
+### 8.2 Contratto sessione, CSRF e bootstrap (da adottare; FE non implementato)
 
-1. Il login restituisce `accessToken`, `refreshToken`, `tokenType`, `userId`, `email` e `role`.
-2. L'API client aggiunge `Authorization: Bearer <accessToken>` solo alle richieste protette.
-3. Dopo login o ripristino sessione, il frontend legge `/me/account` e `/me/profile` prima di costruire navigazione e route specialistiche.
-4. Il JWT contiene email e tipo token, ma non ruolo, user id o specializzazione: non usarlo come unica fonte dello stato utente.
-5. Il refresh token è restituito ma non è utilizzabile: non inviarlo come Bearer e, nell'MVP, non è necessario conservarlo.
+1. Prima delle mutazioni (incluso login), chiamare `GET /api/v1/auth/csrf` e conservare `token` + `headerName` **solo in memoria**.
+2. Inviare l’header CSRF (`headerName`, tipicamente `X-CSRF-TOKEN`) su ogni mutazione; usare `credentials: 'include'` / cookie same-origin gestiti dal browser.
+3. `POST /api/v1/auth/login` → `204 No Content`: nessun `accessToken`/`refreshToken`/`Authorization`. Il cookie HttpOnly è gestito dal browser.
+4. Subito dopo il login, richiamare `GET /csrf` (token ruotato), poi bootstrap con `GET /me/account` e `GET /me/profile` prima di costruire navigazione e route specialistiche.
+5. Non salvare JWT né CSRF in `localStorage`/`sessionStorage`. Non inventare Bearer auth.
+6. Logout: `POST /api/v1/auth/logout` con CSRF → `204`; scartare CSRF in memoria e tornare allo stato anonimo.
+7. Timeout backend: 30 min inattività, 8 h assolute; su `401` trattare la sessione come scaduta e riportare a `/login`.
 
-La persistenza del token non è definita dal backend. Raccomandazione MVP: isolare la scelta dietro un servizio auth e preferire persistenza di sessione limitata rispetto a persistenza indefinita. Qualunque storage JavaScript resta esposto a XSS; la scelta definitiva va riesaminata insieme al futuro lifecycle refresh.
+### 8.3 Topologia e CORS
 
-### 8.3 Contratto CORS per il frontend
-
-- l'origine effettiva del frontend deve comparire esattamente in `app.cors.allowed-origins`, inclusa l'eventuale porta;
-- non sono ammesse wildcard, path, query string o fragment;
-- le chiamate protette possono inviare `Authorization: Bearer <accessToken>` e i payload JSON possono usare `Content-Type`;
-- il preflight `OPTIONS` è gestito dal backend, ma viene rifiutato se l'origine non è configurata;
-- non usare richieste con credenziali browser: `allowCredentials` è deliberatamente disabilitato.
-
-Il valore cambia per ambiente tramite configurazione Spring o `APP_CORS_ALLOWED_ORIGINS`. Il frontend non deve codificare un'origine backend o frontend di produzione nel sorgente.
+- in produzione: same-origin dietro reverse proxy; CORS non è il meccanismo di auth browser;
+- le chiamate JSON usano `Content-Type` e cookie di sessione; non `Authorization: Bearer`;
+- in sviluppo locale può servire un proxy Vite verso il backend, senza cambiare il contratto di produzione;
+- il frontend non deve codificare origini di produzione nel sorgente.
 
 ### 8.4 Risposte 401, 403 e 404
 
 - `401` durante il login: mostrare l'errore nel form, senza redirect ciclici.
-- `401` su una rotta privata (`UNAUTHORIZED`, `TOKEN_EXPIRED`, `INVALID_TOKEN`): cancellare la sessione locale, conservare se utile la destinazione, e reindirizzare a `/login` con messaggio “Sessione scaduta” o “Accesso richiesto”. Non tentare refresh automatici.
+- `401` su una rotta privata (`UNAUTHORIZED` o sessione invalidata): scartare CSRF/stato locale, conservare se utile la destinazione, e reindirizzare a `/login` con messaggio “Sessione scaduta” o “Accesso richiesto”. Non tentare refresh token (non esistono).
+- `403 CSRF_VALIDATION_FAILED`: tipicamente ri-fetch di `/csrf` e retry controllato, oppure messaggio di integrazione.
 - `403 ACCESS_DENIED` da SecurityConfig: lasciare intatta la sessione, mostrare pagina “Non autorizzato” e offrire ritorno alla dashboard corretta.
 - nei dettagli cliente e professionista, `404 CLIENT_NOT_FOUND` e `404 PROFESSIONAL_NOT_FOUND` coprono in modo indistinguibile ID inesistente, relazione assente o inattiva e profilo non leggibile; il frontend non deve tentare di dedurre quale caso si sia verificato;
 - gli altri `403` business, per esempio specializzazione non consentita in flussi diversi, mantengono il comportamento contestuale esistente.
 
-L'azione “Esci” dell'MVP è solo frontend: elimina token e stato utente e torna al login. Non esiste revoca backend.
+L'azione “Esci” deve chiamare il logout backend con CSRF e poi ripulire lo stato client.
 
 ## 9. Gestione errori frontend
 
@@ -297,15 +295,15 @@ Il contratto comune reale è `ErrorResponse`:
 | Status | Comportamento UX |
 |---|---|
 | `400 Bad Request` | Mostrare errori campo per `VALIDATION_ERROR`; per body, path o query malformati mostrare messaggio generale. Comprende anche alcune violazioni di stato/invito. |
-| `401 Unauthorized` | Invalidare ogni sessione locale. Distinguere `TOKEN_EXPIRED` quando serve il copy UX; `UNAUTHORIZED` e `INVALID_TOKEN` restano errori di accesso. Il backend include `WWW-Authenticate: Bearer`. |
-| `403 Forbidden` | Ruolo, account, email o profilo non idonei, oppure altra regola business non legata a una risorsa enumerabile. Non fare logout automatico. |
+| `401 Unauthorized` | Invalidare lo stato auth client (CSRF in memoria). Codice tipico `UNAUTHORIZED`. Il backend **non** include `WWW-Authenticate: Bearer`. |
+| `403 Forbidden` | Ruolo, account, email o profilo non idonei, CSRF non valido (`CSRF_VALIDATION_FAILED`), oppure altra regola business non legata a una risorsa enumerabile. Non fare logout automatico salvo CSRF/sessione incoerente. |
 | `404 Not Found` | Stato neutro “Risorsa non trovata”; offrire ritorno alla lista. Include risorsa inesistente, non collegata o non appartenente al principal: Availability non collegata e Booking estraneo non vanno distinti nella UI. |
 | `409 Conflict` | Stato concorrente/obsoleto, slot sovrapposto o transizione booking non più valida. Non usare più questo status per email duplicata. Mostrare messaggio e ricaricare la risorsa quando opportuno. |
 | `410 Gone` | Per `EMAIL_VERIFICATION_TOKEN_EXPIRED`, proporre il reinvio della verifica email. |
 | `405/406/415` | Errore di integrazione del client: non ritentare invariando metodo, `Accept` o `Content-Type`; 405 include `Allow`. |
 | `500 Internal Server Error` | Messaggio neutro, possibilità di riprovare e nessun dettaglio tecnico. |
 
-Il client deve trattare separatamente gli errori di rete o CORS senza response HTTP. Un preflight CORS rifiutato prima del controller non garantisce un `ErrorResponse` leggibile dal browser.
+Il client deve trattare separatamente gli errori di rete senza response HTTP.
 
 Regole pratiche:
 
@@ -335,9 +333,9 @@ Ogni pagina privata deve prevedere anche gli stati trasversali `unauthorized` e 
 
 La fondazione corrente ha completato il setup React/Vite/TypeScript, il routing, i layout di base, le pagine 404/403 e la home pubblica. L'ordine pragmatico residuo è:
 
-1. configurazione ambiente e API client tipizzato con normalizzazione `ErrorResponse`;
-2. auth state, persistenza sessione, guard per ruolo e specializzazione;
-3. login e logout locale;
+1. configurazione ambiente e API client tipizzato con normalizzazione `ErrorResponse`, `credentials: 'include'` e CSRF in memoria;
+2. auth state session-based (nessun JWT in storage), guard per ruolo e specializzazione;
+3. login `204`, re-fetch CSRF, logout backend;
 4. bootstrap con `/me/account` e `/me/profile`, poi profilo/account;
 5. dashboard base composte, senza analytics;
 6. flusso professionista comune: clienti e inviti;
@@ -351,8 +349,7 @@ Login e bootstrap vanno completati prima delle aree business. Availability e Boo
 ## 12. Cosa NON implementare nella prima fase frontend
 
 - un design system complesso o una libreria interna estesa;
-- refresh automatico, rotazione o revoca token;
-- un falso logout backend: nell'MVP è solo pulizia locale;
+- JWT, Bearer auth, refresh token o storage di token in `localStorage`/`sessionStorage`;
 - Workout, Nutrition, Feedback o Measurements;
 - recupero/reset o cambio password;
 - upload immagine profilo;
@@ -439,7 +436,7 @@ Questi punti non impediscono la mappa funzionale, ma non sono determinabili come
 
 1. **Consegna verifica email:** registrazione e reinvio creano e salvano il token e, dopo commit, usano una porta di consegna con adapter SMTP configurabile. Il default locale resta disabilitato; la porta in-memory è solo per test/debug e non è esposta via endpoint. L'URL frontend remoto deve essere HTTPS; HTTP è ammesso solo per loopback locale. Non sono presenti outbox o retry, quindi la consegna non è garantita.
 2. **Contratto temporale:** audit e scadenze account/booking/inviti arrivano come `Instant` UTC con `Z`; gli orari degli slot e gli snapshot Booking arrivano con offset esplicito `Europe/Rome`, mentre le date civili restano `LocalDate`. La UI deve distinguere questi tre tipi e non applicare una timezone globale ai payload.
-3. **Storage auth:** il backend non prescrive dove conservare l'access token; la strategia va chiusa considerando sicurezza e assenza del refresh operativo.
+3. **Auth client:** il contratto backend è chiuso (cookie HttpOnly + CSRF in memoria + bootstrap `/me`). Resta da implementare lato frontend; non usare JWT.
 4. **URL pubblico dei link:** `app.email.verification-page-url` configura la pagina di verifica, ma il valore pubblico definitivo di ciascun ambiente non è ancora definito; i link invito restano separati.
 5. **Liste:** non esistono paginazione e filtri API per clienti, professionisti, inviti, slot o booking; la prima UI non deve dipenderne. Per Booking l'ordine iniziale è `createdAt DESC, id DESC`.
 6. **Dashboard:** non esiste un contratto aggregato; contenuti e metriche devono restare una composizione minima dei dati già disponibili.

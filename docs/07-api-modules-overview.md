@@ -41,7 +41,7 @@ Nel backend reale risultano implementati i seguenti moduli API:
 
 Sono inoltre presenti e utilizzati:
 
-- security JWT;
+- autenticazione server-side Spring Session JDBC + Spring Security 7 con CSRF;
 - gestione centralizzata degli errori;
 - relazione professionista-cliente tramite `ProfessionalClientLink`.
 
@@ -57,29 +57,37 @@ Il modulo **Auth** gestisce:
 - registrazione cliente tramite codice invito;
 - validazione preventiva del codice invito per registrazione cliente;
 - verifica email uniforme per professionisti e clienti;
-- login;
-- generazione di access token e refresh token distinti tramite claim interno.
+- esposizione del token CSRF di sessione;
+- login session-based (`204`, cookie HttpOnly, senza JWT/Bearer);
+- logout con invalidazione sessione.
 
 ### Endpoint implementati
 
+- `GET /api/v1/auth/csrf`
 - `POST /api/v1/auth/register/professional`
 - `POST /api/v1/auth/register/client`
 - `POST /api/v1/auth/register/client/validate-invite`
 - `POST /api/v1/auth/email-verification/confirm`
 - `POST /api/v1/auth/email-verification/resend`
 - `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+
+### Contratto autenticazione
+
+- le mutazioni richiedono header CSRF (tipicamente `X-CSRF-TOKEN`);
+- `POST /login` con CSRF → `204 No Content`, nessun `accessToken`/`refreshToken`;
+- dopo login il client deve richiamare `GET /csrf` (token ruotato) e bootstrap `/me/account` + `/me/profile`;
+- `POST /logout` con CSRF → `204`, sessione invalidata;
+- nessun JWT runtime, nessun Bearer, nessun refresh token.
 
 ### Cosa non gestisce ancora
 
-Il refresh token viene generato e restituito al login, ma non è accettato come Bearer sugli endpoint protetti. Non risultano ancora implementati:
+Non risultano ancora implementati:
 
-- endpoint di refresh e rinnovo dell’access token;
-- persistenza, rotazione e revoca del refresh token;
-- logout applicativo;
 - forgot password;
 - reset password.
 
-Entrambe le registrazioni producono account pending senza JWT e un token valido 24 ore. La registrazione cliente continua a consumare l'invito e creare il link nella stessa transazione, ma le query Clients escludono il cliente fino alla conferma. La conferma POST è idempotente sullo stato finale coerente; il vecchio GET mutante è stato rimosso. Il reinvio è comune ai due ruoli, risponde sempre 202 per email valide, applica 60 secondi di cooldown e sostituisce tecnicamente i token non usati tramite `used/usedAt`. Non espone token o stato account e non modifica inviti o link. Auth pubblica una richiesta email nella stessa transazione; un listener sincrono la consegna `AFTER_COMMIT` tramite una porta indipendente dal provider. Il link usa `#token=...`; `DISABLED` è il default locale, `IN_MEMORY` serve test e CI senza rete e `SMTP` usa JavaMail per un messaggio testuale UTF-8. Un fallimento di consegna non annulla registrazione o reinvio; retry, outbox e rate limiting distribuito non sono implementati.
+Entrambe le registrazioni producono account pending senza sessione di login e un token email valido 24 ore. La registrazione cliente continua a consumare l'invito e creare il link nella stessa transazione, ma le query Clients escludono il cliente fino alla conferma. La conferma POST è idempotente sullo stato finale coerente; il vecchio GET mutante è stato rimosso. Il reinvio è comune ai due ruoli, risponde sempre 202 per email valide, applica 60 secondi di cooldown e sostituisce tecnicamente i token non usati tramite `used/usedAt`. Non espone token o stato account e non modifica inviti o link. Auth pubblica una richiesta email nella stessa transazione; un listener sincrono la consegna `AFTER_COMMIT` tramite una porta indipendente dal provider. Il link usa `#token=...`; `DISABLED` è il default locale, `IN_MEMORY` serve test e CI senza rete e `SMTP` usa JavaMail per un messaggio testuale UTF-8. Un fallimento di consegna non annulla registrazione o reinvio; retry, outbox e rate limiting distribuito non sono implementati.
 
 ---
 
@@ -375,15 +383,12 @@ Modulo futuro dedicato allo storico delle misurazioni fisiche del cliente.
 
 Oltre ai moduli business non ancora implementati, restano da valutare o sviluppare:
 
-- endpoint e lifecycle completo del refresh token;
-- persistenza, rotazione e revoca dei refresh token;
-- logout;
 - forgot password;
 - reset password;
 - upload immagine profilo;
 - cambio password autenticato;
 - API dedicate per gestione link;
-- integrazione frontend reale;
+- integrazione frontend reale (adozione del contratto sessione/CSRF già esposto dal backend);
 - preparazione deploy.
 
 ---

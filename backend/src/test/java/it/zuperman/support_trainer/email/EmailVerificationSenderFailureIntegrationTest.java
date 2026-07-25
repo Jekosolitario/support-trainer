@@ -32,6 +32,8 @@ import it.zuperman.support_trainer.email.support.EmailTestClockConfiguration;
 import it.zuperman.support_trainer.email.support.EmailTestClockConfiguration.MutableTestClock;
 import it.zuperman.support_trainer.invite.repository.InviteCodeRepository;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 
 import static it.zuperman.support_trainer.email.support.EmailTestClockConfiguration.INITIAL_INSTANT;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -98,7 +100,9 @@ class EmailVerificationSenderFailureIntegrationTest {
 
     @Test
     void senderFailureShouldNotChangeRegistrationOrResendResponses(CapturedOutput output) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         MvcResult registration = mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -126,7 +130,9 @@ class EmailVerificationSenderFailureIntegrationTest {
                 .doesNotContain(EMAIL, registrationTokens.get(0).getToken(), "https://frontend.test/verify-email");
 
         clock.setInstant(INITIAL_INSTANT.plusSeconds(60));
+        csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/email-verification/resend")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"%s\"}".formatted(EMAIL)))
                 .andExpect(status().isAccepted());

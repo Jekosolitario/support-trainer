@@ -13,12 +13,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import org.springframework.test.web.servlet.ResultActions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -36,6 +35,8 @@ import it.zuperman.support_trainer.invite.repository.InviteCodeRepository;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 import jakarta.transaction.Transactional;
 
 @SpringBootTest
@@ -84,9 +85,7 @@ class AuthControllerRegistrationIntegrationTest {
                 }
                 """.formatted(email, password);
 
-        mockMvc.perform(post("/api/v1/auth/register/professional")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        registerProfessionalRequest(requestBody)
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.message").isNotEmpty());
 
@@ -111,9 +110,7 @@ class AuthControllerRegistrationIntegrationTest {
                 }
                 """.formatted(email, password);
 
-        mockMvc.perform(post("/api/v1/auth/register/professional")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        registerProfessionalRequest(requestBody)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.message").value("La richiesta contiene dati non validi"))
@@ -146,9 +143,7 @@ class AuthControllerRegistrationIntegrationTest {
                 }
                 """.formatted(email, password);
 
-        mockMvc.perform(post("/api/v1/auth/register/client")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        registerClientRequest(requestBody)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("password"))
@@ -172,9 +167,7 @@ class AuthControllerRegistrationIntegrationTest {
                 }
                 """.formatted(email);
 
-        mockMvc.perform(post("/api/v1/auth/register/professional")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        registerProfessionalRequest(requestBody)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("password"))
@@ -197,18 +190,14 @@ class AuthControllerRegistrationIntegrationTest {
                 }
                 """;
 
-        MvcResult firstRegistration = mockMvc.perform(post("/api/v1/auth/register/professional")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        MvcResult firstRegistration = registerProfessionalRequest(requestBody)
                 .andExpect(status().isAccepted())
                 .andReturn();
 
         long tokenCountAfterFirstRegistration = emailVerificationTokenRepository.count();
         long professionalCountAfterFirstRegistration = professionalProfileRepository.count();
 
-        MvcResult secondRegistration = mockMvc.perform(post("/api/v1/auth/register/professional")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        MvcResult secondRegistration = registerProfessionalRequest(requestBody)
                 .andExpect(status().isAccepted())
                 .andReturn();
 
@@ -237,9 +226,7 @@ class AuthControllerRegistrationIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/auth/register/client")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        registerClientRequest(requestBody)
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_FOUND"));
     }
@@ -284,9 +271,7 @@ class AuthControllerRegistrationIntegrationTest {
                 }
                 """.formatted(clientEmail, inviteCodeValue);
 
-        mockMvc.perform(post("/api/v1/auth/register/client")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        registerClientRequest(requestBody)
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.message").isNotEmpty());
 
@@ -375,9 +360,7 @@ class AuthControllerRegistrationIntegrationTest {
                 }
                 """.formatted(existingEmail, inviteCode.getCode());
 
-        MvcResult response = mockMvc.perform(post("/api/v1/auth/register/client")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        MvcResult response = registerClientRequest(requestBody)
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.message").isNotEmpty())
                 .andReturn();
@@ -411,9 +394,7 @@ class AuthControllerRegistrationIntegrationTest {
         existingClient.setActive(true);
         clientProfileRepository.saveAndFlush(existingClient);
 
-        mockMvc.perform(post("/api/v1/auth/register/client")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        registerClientRequest("""
                                 {
                                   "firstName": "Giulia",
                                   "lastName": "Neri",
@@ -425,7 +406,7 @@ class AuthControllerRegistrationIntegrationTest {
                                   "gender": "FEMALE",
                                   "inviteCode": "INVITE-NOT-EXISTING"
                                 }
-                                """.formatted(existingEmail)))
+                                """.formatted(existingEmail))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_FOUND"));
     }
@@ -445,9 +426,7 @@ class AuthControllerRegistrationIntegrationTest {
                 }
                 """.formatted(professionalEmail, password);
 
-        mockMvc.perform(post("/api/v1/auth/register/professional")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(professionalRegistrationRequestBody))
+        registerProfessionalRequest(professionalRegistrationRequestBody)
                 .andExpect(status().isAccepted());
 
         ProfessionalProfile savedProfessional = professionalProfileRepository
@@ -459,32 +438,16 @@ class AuthControllerRegistrationIntegrationTest {
                 .findFirst()
                 .orElseThrow();
 
-        mockMvc.perform(post("/api/v1/auth/email-verification/confirm")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"token":"%s"}
-                                """.formatted(verificationToken.getToken())))
-                .andExpect(status().isOk());
+        confirmEmail(verificationToken.getToken());
 
-        String professionalLoginRequestBody = """
-                {
-                  "email": "%s",
-                  "password": "%s"
-                }
-                """.formatted(professionalEmail, password);
-
-        MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(professionalLoginRequestBody))
-                .andExpect(status().isOk())
-                .andReturn();
-        String professionalToken = JsonPath.read(
-                loginResult.getResponse().getContentAsString(),
-                "$.accessToken"
+        CsrfSession professionalAuth = SessionAuthTestSupport.loginAndRefreshCsrf(
+                mockMvc,
+                professionalEmail,
+                password
         );
 
         MvcResult inviteResult = mockMvc.perform(post("/api/v1/invites")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + professionalToken))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth)))
                 .andExpect(status().isCreated())
                 .andReturn();
         String inviteCode = JsonPath.read(
@@ -506,9 +469,7 @@ class AuthControllerRegistrationIntegrationTest {
                 }
                 """.formatted(inviteCode);
 
-        mockMvc.perform(post("/api/v1/auth/register/client")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(firstClientRequestBody))
+        registerClientRequest(firstClientRequestBody)
                 .andExpect(status().isAccepted());
 
         String secondClientRequestBody = """
@@ -525,9 +486,34 @@ class AuthControllerRegistrationIntegrationTest {
                 }
                 """.formatted(inviteCode);
 
-        mockMvc.perform(post("/api/v1/auth/register/client")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(secondClientRequestBody))
+        registerClientRequest(secondClientRequestBody)
                 .andExpect(status().isBadRequest());
+    }
+
+    private ResultActions registerProfessionalRequest(String content) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
+        return mockMvc.perform(post("/api/v1/auth/register/professional")
+                .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(content));
+    }
+
+    private ResultActions registerClientRequest(String content) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
+        return mockMvc.perform(post("/api/v1/auth/register/client")
+                .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(content));
+    }
+
+    private void confirmEmail(String token) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
+        mockMvc.perform(post("/api/v1/auth/email-verification/confirm")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"token":"%s"}
+                                """.formatted(token)))
+                .andExpect(status().isOk());
     }
 }

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import it.zuperman.support_trainer.invite.dto.response.InviteCodeResponse;
 import it.zuperman.support_trainer.invite.entity.InviteCode;
 import it.zuperman.support_trainer.invite.service.InviteCodeService;
+import it.zuperman.support_trainer.security.session.AuthenticatedUserIdResolver;
 
 @RestController
 @RequestMapping("/api/v1/invites")
@@ -21,14 +22,20 @@ import it.zuperman.support_trainer.invite.service.InviteCodeService;
 public class InviteController {
 
     private final InviteCodeService inviteCodeService;
+    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
-    public InviteController(InviteCodeService inviteCodeService) {
+    public InviteController(
+            InviteCodeService inviteCodeService,
+            AuthenticatedUserIdResolver authenticatedUserIdResolver
+    ) {
         this.inviteCodeService = inviteCodeService;
+        this.authenticatedUserIdResolver = authenticatedUserIdResolver;
     }
 
     @PostMapping
     public ResponseEntity<InviteCodeResponse> createInvite(Authentication authentication) {
-        InviteCode inviteCode = inviteCodeService.createInviteCode(authentication.getName());
+        Long professionalUserId = authenticatedUserIdResolver.requireUserId(authentication);
+        InviteCode inviteCode = inviteCodeService.createInviteCode(professionalUserId);
         InviteCodeResponse response = InviteCodeResponse.fromEntity(inviteCode);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -36,7 +43,8 @@ public class InviteController {
 
     @GetMapping
     public ResponseEntity<List<InviteCodeResponse>> getMyInviteCodes(Authentication authentication) {
-        List<InviteCodeResponse> response = inviteCodeService.getInviteCodesByProfessional(authentication.getName())
+        Long professionalUserId = authenticatedUserIdResolver.requireUserId(authentication);
+        List<InviteCodeResponse> response = inviteCodeService.getInviteCodesByProfessional(professionalUserId)
                 .stream()
                 .map(InviteCodeResponse::fromEntity)
                 .toList();

@@ -25,14 +25,14 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
@@ -42,7 +42,6 @@ import it.zuperman.support_trainer.booking.repository.BookingRequestRepository;
 import it.zuperman.support_trainer.booking.service.BookingService;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
-import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.Gender;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
@@ -50,7 +49,8 @@ import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
-import it.zuperman.support_trainer.security.jwt.JwtService;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 
 @SpringBootTest(classes = {
     SupportTrainerApplication.class,
@@ -63,6 +63,7 @@ import it.zuperman.support_trainer.security.jwt.JwtService;
 class BookingHistoricalResponseIntegrationTest {
 
     private static final Instant FIXED_NOW = Instant.parse("2026-01-15T10:00:00Z");
+    private static final String PASSWORD = "Password123!";
 
     @Autowired
     private MockMvc mockMvc;
@@ -83,9 +84,6 @@ class BookingHistoricalResponseIntegrationTest {
     private BookingRequestRepository bookingRequestRepository;
 
     @Autowired
-    private JwtService jwtService;
-
-    @Autowired
     private BookingService bookingService;
 
     @Autowired
@@ -94,16 +92,25 @@ class BookingHistoricalResponseIntegrationTest {
     @Autowired
     private jakarta.persistence.EntityManager entityManager;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     private ProfessionalProfile professional;
     private ClientProfile client;
     private ProfessionalClientLink link;
+    private CsrfSession professionalAuth;
+    private CsrfSession clientAuth;
 
     @BeforeEach
-    void setUpParticipants() {
+    void setUpParticipants() throws Exception {
         String suffix = UUID.randomUUID().toString();
-        professional = professionalProfileRepository.saveAndFlush(activeProfessional("professional-" + suffix + "@example.com"));
+        professional = professionalProfileRepository.saveAndFlush(
+                activeProfessional("professional-" + suffix + "@example.com")
+        );
         client = clientProfileRepository.saveAndFlush(activeClient("client-" + suffix + "@example.com"));
         link = professionalClientLinkRepository.saveAndFlush(new ProfessionalClientLink(professional, client));
+        professionalAuth = SessionAuthTestSupport.loginAndRefreshCsrf(mockMvc, professional.getEmail(), PASSWORD);
+        clientAuth = SessionAuthTestSupport.loginAndRefreshCsrf(mockMvc, client.getEmail(), PASSWORD);
     }
 
     @AfterEach
@@ -116,7 +123,7 @@ class BookingHistoricalResponseIntegrationTest {
         AvailabilitySlot slot = saveSlot("2026-07-20T15:30:00Z", "2026-07-20T16:30:00Z");
 
         mockMvc.perform(post("/api/v1/bookings")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(client))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"availabilitySlotId\":" + slot.getId() + ",\"note\":\"Richiesta sicura\"}"))
                 .andExpect(status().isCreated())
@@ -144,16 +151,16 @@ class BookingHistoricalResponseIntegrationTest {
 
         BookingRequest booking = bookingRequestRepository.findAll().getFirst();
 
-        mockMvc.perform(get("/api/v1/bookings/client").header(HttpHeaders.AUTHORIZATION, bearer(client)))
+        mockMvc.perform(get("/api/v1/bookings/client").with(SessionAuthTestSupport.withSession(clientAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].counterparty.displayName").value("Mario Rossi"))
                 .andExpect(jsonPath("$[0].counterparty.specialization").value("PERSONAL_TRAINER"));
-        mockMvc.perform(get("/api/v1/bookings/professional").header(HttpHeaders.AUTHORIZATION, bearer(professional)))
+        mockMvc.perform(get("/api/v1/bookings/professional").with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].counterparty.displayName").value("Luigi Bianchi"))
                 .andExpect(jsonPath("$[0].counterparty.specialization").doesNotExist());
         mockMvc.perform(get("/api/v1/bookings/{id}", booking.getId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(client)))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(booking.getId()));
     }
@@ -178,7 +185,7 @@ class BookingHistoricalResponseIntegrationTest {
         professionalClientLinkRepository.saveAndFlush(link);
 
         mockMvc.perform(get("/api/v1/bookings/{id}", bookingId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(client)))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.client.displayName").value("Luigi Bianchi"))
                 .andExpect(jsonPath("$.professional.displayName").value("Mario Rossi"))
@@ -186,15 +193,15 @@ class BookingHistoricalResponseIntegrationTest {
                 .andExpect(jsonPath("$.professional.profileImageUrl").value("https://images.test/professional-new.png"))
                 .andExpect(jsonPath("$.scheduledStart").value("2026-07-21T17:30:00+02:00"))
                 .andExpect(jsonPath("$.scheduledEnd").value("2026-07-21T18:30:00+02:00"));
-        mockMvc.perform(get("/api/v1/bookings/client").header(HttpHeaders.AUTHORIZATION, bearer(client)))
+        mockMvc.perform(get("/api/v1/bookings/client").with(SessionAuthTestSupport.withSession(clientAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(bookingId));
         mockMvc.perform(patch("/api/v1/bookings/{id}/cancel", bookingId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(client)))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
         mockMvc.perform(post("/api/v1/bookings")
-                .header(HttpHeaders.AUTHORIZATION, bearer(client))
+                .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"availabilitySlotId\":" + slot.getId() + "}"))
                 .andExpect(status().isNotFound());
@@ -210,23 +217,23 @@ class BookingHistoricalResponseIntegrationTest {
         long thirdBookingId = createBooking(thirdSlot);
 
         mockMvc.perform(patch("/api/v1/bookings/{id}/confirm", firstBookingId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professional)))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.confirmedAt").value("2026-01-15T10:00:00Z"))
                 .andExpect(jsonPath("$.rejectedAt").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.cancelledAt").value(org.hamcrest.Matchers.nullValue()));
         mockMvc.perform(patch("/api/v1/bookings/{id}/cancel", firstBookingId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(client)))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.confirmedAt").value("2026-01-15T10:00:00Z"))
                 .andExpect(jsonPath("$.cancelledAt").value("2026-01-15T10:00:00Z"));
         mockMvc.perform(patch("/api/v1/bookings/{id}/reject", secondBookingId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professional)))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rejectedAt").value("2026-01-15T10:00:00Z"))
                 .andExpect(jsonPath("$.confirmedAt").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.cancelledAt").value(org.hamcrest.Matchers.nullValue()));
-        mockMvc.perform(get("/api/v1/bookings/client").header(HttpHeaders.AUTHORIZATION, bearer(client)))
+        mockMvc.perform(get("/api/v1/bookings/client").with(SessionAuthTestSupport.withSession(clientAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(thirdBookingId))
                 .andExpect(jsonPath("$[1].id").value(secondBookingId))
@@ -248,11 +255,16 @@ class BookingHistoricalResponseIntegrationTest {
         SessionFactory sessionFactory = entityManagerFactory.unwrap(SessionFactory.class);
         sessionFactory.getStatistics().setStatisticsEnabled(true);
         sessionFactory.getStatistics().clear();
-        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
-                client.getEmail(),
-                null,
-                java.util.List.of(new SimpleGrantedAuthority("CLIENT"))
-        ));
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(
+                        new it.zuperman.support_trainer.security.session.AuthenticatedUserPrincipal(
+                                client.getId(),
+                                client.getEmail()
+                        ),
+                        null,
+                        java.util.List.of(new SimpleGrantedAuthority("CLIENT"))
+                )
+        );
 
         assertThat(bookingService.getClientBookingRequests()).hasSize(3);
         assertThat(sessionFactory.getStatistics().getPrepareStatementCount()).isLessThanOrEqualTo(2);
@@ -260,7 +272,7 @@ class BookingHistoricalResponseIntegrationTest {
 
     private long createBooking(AvailabilitySlot slot) throws Exception {
         mockMvc.perform(post("/api/v1/bookings")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(client))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"availabilitySlotId\":" + slot.getId() + "}"))
                 .andExpect(status().isCreated());
@@ -278,9 +290,9 @@ class BookingHistoricalResponseIntegrationTest {
         ));
     }
 
-    private static ProfessionalProfile activeProfessional(String email) {
+    private ProfessionalProfile activeProfessional(String email) {
         ProfessionalProfile value = new ProfessionalProfile(
-                "Mario", "Rossi", email, "encoded-password", ProfessionalSpecialization.PERSONAL_TRAINER
+                "Mario", "Rossi", email, passwordEncoder.encode(PASSWORD), ProfessionalSpecialization.PERSONAL_TRAINER
         );
         value.setAccountStatus(AccountStatus.ACTIVE);
         value.setEmailVerified(true);
@@ -288,9 +300,9 @@ class BookingHistoricalResponseIntegrationTest {
         return value;
     }
 
-    private static ClientProfile activeClient(String email) {
+    private ClientProfile activeClient(String email) {
         ClientProfile value = new ClientProfile(
-                "Luigi", "Bianchi", email, "encoded-password", LocalDate.of(1990, 1, 1),
+                "Luigi", "Bianchi", email, passwordEncoder.encode(PASSWORD), LocalDate.of(1990, 1, 1),
                 BigDecimal.valueOf(180), "Allenamento", Gender.MALE
         );
         value.setAccountStatus(AccountStatus.ACTIVE);
@@ -299,13 +311,8 @@ class BookingHistoricalResponseIntegrationTest {
         return value;
     }
 
-    private String bearer(User user) {
-        UserDetails details = org.springframework.security.core.userdetails.User.builder()
-                .username(user.getEmail())
-                .password(user.getPassword())
-                .authorities(user.getRole().name())
-                .build();
-        return "Bearer " + jwtService.generateAccessToken(details);
+    private static RequestPostProcessor withCsrf(CsrfSession csrfSession) {
+        return SessionAuthTestSupport.withCsrf(csrfSession);
     }
 
     @TestConfiguration

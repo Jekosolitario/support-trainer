@@ -50,7 +50,7 @@ Nel backend reale risultano implementate:
 
 - registrazione professionista;
 - verifica email uniforme per professionista e cliente;
-- login JWT;
+- login session-based (Spring Session JDBC + CSRF);
 - registrazione cliente tramite codice invito;
 - validazione preventiva del codice invito;
 - creazione automatica del collegamento professionista-cliente dopo registrazione cliente valida;
@@ -72,8 +72,6 @@ Non risultano ancora implementate:
 - piani alimentari;
 - feedback o segnalazioni sui contenuti;
 - misurazioni e storico progressi;
-- refresh token persistenti;
-- logout applicativo;
 - recupero e reset password;
 - upload immagine profilo;
 - frontend reale integrato con il backend;

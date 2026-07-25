@@ -6,7 +6,7 @@ import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.Role;
 
 /**
- * Minimal readiness projection for future session authentication checks.
+ * Minimal readiness projection for session authentication checks.
  * Contains only the fields required to validate account readiness and role coherence.
  */
 public final class UserSecuritySnapshot {

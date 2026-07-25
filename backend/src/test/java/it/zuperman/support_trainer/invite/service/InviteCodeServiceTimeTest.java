@@ -45,8 +45,7 @@ class InviteCodeServiceTimeTest {
         InviteCodeRepository inviteCodeRepository = mock(InviteCodeRepository.class);
         ProfessionalProfileRepository professionalRepository = mock(ProfessionalProfileRepository.class);
         ProfessionalProfile professional = activeProfessional();
-        when(professionalRepository.findByEmail("professional@example.com"))
-                .thenReturn(Optional.of(professional));
+        when(professionalRepository.findById(42L)).thenReturn(Optional.of(professional));
         when(inviteCodeRepository.saveAndFlush(any(InviteCode.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         InviteCodeService service = new InviteCodeService(
@@ -56,7 +55,7 @@ class InviteCodeServiceTimeTest {
                 new it.zuperman.support_trainer.common.security.UserReadinessValidator()
         );
 
-        InviteCode inviteCode = service.createInviteCode("professional@example.com");
+        InviteCode inviteCode = service.createInviteCode(42L);
 
         assertThat(inviteCode.getExpiresAt()).isEqualTo(fixedInstant.plus(Duration.ofHours(168)));
     }

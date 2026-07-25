@@ -34,11 +34,6 @@ import it.zuperman.support_trainer.session.MySqlSessionTestDatabaseNames;
 @EnabledIfSystemProperty(named = "it.mysql.enabled", matches = "true")
 class SpringSessionJdbcMySqlIntegrationTest {
 
-    static final String JWT_SECRET
-            = "VGhpc0lzQVRlc3RTZWNyZXRLZXlGb3JKV1RUaGF0SXNMb25nRW5vdWdoMTIzNDU2";
-    static final String JWT_EXPIRATION = "1h";
-    static final String JWT_REFRESH_EXPIRATION = "7d";
-
     @Test
     @DisplayName("MySQL: Flyway fino a V7, upgrade da V6, Hibernate validate e SessionRepository CRUD")
     void shouldMigrateValidateAndOperateSpringSessionOnMysql() throws Exception {
@@ -231,14 +226,6 @@ class SpringSessionJdbcMySqlIntegrationTest {
         }
     }
 
-    static String[] jwtContextArguments() {
-        return new String[] {
-                "--app.security.jwt.secret=" + JWT_SECRET,
-                "--app.security.jwt.expiration=" + JWT_EXPIRATION,
-                "--app.security.jwt.refresh-expiration=" + JWT_REFRESH_EXPIRATION
-        };
-    }
-
     private static ConfigurableApplicationContext springContext(
             String schema,
             String password,
@@ -258,12 +245,8 @@ class SpringSessionJdbcMySqlIntegrationTest {
                         "--spring.jpa.open-in-view=false",
                         "--spring.session.jdbc.initialize-schema=never",
                         "--spring.session.timeout=30m",
-                        "--app.cors.allowed-origins=http://localhost",
                         "--app.email.mode=DISABLED",
-                        "--app.email.verification-page-url=http://localhost:5173/verify-email",
-                        jwtContextArguments()[0],
-                        jwtContextArguments()[1],
-                        jwtContextArguments()[2]
+                        "--app.email.verification-page-url=http://localhost:5173/verify-email"
                 );
     }
 

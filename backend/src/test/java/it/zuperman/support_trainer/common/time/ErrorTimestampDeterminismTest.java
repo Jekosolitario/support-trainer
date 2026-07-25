@@ -12,24 +12,18 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 
-import io.jsonwebtoken.MalformedJwtException;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.exception.GlobalExceptionHandler;
+import it.zuperman.support_trainer.common.response.ErrorResponse;
 import it.zuperman.support_trainer.common.response.ErrorResponseFactory;
 import it.zuperman.support_trainer.common.response.ErrorResponseWriter;
 import it.zuperman.support_trainer.security.config.RestAccessDeniedHandler;
 import it.zuperman.support_trainer.security.config.RestAuthenticationEntryPoint;
-import it.zuperman.support_trainer.security.jwt.JwtAuthenticationFilter;
-import it.zuperman.support_trainer.security.jwt.JwtService;
-import it.zuperman.support_trainer.security.service.CustomUserDetailsService;
-import jakarta.servlet.FilterChain;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 class ErrorTimestampDeterminismTest {
 
@@ -58,7 +52,7 @@ class ErrorTimestampDeterminismTest {
 
         entryPoint.commence(request, response, new BadCredentialsException("test"));
 
-        assertThat(response.getHeader("WWW-Authenticate")).isEqualTo("Bearer");
+        assertThat(response.getHeader("WWW-Authenticate")).isNull();
         verify(writer).write(request, response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Utente non autenticato");
     }
 
@@ -75,21 +69,24 @@ class ErrorTimestampDeterminismTest {
     }
 
     @Test
-    void shouldDelegateInvalidJwtErrorToSharedWriter() throws Exception {
-        JwtService jwtService = mock(JwtService.class);
-        CustomUserDetailsService userDetailsService = mock(CustomUserDetailsService.class);
-        ErrorResponseWriter writer = mock(ErrorResponseWriter.class);
-        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtService, userDetailsService, writer);
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/test");
-        request.addHeader("Authorization", "Bearer invalid-token");
+    void shouldWriteUnauthorizedEntryPointTimestampAtFixedUtcInstant() throws Exception {
+        ErrorResponseFactory factory = new ErrorResponseFactory(fixedTimeProvider());
+        ErrorResponseWriter writer = new ErrorResponseWriter(JsonMapper.builder().build(), factory);
+        RestAuthenticationEntryPoint entryPoint = new RestAuthenticationEntryPoint(writer);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/me/account");
         MockHttpServletResponse response = new MockHttpServletResponse();
-        FilterChain filterChain = mock(FilterChain.class);
-        when(jwtService.extractUsername("invalid-token")).thenThrow(new MalformedJwtException("invalid"));
 
-        filter.doFilter(request, response, filterChain);
+        entryPoint.commence(request, response, new BadCredentialsException("test"));
 
-        assertThat(response.getHeader("WWW-Authenticate")).isEqualTo("Bearer");
-        verify(writer).write(eq(request), eq(response), eq(HttpStatus.UNAUTHORIZED), eq("INVALID_TOKEN"), any());
+        assertThat(response.getStatus()).isEqualTo(401);
+        ErrorResponse body = factory.create(
+                request,
+                HttpStatus.UNAUTHORIZED,
+                "UNAUTHORIZED",
+                "Utente non autenticato"
+        );
+        assertThat(body.timestamp()).isEqualTo(FIXED_INSTANT);
+        assertThat(response.getContentAsString()).contains("\"timestamp\":\"2026-07-13T15:30:45Z\"");
     }
 
     private static ApplicationTimeProvider fixedTimeProvider() {

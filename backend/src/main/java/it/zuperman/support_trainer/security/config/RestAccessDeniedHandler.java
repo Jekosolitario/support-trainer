@@ -5,6 +5,7 @@ import java.io.IOException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.stereotype.Component;
 
 import it.zuperman.support_trainer.common.response.ErrorResponseWriter;
@@ -27,6 +28,28 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
             HttpServletResponse response,
             AccessDeniedException accessDeniedException
     ) throws IOException, ServletException {
+        if (isCsrfFailure(accessDeniedException)) {
+            errorResponseWriter.write(
+                    request,
+                    response,
+                    HttpStatus.FORBIDDEN,
+                    "CSRF_VALIDATION_FAILED",
+                    "La verifica di sicurezza della richiesta non è riuscita"
+            );
+            return;
+        }
+
         errorResponseWriter.write(request, response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Accesso negato");
+    }
+
+    private static boolean isCsrfFailure(AccessDeniedException accessDeniedException) {
+        Throwable current = accessDeniedException;
+        while (current != null) {
+            if (current instanceof CsrfException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

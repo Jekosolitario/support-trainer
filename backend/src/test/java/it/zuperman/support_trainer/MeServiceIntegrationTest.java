@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
+import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.ClientOperationalStatus;
 import it.zuperman.support_trainer.common.enums.Gender;
@@ -34,6 +35,7 @@ import it.zuperman.support_trainer.profile.dto.request.UpdateOperationalStatusRe
 import it.zuperman.support_trainer.profile.dto.response.MyAccountResponse;
 import it.zuperman.support_trainer.profile.dto.response.MyProfileResponse;
 import it.zuperman.support_trainer.profile.service.MeService;
+import it.zuperman.support_trainer.security.session.AuthenticatedUserPrincipal;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 
@@ -63,7 +65,7 @@ class MeServiceIntegrationTest {
     @DisplayName("Cliente autenticato deve leggere il proprio profilo e account")
     void shouldReturnAuthenticatedClientProfileAndAccount() {
         ClientProfile client = createActiveClient();
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         MyProfileResponse profile = meService.getMyProfile();
         MyAccountResponse account = meService.getMyAccount();
@@ -93,7 +95,7 @@ class MeServiceIntegrationTest {
         ClientProfile client = createActiveClient();
         client.setEmailVerified(false);
         clientProfileRepository.saveAndFlush(client);
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         assertThatThrownBy(() -> meService.getMyAccount())
                 .isInstanceOfSatisfying(AppException.class, exception -> {
@@ -108,7 +110,7 @@ class MeServiceIntegrationTest {
         ClientProfile client = createActiveClient();
         client.setActive(false);
         clientProfileRepository.saveAndFlush(client);
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         UpdateOperationalStatusRequest request = new UpdateOperationalStatusRequest();
         request.setOperationalStatus("PAUSA");
@@ -128,7 +130,7 @@ class MeServiceIntegrationTest {
         professional.setCity("Roma");
         professionalProfileRepository.save(professional);
 
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         MyProfileResponse profile = meService.getMyProfile();
         MyAccountResponse account = meService.getMyAccount();
@@ -158,7 +160,7 @@ class MeServiceIntegrationTest {
     @DisplayName("Cliente deve aggiornare solo i campi consentiti del proprio profilo")
     void shouldPartiallyUpdateClientProfileAndRejectProfessionalFields() {
         ClientProfile client = createActiveClient();
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         UpdateMyProfileRequest request = new UpdateMyProfileRequest();
         request.setFirstName(" Luca ");
@@ -190,7 +192,7 @@ class MeServiceIntegrationTest {
     @DisplayName("Professionista deve aggiornare solo i campi consentiti del proprio profilo")
     void shouldPartiallyUpdateProfessionalProfileAndRejectClientFields() {
         ProfessionalProfile professional = createActivePersonalTrainer();
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         UpdateMyProfileRequest request = new UpdateMyProfileRequest();
         request.setLastName(" Verdi ");
@@ -223,7 +225,7 @@ class MeServiceIntegrationTest {
     @DisplayName("Cliente deve aggiornare il proprio stato operativo")
     void shouldUpdateClientOperationalStatus() {
         ClientProfile client = createActiveClient();
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         UpdateOperationalStatusRequest request = new UpdateOperationalStatusRequest();
         request.setOperationalStatus(" pausa ");
@@ -241,7 +243,7 @@ class MeServiceIntegrationTest {
     @DisplayName("Professionista deve aggiornare il proprio stato operativo")
     void shouldUpdateProfessionalOperationalStatus() {
         ProfessionalProfile professional = createActivePersonalTrainer();
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         UpdateOperationalStatusRequest request = new UpdateOperationalStatusRequest();
         request.setOperationalStatus(" ferie ");
@@ -259,7 +261,7 @@ class MeServiceIntegrationTest {
     @DisplayName("Stato operativo non valido deve essere rifiutato")
     void shouldRejectInvalidOperationalStatus() {
         ClientProfile client = createActiveClient();
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         UpdateOperationalStatusRequest request = new UpdateOperationalStatusRequest();
         request.setOperationalStatus("NON_VALIDO");
@@ -283,7 +285,7 @@ class MeServiceIntegrationTest {
 
         professionalProfileRepository.save(professional);
 
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         UpdateMyProfileRequest request = new UpdateMyProfileRequest();
         request.setInstagramUrl("");
@@ -357,12 +359,12 @@ class MeServiceIntegrationTest {
         return clientProfileRepository.save(client);
     }
 
-    private void authenticateAs(String email, String authority) {
+    private void authenticateAs(User user) {
         UsernamePasswordAuthenticationToken authentication
-                = new UsernamePasswordAuthenticationToken(
-                        email,
+                = UsernamePasswordAuthenticationToken.authenticated(
+                        new AuthenticatedUserPrincipal(user.getId(), user.getEmail()),
                         null,
-                        List.of(new SimpleGrantedAuthority(authority))
+                        List.of(new SimpleGrantedAuthority(user.getRole().name()))
                 );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);

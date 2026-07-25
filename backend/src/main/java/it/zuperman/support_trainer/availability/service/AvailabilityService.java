@@ -4,8 +4,6 @@ import java.time.Instant;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,19 +20,19 @@ import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
 import it.zuperman.support_trainer.common.enums.BookingRequestStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
-import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.common.security.UserReadinessValidator;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.common.time.BusinessDateTimeMapper;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
+import it.zuperman.support_trainer.security.session.AuthenticatedUserLoader;
 
 @Service
 public class AvailabilityService {
 
     private final AvailabilitySlotRepository availabilitySlotRepository;
-    private final UserRepository userRepository;
+    private final AuthenticatedUserLoader authenticatedUserLoader;
     private final ProfessionalProfileRepository professionalProfileRepository;
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
     private final BookingRequestItemRepository bookingRequestItemRepository;
@@ -44,7 +42,7 @@ public class AvailabilityService {
 
     public AvailabilityService(
             AvailabilitySlotRepository availabilitySlotRepository,
-            UserRepository userRepository,
+            AuthenticatedUserLoader authenticatedUserLoader,
             ProfessionalProfileRepository professionalProfileRepository,
             ProfessionalClientLinkRepository professionalClientLinkRepository,
             BookingRequestItemRepository bookingRequestItemRepository,
@@ -53,7 +51,7 @@ public class AvailabilityService {
             UserReadinessValidator userReadinessValidator
     ) {
         this.availabilitySlotRepository = availabilitySlotRepository;
-        this.userRepository = userRepository;
+        this.authenticatedUserLoader = authenticatedUserLoader;
         this.professionalProfileRepository = professionalProfileRepository;
         this.professionalClientLinkRepository = professionalClientLinkRepository;
         this.bookingRequestItemRepository = bookingRequestItemRepository;
@@ -392,34 +390,9 @@ public class AvailabilityService {
     }
 
     private User getAuthenticatedUser() {
-        String email = getAuthenticatedEmail();
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException(
-                HttpStatus.UNAUTHORIZED,
-                "AUTHENTICATED_USER_NOT_FOUND",
-                "Utente autenticato non trovato"
-        ));
-
+        User user = authenticatedUserLoader.requireAuthenticatedUser();
         userReadinessValidator.validateOperationalUser(user);
         return user;
-    }
-
-    private String getAuthenticatedEmail() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || authentication.getName() == null
-                || "anonymousUser".equals(authentication.getName())) {
-            throw new AppException(
-                    HttpStatus.UNAUTHORIZED,
-                    "UNAUTHORIZED",
-                    "Utente non autenticato"
-            );
-        }
-
-        return authentication.getName().trim().toLowerCase();
     }
 
 }

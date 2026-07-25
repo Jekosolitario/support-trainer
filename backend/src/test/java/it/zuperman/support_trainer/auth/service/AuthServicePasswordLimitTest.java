@@ -13,8 +13,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import it.zuperman.support_trainer.auth.dto.request.LoginRequest;
 import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.common.security.UserReadinessValidator;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
-import it.zuperman.support_trainer.security.jwt.JwtService;
 
 class AuthServicePasswordLimitTest {
 
@@ -25,11 +25,10 @@ class AuthServicePasswordLimitTest {
             mock(EmailVerificationTokenRepository.class),
             mock(PasswordEncoder.class),
             authenticationManager,
-            mock(JwtService.class),
             mock(ApplicationTimeProvider.class),
             mock(ApplicationEventPublisher.class),
             mock(RegistrationPersistenceService.class),
-            new it.zuperman.support_trainer.common.security.UserReadinessValidator()
+            new UserReadinessValidator()
     );
 
     @Test
@@ -39,7 +38,7 @@ class AuthServicePasswordLimitTest {
                 "A1!" + "a".repeat(70)
         );
 
-        assertThatThrownBy(() -> authService.login(request))
+        assertThatThrownBy(() -> authService.authenticateForSession(request))
                 .isInstanceOf(BadCredentialsException.class)
                 .hasMessage("Credenziali non valide");
         verifyNoInteractions(authenticationManager, userRepository);

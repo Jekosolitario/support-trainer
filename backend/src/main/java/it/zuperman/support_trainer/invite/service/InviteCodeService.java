@@ -42,8 +42,8 @@ public class InviteCodeService {
     }
 
     @Transactional
-    public InviteCode createInviteCode(String professionalEmail) {
-        ProfessionalProfile professional = getVerifiedActiveProfessional(professionalEmail);
+    public InviteCode createInviteCode(Long professionalUserId) {
+        ProfessionalProfile professional = getVerifiedActiveProfessional(professionalUserId);
 
         String code = buildReadableCode();
         Instant expiresAt = timeProvider.nowInstant().plus(INVITE_CODE_VALIDITY);
@@ -62,8 +62,8 @@ public class InviteCodeService {
     }
 
     @Transactional(readOnly = true)
-    public List<InviteCode> getInviteCodesByProfessional(String professionalEmail) {
-        ProfessionalProfile professional = getVerifiedActiveProfessional(professionalEmail);
+    public List<InviteCode> getInviteCodesByProfessional(Long professionalUserId) {
+        ProfessionalProfile professional = getVerifiedActiveProfessional(professionalUserId);
 
         return inviteCodeRepository.findAllByProfessional_IdOrderByCreatedAtDesc(professional.getId());
     }
@@ -137,8 +137,8 @@ public class InviteCodeService {
         }
     }
 
-    private ProfessionalProfile getVerifiedActiveProfessional(String professionalEmail) {
-        ProfessionalProfile professional = professionalProfileRepository.findByEmail(professionalEmail)
+    private ProfessionalProfile getVerifiedActiveProfessional(Long professionalUserId) {
+        ProfessionalProfile professional = professionalProfileRepository.findById(professionalUserId)
                 .orElseThrow(() -> new AppException(
                 HttpStatus.FORBIDDEN,
                 "FORBIDDEN_OPERATION",

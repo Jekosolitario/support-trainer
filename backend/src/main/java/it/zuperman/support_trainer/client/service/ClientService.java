@@ -3,8 +3,6 @@ package it.zuperman.support_trainer.client.service;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,25 +12,25 @@ import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.exception.AppException;
-import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.common.security.UserReadinessValidator;
 import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
+import it.zuperman.support_trainer.security.session.AuthenticatedUserLoader;
 
 @Service
 public class ClientService {
 
-    private final UserRepository userRepository;
+    private final AuthenticatedUserLoader authenticatedUserLoader;
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
     private final UserReadinessValidator userReadinessValidator;
 
     public ClientService(
-            UserRepository userRepository,
+            AuthenticatedUserLoader authenticatedUserLoader,
             ProfessionalClientLinkRepository professionalClientLinkRepository,
             UserReadinessValidator userReadinessValidator
     ) {
-        this.userRepository = userRepository;
+        this.authenticatedUserLoader = authenticatedUserLoader;
         this.professionalClientLinkRepository = professionalClientLinkRepository;
         this.userReadinessValidator = userReadinessValidator;
     }
@@ -92,33 +90,8 @@ public class ClientService {
     }
 
     private User getAuthenticatedUser() {
-        String email = getAuthenticatedEmail();
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException(
-                HttpStatus.UNAUTHORIZED,
-                "AUTHENTICATED_USER_NOT_FOUND",
-                "Utente autenticato non trovato"
-        ));
-
+        User user = authenticatedUserLoader.requireAuthenticatedUser();
         userReadinessValidator.validateOperationalUser(user);
         return user;
-    }
-
-    private String getAuthenticatedEmail() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || authentication.getName() == null
-                || "anonymousUser".equals(authentication.getName())) {
-            throw new AppException(
-                    HttpStatus.UNAUTHORIZED,
-                    "UNAUTHORIZED",
-                    "Utente non autenticato"
-            );
-        }
-
-        return authentication.getName().trim().toLowerCase();
     }
 }

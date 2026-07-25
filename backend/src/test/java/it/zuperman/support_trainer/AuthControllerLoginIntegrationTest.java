@@ -1,9 +1,15 @@
 package it.zuperman.support_trainer;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import java.nio.charset.StandardCharsets;
 
-import com.jayway.jsonpath.JsonPath;
-import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,16 +20,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
 import it.zuperman.support_trainer.auth.token.EmailVerificationToken;
 import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 import jakarta.transaction.Transactional;
 
 @SpringBootTest
@@ -66,10 +70,91 @@ class AuthControllerLoginIntegrationTest {
     }
 
     @Test
-    @DisplayName("Professionista verificato deve effettuare il login e ricevere i token")
-    void shouldLoginVerifiedProfessionalAndReturnTokens() throws Exception {
+    @DisplayName("Professionista verificato deve effettuare il login con sessione e cookie STSESSION")
+    void shouldLoginVerifiedProfessionalWithSessionCookie() throws Exception {
         String email = "anna.neri@example.com";
         String password = "Password123!";
+        registerAndVerifyProfessional(email, password);
+
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(SessionAuthTestSupport.loginBody(email, password)))
+                .andExpect(status().isNoContent())
+                .andExpect(jsonPath("$").doesNotExist())
+                .andExpect(cookie().exists("STSESSION"));
+
+        CsrfSession session = SessionAuthTestSupport.login(mockMvc, email, password);
+        mockMvc.perform(get("/api/v1/me/account")
+                        .with(SessionAuthTestSupport.withSession(session)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Professionista verificato con profilo inactive deve comunque effettuare il login")
+    void shouldLoginVerifiedProfessionalWithInactiveProfile() throws Exception {
+        String email = "inactive.profile.login@example.com";
+        String password = "Password123!";
+        registerAndVerifyProfessional(email, password);
+
+        ProfessionalProfile professional = (ProfessionalProfile) userRepository.findByEmail(email).orElseThrow();
+        professional.setActive(false);
+        userRepository.saveAndFlush(professional);
+
+        CsrfSession session = SessionAuthTestSupport.login(mockMvc, email, password);
+        mockMvc.perform(get("/api/v1/me/account")
+                        .with(SessionAuthTestSupport.withSession(session)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Professionista verificato non deve effettuare il login con password errata")
+    void shouldRejectLoginWithIncorrectPassword() throws Exception {
+        String email = "paolo.bianchi@example.com";
+        String password = "Password123!";
+        registerAndVerifyProfessional(email, password);
+
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(SessionAuthTestSupport.loginBody(email, "WrongPassword123!")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_ERROR"))
+                .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE));
+    }
+
+    @Test
+    @DisplayName("Professionista non verificato non deve effettuare il login")
+    void shouldRejectLoginBeforeEmailVerification() throws Exception {
+        String email = "giulia.romano@example.com";
+        String password = "Password123!";
+        registerProfessional(email, password);
+
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(SessionAuthTestSupport.loginBody(email, password)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_ACTIVE"));
+    }
+
+    private void registerAndVerifyProfessional(String email, String password) throws Exception {
+        registerProfessional(email, password);
+
+        User savedUser = userRepository.findByEmail(email).orElseThrow();
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
+                .stream()
+                .filter(token -> token.getUser().getId().equals(savedUser.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        confirmEmail(verificationToken.getToken());
+    }
+
+    private void registerProfessional(String email, String password) throws Exception {
         String registrationRequestBody = """
                 {
                   "firstName": "Anna",
@@ -80,154 +165,18 @@ class AuthControllerLoginIntegrationTest {
                 }
                 """.formatted(email, password);
 
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registrationRequestBody))
                 .andExpect(status().isAccepted());
-
-        User savedUser = userRepository.findByEmail(email).orElseThrow();
-        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
-                .stream()
-                .filter(token -> token.getUser().getId().equals(savedUser.getId()))
-                .findFirst()
-                .orElseThrow();
-
-        confirmEmail(verificationToken.getToken());
-
-        String loginRequestBody = """
-                {
-                  "email": "%s",
-                  "password": "%s"
-                }
-                """.formatted(email, password);
-
-        MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginRequestBody))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
-                .andReturn();
-
-        String responseBody = loginResult.getResponse().getContentAsString();
-        String accessToken = JsonPath.read(responseBody, "$.accessToken");
-        String refreshToken = JsonPath.read(responseBody, "$.refreshToken");
-
-        mockMvc.perform(get("/api/v1/me/account")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(get("/api/v1/me/account")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + refreshToken))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
-    }
-
-    @Test
-    @DisplayName("Professionista verificato non deve effettuare il login con password errata")
-    void shouldRejectLoginWithIncorrectPassword() throws Exception {
-        String email = "paolo.bianchi@example.com";
-        String password = "Password123!";
-        String registrationRequestBody = """
-                {
-                  "firstName": "Paolo",
-                  "lastName": "Bianchi",
-                  "email": "%s",
-                  "password": "%s",
-                  "specialization": "PERSONAL_TRAINER"
-                }
-                """.formatted(email, password);
-
-        mockMvc.perform(post("/api/v1/auth/register/professional")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(registrationRequestBody))
-                .andExpect(status().isAccepted());
-
-        User savedUser = userRepository.findByEmail(email).orElseThrow();
-        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
-                .stream()
-                .filter(token -> token.getUser().getId().equals(savedUser.getId()))
-                .findFirst()
-                .orElseThrow();
-
-        confirmEmail(verificationToken.getToken());
-
-        String loginRequestBody = """
-                {
-                  "email": "%s",
-                  "password": "WrongPassword123!"
-                }
-                """.formatted(email);
-
-        mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginRequestBody))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTHENTICATION_ERROR"));
-    }
-
-    @Test
-    @DisplayName("Professionista non verificato non deve effettuare il login")
-    void shouldRejectLoginBeforeEmailVerification() throws Exception {
-        String email = "giulia.romano@example.com";
-        String password = "Password123!";
-        String registrationRequestBody = """
-                {
-                  "firstName": "Giulia",
-                  "lastName": "Romano",
-                  "email": "%s",
-                  "password": "%s",
-                  "specialization": "PERSONAL_TRAINER"
-                }
-                """.formatted(email, password);
-
-        mockMvc.perform(post("/api/v1/auth/register/professional")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(registrationRequestBody))
-                .andExpect(status().isAccepted());
-
-        String loginRequestBody = """
-                {
-                  "email": "%s",
-                  "password": "%s"
-                }
-                """.formatted(email, password);
-
-        mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginRequestBody))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_ACTIVE"));
-    }
-
-    private void registerAndVerifyProfessional(String email, String password) throws Exception {
-        String registrationRequestBody = """
-                {
-                  "firstName": "Password",
-                  "lastName": "Limit",
-                  "email": "%s",
-                  "password": "%s",
-                  "specialization": "PERSONAL_TRAINER"
-                }
-                """.formatted(email, password);
-
-        mockMvc.perform(post("/api/v1/auth/register/professional")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(registrationRequestBody))
-                .andExpect(status().isAccepted());
-
-        User savedUser = userRepository.findByEmail(email).orElseThrow();
-        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findAll()
-                .stream()
-                .filter(token -> token.getUser().getId().equals(savedUser.getId()))
-                .findFirst()
-                .orElseThrow();
-
-        confirmEmail(verificationToken.getToken());
     }
 
     private void confirmEmail(String token) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/email-verification/confirm")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"token":"%s"}
@@ -236,16 +185,11 @@ class AuthControllerLoginIntegrationTest {
     }
 
     private void assertGenericInvalidCredentials(String email, String password) throws Exception {
-        String loginRequestBody = """
-                {
-                  "email": "%s",
-                  "password": "%s"
-                }
-                """.formatted(email, password);
-
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/login")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginRequestBody))
+                        .content(SessionAuthTestSupport.loginBody(email, password)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.code").value("AUTHENTICATION_ERROR"))

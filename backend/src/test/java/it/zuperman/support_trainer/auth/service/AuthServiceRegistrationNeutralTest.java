@@ -24,7 +24,6 @@ import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.common.security.UserReadinessValidator;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
-import it.zuperman.support_trainer.security.jwt.JwtService;
 
 class AuthServiceRegistrationNeutralTest {
 
@@ -36,7 +35,6 @@ class AuthServiceRegistrationNeutralTest {
             mock(EmailVerificationTokenRepository.class),
             passwordEncoder,
             mock(AuthenticationManager.class),
-            mock(JwtService.class),
             mock(ApplicationTimeProvider.class),
             mock(ApplicationEventPublisher.class),
             registrationPersistenceService,

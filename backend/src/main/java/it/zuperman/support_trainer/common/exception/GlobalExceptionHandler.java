@@ -164,7 +164,6 @@ public class GlobalExceptionHandler {
     ) {
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .header(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
                 .body(errorResponseFactory.create(
                         request,
                         HttpStatus.UNAUTHORIZED,

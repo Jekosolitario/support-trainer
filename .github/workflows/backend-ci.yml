@@ -124,5 +124,6 @@ jobs:
           -Dit.mysql.enabled=true
           -Dit.mysql.empty-schema=support_trainer_session_test_empty
           -Dit.mysql.v6-schema=support_trainer_session_test_from_v6
-          -Dtest=SpringSessionJdbcMySqlIntegrationTest
+          -Dit.mysql.auth-schema=support_trainer_session_test_auth
+          -Dtest=SpringSessionJdbcMySqlIntegrationTest,SessionAuthenticationMySqlIntegrationTest
           test

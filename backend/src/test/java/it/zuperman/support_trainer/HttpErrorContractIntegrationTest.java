@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,6 +27,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import it.zuperman.support_trainer.common.exception.AppException;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 import jakarta.servlet.RequestDispatcher;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.databind.DeserializationFeature;
@@ -66,7 +69,9 @@ class HttpErrorContractIntegrationTest {
                 {"email":"invalid","password":""}
                 """;
 
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         String body = mockMvc.perform(post("/api/v1/auth/login")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isBadRequest())
@@ -103,11 +108,11 @@ class HttpErrorContractIntegrationTest {
     }
 
     @Test
-    void shouldReturnUniformUnauthorizedForNonBearerScheme() throws Exception {
+    void shouldReturnUniformUnauthorizedWithoutWwwAuthenticateHeader() throws Exception {
         mockMvc.perform(get("/api/v1/me/account")
                         .header(HttpHeaders.AUTHORIZATION, "Basic dGVzdDp0ZXN0"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"))
+                .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
                 .andExpectAll(commonError(401, "UNAUTHORIZED", "/api/v1/me/account"));
     }
 
@@ -132,7 +137,9 @@ class HttpErrorContractIntegrationTest {
 
     @Test
     void shouldWriteJsonEvenWhenTheRequestedRepresentationIsUnsupported() throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/email-verification/resend")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.TEXT_PLAIN)
                         .content("{\"email\":\"not-registered@example.com\"}"))
@@ -179,11 +186,17 @@ class HttpErrorContractIntegrationTest {
     }
 
     private void assertMalformedJson(String payload) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/login")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isBadRequest())
                 .andExpectAll(commonError(400, "MALFORMED_REQUEST", "/api/v1/auth/login"));
+    }
+
+    private static RequestPostProcessor withCsrf(CsrfSession csrfSession) {
+        return SessionAuthTestSupport.withCsrf(csrfSession);
     }
 
     private void assertSanitizedServerError(String path, String internalDetail) throws Exception {

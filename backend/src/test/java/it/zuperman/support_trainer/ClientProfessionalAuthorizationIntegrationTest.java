@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -36,6 +35,8 @@ import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 import jakarta.transaction.Transactional;
 
 @SpringBootTest
@@ -80,13 +81,13 @@ class ClientProfessionalAuthorizationIntegrationTest {
     @Test
     @DisplayName("Utente autenticato con ruolo errato non deve accedere agli endpoint")
     void shouldRejectAuthenticatedUserWithWrongRole() throws Exception {
-        String professionalToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalAuth = registerVerifyAndLoginProfessional(
                 "professional.wrong.role@example.com",
                 "Paolo",
                 "Serra"
         );
-        String inviteCode = createInvite(professionalToken);
-        String clientToken = registerAndLoginClient(
+        String inviteCode = createInvite(professionalAuth);
+        CsrfSession clientAuth = registerAndLoginClient(
                 inviteCode,
                 "client.wrong.role@example.com"
         );
@@ -98,20 +99,20 @@ class ClientProfessionalAuthorizationIntegrationTest {
                 .getId();
 
         mockMvc.perform(get("/api/v1/clients/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(clientToken)))
+                        .with(SessionAuthTestSupport.withSession(clientAuth)))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(get("/api/v1/professionals/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(get("/api/v1/clients/{clientId}", clientId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(clientToken)))
+                        .with(SessionAuthTestSupport.withSession(clientAuth)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         mockMvc.perform(get("/api/v1/professionals/{professionalId}", professionalId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
@@ -119,44 +120,44 @@ class ClientProfessionalAuthorizationIntegrationTest {
     @Test
     @DisplayName("Utente autenticato con ruolo corretto deve accedere agli endpoint")
     void shouldAllowAuthenticatedUserWithCorrectRole() throws Exception {
-        String professionalToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalAuth = registerVerifyAndLoginProfessional(
                 "professional.correct.role@example.com",
                 "Giulia",
                 "Marini"
         );
-        String inviteCode = createInvite(professionalToken);
-        String clientToken = registerAndLoginClient(
+        String inviteCode = createInvite(professionalAuth);
+        CsrfSession clientAuth = registerAndLoginClient(
                 inviteCode,
                 "client.correct.role@example.com"
         );
 
         mockMvc.perform(get("/api/v1/clients/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/v1/professionals/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(clientToken)))
+                        .with(SessionAuthTestSupport.withSession(clientAuth)))
                 .andExpect(status().isOk());
     }
 
     @Test
     @DisplayName("Professionista autenticato deve vedere solo i propri clienti")
     void shouldReturnOnlyAuthenticatedProfessionalClients() throws Exception {
-        String professionalAToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalAAuth = registerVerifyAndLoginProfessional(
                 "professional.a.clients.list@example.com",
                 "Alberto",
                 "Riva"
         );
-        String professionalAInviteCode = createInvite(professionalAToken);
+        String professionalAInviteCode = createInvite(professionalAAuth);
         String clientAEmail = "client.a.clients.list@example.com";
         registerAndLoginClient(professionalAInviteCode, clientAEmail);
 
-        String professionalBToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalBAuth = registerVerifyAndLoginProfessional(
                 "professional.b.clients.list@example.com",
                 "Bianca",
                 "Fontana"
         );
-        String professionalBInviteCode = createInvite(professionalBToken);
+        String professionalBInviteCode = createInvite(professionalBAuth);
         String clientBEmail = "client.b.clients.list@example.com";
         registerAndLoginClient(professionalBInviteCode, clientBEmail);
 
@@ -164,7 +165,7 @@ class ClientProfessionalAuthorizationIntegrationTest {
         Long clientBId = userRepository.findByEmail(clientBEmail).orElseThrow().getId();
 
         MvcResult result = mockMvc.perform(get("/api/v1/clients/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalAToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAAuth)))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -186,24 +187,24 @@ class ClientProfessionalAuthorizationIntegrationTest {
     @DisplayName("Cliente autenticato deve vedere solo i propri professionisti")
     void shouldReturnOnlyAuthenticatedClientProfessionals() throws Exception {
         String professionalAEmail = "professional.a.professionals.list@example.com";
-        String professionalAToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalAAuth = registerVerifyAndLoginProfessional(
                 professionalAEmail,
                 "Claudio",
                 "Neri"
         );
-        String professionalAInviteCode = createInvite(professionalAToken);
-        String clientAToken = registerAndLoginClient(
+        String professionalAInviteCode = createInvite(professionalAAuth);
+        CsrfSession clientAAuth = registerAndLoginClient(
                 professionalAInviteCode,
                 "client.a.professionals.list@example.com"
         );
 
         String professionalBEmail = "professional.b.professionals.list@example.com";
-        String professionalBToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalBAuth = registerVerifyAndLoginProfessional(
                 professionalBEmail,
                 "Daniela",
                 "Costa"
         );
-        String professionalBInviteCode = createInvite(professionalBToken);
+        String professionalBInviteCode = createInvite(professionalBAuth);
         registerAndLoginClient(
                 professionalBInviteCode,
                 "client.b.professionals.list@example.com"
@@ -213,7 +214,7 @@ class ClientProfessionalAuthorizationIntegrationTest {
         Long professionalBId = userRepository.findByEmail(professionalBEmail).orElseThrow().getId();
 
         MvcResult result = mockMvc.perform(get("/api/v1/professionals/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(clientAToken)))
+                        .with(SessionAuthTestSupport.withSession(clientAAuth)))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -235,12 +236,12 @@ class ClientProfessionalAuthorizationIntegrationTest {
     @DisplayName("Collegamento inattivo deve essere escluso dalla lista clienti del professionista")
     void shouldExcludeInactiveLinkFromProfessionalClientList() throws Exception {
         String professionalEmail = "professional.inactive.client.link@example.com";
-        String professionalToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalAuth = registerVerifyAndLoginProfessional(
                 professionalEmail,
                 "Elena",
                 "Galli"
         );
-        String inviteCode = createInvite(professionalToken);
+        String inviteCode = createInvite(professionalAuth);
         String clientEmail = "client.inactive.client.link@example.com";
         registerAndLoginClient(inviteCode, clientEmail);
 
@@ -257,7 +258,7 @@ class ClientProfessionalAuthorizationIntegrationTest {
         professionalClientLinkRepository.saveAndFlush(link);
 
         mockMvc.perform(get("/api/v1/clients/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
     }
@@ -266,14 +267,14 @@ class ClientProfessionalAuthorizationIntegrationTest {
     @DisplayName("Collegamento inattivo deve essere escluso dalla lista professionisti del cliente")
     void shouldExcludeInactiveLinkFromClientProfessionalList() throws Exception {
         String professionalEmail = "professional.inactive.professional.link@example.com";
-        String professionalToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalAuth = registerVerifyAndLoginProfessional(
                 professionalEmail,
                 "Fabio",
                 "Monti"
         );
-        String inviteCode = createInvite(professionalToken);
+        String inviteCode = createInvite(professionalAuth);
         String clientEmail = "client.inactive.professional.link@example.com";
-        String clientToken = registerAndLoginClient(inviteCode, clientEmail);
+        CsrfSession clientAuth = registerAndLoginClient(inviteCode, clientEmail);
 
         Long professionalId = userRepository.findByEmail(professionalEmail).orElseThrow().getId();
         Long clientId = userRepository.findByEmail(clientEmail).orElseThrow().getId();
@@ -288,7 +289,7 @@ class ClientProfessionalAuthorizationIntegrationTest {
         professionalClientLinkRepository.saveAndFlush(link);
 
         mockMvc.perform(get("/api/v1/professionals/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(clientToken)))
+                        .with(SessionAuthTestSupport.withSession(clientAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
     }
@@ -296,21 +297,21 @@ class ClientProfessionalAuthorizationIntegrationTest {
     @Test
     @DisplayName("Professionista deve accedere solo al dettaglio dei clienti collegati")
     void shouldEnforceClientDetailOwnershipForProfessional() throws Exception {
-        String professionalAToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalAAuth = registerVerifyAndLoginProfessional(
                 "professional.a.client.detail@example.com",
                 "Andrea",
                 "Villa"
         );
-        String professionalAInviteCode = createInvite(professionalAToken);
+        String professionalAInviteCode = createInvite(professionalAAuth);
         String clientAEmail = "client.a.client.detail@example.com";
         registerAndLoginClient(professionalAInviteCode, clientAEmail);
 
-        String professionalBToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalBAuth = registerVerifyAndLoginProfessional(
                 "professional.b.client.detail@example.com",
                 "Beatrice",
                 "Leone"
         );
-        String professionalBInviteCode = createInvite(professionalBToken);
+        String professionalBInviteCode = createInvite(professionalBAuth);
         registerAndLoginClient(
                 professionalBInviteCode,
                 "client.b.client.detail@example.com"
@@ -319,12 +320,12 @@ class ClientProfessionalAuthorizationIntegrationTest {
         Long clientAId = userRepository.findByEmail(clientAEmail).orElseThrow().getId();
 
         mockMvc.perform(get("/api/v1/clients/{clientId}", clientAId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalAToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(clientAId));
 
         mockMvc.perform(get("/api/v1/clients/{clientId}", clientAId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalBToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalBAuth)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Cliente non trovato"));
@@ -334,7 +335,7 @@ class ClientProfessionalAuthorizationIntegrationTest {
     @DisplayName("Dettaglio cliente non accessibile deve restituire un payload 404 uniforme")
     void shouldReturnUniformNotFoundForInaccessibleClientDetails() throws Exception {
         String professionalEmail = "professional.client.uniform.not-found@example.com";
-        String professionalToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalAuth = registerVerifyAndLoginProfessional(
                 professionalEmail,
                 "Elisa",
                 "Marchetti"
@@ -356,22 +357,22 @@ class ClientProfessionalAuthorizationIntegrationTest {
                 getComparableNotFoundPayload(
                         "/api/v1/clients/{resourceId}",
                         Long.MAX_VALUE,
-                        professionalToken
+                        professionalAuth
                 ),
                 getComparableNotFoundPayload(
                         "/api/v1/clients/{resourceId}",
                         neverLinkedClient.getId(),
-                        professionalToken
+                        professionalAuth
                 ),
                 getComparableNotFoundPayload(
                         "/api/v1/clients/{resourceId}",
                         inactiveLinkClient.getId(),
-                        professionalToken
+                        professionalAuth
                 ),
                 getComparableNotFoundPayload(
                         "/api/v1/clients/{resourceId}",
                         inactiveClient.getId(),
-                        professionalToken
+                        professionalAuth
                 )
         );
 
@@ -382,24 +383,24 @@ class ClientProfessionalAuthorizationIntegrationTest {
     @DisplayName("Cliente deve accedere solo al dettaglio dei professionisti collegati")
     void shouldEnforceProfessionalDetailOwnershipForClient() throws Exception {
         String professionalAEmail = "professional.a.professional.detail@example.com";
-        String professionalAToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalAAuth = registerVerifyAndLoginProfessional(
                 professionalAEmail,
                 "Carlo",
                 "Ferri"
         );
-        String professionalAInviteCode = createInvite(professionalAToken);
-        String clientAToken = registerAndLoginClient(
+        String professionalAInviteCode = createInvite(professionalAAuth);
+        CsrfSession clientAAuth = registerAndLoginClient(
                 professionalAInviteCode,
                 "client.a.professional.detail@example.com"
         );
 
-        String professionalBToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalBAuth = registerVerifyAndLoginProfessional(
                 "professional.b.professional.detail@example.com",
                 "Diana",
                 "Greco"
         );
-        String professionalBInviteCode = createInvite(professionalBToken);
-        String clientBToken = registerAndLoginClient(
+        String professionalBInviteCode = createInvite(professionalBAuth);
+        CsrfSession clientBAuth = registerAndLoginClient(
                 professionalBInviteCode,
                 "client.b.professional.detail@example.com"
         );
@@ -407,12 +408,12 @@ class ClientProfessionalAuthorizationIntegrationTest {
         Long professionalAId = userRepository.findByEmail(professionalAEmail).orElseThrow().getId();
 
         mockMvc.perform(get("/api/v1/professionals/{professionalId}", professionalAId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(clientAToken)))
+                        .with(SessionAuthTestSupport.withSession(clientAAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(professionalAId));
 
         mockMvc.perform(get("/api/v1/professionals/{professionalId}", professionalAId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(clientBToken)))
+                        .with(SessionAuthTestSupport.withSession(clientBAuth)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PROFESSIONAL_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Professionista non trovato"));
@@ -422,13 +423,13 @@ class ClientProfessionalAuthorizationIntegrationTest {
     @DisplayName("Dettaglio professionista non accessibile deve restituire un payload 404 uniforme")
     void shouldReturnUniformNotFoundForInaccessibleProfessionalDetails() throws Exception {
         String linkedProfessionalEmail = "professional.client-principal@example.com";
-        String linkedProfessionalToken = registerVerifyAndLoginProfessional(
+        CsrfSession linkedProfessionalAuth = registerVerifyAndLoginProfessional(
                 linkedProfessionalEmail,
                 "Lorenzo",
                 "Parisi"
         );
         String clientEmail = "client.professional.uniform.not-found@example.com";
-        String clientToken = registerAndLoginClient(createInvite(linkedProfessionalToken), clientEmail);
+        CsrfSession clientAuth = registerAndLoginClient(createInvite(linkedProfessionalAuth), clientEmail);
         ClientProfile client = getClient(clientEmail);
 
         ProfessionalProfile neverLinkedProfessional = saveActiveProfessional(
@@ -452,22 +453,22 @@ class ClientProfessionalAuthorizationIntegrationTest {
                 getComparableNotFoundPayload(
                         "/api/v1/professionals/{resourceId}",
                         Long.MAX_VALUE,
-                        clientToken
+                        clientAuth
                 ),
                 getComparableNotFoundPayload(
                         "/api/v1/professionals/{resourceId}",
                         neverLinkedProfessional.getId(),
-                        clientToken
+                        clientAuth
                 ),
                 getComparableNotFoundPayload(
                         "/api/v1/professionals/{resourceId}",
                         inactiveLinkProfessional.getId(),
-                        clientToken
+                        clientAuth
                 ),
                 getComparableNotFoundPayload(
                         "/api/v1/professionals/{resourceId}",
                         inactiveProfessional.getId(),
-                        clientToken
+                        clientAuth
                 )
         );
 
@@ -481,10 +482,10 @@ class ClientProfessionalAuthorizationIntegrationTest {
     private Map<String, Object> getComparableNotFoundPayload(
             String endpoint,
             Long resourceId,
-            String token
+            CsrfSession auth
     ) throws Exception {
         MvcResult result = mockMvc.perform(get(endpoint, resourceId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                        .with(SessionAuthTestSupport.withSession(auth)))
                 .andExpect(status().isNotFound())
                 .andReturn();
 
@@ -549,7 +550,7 @@ class ClientProfessionalAuthorizationIntegrationTest {
         return (ProfessionalProfile) userRepository.findByEmail(email).orElseThrow();
     }
 
-    private String registerVerifyAndLoginProfessional(
+    private CsrfSession registerVerifyAndLoginProfessional(
             String email,
             String firstName,
             String lastName
@@ -564,7 +565,9 @@ class ClientProfessionalAuthorizationIntegrationTest {
                 }
                 """.formatted(firstName, lastName, email, PASSWORD);
 
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registrationRequestBody))
                 .andExpect(status().isAccepted());
@@ -578,19 +581,19 @@ class ClientProfessionalAuthorizationIntegrationTest {
 
         confirmEmail(verificationToken.getToken());
 
-        return login(email, PASSWORD);
+        return SessionAuthTestSupport.loginAndRefreshCsrf(mockMvc, email, PASSWORD);
     }
 
-    private String createInvite(String professionalToken) throws Exception {
+    private String createInvite(CsrfSession professionalAuth) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/invites")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth)))
                 .andExpect(status().isCreated())
                 .andReturn();
 
         return JsonPath.read(result.getResponse().getContentAsString(), "$.code");
     }
 
-    private String registerAndLoginClient(String inviteCode, String email) throws Exception {
+    private CsrfSession registerAndLoginClient(String inviteCode, String email) throws Exception {
         String registrationRequestBody = """
                 {
                   "firstName": "Luca",
@@ -605,7 +608,9 @@ class ClientProfessionalAuthorizationIntegrationTest {
                 }
                 """.formatted(email, PASSWORD, inviteCode);
 
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/register/client")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registrationRequestBody))
                 .andExpect(status().isAccepted());
@@ -618,36 +623,17 @@ class ClientProfessionalAuthorizationIntegrationTest {
                 .orElseThrow();
         confirmEmail(verificationToken.getToken());
 
-        return login(email, PASSWORD);
+        return SessionAuthTestSupport.loginAndRefreshCsrf(mockMvc, email, PASSWORD);
     }
 
     private void confirmEmail(String token) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/email-verification/confirm")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"token":"%s"}
                                 """.formatted(token)))
                 .andExpect(status().isOk());
-    }
-
-    private String login(String email, String password) throws Exception {
-        String loginRequestBody = """
-                {
-                  "email": "%s",
-                  "password": "%s"
-                }
-                """.formatted(email, password);
-
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginRequestBody))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        return JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
-    }
-
-    private String bearer(String token) {
-        return "Bearer " + token;
     }
 }

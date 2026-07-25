@@ -1,19 +1,15 @@
 package it.zuperman.support_trainer.profile.service;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.entity.User;
-import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.ClientOperationalStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalOperationalStatus;
 import it.zuperman.support_trainer.common.exception.AppException;
-import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.common.security.UserReadinessValidator;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
@@ -21,22 +17,23 @@ import it.zuperman.support_trainer.profile.dto.request.UpdateMyProfileRequest;
 import it.zuperman.support_trainer.profile.dto.request.UpdateOperationalStatusRequest;
 import it.zuperman.support_trainer.profile.dto.response.MyAccountResponse;
 import it.zuperman.support_trainer.profile.dto.response.MyProfileResponse;
+import it.zuperman.support_trainer.security.session.AuthenticatedUserLoader;
 
 @Service
 public class MeService {
 
-    private final UserRepository userRepository;
+    private final AuthenticatedUserLoader authenticatedUserLoader;
     private final ProfessionalProfileRepository professionalProfileRepository;
     private final ClientProfileRepository clientProfileRepository;
     private final UserReadinessValidator userReadinessValidator;
 
     public MeService(
-            UserRepository userRepository,
+            AuthenticatedUserLoader authenticatedUserLoader,
             ProfessionalProfileRepository professionalProfileRepository,
             ClientProfileRepository clientProfileRepository,
             UserReadinessValidator userReadinessValidator
     ) {
-        this.userRepository = userRepository;
+        this.authenticatedUserLoader = authenticatedUserLoader;
         this.professionalProfileRepository = professionalProfileRepository;
         this.clientProfileRepository = clientProfileRepository;
         this.userReadinessValidator = userReadinessValidator;
@@ -223,34 +220,9 @@ public class MeService {
     }
 
     private User getAuthenticatedUser() {
-        String email = getAuthenticatedEmail();
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException(
-                HttpStatus.UNAUTHORIZED,
-                "AUTHENTICATED_USER_NOT_FOUND",
-                "Utente autenticato non trovato"
-        ));
-
+        User user = authenticatedUserLoader.requireAuthenticatedUser();
         userReadinessValidator.validateAccountAndEmail(user);
         return user;
-    }
-
-    private String getAuthenticatedEmail() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || authentication.getName() == null
-                || "anonymousUser".equals(authentication.getName())) {
-            throw new AppException(
-                    HttpStatus.UNAUTHORIZED,
-                    "UNAUTHORIZED",
-                    "Utente non autenticato"
-            );
-        }
-
-        return authentication.getName().trim().toLowerCase();
     }
 
     private ProfessionalOperationalStatus parseProfessionalOperationalStatus(String value) {

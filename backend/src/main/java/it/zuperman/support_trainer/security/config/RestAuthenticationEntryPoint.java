@@ -2,7 +2,6 @@ package it.zuperman.support_trainer.security.config;
 
 import java.io.IOException;
 
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -28,7 +27,6 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
             HttpServletResponse response,
             AuthenticationException authException
     ) throws IOException, ServletException {
-        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
         errorResponseWriter.write(request, response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Utente non autenticato");
     }
 }

@@ -14,7 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -33,6 +32,8 @@ import it.zuperman.support_trainer.invite.entity.InviteCode;
 import it.zuperman.support_trainer.invite.repository.InviteCodeRepository;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 import jakarta.transaction.Transactional;
 
 @SpringBootTest
@@ -68,8 +69,8 @@ class ClientEmailVerificationIntegrationTest {
     void shouldActivateClientAndExposeExistingLinkOnlyAfterConfirmation() throws Exception {
         String professionalEmail = "professional.client-verification@example.com";
         String clientEmail = "client.pending-verification@example.com";
-        String professionalToken = registerVerifyAndLoginProfessional(professionalEmail);
-        String inviteCode = createInvite(professionalToken);
+        CsrfSession professionalAuth = registerVerifyAndLoginProfessional(professionalEmail);
+        String inviteCode = createInvite(professionalAuth);
         Instant beforeRegistration = timeProvider.nowInstant();
 
         registerClient(inviteCode, clientEmail);
@@ -96,11 +97,11 @@ class ClientEmailVerificationIntegrationTest {
 
         assertLoginForbidden(clientEmail);
         mockMvc.perform(get("/api/v1/clients/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
         mockMvc.perform(get("/api/v1/clients/{clientId}", client.getId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_NOT_FOUND"));
 
@@ -114,14 +115,13 @@ class ClientEmailVerificationIntegrationTest {
         assertThat(inviteCodeRepository.findByCode(inviteCode).orElseThrow().getUsedAt())
                 .isEqualTo(inviteUsedAt);
 
-        String clientToken = login(clientEmail);
-        assertThat(clientToken).isNotBlank();
+        login(clientEmail);
         mockMvc.perform(get("/api/v1/clients/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(client.getId()));
         mockMvc.perform(get("/api/v1/clients/{clientId}", client.getId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(client.getId()));
 
@@ -137,8 +137,8 @@ class ClientEmailVerificationIntegrationTest {
     @Test
     @DisplayName("Token cliente scaduto non attiva il cliente e non modifica l'invito consumato")
     void shouldKeepClientPendingAndInviteConsumedWhenTokenIsExpired() throws Exception {
-        String professionalToken = registerVerifyAndLoginProfessional("professional.expired-client@example.com");
-        String inviteCode = createInvite(professionalToken);
+        CsrfSession professionalAuth = registerVerifyAndLoginProfessional("professional.expired-client@example.com");
+        String inviteCode = createInvite(professionalAuth);
         String clientEmail = "client.expired-verification@example.com";
         registerClient(inviteCode, clientEmail);
 
@@ -149,7 +149,9 @@ class ClientEmailVerificationIntegrationTest {
         token.setExpiresAt(timeProvider.nowInstant());
         emailVerificationTokenRepository.saveAndFlush(token);
 
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post(CONFIRM_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(tokenBody(token.getToken())))
                 .andExpect(status().isGone())
@@ -168,8 +170,8 @@ class ClientEmailVerificationIntegrationTest {
     @DisplayName("Fallimento dopo il lock dell'invito non lascia cliente, link o token e non consuma l'invito")
     void shouldRollbackClientRegistrationWhenProfessionalBecomesInactive() throws Exception {
         String professionalEmail = "professional.rollback-client@example.com";
-        String professionalToken = registerVerifyAndLoginProfessional(professionalEmail);
-        String inviteCode = createInvite(professionalToken);
+        CsrfSession professionalAuth = registerVerifyAndLoginProfessional(professionalEmail);
+        String inviteCode = createInvite(professionalAuth);
         ProfessionalProfile professional = (ProfessionalProfile) userRepository
                 .findByEmail(professionalEmail)
                 .orElseThrow();
@@ -179,7 +181,9 @@ class ClientEmailVerificationIntegrationTest {
         long tokensBefore = emailVerificationTokenRepository.count();
         String clientEmail = "client.rollback-registration@example.com";
 
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/register/client")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(clientRegistrationBody(inviteCode, clientEmail)))
                 .andExpect(status().isForbidden())
@@ -193,8 +197,10 @@ class ClientEmailVerificationIntegrationTest {
         assertThat(emailVerificationTokenRepository.count()).isEqualTo(tokensBefore);
     }
 
-    private String registerVerifyAndLoginProfessional(String email) throws Exception {
+    private CsrfSession registerVerifyAndLoginProfessional(String email) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -209,19 +215,21 @@ class ClientEmailVerificationIntegrationTest {
 
         User professional = userRepository.findByEmail(email).orElseThrow();
         confirmEmail(findTokenFor(professional).getToken());
-        return login(email);
+        return SessionAuthTestSupport.loginAndRefreshCsrf(mockMvc, email, PASSWORD);
     }
 
-    private String createInvite(String professionalToken) throws Exception {
+    private String createInvite(CsrfSession professionalAuth) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/invites")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth)))
                 .andExpect(status().isCreated())
                 .andReturn();
         return JsonPath.read(result.getResponse().getContentAsString(), "$.code");
     }
 
     private void registerClient(String inviteCode, String email) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/register/client")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(clientRegistrationBody(inviteCode, email)))
                 .andExpect(status().isAccepted())
@@ -231,7 +239,9 @@ class ClientEmailVerificationIntegrationTest {
     }
 
     private void registerClientExpectingUsedInvite(String inviteCode, String email) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/register/client")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(clientRegistrationBody(inviteCode, email)))
                 .andExpect(status().isBadRequest())
@@ -256,31 +266,23 @@ class ClientEmailVerificationIntegrationTest {
     }
 
     private void assertLoginForbidden(String email) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/login")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginBody(email)))
+                        .content(SessionAuthTestSupport.loginBody(email, PASSWORD)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_ACTIVE"));
     }
 
-    private String login(String email) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginBody(email)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andReturn();
-        return JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
-    }
-
-    private String loginBody(String email) {
-        return """
-                {"email":"%s","password":"%s"}
-                """.formatted(email, PASSWORD);
+    private CsrfSession login(String email) throws Exception {
+        return SessionAuthTestSupport.loginAndRefreshCsrf(mockMvc, email, PASSWORD);
     }
 
     private void confirmEmail(String token) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post(CONFIRM_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(tokenBody(token)))
                 .andExpect(status().isOk())
@@ -299,9 +301,5 @@ class ClientEmailVerificationIntegrationTest {
                 .filter(token -> token.getUser().getId().equals(user.getId()))
                 .findFirst()
                 .orElseThrow();
-    }
-
-    private String bearer(String token) {
-        return "Bearer " + token;
     }
 }

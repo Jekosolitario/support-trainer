@@ -33,6 +33,7 @@ import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
 import it.zuperman.support_trainer.booking.service.BookingService;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
+import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
 import it.zuperman.support_trainer.common.enums.Gender;
@@ -42,6 +43,7 @@ import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
+import it.zuperman.support_trainer.security.session.AuthenticatedUserPrincipal;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -77,7 +79,7 @@ class AvailabilityServiceIntegrationTest {
     @DisplayName("Deve creare uno slot availability valido per un professionista")
     void shouldCreateAvailabilitySlotForProfessional() {
         ProfessionalProfile professional = createActivePersonalTrainer();
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         LocalDateTime startDateTime = LocalDateTime.now().plusDays(7).withNano(0);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
@@ -105,7 +107,7 @@ class AvailabilityServiceIntegrationTest {
     @DisplayName("Professionista deve aggiornare parzialmente un proprio slot availability")
     void shouldPartiallyUpdateAndReturnOwnAvailabilitySlot() {
         ProfessionalProfile professional = createActivePersonalTrainer();
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         LocalDateTime startDateTime = LocalDateTime.now().plusDays(7).withNano(0);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
@@ -189,12 +191,12 @@ class AvailabilityServiceIntegrationTest {
         return clientProfileRepository.save(client);
     }
 
-    private void authenticateAs(String email, String authority) {
+    private void authenticateAs(User user) {
         UsernamePasswordAuthenticationToken authentication
-                = new UsernamePasswordAuthenticationToken(
-                        email,
+                = UsernamePasswordAuthenticationToken.authenticated(
+                        new AuthenticatedUserPrincipal(user.getId(), user.getEmail()),
                         null,
-                        List.of(new SimpleGrantedAuthority(authority))
+                        List.of(new SimpleGrantedAuthority(user.getRole().name()))
                 );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -204,7 +206,7 @@ class AvailabilityServiceIntegrationTest {
     @DisplayName("Non deve creare uno slot availability sovrapposto per lo stesso professionista")
     void shouldNotCreateOverlappingAvailabilitySlotForSameProfessional() {
         ProfessionalProfile professional = createActivePersonalTrainer();
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         LocalDateTime firstStartDateTime = LocalDateTime.now().plusDays(8).withNano(0);
         LocalDateTime firstEndDateTime = firstStartDateTime.plusHours(2);
@@ -245,7 +247,7 @@ class AvailabilityServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         List<AvailabilitySlotResponse> response
                 = availabilityService.getAvailableSlotsByProfessional(professional.getId());
@@ -270,7 +272,7 @@ class AvailabilityServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         assertThatThrownBy(() -> availabilityService.getAvailableSlotsByProfessional(professional.getId()))
                 .isInstanceOf(AppException.class);
@@ -280,7 +282,7 @@ class AvailabilityServiceIntegrationTest {
     @DisplayName("Professionista deve bloccare e sbloccare un proprio slot availability")
     void shouldBlockAndUnblockAvailabilitySlot() {
         ProfessionalProfile professional = createActivePersonalTrainer();
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         LocalDateTime startDateTime = LocalDateTime.now().plusDays(11).withNano(0);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
@@ -308,7 +310,7 @@ class AvailabilityServiceIntegrationTest {
         ProfessionalProfile owner = createActivePersonalTrainer();
         ProfessionalProfile otherProfessional = createActivePersonalTrainer();
 
-        authenticateAs(owner.getEmail(), "PROFESSIONAL");
+        authenticateAs(owner);
 
         LocalDateTime startDateTime = LocalDateTime.now().plusDays(12).withNano(0);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
@@ -320,7 +322,7 @@ class AvailabilityServiceIntegrationTest {
                 )
         );
 
-        authenticateAs(otherProfessional.getEmail(), "PROFESSIONAL");
+        authenticateAs(otherProfessional);
 
         UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
                 asBusinessOffset(startDateTime.plusDays(1)),
@@ -361,7 +363,7 @@ class AvailabilityServiceIntegrationTest {
     @DisplayName("Non deve aggiornare uno slot availability se non è disponibile")
     void shouldNotUpdateAvailabilitySlotWhenNotAvailable() {
         ProfessionalProfile professional = createActivePersonalTrainer();
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         LocalDateTime startDateTime = LocalDateTime.now().plusDays(12).withNano(0);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
@@ -407,7 +409,7 @@ class AvailabilityServiceIntegrationTest {
                 )
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         List<AvailabilitySlotResponse> response
                 = availabilityService.getAvailableSlotsByProfessional(professional.getId());
@@ -436,7 +438,7 @@ class AvailabilityServiceIntegrationTest {
 
         professionalProfileRepository.save(nutritionist);
 
-        authenticateAs(nutritionist.getEmail(), "PROFESSIONAL");
+        authenticateAs(nutritionist);
 
         LocalDateTime startDateTime = LocalDateTime.now().plusDays(7).withNano(0);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
@@ -470,13 +472,13 @@ class AvailabilityServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         bookingService.createBookingRequest(
                 new CreateBookingRequest(slot.getId(), "Vorrei prenotare questo slot.")
         );
 
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
                 asBusinessOffset(startDateTime.plusDays(1)),
@@ -505,13 +507,13 @@ class AvailabilityServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         bookingService.createBookingRequest(
                 new CreateBookingRequest(slot.getId(), "Vorrei prenotare questo slot.")
         );
 
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         assertThatThrownBy(() -> availabilityService.blockAvailabilitySlot(slot.getId()))
                 .isInstanceOf(AppException.class)
@@ -540,13 +542,13 @@ class AvailabilityServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(requestingClient.getEmail(), "CLIENT");
+        authenticateAs(requestingClient);
 
         bookingService.createBookingRequest(
                 new CreateBookingRequest(slot.getId(), "Vorrei prenotare questo slot.")
         );
 
-        authenticateAs(otherClient.getEmail(), "CLIENT");
+        authenticateAs(otherClient);
 
         List<AvailabilitySlotResponse> response
                 = availabilityService.getAvailableSlotsByProfessional(professional.getId());
@@ -571,13 +573,13 @@ class AvailabilityServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         var pendingBooking = bookingService.createBookingRequest(
                 new CreateBookingRequest(slot.getId(), "Vorrei prenotare questo slot.")
         );
 
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         bookingService.rejectBookingRequest(pendingBooking.getId());
 

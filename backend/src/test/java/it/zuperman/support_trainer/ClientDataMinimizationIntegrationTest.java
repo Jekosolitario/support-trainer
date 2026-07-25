@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,6 +30,8 @@ import it.zuperman.support_trainer.auth.token.EmailVerificationToken;
 import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.repository.UserRepository;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 import jakarta.transaction.Transactional;
 
 @SpringBootTest
@@ -87,17 +88,17 @@ class ClientDataMinimizationIntegrationTest {
         String suffix = specialization.name().toLowerCase().replace('_', '-')
                 + "-" + UUID.randomUUID().toString().substring(0, 8);
         String professionalEmail = "professional-" + suffix + "@test.com";
-        String professionalToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalAuth = registerVerifyAndLoginProfessional(
                 professionalEmail,
                 specialization
         );
-        String inviteCode = createInvite(professionalToken);
+        String inviteCode = createInvite(professionalAuth);
         String clientEmail = "client-" + suffix + "@test.com";
-        registerAndLoginClient(inviteCode, clientEmail);
+        CsrfSession clientAuth = registerAndLoginClient(inviteCode, clientEmail);
         Long clientId = userRepository.findByEmail(clientEmail).orElseThrow().getId();
 
         MvcResult listResult = mockMvc.perform(get("/api/v1/clients/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -108,7 +109,7 @@ class ClientDataMinimizationIntegrationTest {
         assertSummaryContract(summary);
 
         MvcResult detailResult = mockMvc.perform(get("/api/v1/clients/{clientId}", clientId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -122,17 +123,17 @@ class ClientDataMinimizationIntegrationTest {
     void shouldPreserveOwnerProfileAndHideItsSensitiveFieldsFromProfessionalEndpoints() throws Exception {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         String professionalEmail = "professional-owner-profile-" + suffix + "@test.com";
-        String professionalToken = registerVerifyAndLoginProfessional(
+        CsrfSession professionalAuth = registerVerifyAndLoginProfessional(
                 professionalEmail,
                 ProfessionalSpecialization.PERSONAL_TRAINER
         );
-        String inviteCode = createInvite(professionalToken);
+        String inviteCode = createInvite(professionalAuth);
         String clientEmail = "client-owner-profile-" + suffix + "@test.com";
-        String clientToken = registerAndLoginClient(inviteCode, clientEmail);
+        CsrfSession clientAuth = registerAndLoginClient(inviteCode, clientEmail);
         Long clientId = userRepository.findByEmail(clientEmail).orElseThrow().getId();
 
         mockMvc.perform(get("/api/v1/me/profile")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(clientToken)))
+                        .with(SessionAuthTestSupport.withSession(clientAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.operationalStatus").value("ATTIVO"))
                 .andExpect(jsonPath("$.birthDate").value("1996-04-15"))
@@ -152,7 +153,7 @@ class ClientDataMinimizationIntegrationTest {
                 """;
 
         MvcResult updateResult = mockMvc.perform(patch("/api/v1/me/profile")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(clientToken))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateRequestBody))
                 .andExpect(status().isOk())
@@ -161,14 +162,14 @@ class ClientDataMinimizationIntegrationTest {
         assertUpdatedOwnerProfile(readObject(updateResult));
 
         MvcResult persistedProfileResult = mockMvc.perform(get("/api/v1/me/profile")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(clientToken)))
+                        .with(SessionAuthTestSupport.withSession(clientAuth)))
                 .andExpect(status().isOk())
                 .andReturn();
 
         assertUpdatedOwnerProfile(readObject(persistedProfileResult));
 
         MvcResult detailResult = mockMvc.perform(get("/api/v1/clients/{clientId}", clientId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -203,7 +204,7 @@ class ClientDataMinimizationIntegrationTest {
         assertThat(profile.get("operationalStatus")).isEqualTo("ATTIVO");
     }
 
-    private String registerVerifyAndLoginProfessional(
+    private CsrfSession registerVerifyAndLoginProfessional(
             String email,
             ProfessionalSpecialization specialization
     ) throws Exception {
@@ -217,7 +218,9 @@ class ClientDataMinimizationIntegrationTest {
                 }
                 """.formatted(email, PASSWORD, specialization.name());
 
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registrationRequestBody))
                 .andExpect(status().isAccepted());
@@ -231,19 +234,19 @@ class ClientDataMinimizationIntegrationTest {
 
         confirmEmail(verificationToken.getToken());
 
-        return login(email);
+        return SessionAuthTestSupport.loginAndRefreshCsrf(mockMvc, email, PASSWORD);
     }
 
-    private String createInvite(String professionalToken) throws Exception {
+    private String createInvite(CsrfSession professionalAuth) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/invites")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth)))
                 .andExpect(status().isCreated())
                 .andReturn();
 
         return JsonPath.read(result.getResponse().getContentAsString(), "$.code");
     }
 
-    private String registerAndLoginClient(String inviteCode, String email) throws Exception {
+    private CsrfSession registerAndLoginClient(String inviteCode, String email) throws Exception {
         String registrationRequestBody = """
                 {
                   "firstName": "Luca",
@@ -261,7 +264,9 @@ class ClientDataMinimizationIntegrationTest {
                 }
                 """.formatted(email, PASSWORD, inviteCode);
 
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/register/client")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registrationRequestBody))
                 .andExpect(status().isAccepted());
@@ -274,11 +279,13 @@ class ClientDataMinimizationIntegrationTest {
                 .orElseThrow();
         confirmEmail(verificationToken.getToken());
 
-        return login(email);
+        return SessionAuthTestSupport.loginAndRefreshCsrf(mockMvc, email, PASSWORD);
     }
 
     private void confirmEmail(String token) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/email-verification/confirm")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"token":"%s"}
@@ -286,28 +293,7 @@ class ClientDataMinimizationIntegrationTest {
                 .andExpect(status().isOk());
     }
 
-    private String login(String email) throws Exception {
-        String loginRequestBody = """
-                {
-                  "email": "%s",
-                  "password": "%s"
-                }
-                """.formatted(email, PASSWORD);
-
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginRequestBody))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        return JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
-    }
-
     private Map<String, Object> readObject(MvcResult result) throws Exception {
         return JsonPath.read(result.getResponse().getContentAsString(), "$");
-    }
-
-    private String bearer(String token) {
-        return "Bearer " + token;
     }
 }

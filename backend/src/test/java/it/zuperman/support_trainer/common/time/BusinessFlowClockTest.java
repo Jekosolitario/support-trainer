@@ -6,11 +6,13 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import it.zuperman.support_trainer.availability.dto.request.CreateAvailabilitySlotRequest;
@@ -31,6 +33,9 @@ import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
+import it.zuperman.support_trainer.security.session.AuthenticatedUserIdResolver;
+import it.zuperman.support_trainer.security.session.AuthenticatedUserLoader;
+import it.zuperman.support_trainer.security.session.AuthenticatedUserPrincipal;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
@@ -54,8 +59,8 @@ class BusinessFlowClockTest {
         ProfessionalClientLinkRepository linkRepository = mock(ProfessionalClientLinkRepository.class);
         BookingRequestItemRepository bookingItemRepository = mock(BookingRequestItemRepository.class);
         ProfessionalProfile professional = mock(ProfessionalProfile.class);
-        authenticate("professional@example.com");
-        when(userRepository.findByEmail("professional@example.com")).thenReturn(Optional.of(professional));
+        authenticate(1L, "professional@example.com", "PROFESSIONAL");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(professional));
         when(professional.getAccountStatus()).thenReturn(AccountStatus.ACTIVE);
         when(professional.getEmailVerified()).thenReturn(true);
         when(professional.getActive()).thenReturn(true);
@@ -64,7 +69,7 @@ class BusinessFlowClockTest {
         when(professionalRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(professional));
         AvailabilityService service = new AvailabilityService(
                 slotRepository,
-                userRepository,
+                authenticatedUserLoader(userRepository),
                 professionalRepository,
                 linkRepository,
                 bookingItemRepository,
@@ -88,13 +93,12 @@ class BusinessFlowClockTest {
         BookingRequestRepository bookingRepository = mock(BookingRequestRepository.class);
         BookingRequestItemRepository bookingItemRepository = mock(BookingRequestItemRepository.class);
         AvailabilitySlotRepository slotRepository = mock(AvailabilitySlotRepository.class);
-        ProfessionalClientLinkRepository linkRepository = mock(ProfessionalClientLinkRepository.class);
         UserRepository userRepository = mock(UserRepository.class);
         ClientProfile client = mock(ClientProfile.class);
         ProfessionalProfile professional = mock(ProfessionalProfile.class);
         AvailabilitySlot slot = mock(AvailabilitySlot.class);
-        authenticate("client@example.com");
-        when(userRepository.findByEmail("client@example.com")).thenReturn(Optional.of(client));
+        authenticate(2L, "client@example.com", "CLIENT");
+        when(userRepository.findById(2L)).thenReturn(Optional.of(client));
         when(client.getAccountStatus()).thenReturn(AccountStatus.ACTIVE);
         when(client.getEmailVerified()).thenReturn(true);
         when(client.getActive()).thenReturn(true);
@@ -116,7 +120,7 @@ class BusinessFlowClockTest {
                 bookingRepository,
                 bookingItemRepository,
                 slotRepository,
-                userRepository,
+                authenticatedUserLoader(userRepository),
                 fixedTimeProvider(),
                 bookingResponseMapper(),
                 new it.zuperman.support_trainer.common.security.UserReadinessValidator()
@@ -128,11 +132,18 @@ class BusinessFlowClockTest {
                                 .isEqualTo("AVAILABILITY_SLOT_NOT_BOOKABLE"));
     }
 
-    private static void authenticate(String email) {
-        Authentication authentication = mock(Authentication.class);
-        when(authentication.isAuthenticated()).thenReturn(true);
-        when(authentication.getName()).thenReturn(email);
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+    private static void authenticate(Long userId, String email, String role) {
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(
+                        new AuthenticatedUserPrincipal(userId, email),
+                        null,
+                        List.of(new SimpleGrantedAuthority(role))
+                )
+        );
+    }
+
+    private static AuthenticatedUserLoader authenticatedUserLoader(UserRepository userRepository) {
+        return new AuthenticatedUserLoader(new AuthenticatedUserIdResolver(), userRepository);
     }
 
     private static ApplicationTimeProvider fixedTimeProvider() {

@@ -34,6 +34,7 @@ import it.zuperman.support_trainer.booking.repository.BookingRequestRepository;
 import it.zuperman.support_trainer.booking.service.BookingService;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
+import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
 import it.zuperman.support_trainer.common.enums.Gender;
@@ -43,6 +44,7 @@ import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
+import it.zuperman.support_trainer.security.session.AuthenticatedUserPrincipal;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -95,7 +97,7 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         CreateBookingRequest request = new CreateBookingRequest(
                 slot.getId(),
@@ -136,17 +138,17 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professionalB, asBusinessInstant(startDateTimeB), asBusinessInstant(startDateTimeB.plusHours(1)))
         );
 
-        authenticateAs(clientA.getEmail(), "CLIENT");
+        authenticateAs(clientA);
         BookingDetailResponse bookingA = bookingService.createBookingRequest(
                 new CreateBookingRequest(slotA.getId(), "Richiesta coppia A.")
         );
 
-        authenticateAs(clientB.getEmail(), "CLIENT");
+        authenticateAs(clientB);
         BookingDetailResponse bookingB = bookingService.createBookingRequest(
                 new CreateBookingRequest(slotB.getId(), "Richiesta coppia B.")
         );
 
-        authenticateAs(clientA.getEmail(), "CLIENT");
+        authenticateAs(clientA);
         List<Long> clientBookingIds = bookingService.getClientBookingRequests().stream()
                 .map(response -> response.getId())
                 .toList();
@@ -155,7 +157,7 @@ class BookingServiceIntegrationTest {
                 .containsExactly(bookingA.getId())
                 .doesNotContain(bookingB.getId());
 
-        authenticateAs(professionalA.getEmail(), "PROFESSIONAL");
+        authenticateAs(professionalA);
         List<Long> professionalBookingIds = bookingService.getProfessionalBookingRequests().stream()
                 .map(response -> response.getId())
                 .toList();
@@ -181,12 +183,12 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professionalA, asBusinessInstant(startDateTime), asBusinessInstant(startDateTime.plusHours(1)))
         );
 
-        authenticateAs(clientA.getEmail(), "CLIENT");
+        authenticateAs(clientA);
         BookingDetailResponse booking = bookingService.createBookingRequest(
                 new CreateBookingRequest(slot.getId(), "Richiesta coppia A.")
         );
 
-        authenticateAs(professionalB.getEmail(), "PROFESSIONAL");
+        authenticateAs(professionalB);
 
         assertThatThrownBy(() -> bookingService.confirmBookingRequest(booking.getId()))
                 .isInstanceOfSatisfying(AppException.class, exception ->
@@ -196,7 +198,7 @@ class BookingServiceIntegrationTest {
                 .isInstanceOfSatisfying(AppException.class, exception ->
                 assertThat(exception.getErrorCode()).isEqualTo("BOOKING_REQUEST_NOT_FOUND"));
 
-        authenticateAs(clientB.getEmail(), "CLIENT");
+        authenticateAs(clientB);
 
         AppException foreignBookingCancellation = catchThrowableOfType(
                 () -> bookingService.cancelBookingRequest(booking.getId()),
@@ -262,12 +264,12 @@ class BookingServiceIntegrationTest {
         return clientProfileRepository.save(client);
     }
 
-    private void authenticateAs(String email, String authority) {
+    private void authenticateAs(User user) {
         UsernamePasswordAuthenticationToken authentication
-                = new UsernamePasswordAuthenticationToken(
-                        email,
+                = UsernamePasswordAuthenticationToken.authenticated(
+                        new AuthenticatedUserPrincipal(user.getId(), user.getEmail()),
                         null,
-                        List.of(new SimpleGrantedAuthority(authority))
+                        List.of(new SimpleGrantedAuthority(user.getRole().name()))
                 );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -286,7 +288,7 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         CreateBookingRequest request = new CreateBookingRequest(
                 slot.getId(),
@@ -312,7 +314,7 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(startDateTime.plusHours(1)))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         assertThatThrownBy(() -> bookingService.createBookingRequest(new CreateBookingRequest(slot.getId(), null)))
                 .isInstanceOfSatisfying(AppException.class, exception -> {
@@ -337,10 +339,10 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(startDateTime.plusHours(1)))
         );
 
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
         availabilityService.blockAvailabilitySlot(slot.getId());
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         assertThatThrownBy(() -> bookingService.createBookingRequest(
                 new CreateBookingRequest(slot.getId(), "Richiesta su slot bloccato.")
@@ -369,15 +371,15 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(startDateTime.plusHours(1)))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
         BookingDetailResponse pendingBooking = bookingService.createBookingRequest(
                 new CreateBookingRequest(slot.getId(), "Prima richiesta.")
         );
 
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
         bookingService.confirmBookingRequest(pendingBooking.getId());
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         assertThatThrownBy(() -> bookingService.createBookingRequest(
                 new CreateBookingRequest(slot.getId(), "Seconda richiesta.")
@@ -408,7 +410,7 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         CreateBookingRequest request = new CreateBookingRequest(
                 slot.getId(),
@@ -417,7 +419,7 @@ class BookingServiceIntegrationTest {
 
         BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         BookingDetailResponse confirmedResponse
                 = bookingService.confirmBookingRequest(pendingResponse.getId());
@@ -448,7 +450,7 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         CreateBookingRequest request = new CreateBookingRequest(
                 slot.getId(),
@@ -457,7 +459,7 @@ class BookingServiceIntegrationTest {
 
         BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         BookingDetailResponse rejectedResponse
                 = bookingService.rejectBookingRequest(pendingResponse.getId());
@@ -488,7 +490,7 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         CreateBookingRequest request = new CreateBookingRequest(
                 slot.getId(),
@@ -526,7 +528,7 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         CreateBookingRequest request = new CreateBookingRequest(
                 slot.getId(),
@@ -535,14 +537,14 @@ class BookingServiceIntegrationTest {
 
         BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         BookingDetailResponse confirmedResponse
                 = bookingService.confirmBookingRequest(pendingResponse.getId());
 
         assertThat(confirmedResponse.getStatus()).isEqualTo("CONFIRMED");
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         BookingDetailResponse cancelledResponse
                 = bookingService.cancelBookingRequest(confirmedResponse.getId());
@@ -573,7 +575,7 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         CreateBookingRequest request = new CreateBookingRequest(
                 slot.getId(),
@@ -582,13 +584,13 @@ class BookingServiceIntegrationTest {
 
         BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         assertThatThrownBy(() -> bookingService.cancelBookingRequest(pendingResponse.getId()))
                 .isInstanceOf(AppException.class)
                 .hasMessage("Una richiesta in attesa deve essere rifiutata dal professionista");
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         BookingDetailResponse detailResponse
                 = bookingService.getBookingRequestDetail(pendingResponse.getId());
@@ -620,7 +622,7 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         CreateBookingRequest request = new CreateBookingRequest(
                 slot.getId(),
@@ -630,7 +632,7 @@ class BookingServiceIntegrationTest {
         BookingDetailResponse bookingResponse
                 = bookingService.createBookingRequest(request);
 
-        authenticateAs(otherClient.getEmail(), "CLIENT");
+        authenticateAs(otherClient);
 
         AppException foreignBooking = catchThrowableOfType(
                 () -> bookingService.getBookingRequestDetail(bookingResponse.getId()),
@@ -647,7 +649,7 @@ class BookingServiceIntegrationTest {
         assertThat(foreignBooking.getErrorCode()).isEqualTo(missingBooking.getErrorCode());
         assertThat(foreignBooking.getMessage()).isEqualTo(missingBooking.getMessage());
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         BookingDetailResponse detailResponse
                 = bookingService.getBookingRequestDetail(bookingResponse.getId());
@@ -674,7 +676,7 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         CreateBookingRequest request = new CreateBookingRequest(
                 expiredSlot.getId(),
@@ -718,7 +720,7 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(nutritionist, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         CreateBookingRequest request = new CreateBookingRequest(
                 invalidSlot.getId(),
@@ -747,7 +749,7 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(futureStartDateTime), asBusinessInstant(futureEndDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         CreateBookingRequest request = new CreateBookingRequest(
                 slot.getId(),
@@ -761,7 +763,7 @@ class BookingServiceIntegrationTest {
         slot.setEndDateTime(asBusinessInstant(LocalDateTime.now().minusHours(1).withNano(0)));
         availabilitySlotRepository.save(slot);
 
-        authenticateAs(professional.getEmail(), "PROFESSIONAL");
+        authenticateAs(professional);
 
         assertThatThrownBy(() -> bookingService.confirmBookingRequest(pendingResponse.getId()))
                 .isInstanceOf(AppException.class)
@@ -819,7 +821,7 @@ class BookingServiceIntegrationTest {
 
         bookingRequest.getItems().add(bookingRequestItem);
 
-        authenticateAs(nutritionist.getEmail(), "PROFESSIONAL");
+        authenticateAs(nutritionist);
 
         assertThatThrownBy(() -> bookingService.confirmBookingRequest(bookingRequest.getId()))
                 .isInstanceOf(AppException.class)
@@ -845,7 +847,7 @@ class BookingServiceIntegrationTest {
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(endDateTime))
         );
 
-        authenticateAs(client.getEmail(), "CLIENT");
+        authenticateAs(client);
 
         CreateBookingRequest firstRequest = new CreateBookingRequest(
                 slot.getId(),

@@ -7,7 +7,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
 /**
- * Resolves the canonical user id from a future session {@link Authentication}.
+ * Resolves the canonical user id from a session {@link Authentication}.
  * Accepts only {@link AuthenticatedUserPrincipal}; any other principal is rejected.
  */
 @Component

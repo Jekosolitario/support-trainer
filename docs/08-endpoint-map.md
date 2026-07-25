@@ -41,7 +41,7 @@ Regola generale:
 ## 3. Stato del documento
 Questo file include **solo endpoint realmente presenti nel codice attuale**.
 
-Il conteggio è di **29 endpoint applicativi**: Auth 6, Me 4, Client 2, Professional 3, Invite 2, Availability 5 e Booking 7. `/error` è un endpoint tecnico di fallback e non è contato fra le API funzionali.
+Il conteggio è di **31 endpoint applicativi**: Auth 8, Me 4, Client 2, Professional 3, Invite 2, Availability 5 e Booking 7. `/error` è un endpoint tecnico di fallback e non è contato fra le API funzionali.
 
 Gli endpoint futuri o ancora da definire non vengono elencati qui.  
 Devono essere mantenuti in un documento separato dedicato agli endpoint pianificati.
@@ -50,31 +50,41 @@ Devono essere mantenuti in un documento separato dedicato agli endpoint pianific
 
 ## 4. Modulo Auth
 
-### 4.1 Registrazione professionista
+Le mutazioni Auth richiedono header CSRF ottenuto da `GET /api/v1/auth/csrf` (tipicamente `X-CSRF-TOKEN`). Non esiste autenticazione Bearer/JWT.
+
+### 4.1 Token CSRF
+**GET** `/api/v1/auth/csrf`
+Restituisce `{ "token": "...", "headerName": "X-CSRF-TOKEN" }` con `Cache-Control: no-store`. Il client deve usare `headerName` come nome dell’header sulle mutazioni. Dopo un login riuscito il CSRF è ruotato: va richiesto di nuovo.
+
+### 4.2 Registrazione professionista
 **POST** `/api/v1/auth/register/professional`  
-Valida una nuova registrazione professionista e restituisce sempre `202 Accepted` con un DTO neutro. Lo stesso status e payload vengono restituiti per un'email già esistente: non sono esposti ID, ruolo, email, token o `EMAIL_ALREADY_REGISTERED`. Solo una nuova email crea profilo pending, token e richiesta email after-commit.
+Valida una nuova registrazione professionista e restituisce sempre `202 Accepted` con un DTO neutro. Lo stesso status e payload vengono restituiti per un'email già esistente: non sono esposti ID, ruolo, email, token o `EMAIL_ALREADY_REGISTERED`. Solo una nuova email crea profilo pending, token e richiesta email after-commit. Richiede CSRF.
 
-### 4.2 Login
+### 4.3 Login
 **POST** `/api/v1/auth/login`  
-Autentica l’utente e restituisce la risposta di login.
+Autentica l’utente con email/password e CSRF. Risponde `204 No Content` senza body: nessun `accessToken`, `refreshToken` o `Authorization`. Imposta il cookie di sessione HttpOnly (`__Host-STSESSION` in produzione, `STSESSION` in locale/test). Eligibilità: account `ACTIVE` e `emailVerified=true`; `profile.active=false` non blocca il login. Dopo il login il client deve richiamare `GET /csrf` e fare bootstrap con `GET /api/v1/me/account` e `GET /api/v1/me/profile`.
 
-### 4.3 Conferma email uniforme
+### 4.4 Logout
+**POST** `/api/v1/auth/logout`
+Invalida la sessione server-side. Richiede CSRF e risponde `204 No Content`.
+
+### 4.5 Conferma email uniforme
 **POST** `/api/v1/auth/email-verification/confirm`
-Conferma l’account professionista o cliente tramite body JSON `{"token":"..."}`. Il token è obbligatorio, non blank e lungo al massimo 500 caratteri. Il primo consumo valido restituisce `200`, attiva l'account e marca il token usato; il secondo consumo coerente restituisce nuovamente `200` senza cambiare `usedAt`. Token inesistente e scaduto producono rispettivamente `404` e `410 Gone`. Il precedente `GET /api/v1/auth/verify-email` non è più esposto.
+Conferma l’account professionista o cliente tramite body JSON `{"token":"..."}`. Il token è obbligatorio, non blank e lungo al massimo 500 caratteri. Il primo consumo valido restituisce `200`, attiva l'account e marca il token usato; il secondo consumo coerente restituisce nuovamente `200` senza cambiare `usedAt`. Token inesistente e scaduto producono rispettivamente `404` e `410 Gone`. Il precedente `GET /api/v1/auth/verify-email` non è più esposto. Richiede CSRF.
 
-### 4.4 Reinvio verifica email
+### 4.6 Reinvio verifica email
 **POST** `/api/v1/auth/email-verification/resend`
-Accetta `{"email":"utente@example.com"}` e restituisce sempre `202 Accepted` con messaggio neutro per richieste sintatticamente valide. Supporta entrambi i ruoli senza rivelare esistenza, stato, cooldown o creazione del token. Solo account pending, non verificati e con profilo attivo generano un nuovo token; il cooldown è 60 secondi dal token più recente e termina al boundary esatto. I precedenti token non usati vengono invalidati tramite `used/usedAt`, lasciando un solo token utilizzabile per 24 ore. Nessun token viene restituito o registrato; invito e link restano invariati.
+Accetta `{"email":"utente@example.com"}` e restituisce sempre `202 Accepted` con messaggio neutro per richieste sintatticamente valide. Supporta entrambi i ruoli senza rivelare esistenza, stato, cooldown o creazione del token. Solo account pending, non verificati e con profilo attivo generano un nuovo token; il cooldown è 60 secondi dal token più recente e termina al boundary esatto. I precedenti token non usati vengono invalidati tramite `used/usedAt`, lasciando un solo token utilizzabile per 24 ore. Nessun token viene restituito o registrato; invito e link restano invariati. Richiede CSRF.
 
 Per registrazione professionista, registrazione cliente e reinvio idoneo, il backend pubblica la richiesta di consegna dentro la transazione e la esegue soltanto dopo il commit. Il link destinato al frontend ha forma `{verification-page-url}#token={tokenEncoded}`. Un errore del sender non cambia il `202 Accepted`; non esiste alcun endpoint per consultare i messaggi in-memory.
 
-### 4.5 Validazione codice invito cliente
+### 4.7 Validazione codice invito cliente
 **POST** `/api/v1/auth/register/client/validate-invite`  
-Verifica che il codice invito esista, sia attivo, non sia scaduto e non sia già usato.
+Verifica che il codice invito esista, sia attivo, non sia scaduto e non sia già usato. Richiede CSRF.
 
-### 4.6 Registrazione cliente con invito
+### 4.8 Registrazione cliente con invito
 **POST** `/api/v1/auth/register/client`  
-Completa la registrazione cliente usando un codice invito valido e restituisce sempre lo stesso `202 Accepted` neutro. L'invito viene validato prima del controllo email; per un'email già esistente, con invito ancora valido, non vengono creati profilo, link, token o messaggio e l'invito non viene consumato. Per una nuova email cliente, link, consumo invito e token email sono atomici; il login resta vietato fino alla conferma.
+Completa la registrazione cliente usando un codice invito valido e restituisce sempre lo stesso `202 Accepted` neutro. L'invito viene validato prima del controllo email; per un'email già esistente, con invito ancora valido, non vengono creati profilo, link, token o messaggio e l'invito non viene consumato. Per una nuova email cliente, link, consumo invito e token email sono atomici; il login resta vietato fino alla conferma. Richiede CSRF.
 
 ---
 
@@ -345,15 +355,19 @@ Attualmente sono pubblici gli endpoint sotto:
 `/api/v1/auth/**`
 
 In particolare:
+- `GET /api/v1/auth/csrf`
 - `POST /api/v1/auth/register/professional`
 - `POST /api/v1/auth/register/client`
 - `POST /api/v1/auth/register/client/validate-invite`
 - `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
 - `POST /api/v1/auth/email-verification/confirm`
 - `POST /api/v1/auth/email-verification/resend`
 
+Le mutazioni pubbliche e protette richiedono CSRF. Il logout è pubblico come URL ma invalida la sessione corrente quando presente.
+
 ### 11.2 Endpoint protetti
-Tutti gli altri endpoint richiedono autenticazione valida tramite JWT.
+Tutti gli altri endpoint richiedono una sessione autenticata valida (cookie HttpOnly + readiness). Non si usa `Authorization: Bearer`.
 
 ### 11.3 Regole per area
 - `/api/v1/clients/**` → solo `PROFESSIONAL`
@@ -374,9 +388,9 @@ Tutti gli altri endpoint richiedono autenticazione valida tramite JWT.
 
 ### 11.4 Contratto uniforme degli errori
 
-Endpoint, filtro JWT, handler Security e fallback `/error` restituiscono lo stesso JSON: `timestamp` UTC, `status`, `code`, `message` e `path` senza query. Solo `VALIDATION_ERROR` aggiunge `fieldErrors`, lista ordinata di `{field, code, message}` che può contenere più errori sullo stesso campo o un errore globale senza `field`.
+Endpoint, entry point Security, handler Access Denied e fallback `/error` restituiscono lo stesso JSON: `timestamp` UTC, `status`, `code`, `message` e `path` senza query. Solo `VALIDATION_ERROR` aggiunge `fieldErrors`, lista ordinata di `{field, code, message}` che può contenere più errori sullo stesso campo o un errore globale senza `field`.
 
-I codici dominio 4xx restano invariati. I casi framework usano `MALFORMED_REQUEST`, `MISSING_REQUEST_PARAMETER`, `INVALID_REQUEST_PARAMETER`, `RESOURCE_NOT_FOUND`, `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE` e `UNSUPPORTED_MEDIA_TYPE`. Le 401 distinguono `UNAUTHORIZED`, `INVALID_TOKEN` e `TOKEN_EXPIRED` e includono `WWW-Authenticate: Bearer`; il login errato mantiene `AUTHENTICATION_ERROR`. Le 405 conservano `Allow`, le 415 i media type supportati quando disponibili. Ogni 500 è esposto come `INTERNAL_SERVER_ERROR` con messaggio generico e senza dettagli interni.
+I codici dominio 4xx restano invariati. I casi framework usano `MALFORMED_REQUEST`, `MISSING_REQUEST_PARAMETER`, `INVALID_REQUEST_PARAMETER`, `RESOURCE_NOT_FOUND`, `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE` e `UNSUPPORTED_MEDIA_TYPE`. Le 401 tipiche usano `UNAUTHORIZED` e **non** includono `WWW-Authenticate: Bearer`. Il login errato mantiene `AUTHENTICATION_ERROR`. Un CSRF non valido produce `403 CSRF_VALIDATION_FAILED`. Le 405 conservano `Allow`, le 415 i media type supportati quando disponibili. Ogni 500 è esposto come `INTERNAL_SERVER_ERROR` con messaggio generico e senza dettagli interni.
 
 ---
 

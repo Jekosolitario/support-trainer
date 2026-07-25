@@ -4,10 +4,11 @@
 Questo documento definisce il flusso di sicurezza **attualmente implementato** nella v1 di Support Trainer.
 
 Lo scopo è chiarire:
-- come avviene l’autenticazione
+- come avviene l’autenticazione server-side
+- come vengono gestiti sessione HTTP, cookie e CSRF
 - come viene gestita l’autorizzazione
 - quali endpoint sono pubblici e quali protetti
-- come funzionano verifica email, JWT e refresh token
+- come funzionano verifica email, login, logout e readiness dinamica
 - quali controlli spettano a Spring Security e quali al service layer
 
 ---
@@ -16,9 +17,10 @@ Lo scopo è chiarire:
 
 Nello stato attuale del progetto, il sistema adotta i seguenti principi:
 
-- autenticazione con **Spring Security**
-- sessione **stateless**
-- uso di **JWT**
+- autenticazione con **Spring Security 7** e **Spring Session JDBC**
+- sessione **server-side** (non JWT runtime)
+- cookie di sessione **HttpOnly**; nessuna credenziale Bearer
+- CSRF abilitato sulle mutazioni
 - distinzione chiara tra:
   - **autenticazione**
   - **autorizzazione**
@@ -26,6 +28,7 @@ Nello stato attuale del progetto, il sistema adotta i seguenti principi:
 - protezione degli endpoint sensibili
 - verifica email obbligatoria e reinvio uniforme per professionista e cliente
 - controlli business aggiuntivi nel service layer sulle risorse accessibili
+- topologia di produzione **same-origin** dietro reverse proxy (`/` frontend, `/api/v1/**` backend): CORS browser non è richiesto in produzione
 
 ---
 
@@ -34,21 +37,23 @@ Nello stato attuale del progetto, il sistema adotta i seguenti principi:
 ## 3.1 Strategia scelta
 Il sistema usa:
 
-- **Spring Security**
-- **JWT stateless**
-- **access token**
-- **refresh token**
+- **Spring Security 7**
+- **Spring Session JDBC** (schema creato da Flyway V7)
+- cookie di sessione HttpOnly
+- token CSRF di sessione
+
+Non esiste runtime JWT: nessun `accessToken`, `refreshToken`, header `Authorization: Bearer` né dipendenza JJWT.
 
 ## 3.2 Obiettivo
-L’utente, dopo login valido, ottiene un accesso temporaneo senza usare sessioni server-side classiche.
+L’utente, dopo login valido, ottiene una sessione server-side. Il browser conserva solo il cookie di sessione; il client applica il CSRF alle mutazioni.
 
-## 3.3 Vantaggi
-Questa scelta è adatta perché:
-- è coerente con un backend REST separato dal frontend
-- si integra bene con un frontend web React + TypeScript + Vite separato dal backend;
-- resta compatibile, a livello di API REST e autenticazione JWT, con una possibile futura app mobile React Native + Expo da valutare dopo la stabilizzazione della web app.
-- permette un controllo chiaro sugli endpoint
-- si adatta bene a un’applicazione scalabile e testabile
+## 3.3 Topologia
+In produzione il browser parla same-origin con un reverse proxy che espone:
+
+- `/` → frontend
+- `/api/v1/**` → backend
+
+CORS applicativo è disabilitato (`cors.disable()`). Non è un meccanismo richiesto per l’autenticazione browser in produzione.
 
 ---
 
@@ -98,116 +103,126 @@ Solo dopo verifica email:
 - `accountStatus = ACTIVE`
 - `emailVerified = true`
 
-## 5.3 Blocco operativo
-Finché l'utente non è attivo e verificato non può completare correttamente il login né usare endpoint operativi. Il controllo `emailVerified=true` è esplicito sia per `CLIENT` sia per `PROFESSIONAL`; il profilo attivo è richiesto per Availability, Booking, inviti e letture relazionali. Gli endpoint self-service `/api/v1/me/**` richiedono comunque account attivo ed email verificata, ma non bloccano la consultazione o l'aggiornamento dello stato operativo del proprio profilo quando `active=false`.
+## 5.3 Blocco operativo e readiness
+Il login e il mantenimento della sessione richiedono account `ACTIVE` ed `emailVerified=true`. Il flag `profile.active=false` **non** blocca login né invalidazione sessione per readiness di autenticazione.
+
+`SessionAuthenticationStateFilter` rivaluta su ogni richiesta autenticata:
+
+- esistenza dell’utente;
+- `accountStatus = ACTIVE`;
+- `emailVerified = true`;
+- coerenza ruolo/authority;
+- timeout assoluto di 8 ore da `authenticatedAt`.
+
+Il profilo attivo resta richiesto per Availability, Booking, inviti e letture relazionali. Gli endpoint self-service `/api/v1/me/**` richiedono account attivo ed email verificata, ma non bloccano la consultazione o l'aggiornamento dello stato operativo del proprio profilo quando `active=false`.
 
 ## 5.4 Cliente
 Il cliente può registrarsi solo tramite codice invito valido. La registrazione crea subito link e token e consuma l'invito, ma l'account resta pending e il professionista non può leggerlo fino alla conferma. La nuova regola riguarda le nuove registrazioni e non migra i clienti già salvati.
 
 ---
 
-## 6. Token model
+## 6. Sessione, cookie e timeout
 
-## 6.1 Access token
-L’access token:
-- identifica l’utente autenticato
-- viene generato al login
-- ha scadenza configurabile
-- viene inviato nelle richieste protette
-- contiene il claim interno `token_type = access`
-- è l’unico tipo di JWT accettato come credenziale Bearer sugli endpoint protetti
+## 6.1 Store di sessione
+Le sessioni autenticate sono persistite via **Spring Session JDBC**. Lo schema (`SPRING_SESSION`, `SPRING_SESSION_ATTRIBUTES`) è creato da Flyway **V7**; `spring.session.jdbc.initialize-schema=never`.
 
-### Header standard
-`Authorization: Bearer <access_token>`
+## 6.2 Cookie di sessione
 
-## 6.2 Refresh token
-Il refresh token:
-- viene generato al login
-- ha scadenza più lunga rispetto all’access token
-- viene restituito nella `AuthResponse`
-- contiene il claim interno `token_type = refresh`
-- non è accettato come credenziale Bearer sugli endpoint protetti
+### Produzione (esempio tracciato)
+- nome: `__Host-STSESSION`
+- `Secure=true`
+- `HttpOnly=true`
+- `SameSite=Strict`
+- `Path=/`
+- nessun `Domain`
+- cookie di sessione (non persistente; nessun `Max-Age` applicativo)
 
-## 6.3 Stato attuale del refresh token
-Nel codice attuale:
-- il **refresh token viene generato**
-- il **refresh token viene restituito**
-- il filtro JWT lo rifiuta se viene usato come access token Bearer
-- **non esiste ancora un endpoint dedicato di refresh**
-- **non esiste ancora un lifecycle completo di rinnovo, persistenza, rotazione o revoca**
+### Locale / test
+- nome: `STSESSION`
+- `Secure=false`
+- `HttpOnly=true`
+- `SameSite=Strict`
+- `Path=/`
 
-Quindi il refresh token è già presente nel modello di autenticazione, ma il relativo flusso di rinnovo non è ancora esposto via endpoint.
+Il browser gestisce il cookie; il frontend non lo legge né lo scrive in `localStorage`/`sessionStorage`.
 
-## 6.4 Contenuto JWT
-Nel codice attuale il JWT contiene solo informazioni essenziali:
-- `subject` = email dell’utente
-- `issuedAt`
-- `expiration`
-- claim interno `token_type`, valorizzato con `access` oppure `refresh`
+## 6.3 Timeout
+- **inattività:** 30 minuti (`spring.session.timeout=30m`)
+- **assoluto:** 8 ore dall’attributo di sessione `authenticatedAt`, valutato da `SessionAuthenticationStateFilter`
 
-Attualmente **non** vengono aggiunti altri claim applicativi come:
-- user id
-- role
-- dati business
+Se la readiness o il timeout assoluto falliscono, la sessione viene invalidata e la richiesta riceve `401 UNAUTHORIZED`.
 
-## 6.5 Configurazione e validazione JWT
-
-Le proprietà `app.security.jwt.secret`, `app.security.jwt.expiration` e `app.security.jwt.refresh-expiration` sono raccolte in una configurazione tipizzata e validate durante l'avvio.
-
-- il secret è obbligatorio, deve essere Base64 valido e decodificare almeno 32 byte;
-- le durate devono essere positive;
-- la durata del refresh token deve essere maggiore di quella dell'access token;
-- i numeri senza suffisso mantengono la semantica storica in millisecondi; sono ammessi anche valori espliciti come `1h` o `7d`.
-
-Il servizio JWT riceve questa configurazione come unica dipendenza e conserva in memoria la chiave di firma già decodificata. Nessun secret applicativo è previsto come default o deve essere versionato.
+## 6.4 Attributi di sessione rilevanti
+Al login valido viene impostato `authenticatedAt` (Instant). Il CSRF token di sessione viene ruotato dalle strategie di autenticazione sessione (rotazione session id + invalidazione CSRF).
 
 ---
 
-## 7. Endpoint pubblici e protetti
+## 7. CSRF
 
-## 7.1 Endpoint pubblici
-In base al codice attuale, gli endpoint pubblici effettivamente implementati sono:
+## 7.1 Endpoint
+`GET /api/v1/auth/csrf` restituisce:
 
+```json
+{ "token": "...", "headerName": "X-CSRF-TOKEN" }
+```
+
+con `Cache-Control: no-store`. `headerName` è quello esposto dal token Spring (tipicamente `X-CSRF-TOKEN`).
+
+## 7.2 Uso
+Le mutazioni (POST/PATCH e logout) devono inviare l’header CSRF indicato da `headerName`. Un fallimento CSRF produce `403` con codice `CSRF_VALIDATION_FAILED`.
+
+## 7.3 Rotazione dopo login
+Il login invalida/ruota il CSRF di sessione. Dopo un login riuscito il client deve richiamare `GET /api/v1/auth/csrf` e usare il nuovo token. Il token CSRF va tenuto solo in memoria, non in storage persistente del browser.
+
+---
+
+## 8. Endpoint pubblici e protetti
+
+## 8.1 Endpoint pubblici
+In base al codice attuale, gli endpoint pubblici effettivamente implementati sotto `/api/v1/auth/**` sono:
+
+- `GET /api/v1/auth/csrf`
 - `POST /api/v1/auth/register/professional`
 - `POST /api/v1/auth/register/client`
 - `POST /api/v1/auth/email-verification/confirm`
 - `POST /api/v1/auth/email-verification/resend`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/register/client/validate-invite`
+- `POST /api/v1/auth/logout` (URL di logout Spring Security; richiede CSRF; risponde `204` e invalida la sessione)
 
-## 7.2 Regola generale in SecurityConfig
+## 8.2 Regola generale in SecurityConfig
 Nel codice, Spring Security consente pubblicamente:
 - `/error`
 - `/api/v1/auth/**`
 
-Swagger UI e OpenAPI non sono pubblici: senza JWT rispondono `401`; con un JWT valido, non essendo esposti dall'applicazione, rispondono con il `404` uniforme.
+Swagger UI e OpenAPI non sono pubblici: senza autenticazione rispondono `401`; non essendo esposti dall'applicazione, con sessione valida rispondono con il `404` uniforme.
 
-## 7.3 Endpoint protetti
-Tutti gli altri endpoint richiedono autenticazione valida tramite JWT, salvo regole più specifiche sui ruoli.
+## 8.3 Endpoint protetti
+Tutti gli altri endpoint richiedono una sessione autenticata valida (cookie + readiness), salvo regole più specifiche sui ruoli. Le mutazioni richiedono anche CSRF.
 
 ---
 
-## 8. Flusso registrazione professionista
+## 9. Flusso registrazione professionista
 
-## 8.1 Step principali
+## 9.1 Step principali
 1. il professionista invia richiesta di registrazione
 2. il backend valida i dati
 3. il sistema verifica in modo neutro se l’email sia già registrata
 4. solo per una nuova email crea il professionista con stato `PENDING_VERIFICATION`, token e richiesta email after-commit
 5. per un’email già esistente non muta account, profilo o token
-6. la registrazione restituisce sempre `202 Accepted` con lo stesso DTO neutro, senza token di login, ID, ruolo o email
+6. la registrazione restituisce sempre `202 Accepted` con lo stesso DTO neutro, senza sessione di login, ID, ruolo o email
 7. il professionista deve poi verificare l’email tramite endpoint dedicato oppure usare resend
 
-## 8.2 Regola importante
+## 9.2 Regola importante
 Prima della verifica email:
 - il professionista non può effettuare login operativo
 - l’account non è ancora attivo
 
 ---
 
-## 9. Flusso registrazione cliente con invito
+## 10. Flusso registrazione cliente con invito
 
-## 9.1 Step principali
+## 10.1 Step principali
 1. il cliente invia i dati di registrazione insieme al codice invito
 2. il backend acquisisce e valida con lock il codice invito
 3. il backend verifica il professionista associato e solo dopo controlla l'email in modo neutro
@@ -221,7 +236,7 @@ Prima della verifica email:
 9. il backend crea il token email da 24 ore
 10. la registrazione restituisce `202 Accepted` con il DTO neutro
 
-## 9.2 Regola importante
+## 10.2 Regola importante
 La registrazione cliente può essere completata solo con codice invito:
 - esistente
 - attivo
@@ -230,9 +245,9 @@ La registrazione cliente può essere completata solo con codice invito:
 
 ---
 
-## 10. Flusso verifica email
+## 11. Flusso verifica email
 
-## 10.1 Step principali
+## 11.1 Step principali
 1. il professionista o cliente invia `POST /api/v1/auth/email-verification/confirm` con il token nel body
 2. il backend cerca il token
 3. il backend verifica che il token:
@@ -245,14 +260,14 @@ La registrazione cliente può essere completata solo con codice invito:
 5. il backend marca il token come usato e valorizza `usedAt`
 6. un secondo POST sullo stesso stato coerente restituisce 200 senza modificare nuovamente `usedAt`
 
-## 10.2 Errori gestiti
+## 11.2 Errori gestiti
 Il flusso gestisce almeno questi casi:
 - body o campo `token` obbligatorio mancante/non valido
 - token non trovato
 - token usato con stato incoerente
 - token scaduto, restituito come `410 Gone`
 
-## 10.3 Reinvio uniforme
+## 11.3 Reinvio uniforme
 
 1. il chiamante invia `POST /api/v1/auth/email-verification/resend` con l'email nel body;
 2. il service normalizza l'email e acquisisce un lock pessimista sull'utente, se esiste;
@@ -265,66 +280,46 @@ Al boundary `now == latestToken.createdAt + 60 secondi` il reinvio è consentito
 
 ---
 
-## 11. Flusso login
+## 12. Flusso login
 
-## 11.1 Step principali
-1. l’utente invia email e password
-2. il backend normalizza l’email
-3. il backend rifiuta come credenziali non valide una password oltre 72 byte UTF-8
-4. `AuthenticationManager` autentica le credenziali
-5. il backend recupera l’utente dal database
-6. il backend verifica che l’account sia abilitato all’accesso
-7. se tutto è valido, genera:
-   - access token
-   - refresh token
-8. il backend restituisce la risposta di login
+## 12.1 Step principali
+1. il client ottiene un CSRF valido (`GET /api/v1/auth/csrf`) e lo invia nell’header richiesto
+2. l’utente invia email e password a `POST /api/v1/auth/login`
+3. il backend normalizza l’email
+4. il backend rifiuta come credenziali non valide una password oltre 72 byte UTF-8
+5. `AuthenticationManager` autentica le credenziali
+6. il backend recupera l’utente e verifica l’eligibilità: `ACTIVE` + `emailVerified=true` (`profile.active` non è controllato)
+7. se tutto è valido, crea la sessione server-side, ruota l’id di sessione, invalida il CSRF precedente e imposta `authenticatedAt`
+8. la risposta è `204 No Content` senza body e senza token
 
-## 11.2 Controlli aggiuntivi
+## 12.2 Controlli aggiuntivi
 Nel login vengono verificati almeno:
 - credenziali corrette
 - utente esistente
 - account `ACTIVE`
-- per il professionista: email verificata
+- email verificata (entrambi i ruoli)
 
-## 11.3 Risposta login
-La `AuthResponse` di login contiene:
-- `accessToken`
-- `refreshToken`
-- `tokenType`
-- `userId`
-- `email`
-- `role`
+## 12.3 Dopo il login
+Il client deve:
+1. richiamare `GET /api/v1/auth/csrf` (token ruotato);
+2. fare bootstrap con `GET /api/v1/me/account` e `GET /api/v1/me/profile`.
 
----
-
-## 12. Refresh token
-
-## 12.1 Stato attuale
-Il progetto attualmente:
-- genera refresh token
-- restituisce refresh token nel login
-
-Ma **non implementa ancora**:
-- endpoint di refresh
-- rinnovo dell’access token
-- rotazione token
-- revoca token
-- persistenza token
-
-## 12.2 Implicazione pratica
-Il refresh token è già previsto nel modello e distinto dall’access token, ma non può autenticare richieste protette. Il flusso completo di rinnovo resta da completare in uno sprint successivo.
+Non esistono `accessToken`, `refreshToken`, `tokenType` né header `Authorization`.
 
 ---
 
 ## 13. Logout
 
 ## 13.1 Stato attuale
-Nel codice attuale **non esiste ancora un endpoint di logout**.
+`POST /api/v1/auth/logout` è implementato tramite Spring Security logout:
+
+- richiede CSRF;
+- invalida la sessione HTTP;
+- cancella l’autenticazione;
+- risponde `204 No Content`.
 
 ## 13.2 Significato pratico
-In un sistema JWT stateless, il logout lato applicazione potrà in futuro significare:
-- rimozione dei token lato client
-- eventuale revoca lato backend dei refresh token, se verranno persistiti
+Il logout invalida la sessione server-side. Il client deve scartare il CSRF in memoria e tornare allo stato anonimo. Non esiste revoca di JWT perché non esiste JWT runtime.
 
 ---
 
@@ -345,9 +340,10 @@ Risponde alla domanda:
 - **chi sei?**
 
 È gestita da:
-- login
+- login session-based
 - verifica credenziali
-- JWT
+- cookie di sessione Spring Session
+- `SessionAuthenticationStateFilter`
 - filter chain di Spring Security
 
 ## 15.2 Autorizzazione
@@ -442,7 +438,7 @@ Tutto il resto richiede autenticazione valida.
 
 I dettagli `GET /api/v1/clients/{clientId}` e `GET /api/v1/professionals/{professionalId}` interrogano direttamente il perimetro accessibile al principal. La query combina ID richiesto, ID del principal, collegamento attivo e stati di account/profilo già richiesti dal dominio; non esegue prima un lookup del solo ID né una query di esistenza usata per scegliere un errore diverso.
 
-Un risultato vuoto produce sempre il medesimo 404 specifico dell'endpoint, sia per ID inesistente sia per collegamento assente o inattivo e profilo non leggibile. La policy non modifica i confini di Spring Security: richiesta anonima e token non valido restano 401, mentre un ruolo non ammesso sull'endpoint resta 403. Gli stati operativi, come `PAUSA` o `FERIE`, restano informazioni di dominio e non sono criteri di occultamento del dettaglio.
+Un risultato vuoto produce sempre il medesimo 404 specifico dell'endpoint, sia per ID inesistente sia per collegamento assente o inattivo e profilo non leggibile. La policy non modifica i confini di Spring Security: richiesta anonima e sessione non valida restano 401, mentre un ruolo non ammesso sull'endpoint resta 403. Gli stati operativi, come `PAUSA` o `FERIE`, restano informazioni di dominio e non sono criteri di occultamento del dettaglio.
 
 ### Minimizzazione del profilo cliente condiviso
 
@@ -612,8 +608,10 @@ Algoritmo, costo e formato degli hash esistenti restano invariati.
 ## 20. Token applicativi aggiuntivi
 
 ## 20.1 Token realmente presenti
-Oltre ai JWT, nel codice attuale esiste un token applicativo dedicato per:
+Nel codice attuale esiste un token applicativo dedicato per:
 - verifica email
+
+Non esistono JWT di autenticazione runtime.
 
 ## 20.2 Regole del token di verifica email
 Il token di verifica email è:
@@ -628,49 +626,46 @@ Il token di verifica email è:
 ## 20.3 Token non presenti
 Nel codice attuale **non** risulta ancora implementato un token applicativo per:
 - reset password
+- refresh autenticazione
 
 ---
 
-## 21. CORS e frontend separato
+## 21. CORS e topologia same-origin
 
 ## 21.1 Stato attuale
 
-- il CORS è abilitato nella `SecurityFilterChain` tramite il bean `CorsConfigurationSource`;
-- gli origin consentiti sono letti dalla proprietà tipizzata `app.cors.allowed-origins`;
-- la lista è obbligatoria, normalizzata e priva di valori vuoti o duplicati;
-- sono accettate solo origini esatte `http` o `https`, senza wildcard, path, query string o fragment;
-- sono consentiti `GET`, `POST`, `PATCH` e `OPTIONS`, coerenti con le API correnti;
-- sono consentiti gli header `Authorization` e `Content-Type`;
-- `allowCredentials` è disabilitato perché l'autenticazione usa Bearer JWT.
+- CORS applicativo è **disabilitato** nella `SecurityFilterChain`;
+- in produzione il browser raggiunge frontend e API same-origin tramite reverse proxy;
+- non è richiesta una lista `app.cors.allowed-origins` per l’autenticazione browser di produzione;
+- le credenziali di autenticazione sono il cookie di sessione HttpOnly, non un Bearer header.
 
 ## 21.2 Nota importante
 
-La configurazione applicativa di esempio richiede `APP_CORS_ALLOWED_ORIGINS`; il file locale ignorato può continuare a definire direttamente la proprietà e il profilo `test` usa un origin fittizio autonomo. Ogni ambiente deve fornire l'origine esatta del proprio frontend, inclusa l'eventuale porta. Un preflight proveniente da un'origine non configurata viene rifiutato.
-
-Questa configurazione supporta un frontend separato senza usare wildcard e resta sovrascrivibile tramite le normali sorgenti esterne di Spring. Non sono introdotti profili di deploy né valori di produzione nel repository. Un rifiuto CORS avviene prima di controller e contract error HTTP: il browser non può quindi trattare il suo eventuale body come `ErrorResponse` consumabile.
+Ambienti di sviluppo con origini separate (es. Vite su porta diversa) non sono il modello di produzione documentato. Il contratto corrente assume same-origin in produzione; eventuali workaround locali di proxy non cambiano il modello di sicurezza runtime.
 
 ---
 
-## 22. CSRF
+## 22. CSRF (riepilogo operativo)
 
 ## 22.1 Stato attuale
-Nel `SecurityConfig` il CSRF è disabilitato:
-
-- `csrf(csrf -> csrf.disable())`
+Nel `SecurityConfig` il CSRF è **abilitato** con `HttpSessionCsrfTokenRepository`.
 
 ## 22.2 Coerenza architetturale
 Questa scelta è coerente con:
-- API REST stateless
-- autenticazione via header Bearer JWT
+- API REST con sessione server-side
+- cookie di sessione HttpOnly
+- mutazioni autenticate e pubbliche che richiedono l’header CSRF
 
 ---
 
 ## 23. Security responsibilities
 
 ## 23.1 Spring Security gestisce
-- autenticazione login
-- parsing e validazione JWT
-- filtro richieste
+- autenticazione login e creazione sessione
+- cookie di sessione e store JDBC
+- CSRF
+- logout con invalidazione sessione
+- filtro readiness (`SessionAuthenticationStateFilter`)
 - distinzione tra endpoint pubblici e protetti
 - controllo base delle authority sugli endpoint configurati
 
@@ -703,17 +698,18 @@ Questa scelta è coerente con:
 Nel codice attuale le situazioni seguenti devono produrre errori chiari:
 
 - credenziali non valide
-- utente non autenticato
-- token mancante, alterato, non valido o scaduto
-- refresh token usato impropriamente come Bearer
+- utente non autenticato / sessione assente o invalidata
+- CSRF mancante o non valido (`CSRF_VALIDATION_FAILED`)
+- sessione scaduta per inattività o timeout assoluto
+- account non più ACTIVE o email non verificata su richiesta autenticata (fail-closed con invalidazione sessione)
 - route o risorsa inesistente dopo autenticazione
 - metodo HTTP non supportato
 - media type non supportato
 - parametro HTTP obbligatorio mancante
-- account non attivo
+- account non attivo in fase di login o operativa
 - email non verificata
-- profilo professionista non attivo
-- profilo cliente non attivo
+- profilo professionista non attivo (operazioni business, non login)
+- profilo cliente non attivo (operazioni business, non login)
 - accesso a endpoint con authority errata
 - accesso ai dettagli cliente/professionista fuori dal perimetro del principal, esposto come 404 uniforme
 - uso di codice invito non valido, non attivo, già usato o scaduto
@@ -731,23 +727,28 @@ Nel codice attuale le situazioni seguenti devono produrre errori chiari:
 - accesso a booking da utente non coinvolto
 - transizione booking non consentita
 
+Le risposte `401` usano il contratto `ErrorResponse` con codice tipico `UNAUTHORIZED` e **non** espongono `WWW-Authenticate: Bearer`.
+
 ---
 
 ## 25. Decisioni confermate
 
 Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti scelte:
 
-- Spring Security + JWT stateless
-- access token + refresh token generati al login
-- claim interno `token_type` per distinguere access e refresh token
-- solo gli access token sono accettati come Bearer sugli endpoint protetti
+- Spring Security 7 + Spring Session JDBC
+- login `204` con cookie HttpOnly, senza JWT/Bearer/refresh
+- CSRF abilitato; `GET /api/v1/auth/csrf` espone token e `headerName`
+- logout `POST /api/v1/auth/logout` con CSRF → `204` e sessione invalidata
+- timeout 30 min inattività + 8 h assolute da `authenticatedAt`
+- eligibilità login: `ACTIVE` + `emailVerified`; `profile.active=false` non blocca il login
+- readiness dinamica su ogni richiesta autenticata
+- topologia produzione same-origin; CORS non richiesto per auth browser
 - ruoli reali: `PROFESSIONAL`, `CLIENT`
 - specializzazione business: `PERSONAL_TRAINER`, `NUTRITIONIST`
 - verifica email obbligatoria per professionista e cliente
 - cliente registrabile solo tramite codice invito valido
 - business authorization gestita nel service layer
 - password hashata con BCrypt
-- refresh token già presente nel modello, ma lifecycle di rinnovo, persistenza, rotazione e revoca non ancora implementato
 - forgot password / reset password non ancora implementati
 - Availability è modulo backend implementato e protetto
 - Bookings è modulo backend implementato e protetto
@@ -763,6 +764,6 @@ Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti
 
 ## 26. Riferimento temporale dei flussi di sicurezza
 
-JWT, verifica email, inviti e timestamp delle risposte di errore usano l'unica fonte temporale applicativa. Il `Clock` tecnico opera in UTC; JWT converte esplicitamente l'`Instant` in `Date` mantenendo invariati claim, algoritmo e durate. Le scadenze di verifica email e invito sono ora `Instant` persistiti in UTC e durano rispettivamente 24 e 168 ore reali. Il timestamp di `ErrorResponse` usa `ApplicationTimeProvider.nowInstant()` ed è serializzato in UTC con `Z`.
+Verifica email, inviti, `authenticatedAt` e timestamp delle risposte di errore usano l'unica fonte temporale applicativa. Il `Clock` tecnico opera in UTC. Le scadenze di verifica email e invito sono `Instant` persistiti in UTC e durano rispettivamente 24 e 168 ore reali. Il timestamp di `ErrorResponse` usa `ApplicationTimeProvider.nowInstant()` ed è serializzato in UTC con `Z`.
 
-I test di sicurezza possono sostituire il bean con `Clock.fixed`, rendendo deterministici issued-at, expiration, consumo dei token e timestamp 401/403. Le scadenze esposte per gli inviti sono serializzate in ISO-8601 UTC con `Z`; endpoint e messaggi restano invariati.
+I test di sicurezza possono sostituire il bean con `Clock.fixed`, rendendo deterministici consumo dei token, timeout assoluto di sessione e timestamp 401/403. Le scadenze esposte per gli inviti sono serializzate in ISO-8601 UTC con `Z`; endpoint e messaggi restano invariati.

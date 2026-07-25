@@ -26,7 +26,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -45,6 +44,8 @@ import it.zuperman.support_trainer.invite.repository.InviteCodeRepository;
 import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 import jakarta.transaction.Transactional;
 
 @SpringBootTest
@@ -117,7 +118,7 @@ class AuthControllerEmailResendIntegrationTest {
         confirm(currentToken.getToken());
         assertThat(professional.getAccountStatus()).isEqualTo(AccountStatus.ACTIVE);
         assertThat(professional.getEmailVerified()).isTrue();
-        assertThat(login(email)).isNotBlank();
+        login(email);
     }
 
     @Test
@@ -127,8 +128,8 @@ class AuthControllerEmailResendIntegrationTest {
         registerProfessional(professionalEmail);
         User professional = userRepository.findByEmail(professionalEmail).orElseThrow();
         confirm(findTokensFor(professional).get(0).getToken());
-        String professionalAccessToken = login(professionalEmail);
-        String inviteCodeValue = createInvite(professionalAccessToken);
+        CsrfSession professionalAuth = login(professionalEmail);
+        String inviteCodeValue = createInvite(professionalAuth);
         String clientEmail = "client.resend@example.com";
         registerClient(inviteCodeValue, clientEmail);
 
@@ -160,10 +161,10 @@ class AuthControllerEmailResendIntegrationTest {
         assertThat(linkAfter.getClient().getId()).isEqualTo(client.getId());
         assertThat(professionalClientLinkRepository.count()).isEqualTo(linkCount);
 
-        assertClientHidden(professionalAccessToken, client.getId());
+        assertClientHidden(professionalAuth, client.getId());
         confirm(currentToken.getToken());
-        assertThat(login(clientEmail)).isNotBlank();
-        assertClientVisible(professionalAccessToken, client.getId());
+        assertThat(login(clientEmail)).isNotNull();
+        assertClientVisible(professionalAuth, client.getId());
     }
 
     @Test
@@ -213,9 +214,9 @@ class AuthControllerEmailResendIntegrationTest {
         registerProfessional(ownerEmail);
         User owner = userRepository.findByEmail(ownerEmail).orElseThrow();
         confirm(findTokensFor(owner).get(0).getToken());
-        String ownerAccessToken = login(ownerEmail);
+        CsrfSession ownerAuth = login(ownerEmail);
         String pendingClientEmail = "client.uniform@example.com";
-        registerClient(createInvite(ownerAccessToken), pendingClientEmail);
+        registerClient(createInvite(ownerAuth), pendingClientEmail);
 
         String verifiedEmail = "verified.uniform@example.com";
         registerProfessional(verifiedEmail);
@@ -327,11 +328,16 @@ class AuthControllerEmailResendIntegrationTest {
     @Test
     @DisplayName("Body assente e JSON malformato restituiscono 400")
     void shouldRejectMissingOrMalformedBody() throws Exception {
-        mockMvc.perform(post(RESEND_ENDPOINT).contentType(MediaType.APPLICATION_JSON))
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
+        mockMvc.perform(post(RESEND_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
 
+        csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post(RESEND_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":"))
                 .andExpect(status().isBadRequest())
@@ -352,7 +358,9 @@ class AuthControllerEmailResendIntegrationTest {
     @Test
     @DisplayName("Content-Type non supportato restituisce 415")
     void shouldRejectUnsupportedContentType() throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post(RESEND_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_XML)
                         .content("<email>user@example.com</email>"))
                 .andExpect(status().isUnsupportedMediaType())
@@ -360,7 +368,9 @@ class AuthControllerEmailResendIntegrationTest {
     }
 
     private MvcResult resend(String email) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         return mockMvc.perform(post(RESEND_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(emailBody(email)))
                 .andExpect(status().isAccepted())
@@ -373,7 +383,9 @@ class AuthControllerEmailResendIntegrationTest {
     }
 
     private void registerProfessional(String email) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -388,7 +400,9 @@ class AuthControllerEmailResendIntegrationTest {
     }
 
     private void registerClient(String inviteCode, String email) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/register/client")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -406,16 +420,18 @@ class AuthControllerEmailResendIntegrationTest {
                 .andExpect(status().isAccepted());
     }
 
-    private String createInvite(String accessToken) throws Exception {
+    private String createInvite(CsrfSession professionalAuth) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/invites")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth)))
                 .andExpect(status().isCreated())
                 .andReturn();
         return JsonPath.read(result.getResponse().getContentAsString(), "$.code");
     }
 
     private void confirm(String token) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post(CONFIRM_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(tokenBody(token)))
                 .andExpect(status().isOk())
@@ -423,49 +439,45 @@ class AuthControllerEmailResendIntegrationTest {
     }
 
     private void confirmExpectingAlreadyUsed(String token) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post(CONFIRM_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(tokenBody(token)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_TOKEN_ALREADY_USED"));
     }
 
-    private String login(String email) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"email":"%s","password":"%s"}
-                                """.formatted(email, PASSWORD)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andReturn();
-        return JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
+    private CsrfSession login(String email) throws Exception {
+        return SessionAuthTestSupport.loginAndRefreshCsrf(mockMvc, email, PASSWORD);
     }
 
-    private void assertClientHidden(String professionalToken, Long clientId) throws Exception {
+    private void assertClientHidden(CsrfSession professionalAuth, Long clientId) throws Exception {
         mockMvc.perform(get("/api/v1/clients/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
         mockMvc.perform(get("/api/v1/clients/{clientId}", clientId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CLIENT_NOT_FOUND"));
     }
 
-    private void assertClientVisible(String professionalToken, Long clientId) throws Exception {
+    private void assertClientVisible(CsrfSession professionalAuth, Long clientId) throws Exception {
         mockMvc.perform(get("/api/v1/clients/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(clientId));
         mockMvc.perform(get("/api/v1/clients/{clientId}", clientId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(professionalToken)))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(clientId));
     }
 
     private void assertInvalidEmail(String body) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post(RESEND_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest())
@@ -487,10 +499,6 @@ class AuthControllerEmailResendIntegrationTest {
         return """
                 {"token":"%s"}
                 """.formatted(token);
-    }
-
-    private String bearer(String token) {
-        return "Bearer " + token;
     }
 
     @TestConfiguration(proxyBeanMethods = false)

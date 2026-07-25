@@ -31,7 +31,6 @@ import it.zuperman.support_trainer.invite.service.InviteCodeService;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
-import it.zuperman.support_trainer.security.jwt.JwtService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -60,8 +59,6 @@ class AuthServiceTimeTest {
     @Mock
     private AuthenticationManager authenticationManager;
     @Mock
-    private JwtService jwtService;
-    @Mock
     private ProfessionalClientLinkRepository professionalClientLinkRepository;
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -75,7 +72,6 @@ class AuthServiceTimeTest {
                 emailVerificationTokenRepository,
                 passwordEncoder,
                 authenticationManager,
-                jwtService,
                 fixedTimeProvider(),
                 eventPublisher,
                 new RegistrationPersistenceService(
@@ -210,7 +206,6 @@ class AuthServiceTimeTest {
                 emailVerificationTokenRepository,
                 passwordEncoder,
                 authenticationManager,
-                jwtService,
                 fixedTimeProvider(instant),
                 eventPublisher,
                 new RegistrationPersistenceService(

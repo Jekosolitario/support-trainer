@@ -20,19 +20,18 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
-import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.Gender;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
@@ -40,7 +39,8 @@ import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
-import it.zuperman.support_trainer.security.jwt.JwtService;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -59,6 +59,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AvailabilityTemporalContractIntegrationTest {
 
     private static final Instant FIXED_NOW = Instant.parse("2026-01-15T10:00:00Z");
+    private static final String PASSWORD = "Password123!";
 
     @Autowired
     private MockMvc mockMvc;
@@ -76,31 +77,35 @@ class AvailabilityTemporalContractIntegrationTest {
     private ProfessionalClientLinkRepository professionalClientLinkRepository;
 
     @Autowired
-    private JwtService jwtService;
+    private PasswordEncoder passwordEncoder;
 
     private ProfessionalProfile professional;
-    private String professionalAuthorization;
+    private CsrfSession professionalAuth;
 
     @BeforeEach
-    void createProfessional() {
+    void createProfessional() throws Exception {
         professional = new ProfessionalProfile(
                 "Mario",
                 "Rossi",
                 "temporal-professional@example.com",
-                "encoded-password",
+                passwordEncoder.encode(PASSWORD),
                 ProfessionalSpecialization.PERSONAL_TRAINER
         );
         professional.setAccountStatus(AccountStatus.ACTIVE);
         professional.setEmailVerified(true);
         professional.setActive(true);
         professional = professionalProfileRepository.saveAndFlush(professional);
-        professionalAuthorization = bearer(professional);
+        professionalAuth = SessionAuthTestSupport.loginAndRefreshCsrf(
+                mockMvc,
+                professional.getEmail(),
+                PASSWORD
+        );
     }
 
     @Test
     void shouldCreateAvailabilityWithOffsetAndPreserveIsoResponse() throws Exception {
         mockMvc.perform(post("/api/v1/availability")
-                        .header(HttpHeaders.AUTHORIZATION, professionalAuthorization)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(slotPayload(
                                 "2026-07-13T17:30:00+02:00",
@@ -120,7 +125,7 @@ class AvailabilityTemporalContractIntegrationTest {
         ));
 
         mockMvc.perform(patch("/api/v1/availability/{slotId}", slot.getId())
-                        .header(HttpHeaders.AUTHORIZATION, professionalAuthorization)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"endDateTime\":\"2026-01-20T19:00:00+01:00\"}"))
                 .andExpect(status().isOk())
@@ -128,7 +133,7 @@ class AvailabilityTemporalContractIntegrationTest {
                 .andExpect(jsonPath("$.endDateTime").value("2026-01-20T19:00:00+01:00"));
 
         mockMvc.perform(get("/api/v1/availability/my")
-                        .header(HttpHeaders.AUTHORIZATION, professionalAuthorization))
+                        .with(SessionAuthTestSupport.withSession(professionalAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].startDateTime").value("2026-01-20T17:30:00+01:00"))
                 .andExpect(jsonPath("$[0].endDateTime").value("2026-01-20T19:00:00+01:00"));
@@ -137,7 +142,7 @@ class AvailabilityTemporalContractIntegrationTest {
     @Test
     void shouldAcceptIncreasingInstantAcrossSpringOffsetChange() throws Exception {
         mockMvc.perform(post("/api/v1/availability")
-                        .header(HttpHeaders.AUTHORIZATION, professionalAuthorization)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(slotPayload(
                                 "2026-03-29T01:30:00+01:00",
@@ -152,7 +157,7 @@ class AvailabilityTemporalContractIntegrationTest {
     @MethodSource("invalidSlotPayloads")
     void shouldRejectInvalidTemporalPayloads(String payload, String expectedErrorCode) throws Exception {
         ResultActions result = mockMvc.perform(post("/api/v1/availability")
-                        .header(HttpHeaders.AUTHORIZATION, professionalAuthorization)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isBadRequest())
@@ -169,7 +174,7 @@ class AvailabilityTemporalContractIntegrationTest {
     @MethodSource("invalidIntervals")
     void shouldRejectNonIncreasingIntervalsComparedAsInstants(String start, String end) throws Exception {
         mockMvc.perform(post("/api/v1/availability")
-                        .header(HttpHeaders.AUTHORIZATION, professionalAuthorization)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(slotPayload(start, end)))
                 .andExpect(status().isBadRequest())
@@ -179,6 +184,7 @@ class AvailabilityTemporalContractIntegrationTest {
     @Test
     void shouldExposeBookingSlotTimesWithBusinessOffsetWhileLeavingAuditContractUnchanged() throws Exception {
         ClientProfile client = createClient();
+        CsrfSession clientAuth = authenticateClient(client);
         professionalClientLinkRepository.saveAndFlush(new ProfessionalClientLink(professional, client));
         AvailabilitySlot slot = availabilitySlotRepository.saveAndFlush(new AvailabilitySlot(
                 professional,
@@ -187,7 +193,7 @@ class AvailabilityTemporalContractIntegrationTest {
         ));
 
         mockMvc.perform(post("/api/v1/bookings")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(client))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"availabilitySlotId\":" + slot.getId() + "}"))
                 .andExpect(status().isCreated())
@@ -202,10 +208,10 @@ class AvailabilityTemporalContractIntegrationTest {
     @Test
     void shouldReturnTheSameNotFoundContractForMissingAndUnlinkedProfessionalAvailability() throws Exception {
         ClientProfile client = createClient();
-        String authorization = bearer(client);
+        CsrfSession clientAuth = authenticateClient(client);
 
-        Map<String, Object> missing = notFoundContract(Long.MAX_VALUE, authorization);
-        Map<String, Object> unlinked = notFoundContract(professional.getId(), authorization);
+        Map<String, Object> missing = notFoundContract(Long.MAX_VALUE, clientAuth);
+        Map<String, Object> unlinked = notFoundContract(professional.getId(), clientAuth);
 
         org.assertj.core.api.Assertions.assertThat(unlinked)
                 .containsEntry("status", missing.get("status"))
@@ -272,7 +278,7 @@ class AvailabilityTemporalContractIntegrationTest {
                 "Luigi",
                 "Bianchi",
                 "temporal-client@example.com",
-                "encoded-password",
+                passwordEncoder.encode(PASSWORD),
                 LocalDate.of(1990, 1, 1),
                 BigDecimal.valueOf(180),
                 "Allenamento",
@@ -284,18 +290,13 @@ class AvailabilityTemporalContractIntegrationTest {
         return clientProfileRepository.saveAndFlush(client);
     }
 
-    private String bearer(User user) {
-        UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
-                .username(user.getEmail())
-                .password(user.getPassword())
-                .authorities(user.getRole().name())
-                .build();
-        return "Bearer " + jwtService.generateAccessToken(userDetails);
+    private CsrfSession authenticateClient(ClientProfile client) throws Exception {
+        return SessionAuthTestSupport.loginAndRefreshCsrf(mockMvc, client.getEmail(), PASSWORD);
     }
 
-    private Map<String, Object> notFoundContract(Long professionalId, String authorization) throws Exception {
+    private Map<String, Object> notFoundContract(Long professionalId, CsrfSession clientAuth) throws Exception {
         String body = mockMvc.perform(get("/api/v1/professionals/{professionalId}/availability", professionalId)
-                        .header(HttpHeaders.AUTHORIZATION, authorization))
+                        .with(SessionAuthTestSupport.withSession(clientAuth)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.code").value("PROFESSIONAL_NOT_FOUND"))
@@ -309,6 +310,10 @@ class AvailabilityTemporalContractIntegrationTest {
                 "code", com.jayway.jsonpath.JsonPath.read(body, "$.code"),
                 "message", com.jayway.jsonpath.JsonPath.read(body, "$.message")
         );
+    }
+
+    private static RequestPostProcessor withCsrf(CsrfSession csrfSession) {
+        return SessionAuthTestSupport.withCsrf(csrfSession);
     }
 
     private static String slotPayload(String startDateTime, String endDateTime) {

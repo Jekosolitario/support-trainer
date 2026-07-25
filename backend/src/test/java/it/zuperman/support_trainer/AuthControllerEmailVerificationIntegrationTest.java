@@ -25,6 +25,8 @@ import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 import jakarta.transaction.Transactional;
 
 @SpringBootTest
@@ -62,13 +64,7 @@ class AuthControllerEmailVerificationIntegrationTest {
         assertThat(verificationToken.getUsed()).isFalse();
         assertThat(verificationToken.getToken()).isNotBlank();
 
-        mockMvc.perform(post(CONFIRM_ENDPOINT)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(tokenBody(verificationToken.getToken())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Email verificata correttamente"))
-                .andExpect(jsonPath("$.accessToken").doesNotExist())
-                .andExpect(jsonPath("$.refreshToken").doesNotExist());
+        confirmEmail(verificationToken.getToken());
 
         User verifiedUser = userRepository.findByEmail(email).orElseThrow();
         EmailVerificationToken usedToken = findTokenFor(verifiedUser);
@@ -103,17 +99,15 @@ class AuthControllerEmailVerificationIntegrationTest {
     @Test
     @DisplayName("Token inesistente deve restituire not found")
     void shouldReturnNotFoundForMissingEmailVerificationToken() throws Exception {
-        mockMvc.perform(post(CONFIRM_ENDPOINT)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(tokenBody("inesistente")))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_TOKEN_NOT_FOUND"));
+        confirmEmailWithExpectations("inesistente", status().isNotFound(), "EMAIL_VERIFICATION_TOKEN_NOT_FOUND");
     }
 
     @Test
     @DisplayName("Body assente deve restituire malformed request")
     void shouldRejectMissingBody() throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post(CONFIRM_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
@@ -142,7 +136,9 @@ class AuthControllerEmailVerificationIntegrationTest {
     @Test
     @DisplayName("JSON malformato deve restituire malformed request")
     void shouldRejectMalformedJson() throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post(CONFIRM_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":"))
                 .andExpect(status().isBadRequest())
@@ -152,7 +148,9 @@ class AuthControllerEmailVerificationIntegrationTest {
     @Test
     @DisplayName("Content-Type non supportato deve restituire 415")
     void shouldRejectUnsupportedContentType() throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post(CONFIRM_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_XML)
                         .content("<token>value</token>"))
                 .andExpect(status().isUnsupportedMediaType())
@@ -169,11 +167,7 @@ class AuthControllerEmailVerificationIntegrationTest {
         token.setExpiresAt(timeProvider.nowInstant());
         emailVerificationTokenRepository.saveAndFlush(token);
 
-        mockMvc.perform(post(CONFIRM_ENDPOINT)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(tokenBody(token.getToken())))
-                .andExpect(status().isGone())
-                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_TOKEN_EXPIRED"));
+        confirmEmailWithExpectations(token.getToken(), status().isGone(), "EMAIL_VERIFICATION_TOKEN_EXPIRED");
 
         assertThat(user.getAccountStatus()).isEqualTo(AccountStatus.PENDING_VERIFICATION);
         assertThat(user.getEmailVerified()).isFalse();
@@ -190,11 +184,7 @@ class AuthControllerEmailVerificationIntegrationTest {
         token.markAsUsed(timeProvider.nowInstant());
         emailVerificationTokenRepository.saveAndFlush(token);
 
-        mockMvc.perform(post(CONFIRM_ENDPOINT)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(tokenBody(token.getToken())))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_TOKEN_ALREADY_USED"));
+        confirmEmailWithExpectations(token.getToken(), status().isBadRequest(), "EMAIL_VERIFICATION_TOKEN_ALREADY_USED");
     }
 
     @Test
@@ -207,11 +197,7 @@ class AuthControllerEmailVerificationIntegrationTest {
         userRepository.saveAndFlush(professional);
         EmailVerificationToken token = findTokenFor(professional);
 
-        mockMvc.perform(post(CONFIRM_ENDPOINT)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(tokenBody(token.getToken())))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("PROFESSIONAL_NOT_ACTIVE"));
+        confirmEmailWithExpectations(token.getToken(), status().isForbidden(), "PROFESSIONAL_NOT_ACTIVE");
 
         assertThat(professional.getActive()).isFalse();
         assertThat(professional.getEmailVerified()).isFalse();
@@ -251,7 +237,9 @@ class AuthControllerEmailVerificationIntegrationTest {
                 }
                 """.formatted(email);
 
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isAccepted());
@@ -266,15 +254,39 @@ class AuthControllerEmailVerificationIntegrationTest {
     }
 
     private void confirm(String token) throws Exception {
+        confirmEmail(token);
+    }
+
+    private void confirmEmail(String token) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post(CONFIRM_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(tokenBody(token)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Email verificata correttamente"));
+                .andExpect(jsonPath("$.message").value("Email verificata correttamente"))
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist());
+    }
+
+    private void confirmEmailWithExpectations(
+            String token,
+            org.springframework.test.web.servlet.ResultMatcher statusMatcher,
+            String expectedCode
+    ) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
+        mockMvc.perform(post(CONFIRM_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(tokenBody(token)))
+                .andExpect(statusMatcher)
+                .andExpect(jsonPath("$.code").value(expectedCode));
     }
 
     private void assertInvalidTokenBody(String body) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         mockMvc.perform(post(CONFIRM_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest())

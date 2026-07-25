@@ -137,7 +137,6 @@ class BookingHistoricalSnapshotMySqlIntegrationTest {
                         "--spring.flyway.enabled=false",
                         "--spring.jpa.hibernate.ddl-auto=validate",
                         "--spring.jpa.open-in-view=false",
-                        "--app.cors.allowed-origins=http://localhost",
                         "--app.email.mode=DISABLED",
                         "--app.email.verification-page-url=http://localhost:5173/verify-email"
                 )) {

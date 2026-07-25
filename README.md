@@ -4,23 +4,23 @@
 
 Support Trainer è un progetto full stack per la gestione del rapporto tra professionisti del benessere e clienti. Il backend MVP copre autenticazione, profili, inviti, collegamenti professionista-cliente, disponibilità e richieste di prenotazione. Il frontend dispone di una fondazione React e di una home pubblica implementata.
 
-Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Le route e i layout frontend di base sono presenti, ma le pagine applicative sono ancora prevalentemente placeholder e non esistono ancora integrazione API, autenticazione JWT o sessione frontend.
+Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Le route e i layout frontend di base sono presenti, ma le pagine applicative sono ancora prevalentemente placeholder e non esistono ancora integrazione API né autenticazione di sessione lato frontend.
 
 ## 2. Stato attuale del progetto
 
-Il backend MVP è implementato e validato: comprende API REST protette tramite JWT, persistenza JPA, migrazioni Flyway applicate al database MySQL locale e test automatici standard con database H2 in memoria.
+Il backend MVP è implementato e validato: comprende API REST protette tramite sessione server-side (Spring Session JDBC + Spring Security 7), persistenza JPA, migrazioni Flyway applicate al database MySQL locale e test automatici standard con database H2 in memoria.
 
 Stato sintetico:
 
 - backend Spring Boot presente;
 - API per i flussi principali implementate;
-- 29 endpoint applicativi documentati; `/error` resta un fallback tecnico separato;
-- autenticazione e autorizzazione per ruolo presenti;
-- test di integrazione per auth, inviti, access control, profili, availability, booking e Security / Common presenti;
-- database applicativo MySQL migrato e validato a Flyway V6;
+- 31 endpoint applicativi documentati; `/error` resta un fallback tecnico separato;
+- autenticazione session-based, CSRF e autorizzazione per ruolo presenti;
+- test di integrazione per auth, sessione, inviti, access control, profili, availability, booking e Security / Common presenti;
+- database applicativo MySQL con migrazioni Flyway fino a V7 (schema Spring Session JDBC);
 - fondazione frontend con routing, layout, navigazione per ruolo, pagine di errore e test automatici presente;
 - home pubblica responsive/mobile-first implementata sulla route `/`;
-- pagine applicative prevalentemente placeholder e integrazione con API, JWT e sessione frontend non ancora implementata;
+- pagine applicative prevalentemente placeholder; integrazione API e auth di sessione frontend non ancora implementate;
 - pipeline CI GitHub Actions per build, test e package del backend presente; deploy non configurato;
 - progetto non ancora considerato production-ready.
 
@@ -31,11 +31,11 @@ Stato sintetico:
 - Java 21
 - Spring Boot 4.0.5
 - Spring Web MVC
-- Spring Security
+- Spring Security 7
+- Spring Session JDBC
 - Spring Data JPA / Hibernate
 - Flyway 11.14.1, gestito dal BOM Spring Boot
 - Jakarta Validation
-- JJWT 0.13.0
 - Lombok
 - script Maven Wrapper 3.3.4 con distribuzione Apache Maven 3.9.12
 
@@ -43,7 +43,7 @@ Stato sintetico:
 
 - MySQL per l'ambiente applicativo
 - H2 in memoria per i test
-- migrazioni Flyway versionate per le nove tabelle runtime MySQL
+- migrazioni Flyway versionate per le nove tabelle runtime MySQL e per lo schema Spring Session (V7)
 - JUnit
 - Spring Test e MockMvc
 - AssertJ
@@ -68,15 +68,20 @@ Stato sintetico:
 - conferma email uniforme e idempotente tramite `POST /api/v1/auth/email-verification/confirm`;
 - reinvio uniforme tramite `POST /api/v1/auth/email-verification/resend`, senza enumerazione degli account;
 - richiesta di consegna della verifica email eseguita in modo sincrono soltanto dopo il commit;
-- login con JWT;
-- generazione di access token e refresh token;
-- distinzione interna tra access token e refresh token tramite claim JWT;
-- accettazione dei soli access token come Bearer sugli endpoint protetti;
+- autenticazione server-side con Spring Session JDBC e Spring Security 7;
+- `GET /api/v1/auth/csrf` espone `{token, headerName}` con `Cache-Control: no-store`;
+- login `POST /api/v1/auth/login` con CSRF → `204 No Content`, cookie di sessione HttpOnly, senza `accessToken`/`refreshToken`/`Authorization`;
+- dopo il login il client deve richiedere di nuovo il CSRF (token ruotato) e fare bootstrap con `GET /api/v1/me/account` e `GET /api/v1/me/profile`;
+- logout `POST /api/v1/auth/logout` con CSRF → `204`, sessione invalidata;
+- cookie produzione `__Host-STSESSION` (`Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, senza `Domain`); locale/test `STSESSION` con `Secure=false`;
+- timeout 30 minuti di inattività (Spring Session) e 8 ore assolute da `authenticatedAt`;
+- eligibilità login: `ACTIVE` + `emailVerified`; `profile.active=false` non blocca il login;
+- readiness dinamica su ogni richiesta autenticata tramite `SessionAuthenticationStateFilter`;
+- topologia produzione same-origin dietro reverse proxy (`/` frontend, `/api/v1/**` backend); CORS browser non richiesto in produzione;
+- nessun JWT runtime, nessun Bearer auth, nessun refresh token;
 - autorizzazione per ruolo `PROFESSIONAL` e `CLIENT`;
 - controlli applicativi su stato account, specializzazione e proprietà delle risorse;
 - gestione uniforme degli errori API.
-
-Il refresh token viene generato durante il login, ma non è accettato come Bearer sugli endpoint protetti. Non sono ancora presenti endpoint di refresh né lifecycle completo di rinnovo, persistenza, rotazione o revoca.
 
 Entrambi i ruoli nascono con account `PENDING_VERIFICATION` ed `emailVerified=false`, ricevono un token valido 24 ore e possono effettuare login soltanto dopo la conferma. Le due registrazioni pubbliche restituiscono sempre lo stesso `202 Accepted` neutro e non espongono l'esistenza dell'email, ruoli, identificativi o token. Per il cliente l'invito viene validato prima del controllo neutro dell'email: solo per una nuova email il link professionale viene creato e l'invito consumato nella stessa transazione; per un'email già presente l'invito resta inutilizzato. Il resend è l'unico percorso pubblico per richiedere un nuovo invio su un account esistente. Il precedente GET mutante è stato rimosso; token scaduti producono `410 Gone` e un secondo POST sul token già consumato restituisce successo soltanto se lo stato finale dell'utente è coerente.
 
@@ -128,13 +133,10 @@ Le liste usano un riepilogo autosufficiente e create, dettaglio e transizioni re
 - piani alimentari;
 - feedback del cliente;
 - misurazioni e monitoraggio dei progressi;
-- endpoint completo per il refresh token;
-- persistenza, rotazione e revoca dei refresh token;
-- logout applicativo;
 - recupero e reset della password;
 - upload dell'immagine profilo;
 - API dedicate alla gestione manuale dei collegamenti;
-- frontend integrato con il backend;
+- frontend integrato con il backend (auth di sessione/CSRF da adottare lato client; non ancora implementata);
 - configurazione completa per il deploy.
 
 Chat in tempo reale, pagamenti, notifiche push e statistiche avanzate non fanno parte del perimetro attuale.
@@ -201,7 +203,13 @@ Non è richiesta un'installazione globale di Maven. Il progetto frontend non dic
    | `spring.datasource.url` | `SPRING_DATASOURCE_URL` | URL JDBC MySQL con `connectionTimeZone=%2B00:00` e `forceConnectionTimeZoneToSession=true` |
    | `spring.datasource.username` | `SPRING_DATASOURCE_USERNAME` | utenza database |
    | `spring.datasource.password` | `SPRING_DATASOURCE_PASSWORD` | password database |
-   | `app.cors.allowed-origins` | `APP_CORS_ALLOWED_ORIGINS` | lista separata da virgole di origini esatte `http`/`https` |
+   | `spring.session.timeout` | `SPRING_SESSION_TIMEOUT` | durata positiva; default tracciato `30m` |
+   | `spring.session.jdbc.initialize-schema` | — | `never` (schema sessioni da Flyway V7) |
+   | `server.servlet.session.cookie.name` | — | produzione `__Host-STSESSION`; locale/test `STSESSION` |
+   | `server.servlet.session.cookie.http-only` | — | `true` |
+   | `server.servlet.session.cookie.secure` | — | produzione `true`; locale/test `false` |
+   | `server.servlet.session.cookie.same-site` | — | `strict` |
+   | `server.servlet.session.cookie.path` | — | `/` (non impostare `Domain`) |
    | `app.time.business-zone` | `APP_TIME_BUSINESS_ZONE` | `ZoneId` business; default `Europe/Rome` |
    | `app.time.clock-zone` | `APP_TIME_CLOCK_ZONE` | zona tecnica, deve rappresentare UTC |
    | `app.email.mode` | `APP_EMAIL_MODE` | `DISABLED` (default locale sicuro), `IN_MEMORY` oppure `SMTP` |
@@ -213,15 +221,8 @@ Non è richiesta un'installazione globale di Maven. Il progetto frontend non dic
    | `app.email.smtp.username` / `password` | `APP_EMAIL_SMTP_USERNAME` / `APP_EMAIL_SMTP_PASSWORD` | obbligatori solo con `APP_EMAIL_SMTP_AUTH=true`; fornire solo tramite environment |
    | `app.email.smtp.auth` / `start-tls` | `APP_EMAIL_SMTP_AUTH` / `APP_EMAIL_SMTP_START_TLS` | autenticazione e STARTTLS configurabili |
    | `app.email.smtp.connect-timeout` / `read-timeout` / `write-timeout` | `APP_EMAIL_SMTP_CONNECT_TIMEOUT` / `APP_EMAIL_SMTP_READ_TIMEOUT` / `APP_EMAIL_SMTP_WRITE_TIMEOUT` | durate positive, ad esempio `5s` |
-   | `app.security.jwt.secret` | `APP_SECURITY_JWT_SECRET` | Base64 di almeno 32 byte casuali |
-   | `app.security.jwt.expiration` | `APP_SECURITY_JWT_EXPIRATION` | durata positiva |
-   | `app.security.jwt.refresh-expiration` | `APP_SECURITY_JWT_REFRESH_EXPIRATION` | durata positiva e maggiore dell'access token |
 
-Le durate accettano millisecondi senza suffisso, per compatibilità con i valori attuali, oppure unità esplicite come `1h` e `7d`. Il secret JWT non ha default, non deve essere versionato e non va riutilizzato tra ambienti.
-
-Gli origin CORS non ammettono wildcard, path, query string o fragment: va indicata l'origine esatta del frontend, inclusa l'eventuale porta. Spazi e duplicati vengono normalizzati; `Authorization` e `Content-Type` sono consentiti, mentre le credenziali browser restano disabilitate perché l'autenticazione usa Bearer JWT.
-
-La configurazione JWT e CORS è tipizzata e validata all'avvio. Proprietà assenti, valori non validi, secret troppo corto o origin non sicuri impediscono l'avvio senza stampare i valori sensibili. Il file `application.properties` resta escluso da Git.
+Non sono più richieste proprietà `app.security.jwt.*` né `app.cors.allowed-origins`: non esiste JWT runtime e CORS applicativo è disabilitato. In produzione l’autenticazione browser assume topologia same-origin dietro reverse proxy. Il file `application.properties` resta escluso da Git.
 
 Anche `app.email` è tipizzata e fail-fast. `verification-page-url` rappresenta direttamente la futura pagina frontend e può includere un base path; il backend aggiunge il token codificato nel fragment `#token=...`. `DISABLED` è soltanto un default locale sicuro e non rende la configurazione pronta per produzione. `IN_MEMORY` conserva messaggi esclusivamente nel processo, non espone inbox HTTP e viene usato dal profilo `test`; non sono configurati host SMTP, credenziali o accessi di rete. `SMTP` richiede mittente valido, host, porta, tre timeout positivi e, quando `auth=true`, username e password; applica UTF-8, `mail.smtp.auth`, STARTTLS e i timeout JavaMail in millisecondi. Nessuna connessione viene eseguita durante la validazione. Le combinazioni incoerenti impediscono l'avvio e password o credenziali non sono incluse nei `toString` o nei log.
 
@@ -229,9 +230,9 @@ La configurazione locale validata usa `app.email.verification-page-url=http://lo
 
 Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazione usa un unico `Clock` tecnico UTC; `ApplicationTimeProvider.nowInstant()` tronca, senza arrotondare, alla precisione canonica di sei cifre. Gli istanti persistiti e gli audit applicativi sono `Instant` su colonne `DATETIME(6)`, con `spring.jpa.properties.hibernate.jdbc.time_zone=UTC`; `Europe/Rome` resta soltanto la zona business. Spring Data JPA valorizza `createdAt` e `updatedAt`. Le scadenze email e invito sono rispettivamente 24 e 168 ore reali e sono esposte con `Z`. Sul confine HTTP gli orari degli slot restano `OffsetDateTime` al secondo, validati contro gap, overlap e offset di `Europe/Rome`. Anche il timestamp di `ErrorResponse` è un `Instant` UTC serializzato con `Z`.
 
-La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle nove tabelle runtime tramite `classpath:db/migration`.
+La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle nove tabelle runtime e dello schema Spring Session tramite `classpath:db/migration`.
 
-Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true`. Le 22 migrazioni runtime sono V1, V2, `V3_1`–`V3_9`, V4, `V5_1`–`V5_9` e V6. V4 prepara e verifica atomicamente la conversione delle 23 colonne temporali legacy da `Europe/Rome` a UTC; V5 trasferisce l'auditing all'applicazione; V6 aggiunge e verifica il backfill degli snapshot storici Booking. Tutti gli istanti runtime usano `DATETIME(6)` e Hibernate valida il contratto con `ddl-auto=validate`.
+Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true`. Le 23 migrazioni runtime sono V1, V2, `V3_1`–`V3_9`, V4, `V5_1`–`V5_9`, V6 e V7. V4 prepara e verifica atomicamente la conversione delle 23 colonne temporali legacy da `Europe/Rome` a UTC; V5 trasferisce l'auditing all'applicazione; V6 aggiunge e verifica il backfill degli snapshot storici Booking; V7 crea lo schema Spring Session JDBC (`SPRING_SESSION`, `SPRING_SESSION_ATTRIBUTES`) senza auto-init di Boot. Tutti gli istanti runtime usano `DATETIME(6)` e Hibernate valida il contratto con `ddl-auto=validate`.
 
 La validazione conclusiva del 16 luglio 2026 su MySQL 8.0.44 ha prodotto il verdetto **MYSQL VALIDATION PASSED WITH WARNINGS**. Gli schemi isolati `support_trainer_audit_empty_20260716_101232` e `support_trainer_audit_legacy_20260716_101232` hanno certificato i percorsi da schema vuoto e legacy simulato. Sono rimasti presenti e non devono essere eliminati senza autorizzazione.
 
@@ -350,7 +351,7 @@ La suite include test relativi a:
 - lettura e aggiornamento del profilo;
 - disponibilità e relative regole business;
 - richieste di prenotazione e relative transizioni;
-- JWT, ruoli, risposte 400/401/403 e gestione uniforme degli errori HTTP 404/405/406/409/410/415/500.
+- sessione, CSRF, ruoli, risposte 400/401/403 e gestione uniforme degli errori HTTP 404/405/406/409/410/415/500.
 
 ### Baseline certificata
 
@@ -358,7 +359,7 @@ L'ultimo `clean verify` certificato ha prodotto il JAR e completato **50 suite, 
 
 La correzione conclusiva ha reso deterministico `EmailVerificationTransactionIntegrationTest`: la precedente scadenza assoluta è stata sostituita con scadenze relative al `MutableTestClock` fornito da `EmailTestClockConfiguration`. Il codice di produzione non è cambiato e il test non dipende più da data corrente, timezone host o orologio reale.
 
-Le risposte di errore usano il contratto `ErrorResponse`: `timestamp` UTC, `status`, `code`, `message` e `path` senza query; `fieldErrors` è una lista presente solo per `VALIDATION_ERROR`. Il client deve decidere il comportamento tramite `code`, non tramite `message`. La configurazione Java centralizzata `JacksonConfiguration` rende il parser JSON stretto: rifiuta proprietà sconosciute, contenuto trailing e chiavi duplicate. Le risposte 401 espongono `WWW-Authenticate: Bearer`; le 405 preservano `Allow`; le 415 preservano i media type supportati quando Spring li fornisce. Gli errori 500 sono sanitizzati e anche `/error` restituisce lo stesso formato. Non sono ancora previsti correlation ID, request ID o header proprietari. I rifiuti CORS che avvengono prima del controller non costituiscono invece un contratto JSON consumabile dal browser.
+Le risposte di errore usano il contratto `ErrorResponse`: `timestamp` UTC, `status`, `code`, `message` e `path` senza query; `fieldErrors` è una lista presente solo per `VALIDATION_ERROR`. Il client deve decidere il comportamento tramite `code`, non tramite `message`. La configurazione Java centralizzata `JacksonConfiguration` rende il parser JSON stretto: rifiuta proprietà sconosciute, contenuto trailing e chiavi duplicate. Le risposte 401 **non** espongono `WWW-Authenticate: Bearer` (non esiste Bearer JWT); le 405 preservano `Allow`; le 415 preservano i media type supportati quando Spring li fornisce. Un CSRF non valido produce `403` con codice `CSRF_VALIDATION_FAILED`. Gli errori 500 sono sanitizzati e anche `/error` restituisce lo stesso formato. Non sono ancora previsti correlation ID, request ID o header proprietari.
 
 ## 12. Profili Spring
 
@@ -374,15 +375,16 @@ Usa `src/test/resources/application-test.properties` con:
 - schema ricreato tramite `create-drop`;
 - Flyway disabilitato;
 - `open-in-view` disabilitato;
-- JWT con valori dedicati ai test;
-- origin CORS locale dedicato ai test;
+- Spring Session JDBC con schema H2 di test applicato esplicitamente (non auto-init);
+- cookie di sessione `STSESSION` (`Secure=false`, `HttpOnly`, `SameSite=Strict`, `Path=/`);
+- timeout sessione `30m`;
 - Clock UTC e zona business `Europe/Rome` espliciti;
 - sender email `IN_MEMORY` e pagina fittizia assoluta, senza rete o credenziali;
 - logging SQL disabilitato.
 
 Le classi di test principali attivano il profilo con `@ActiveProfiles("test")`.
 
-Le proprietà JWT e `app.cors.allowed-origins` sono definite direttamente nel profilo `test`; la suite non dipende quindi dall’`application.properties` locale, escluso da Git, da MySQL o da segreti reali. H2 resta la suite applicativa rapida, ma non certifica la sintassi DDL MySQL, i lock o l'esecuzione reale delle migrazioni: questi controlli richiedono un ambiente MySQL 8 isolato.
+Le proprietà di sessione/cookie sono definite direttamente nel profilo `test`; la suite non dipende quindi dall’`application.properties` locale, escluso da Git, da MySQL o da segreti reali. H2 resta la suite applicativa rapida, ma non certifica la sintassi DDL MySQL, i lock o l'esecuzione reale delle migrazioni: questi controlli richiedono un ambiente MySQL 8 isolato.
 
 Non sono attualmente presenti profili Spring dedicati a sviluppo, staging o produzione. La configurazione locale usa il file ignorato; i test usano il profilo tracciato `test`; un futuro ambiente di produzione deve fornire i valori esternamente tramite environment o altra sorgente di configurazione Spring, senza versionare segreti.
 
@@ -415,8 +417,8 @@ La cartella `docs` contiene la documentazione funzionale e tecnica. I riferiment
 
 ## 14. Roadmap sintetica
 
-1. integrare la fondazione frontend esistente con i 29 endpoint applicativi;
-2. completare il lifecycle account e il flusso refresh token;
+1. integrare la fondazione frontend esistente con i 31 endpoint applicativi, adottando sessione cookie + CSRF (contratto già backend);
+2. completare il lifecycle account (recupero/reset password);
 3. implementare le schede di allenamento;
 4. implementare i piani alimentari;
 5. aggiungere feedback, misurazioni e progressi;
@@ -439,6 +441,6 @@ La cartella `frontend` contiene una fondazione web basata su React, TypeScript e
 
 La home è responsive/mobile-first e usa una direzione visuale dark-tech circoscritta al layout pubblico. Le aree autenticate mantengono attualmente il tema legacy.
 
-Le route di login, registrazione, validazione invito, verifica email e delle aree private sono registrate, ma le relative pagine sono ancora prevalentemente placeholder. API client, chiamate al backend, autenticazione JWT, stato della sessione e guard basate sul principal non sono implementati.
+Le route di login, registrazione, validazione invito, verifica email e delle aree private sono registrate, ma le relative pagine sono ancora prevalentemente placeholder. API client, chiamate al backend, autenticazione di sessione/CSRF, stato auth frontend e guard basate sul principal non sono implementati. Il contratto da adottare è descritto in [Security Flow](docs/09-security-flow.md) e nella mappa frontend: CSRF solo in memoria, cookie gestito dal browser, nessun JWT in `localStorage`/`sessionStorage`.
 
 Le funzionalità realmente disponibili nel backend e quelle future restano definite nella documentazione funzionale. La struttura e le decisioni della home sono descritte in [Public Home Implementation](docs/frontend/02-public-home-implementation.md). Una possibile evoluzione mobile con React Native ed Expo resta fuori dall'MVP corrente.

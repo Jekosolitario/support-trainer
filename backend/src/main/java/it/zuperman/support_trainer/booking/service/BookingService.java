@@ -4,8 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,10 +24,10 @@ import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
 import it.zuperman.support_trainer.common.enums.BookingRequestStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
-import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.common.security.UserReadinessValidator;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
+import it.zuperman.support_trainer.security.session.AuthenticatedUserLoader;
 
 @Service
 public class BookingService {
@@ -37,7 +35,7 @@ public class BookingService {
     private final BookingRequestRepository bookingRequestRepository;
     private final BookingRequestItemRepository bookingRequestItemRepository;
     private final AvailabilitySlotRepository availabilitySlotRepository;
-    private final UserRepository userRepository;
+    private final AuthenticatedUserLoader authenticatedUserLoader;
     private final ApplicationTimeProvider timeProvider;
     private final BookingResponseMapper bookingResponseMapper;
     private final UserReadinessValidator userReadinessValidator;
@@ -46,7 +44,7 @@ public class BookingService {
             BookingRequestRepository bookingRequestRepository,
             BookingRequestItemRepository bookingRequestItemRepository,
             AvailabilitySlotRepository availabilitySlotRepository,
-            UserRepository userRepository,
+            AuthenticatedUserLoader authenticatedUserLoader,
             ApplicationTimeProvider timeProvider,
             BookingResponseMapper bookingResponseMapper,
             UserReadinessValidator userReadinessValidator
@@ -54,7 +52,7 @@ public class BookingService {
         this.bookingRequestRepository = bookingRequestRepository;
         this.bookingRequestItemRepository = bookingRequestItemRepository;
         this.availabilitySlotRepository = availabilitySlotRepository;
-        this.userRepository = userRepository;
+        this.authenticatedUserLoader = authenticatedUserLoader;
         this.timeProvider = timeProvider;
         this.bookingResponseMapper = bookingResponseMapper;
         this.userReadinessValidator = userReadinessValidator;
@@ -437,34 +435,9 @@ public class BookingService {
     }
 
     private User getAuthenticatedUser() {
-        String email = getAuthenticatedEmail();
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException(
-                HttpStatus.UNAUTHORIZED,
-                "AUTHENTICATED_USER_NOT_FOUND",
-                "Utente autenticato non trovato"
-        ));
-
+        User user = authenticatedUserLoader.requireAuthenticatedUser();
         userReadinessValidator.validateOperationalUser(user);
         return user;
-    }
-
-    private String getAuthenticatedEmail() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || authentication.getName() == null
-                || "anonymousUser".equals(authentication.getName())) {
-            throw new AppException(
-                    HttpStatus.UNAUTHORIZED,
-                    "UNAUTHORIZED",
-                    "Utente non autenticato"
-            );
-        }
-
-        return authentication.getName().trim().toLowerCase();
     }
 
 }

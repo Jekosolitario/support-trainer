@@ -22,6 +22,8 @@ import it.zuperman.support_trainer.invite.entity.InviteCode;
 import it.zuperman.support_trainer.invite.repository.InviteCodeRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRepository;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 import jakarta.transaction.Transactional;
 
 @SpringBootTest
@@ -58,9 +60,7 @@ class AuthControllerInviteValidationIntegrationTest {
                 }
                 """.formatted(inviteCodeValue);
 
-        mockMvc.perform(post(VALIDATE_INVITE_ENDPOINT)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        validateInvite(requestBody)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.valid").value(true))
                 .andExpect(jsonPath("$.code").value(inviteCodeValue));
@@ -79,9 +79,7 @@ class AuthControllerInviteValidationIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post(VALIDATE_INVITE_ENDPOINT)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        validateInvite(requestBody)
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_FOUND"));
     }
@@ -104,9 +102,7 @@ class AuthControllerInviteValidationIntegrationTest {
                 }
                 """.formatted(inviteCodeValue);
 
-        mockMvc.perform(post(VALIDATE_INVITE_ENDPOINT)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        validateInvite(requestBody)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVITE_CODE_ALREADY_USED"));
     }
@@ -128,9 +124,7 @@ class AuthControllerInviteValidationIntegrationTest {
                 }
                 """.formatted(inviteCodeValue);
 
-        mockMvc.perform(post(VALIDATE_INVITE_ENDPOINT)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        validateInvite(requestBody)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVITE_CODE_EXPIRED"));
     }
@@ -152,9 +146,7 @@ class AuthControllerInviteValidationIntegrationTest {
                 }
                 """.formatted(inviteCodeValue);
 
-        mockMvc.perform(post(VALIDATE_INVITE_ENDPOINT)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        validateInvite(requestBody)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_ACTIVE"));
     }
@@ -177,9 +169,7 @@ class AuthControllerInviteValidationIntegrationTest {
                 }
                 """.formatted(inviteCodeValue);
 
-        mockMvc.perform(post(VALIDATE_INVITE_ENDPOINT)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        validateInvite(requestBody)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_ACTIVE"));
     }
@@ -202,9 +192,7 @@ class AuthControllerInviteValidationIntegrationTest {
                 }
                 """.formatted(inviteCodeValue);
 
-        mockMvc.perform(post(VALIDATE_INVITE_ENDPOINT)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        validateInvite(requestBody)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_ACTIVE"));
     }
@@ -227,9 +215,7 @@ class AuthControllerInviteValidationIntegrationTest {
                 }
                 """.formatted(inviteCodeValue);
 
-        mockMvc.perform(post(VALIDATE_INVITE_ENDPOINT)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+        validateInvite(requestBody)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVITE_CODE_NOT_ACTIVE"));
     }
@@ -254,5 +240,13 @@ class AuthControllerInviteValidationIntegrationTest {
         );
 
         return inviteCodeRepository.saveAndFlush(inviteCode);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions validateInvite(String requestBody) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
+        return mockMvc.perform(post(VALIDATE_INVITE_ENDPOINT)
+                .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody));
     }
 }

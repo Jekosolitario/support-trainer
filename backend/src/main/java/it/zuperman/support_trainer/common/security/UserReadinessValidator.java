@@ -13,6 +13,14 @@ import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 @Component
 public class UserReadinessValidator {
 
+    /**
+     * Eligibility to establish or keep session authentication.
+     * Does not inspect profile.active.
+     */
+    public void validateAuthenticationEligibility(User user) {
+        validateAccountAndEmail(user);
+    }
+
     public void validateAccountAndEmail(User user) {
         if (user.getAccountStatus() != AccountStatus.ACTIVE) {
             throw new AppException(

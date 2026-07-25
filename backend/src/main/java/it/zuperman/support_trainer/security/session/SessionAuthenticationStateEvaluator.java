@@ -14,8 +14,8 @@ import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 
 /**
- * Pure readiness and absolute-timeout evaluator for the future session authentication model.
- * Not a Servlet filter and not registered in the current JWT {@code SecurityFilterChain}.
+ * Pure readiness and absolute-timeout evaluator for server-side session authentication.
+ * Used by {@link SessionAuthenticationStateFilter} before authorization.
  */
 @Component
 public final class SessionAuthenticationStateEvaluator {

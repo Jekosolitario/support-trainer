@@ -13,7 +13,6 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -38,6 +37,8 @@ import it.zuperman.support_trainer.invite.repository.InviteCodeRepository;
 import it.zuperman.support_trainer.link.entity.ProfessionalClientLink;
 import it.zuperman.support_trainer.link.repository.ProfessionalClientLinkRepository;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport;
+import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 
 import static it.zuperman.support_trainer.email.support.EmailTestClockConfiguration.INITIAL_INSTANT;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -110,8 +111,8 @@ class EmailVerificationDeliveryIntegrationTest {
         professional.setEmailVerified(true);
         professional.setAccountStatus(AccountStatus.ACTIVE);
         userRepository.saveAndFlush(professional);
-        String accessToken = login(professionalEmail);
-        String inviteCode = createInvite(accessToken);
+        CsrfSession professionalAuth = login(professionalEmail);
+        String inviteCode = createInvite(professionalAuth);
         sender.clearForTesting();
 
         String clientEmail = "client.delivery@example.com";
@@ -183,7 +184,9 @@ class EmailVerificationDeliveryIntegrationTest {
     }
 
     private MvcResult registerProfessional(String email) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         return mockMvc.perform(post("/api/v1/auth/register/professional")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -199,7 +202,9 @@ class EmailVerificationDeliveryIntegrationTest {
     }
 
     private MvcResult registerClient(String inviteCode, String email) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         return mockMvc.perform(post("/api/v1/auth/register/client")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -218,26 +223,22 @@ class EmailVerificationDeliveryIntegrationTest {
                 .andReturn();
     }
 
-    private String login(String email) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"%s\",\"password\":\"%s\"}"
-                                .formatted(email, PASSWORD)))
-                .andExpect(status().isOk())
-                .andReturn();
-        return JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
+    private CsrfSession login(String email) throws Exception {
+        return SessionAuthTestSupport.loginAndRefreshCsrf(mockMvc, email, PASSWORD);
     }
 
-    private String createInvite(String accessToken) throws Exception {
+    private String createInvite(CsrfSession professionalAuth) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/invites")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth)))
                 .andExpect(status().isCreated())
                 .andReturn();
         return JsonPath.read(result.getResponse().getContentAsString(), "$.code");
     }
 
     private MvcResult resend(String email) throws Exception {
+        CsrfSession csrf = SessionAuthTestSupport.fetchCsrf(mockMvc);
         return mockMvc.perform(post(RESEND_ENDPOINT)
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(csrf))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"%s\"}".formatted(email)))
                 .andExpect(status().isAccepted())

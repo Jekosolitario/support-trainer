@@ -13,7 +13,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import it.zuperman.support_trainer.auth.dto.request.LoginRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterClientRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterProfessionalRequest;
-import it.zuperman.support_trainer.auth.dto.response.AuthResponse;
 import it.zuperman.support_trainer.auth.dto.response.RegistrationAcceptedResponse;
 import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
 import it.zuperman.support_trainer.auth.token.EmailVerificationToken;
@@ -35,8 +33,8 @@ import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.email.event.EmailVerificationRequestedEvent;
 import it.zuperman.support_trainer.email.model.EmailVerificationReason;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
-import it.zuperman.support_trainer.security.jwt.JwtService;
 import it.zuperman.support_trainer.security.password.BcryptPasswordPolicy;
+import it.zuperman.support_trainer.security.session.SessionLoginIdentity;
 
 @Service
 public class AuthService {
@@ -48,7 +46,6 @@ public class AuthService {
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
-    private final JwtService jwtService;
     private final ApplicationTimeProvider timeProvider;
     private final ApplicationEventPublisher eventPublisher;
     private final RegistrationPersistenceService registrationPersistenceService;
@@ -59,7 +56,6 @@ public class AuthService {
             EmailVerificationTokenRepository emailVerificationTokenRepository,
             PasswordEncoder passwordEncoder,
             AuthenticationManager authenticationManager,
-            JwtService jwtService,
             ApplicationTimeProvider timeProvider,
             ApplicationEventPublisher eventPublisher,
             RegistrationPersistenceService registrationPersistenceService,
@@ -69,7 +65,6 @@ public class AuthService {
         this.emailVerificationTokenRepository = emailVerificationTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
-        this.jwtService = jwtService;
         this.timeProvider = timeProvider;
         this.eventPublisher = eventPublisher;
         this.registrationPersistenceService = registrationPersistenceService;
@@ -282,7 +277,10 @@ public class AuthService {
         return false;
     }
 
-    public AuthResponse login(LoginRequest request) {
+    /**
+     * Verifies credentials and authentication eligibility. Does not touch HTTP or session infrastructure.
+     */
+    public SessionLoginIdentity authenticateForSession(LoginRequest request) {
         String normalizedEmail = normalizeEmail(request.getEmail());
 
         if (!BcryptPasswordPolicy.isWithinLimit(request.getPassword())) {
@@ -303,18 +301,9 @@ public class AuthService {
                 "Utente non trovato"
         ));
 
-        validateLoginAccess(user);
+        userReadinessValidator.validateAuthenticationEligibility(user);
 
-        UserDetails userDetails = buildUserDetails(user);
-
-        String accessToken = jwtService.generateAccessToken(userDetails);
-        String refreshToken = jwtService.generateRefreshToken(userDetails);
-
-        return buildAuthResponse(user, accessToken, refreshToken);
-    }
-
-    private void validateLoginAccess(User user) {
-        userReadinessValidator.validateOperationalUser(user);
+        return new SessionLoginIdentity(user.getId(), user.getEmail(), user.getRole());
     }
 
     private RegistrationAcceptedResponse handleEmailUniqueCollision(DataIntegrityViolationException ex) {
@@ -382,16 +371,6 @@ public class AuthService {
         return false;
     }
 
-    private AuthResponse buildAuthResponse(User user, String accessToken, String refreshToken) {
-        return new AuthResponse(
-                accessToken,
-                refreshToken,
-                user.getId(),
-                user.getEmail(),
-                user.getRole().name()
-        );
-    }
-
     private String encodePassword(String password) {
         if (!BcryptPasswordPolicy.isWithinLimit(password)) {
             throw new AppException(
@@ -402,14 +381,6 @@ public class AuthService {
         }
 
         return passwordEncoder.encode(password);
-    }
-
-    private UserDetails buildUserDetails(User user) {
-        return org.springframework.security.core.userdetails.User
-                .withUsername(user.getEmail())
-                .password(user.getPassword())
-                .authorities(user.getRole().name())
-                .build();
     }
 
     private String normalizeEmail(String email) {
