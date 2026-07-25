@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import it.zuperman.support_trainer.common.entity.User;
+import it.zuperman.support_trainer.security.session.UserSecuritySnapshot;
 import jakarta.persistence.LockModeType;
 
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -19,4 +20,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmailForUpdate(@Param("email") String email);
 
     boolean existsByEmail(String email);
+
+    @Query("""
+            select new it.zuperman.support_trainer.security.session.UserSecuritySnapshot(
+                user.id,
+                user.role,
+                user.accountStatus,
+                user.emailVerified
+            )
+            from User user
+            where user.id = :userId
+            """)
+    Optional<UserSecuritySnapshot> findSecuritySnapshotById(@Param("userId") Long userId);
 }
