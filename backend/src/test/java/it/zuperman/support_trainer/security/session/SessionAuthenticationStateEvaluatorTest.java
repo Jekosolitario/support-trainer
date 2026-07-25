@@ -69,6 +69,36 @@ class SessionAuthenticationStateEvaluatorTest {
     }
 
     @Test
+    @DisplayName("Esattamente a authenticatedAt deve restare valido")
+    void shouldAcceptExactlyAtAuthenticatedAt() {
+        evaluator = evaluatorWithClock(AUTHENTICATED_AT);
+        Authentication authentication = authentication(7L, Role.CLIENT);
+        when(userRepository.findSecuritySnapshotById(7L)).thenReturn(Optional.of(snapshot(
+                7L,
+                Role.CLIENT,
+                AccountStatus.ACTIVE,
+                true
+        )));
+
+        assertThat(evaluator.isAuthenticationStillValid(authentication, AUTHENTICATED_AT)).isTrue();
+    }
+
+    @Test
+    @DisplayName("authenticatedAt nel futuro deve invalidare")
+    void shouldRejectFutureAuthenticatedAt() {
+        evaluator = evaluatorWithClock(AUTHENTICATED_AT.minus(Duration.ofHours(1)));
+        Authentication authentication = authentication(7L, Role.CLIENT);
+        when(userRepository.findSecuritySnapshotById(7L)).thenReturn(Optional.of(snapshot(
+                7L,
+                Role.CLIENT,
+                AccountStatus.ACTIVE,
+                true
+        )));
+
+        assertThat(evaluator.isAuthenticationStillValid(authentication, AUTHENTICATED_AT)).isFalse();
+    }
+
+    @Test
     @DisplayName("Esattamente a 8 ore authenticatedAt deve invalidare")
     void shouldRejectExactlyAtAbsoluteTimeout() {
         evaluator = evaluatorWithClock(AUTHENTICATED_AT.plus(Duration.ofHours(8)));
@@ -96,6 +126,21 @@ class SessionAuthenticationStateEvaluatorTest {
         )));
 
         assertThat(evaluator.isAuthenticationStillValid(authentication, AUTHENTICATED_AT)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Instant estremi devono invalidare senza propagare eccezioni")
+    void shouldRejectExtremeInstantsWithoutThrowing() {
+        Authentication authentication = authentication(7L, Role.CLIENT);
+        when(userRepository.findSecuritySnapshotById(7L)).thenReturn(Optional.of(snapshot(
+                7L,
+                Role.CLIENT,
+                AccountStatus.ACTIVE,
+                true
+        )));
+
+        assertThat(evaluator.isAuthenticationStillValid(authentication, Instant.MAX)).isFalse();
+        assertThat(evaluator.isAuthenticationStillValid(authentication, Instant.MIN)).isFalse();
     }
 
     @Test

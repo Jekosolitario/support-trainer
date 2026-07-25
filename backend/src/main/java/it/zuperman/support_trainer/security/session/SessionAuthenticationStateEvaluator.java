@@ -68,9 +68,11 @@ public final class SessionAuthenticationStateEvaluator {
             return false;
         }
 
-        Instant expiresAt = authenticatedAt.plus(ABSOLUTE_SESSION_DURATION);
         Instant now = timeProvider.nowInstant();
-        return now.isBefore(expiresAt);
+        if (authenticatedAt.isAfter(now)) {
+            return false;
+        }
+        return Duration.between(authenticatedAt, now).compareTo(ABSOLUTE_SESSION_DURATION) < 0;
     }
 
     private static boolean roleMatchesAuthority(

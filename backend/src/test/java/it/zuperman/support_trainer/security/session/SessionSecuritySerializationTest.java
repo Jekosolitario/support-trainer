@@ -30,23 +30,30 @@ class SessionSecuritySerializationTest {
         SecurityContext securityContext = new SecurityContextImpl(authentication);
 
         SecurityContext restoredContext = roundTrip(securityContext);
-        Authentication restoredAuthentication = restoredContext.getAuthentication();
+        assertThat(restoredContext).isNotNull();
 
+        Authentication restoredAuthentication = restoredContext.getAuthentication();
+        assertThat(restoredAuthentication).isNotNull();
+        assertThat(restoredAuthentication.isAuthenticated()).isTrue();
         assertThat(restoredAuthentication).isInstanceOf(UsernamePasswordAuthenticationToken.class);
         assertThat(restoredAuthentication.getCredentials()).isNull();
         assertThat(restoredAuthentication.getPrincipal()).isInstanceOf(AuthenticatedUserPrincipal.class);
+
         AuthenticatedUserPrincipal restoredPrincipal
                 = (AuthenticatedUserPrincipal) restoredAuthentication.getPrincipal();
         assertThat(restoredPrincipal.getUserId()).isEqualTo(15L);
         assertThat(restoredPrincipal.getEmail()).isEqualTo("session@example.com");
         assertThat(restoredPrincipal.getName()).isEqualTo("15");
         assertThat(restoredAuthentication.getAuthorities())
-                .extracting(Object::toString)
+                .extracting(authority -> authority.getAuthority())
                 .containsExactly("CLIENT");
 
         String payload = new String(serialize(securityContext));
         assertThat(payload).doesNotContain("secret-password");
         assertThat(payload).doesNotContain("password=");
+        assertThat(payload).doesNotContain("ClientProfile");
+        assertThat(payload).doesNotContain("ProfessionalProfile");
+        assertThat(payload).doesNotContain("specialization");
     }
 
     private static SecurityContext roundTrip(SecurityContext context) throws Exception {

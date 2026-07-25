@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +37,10 @@ import it.zuperman.support_trainer.professional.repository.ProfessionalProfileRe
 @ActiveProfiles("test")
 @Transactional
 class UserSecuritySnapshotRepositoryIntegrationTest {
+
+    private static final Pattern IDENTIFIER = Pattern.compile(
+            "(?i)(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])"
+    );
 
     @Autowired
     private UserRepository userRepository;
@@ -70,14 +76,27 @@ class UserSecuritySnapshotRepositoryIntegrationTest {
         assertThat(professionalSnapshot).isPresent();
         assertThat(professionalSnapshot.get().getRole()).isEqualTo(Role.PROFESSIONAL);
 
-        String joinedSql = String.join("\n", CapturingStatementInspector.statements()).toLowerCase(Locale.ROOT);
-        assertThat(joinedSql).contains("from users");
-        assertThat(joinedSql).doesNotContain("client_profiles");
-        assertThat(joinedSql).doesNotContain("professional_profiles");
-        assertThat(joinedSql).doesNotContain("specialization");
-        assertThat(joinedSql).doesNotContain("primary_goal");
-        assertThat(joinedSql).doesNotContain("height_cm");
-        assertThat(joinedSql).doesNotContain("password");
+        List<String> snapshotStatements = CapturingStatementInspector.statements().stream()
+                .map(UserSecuritySnapshotRepositoryIntegrationTest::normalizeSql)
+                .filter(sql -> containsIdentifier(sql, "users"))
+                .toList();
+        assertThat(snapshotStatements).isNotEmpty();
+
+        for (String sql : snapshotStatements) {
+            assertThat(sql).contains("from users");
+            assertThat(containsIdentifier(sql, "client_profiles")).isFalse();
+            assertThat(containsIdentifier(sql, "professional_profiles")).isFalse();
+            assertThat(containsIdentifier(sql, "specialization")).isFalse();
+            assertThat(containsIdentifier(sql, "primary_goal")).isFalse();
+            assertThat(containsIdentifier(sql, "height_cm")).isFalse();
+            assertThat(containsIdentifier(sql, "password")).isFalse();
+            assertThat(containsIdentifier(sql, "email")).isFalse();
+            assertThat(containsIdentifier(sql, "first_name")).isFalse();
+            assertThat(containsIdentifier(sql, "last_name")).isFalse();
+            assertThat(containsIdentifier(sql, "profile_image_url")).isFalse();
+            assertThat(containsIdentifier(sql, "created_at")).isFalse();
+            assertThat(containsIdentifier(sql, "updated_at")).isFalse();
+        }
     }
 
     @Test
@@ -117,5 +136,21 @@ class UserSecuritySnapshotRepositoryIntegrationTest {
         professional.setOperationalStatus(ProfessionalOperationalStatus.DISPONIBILE);
         professional.setActive(true);
         return professionalProfileRepository.save(professional);
+    }
+
+    private static String normalizeSql(String sql) {
+        return sql.toLowerCase(Locale.ROOT)
+                .replace("`", "")
+                .replace("\"", "")
+                .replace("[", "")
+                .replace("]", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private static boolean containsIdentifier(String normalizedSql, String identifier) {
+        return Pattern.compile(IDENTIFIER.pattern().formatted(Pattern.quote(identifier.toLowerCase(Locale.ROOT))))
+                .matcher(normalizedSql)
+                .find();
     }
 }

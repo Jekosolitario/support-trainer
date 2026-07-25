@@ -9,6 +9,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,6 +50,19 @@ class AuthenticatedUserPrincipalTest {
 
         assertThat(first).isEqualTo(second).hasSameHashCodeAs(second);
         assertThat(first).isNotEqualTo(third);
+    }
+
+    @Test
+    @DisplayName("I soli campi di istanza ammessi devono essere userId ed email")
+    void shouldExposeOnlyCanonicalInstanceFields() {
+        Field[] instanceFields = Arrays.stream(AuthenticatedUserPrincipal.class.getDeclaredFields())
+                .filter(field -> !Modifier.isStatic(field.getModifiers()))
+                .toArray(Field[]::new);
+
+        assertThat(instanceFields)
+                .extracting(Field::getName)
+                .containsExactlyInAnyOrder("userId", "email");
+        assertThat(instanceFields).allMatch(field -> Modifier.isFinal(field.getModifiers()));
     }
 
     @Test
