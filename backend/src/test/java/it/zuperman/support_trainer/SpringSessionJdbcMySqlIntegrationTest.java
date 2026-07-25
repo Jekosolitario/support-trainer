@@ -83,10 +83,11 @@ class SpringSessionJdbcMySqlIntegrationTest {
                     "SPRING_SESSION_IX3",
                     "PRIMARY"
             ));
-            assertIndexNames(statement, validatedSchema, "SPRING_SESSION_ATTRIBUTES", Set.of(
-                    "SPRING_SESSION_ATTRIBUTES_FK",
-                    "PRIMARY"
-            ));
+            // MySQL may omit a dedicated index named like the FK when the composite PRIMARY KEY
+            // already leads with SESSION_PRIMARY_ID; assert real indexes and the FK separately.
+            assertIndexNames(statement, validatedSchema, "SPRING_SESSION_ATTRIBUTES", Set.of("PRIMARY"));
+            assertSpringSessionAttributesPrimaryKey(statement, validatedSchema);
+            assertSpringSessionAttributesForeignKey(statement, validatedSchema);
 
             try (ResultSet engine = statement.executeQuery(
                     "SELECT ENGINE, ROW_FORMAT FROM information_schema.TABLES "
@@ -106,15 +107,60 @@ class SpringSessionJdbcMySqlIntegrationTest {
                 assertThat(columns.next()).isTrue();
                 assertThat(columns.getString("DATA_TYPE").toLowerCase(Locale.ROOT)).isEqualTo("blob");
             }
+        }
+    }
 
-            try (ResultSet foreignKeys = statement.executeQuery(
-                    "SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS "
-                            + "WHERE CONSTRAINT_SCHEMA = '" + validatedSchema + "' "
-                            + "AND CONSTRAINT_NAME = 'SPRING_SESSION_ATTRIBUTES_FK'"
-            )) {
-                assertThat(foreignKeys.next()).isTrue();
-                assertThat(foreignKeys.getString("DELETE_RULE")).isEqualToIgnoringCase("CASCADE");
-            }
+    private static void assertSpringSessionAttributesPrimaryKey(
+            Statement statement,
+            String schema
+    ) throws Exception {
+        String validatedSchema = MySqlSessionTestDatabaseNames.requireValid(schema);
+        try (ResultSet primaryKey = statement.executeQuery(
+                "SELECT COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE "
+                        + "WHERE TABLE_SCHEMA = '" + validatedSchema + "' "
+                        + "AND TABLE_NAME = 'SPRING_SESSION_ATTRIBUTES' "
+                        + "AND CONSTRAINT_NAME = 'PRIMARY' "
+                        + "ORDER BY ORDINAL_POSITION"
+        )) {
+            assertThat(primaryKey.next()).isTrue();
+            assertThat(primaryKey.getString("COLUMN_NAME")).isEqualToIgnoringCase("SESSION_PRIMARY_ID");
+            assertThat(primaryKey.next()).isTrue();
+            assertThat(primaryKey.getString("COLUMN_NAME")).isEqualToIgnoringCase("ATTRIBUTE_NAME");
+            assertThat(primaryKey.next()).isFalse();
+        }
+    }
+
+    private static void assertSpringSessionAttributesForeignKey(
+            Statement statement,
+            String schema
+    ) throws Exception {
+        String validatedSchema = MySqlSessionTestDatabaseNames.requireValid(schema);
+        try (ResultSet foreignKey = statement.executeQuery(
+                "SELECT rc.CONSTRAINT_NAME, rc.DELETE_RULE, "
+                        + "kcu.TABLE_NAME, kcu.COLUMN_NAME, "
+                        + "kcu.REFERENCED_TABLE_NAME, kcu.REFERENCED_COLUMN_NAME "
+                        + "FROM information_schema.REFERENTIAL_CONSTRAINTS rc "
+                        + "INNER JOIN information_schema.KEY_COLUMN_USAGE kcu "
+                        + "ON rc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA "
+                        + "AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME "
+                        + "AND rc.TABLE_NAME = kcu.TABLE_NAME "
+                        + "WHERE rc.CONSTRAINT_SCHEMA = '" + validatedSchema + "' "
+                        + "AND rc.CONSTRAINT_NAME = 'SPRING_SESSION_ATTRIBUTES_FK' "
+                        + "AND rc.TABLE_NAME = 'SPRING_SESSION_ATTRIBUTES'"
+        )) {
+            assertThat(foreignKey.next()).isTrue();
+            assertThat(foreignKey.getString("CONSTRAINT_NAME"))
+                    .isEqualToIgnoringCase("SPRING_SESSION_ATTRIBUTES_FK");
+            assertThat(foreignKey.getString("TABLE_NAME"))
+                    .isEqualToIgnoringCase("SPRING_SESSION_ATTRIBUTES");
+            assertThat(foreignKey.getString("COLUMN_NAME"))
+                    .isEqualToIgnoringCase("SESSION_PRIMARY_ID");
+            assertThat(foreignKey.getString("REFERENCED_TABLE_NAME"))
+                    .isEqualToIgnoringCase("SPRING_SESSION");
+            assertThat(foreignKey.getString("REFERENCED_COLUMN_NAME"))
+                    .isEqualToIgnoringCase("PRIMARY_ID");
+            assertThat(foreignKey.getString("DELETE_RULE")).isEqualToIgnoringCase("CASCADE");
+            assertThat(foreignKey.next()).isFalse();
         }
     }
 
