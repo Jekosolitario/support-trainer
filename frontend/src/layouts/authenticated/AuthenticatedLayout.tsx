@@ -11,11 +11,13 @@ import styles from './AuthenticatedLayout.module.css';
 
 interface AuthenticatedLayoutProps {
   profile: UserAccessProfile;
+  headerActions?: ReactNode;
   children?: ReactNode;
 }
 
 export function AuthenticatedLayout({
   profile,
+  headerActions,
   children,
 }: AuthenticatedLayoutProps) {
   return (
@@ -25,7 +27,10 @@ export function AuthenticatedLayout({
       </a>
       <header className={styles.header}>
         <Branding />
-        <p className={styles.area}>{getAccessProfileLabel(profile)}</p>
+        <div className={styles.headerEnd}>
+          <p className={styles.area}>{getAccessProfileLabel(profile)}</p>
+          {headerActions}
+        </div>
       </header>
       <div className={styles.body}>
         <div className={styles.navigationSlot}>

@@ -83,6 +83,32 @@ it('rende il boundary initializing senza montare l’outlet privato', () => {
   expect(privateRender).not.toHaveBeenCalled();
 });
 
+it.each([
+  ['bootstrap', 'Verifica della sessione in corso.'],
+  ['reconciliation', 'Verifica della sessione in corso.'],
+  ['login', 'Verifica della sessione in corso.'],
+  ['logout', 'Disconnessione in corso.'],
+] as const)(
+  'usa la copy initializing corretta per operation=%s',
+  (operation, copy) => {
+    renderWithAuthContext(
+      guardedRoutes(<p>Contenuto privato</p>),
+      createAuthContextValue({
+        status: 'initializing',
+        operation,
+        reason: null,
+        account: null,
+        profile: null,
+        accessProfile: null,
+      }),
+      { initialEntries: ['/private'] },
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent(copy);
+    expect(screen.queryByText('Contenuto privato')).not.toBeInTheDocument();
+  },
+);
+
 it('rende il boundary unavailable senza outlet o redirect login', () => {
   renderWithAuthContext(
     guardedRoutes(<p>Contenuto privato</p>),

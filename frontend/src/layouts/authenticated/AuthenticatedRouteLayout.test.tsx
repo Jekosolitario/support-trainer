@@ -53,7 +53,7 @@ it.each([
     hiddenLink: 'Disponibilità',
   },
 ] satisfies LayoutCase[])(
-  'usa il profilo runtime $label dal Context per layout e navigation',
+  'usa il profilo runtime $label dal Context per layout, navigation e Logout',
   ({ accessProfile, path, area, visibleLink, hiddenLink }) => {
     const state = createAuthenticatedAuthState(accessProfile);
 
@@ -70,6 +70,7 @@ it.each([
     );
 
     expect(screen.getByText(area)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Esci' })).toBeEnabled();
     const navigation = screen.getByRole('navigation', {
       name: 'Navigazione principale',
     });
@@ -82,6 +83,28 @@ it.each([
     expect(screen.getByText('Pagina privata')).toBeVisible();
   },
 );
+
+it('mostra Logout anche con profile.active=false', () => {
+  const state = createAuthenticatedAuthState(
+    { role: 'CLIENT', specialization: null },
+    { active: false },
+  );
+
+  renderWithAuthContext(
+    <Routes>
+      <Route element={<RequireAuth />}>
+        <Route element={<AuthenticatedRouteLayout />}>
+          <Route path="/app/client/dashboard" element={<p>Pagina privata</p>} />
+        </Route>
+      </Route>
+    </Routes>,
+    createAuthContextValue(state),
+    { initialEntries: ['/app/client/dashboard'] },
+  );
+
+  expect(screen.getByRole('button', { name: 'Esci' })).toBeEnabled();
+  expect(screen.getByText('Pagina privata')).toBeVisible();
+});
 
 it('fallisce chiuso se montato accidentalmente fuori authenticated', () => {
   const state: AuthState = {
@@ -106,5 +129,8 @@ it('fallisce chiuso se montato accidentalmente fuori authenticated', () => {
   expect(screen.queryByText('Pagina privata')).not.toBeInTheDocument();
   expect(
     screen.queryByRole('navigation', { name: 'Navigazione principale' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Esci' }),
   ).not.toBeInTheDocument();
 });

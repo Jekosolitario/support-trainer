@@ -30,6 +30,14 @@
   background: var(--color-background-elevated);
 }
 
+.headerEnd {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
 .area {
   margin: 0;
   color: var(--color-text-muted);

@@ -19,7 +19,9 @@ export function RequireAuth() {
     case 'initializing':
       return (
         <p aria-live="polite" role="status">
-          Verifica della sessione in corso.
+          {state.operation === 'logout'
+            ? 'Disconnessione in corso.'
+            : 'Verifica della sessione in corso.'}
         </p>
       );
     case 'unavailable':

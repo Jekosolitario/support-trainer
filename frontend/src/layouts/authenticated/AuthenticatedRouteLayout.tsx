@@ -1,4 +1,5 @@
 import { useAuth } from '../../auth/authState';
+import { LogoutButton } from '../../components/navigation/LogoutButton';
 import { AuthenticatedLayout } from './AuthenticatedLayout';
 
 export function AuthenticatedRouteLayout() {
@@ -8,5 +9,10 @@ export function AuthenticatedRouteLayout() {
     return null;
   }
 
-  return <AuthenticatedLayout profile={state.accessProfile} />;
+  return (
+    <AuthenticatedLayout
+      profile={state.accessProfile}
+      headerActions={<LogoutButton />}
+    />
+  );
 }

@@ -23,5 +23,8 @@ describe('RolePreviewPage', () => {
     expect(
       screen.getByRole('article', { name: 'Nutrition: In arrivo' }),
     ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Esci' }),
+    ).not.toBeInTheDocument();
   });
 });
