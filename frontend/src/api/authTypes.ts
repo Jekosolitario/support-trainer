@@ -1,0 +1,76 @@
+export type UserRole = 'CLIENT' | 'PROFESSIONAL';
+
+export type ProfessionalSpecialization = 'PERSONAL_TRAINER' | 'NUTRITIONIST';
+
+export type AccountStatus = 'PENDING_VERIFICATION' | 'ACTIVE';
+
+export type Gender = 'MALE' | 'FEMALE' | 'OTHER' | 'NOT_SPECIFIED';
+
+export type ClientOperationalStatus = 'ATTIVO' | 'INFORTUNATO' | 'PAUSA';
+
+export type ProfessionalOperationalStatus =
+  'DISPONIBILE' | 'ASSENTE' | 'FERIE' | 'MALATTIA';
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface MyAccountResponse {
+  id: number;
+  email: string;
+  role: UserRole;
+  accountStatus: AccountStatus;
+  emailVerified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface MyProfileCommon {
+  id: number;
+  firstName: string;
+  lastName: string;
+  profileImageUrl: string | null;
+  active: boolean;
+}
+
+export interface MyClientProfileResponse extends MyProfileCommon {
+  role: 'CLIENT';
+  operationalStatus: ClientOperationalStatus;
+  specialization: null;
+  phoneNumber: null;
+  bio: null;
+  workplaceName: null;
+  city: null;
+  instagramUrl: null;
+  websiteUrl: null;
+  birthDate: string;
+  heightCm: number;
+  primaryGoal: string;
+  gender: Gender;
+  medicalNotes: string | null;
+  injuryNotes: string | null;
+  notes: string | null;
+}
+
+export interface MyProfessionalProfileResponse extends MyProfileCommon {
+  role: 'PROFESSIONAL';
+  operationalStatus: ProfessionalOperationalStatus;
+  specialization: ProfessionalSpecialization;
+  phoneNumber: string | null;
+  bio: string | null;
+  workplaceName: string | null;
+  city: string | null;
+  instagramUrl: string | null;
+  websiteUrl: string | null;
+  birthDate: null;
+  heightCm: null;
+  primaryGoal: null;
+  gender: null;
+  medicalNotes: null;
+  injuryNotes: null;
+  notes: null;
+}
+
+export type MyProfileResponse =
+  MyClientProfileResponse | MyProfessionalProfileResponse;
