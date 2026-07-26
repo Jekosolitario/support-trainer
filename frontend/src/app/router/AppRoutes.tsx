@@ -1,10 +1,10 @@
 import { useRoutes, type RouteObject } from 'react-router-dom';
 
-import {
-  CLIENT_ACCESS_PROFILE,
-  PERSONAL_TRAINER_ACCESS_PROFILE,
-} from '../config/access';
-import { AuthenticatedLayout } from '../../layouts/authenticated/AuthenticatedLayout';
+import { RequireAuth } from '../../auth/RequireAuth';
+import { RequireRole } from '../../auth/RequireRole';
+import { RequireSpecialization } from '../../auth/RequireSpecialization';
+import { useAuth } from '../../auth/authState';
+import { AuthenticatedRouteLayout } from '../../layouts/authenticated/AuthenticatedRouteLayout';
 import { ErrorLayout } from '../../layouts/error/ErrorLayout';
 import { PublicLayout } from '../../layouts/public/PublicLayout';
 import {
@@ -35,6 +35,16 @@ import { DashboardPage } from '../../pages/shared/DashboardPage';
 import { ForbiddenPage, NotFoundPage } from '../../pages/shared/ErrorPages';
 import { ProfilePage } from '../../pages/shared/ProfilePage';
 
+function AuthenticatedDashboardRoute() {
+  const { state } = useAuth();
+
+  if (state.status !== 'authenticated') {
+    return null;
+  }
+
+  return <DashboardPage profile={state.accessProfile} />;
+}
+
 function createAppRoutes(isDevelopment: boolean): RouteObject[] {
   const routes: RouteObject[] = [
     {
@@ -52,74 +62,94 @@ function createAppRoutes(isDevelopment: boolean): RouteObject[] {
       ],
     },
     {
-      element: <AuthenticatedLayout profile={CLIENT_ACCESS_PROFILE} />,
+      element: <RequireAuth />,
       children: [
         {
-          path: '/app/client/dashboard',
-          element: <DashboardPage profile={CLIENT_ACCESS_PROFILE} />,
+          element: <RequireRole role="CLIENT" />,
+          children: [
+            {
+              element: <AuthenticatedRouteLayout />,
+              children: [
+                {
+                  path: '/app/client/dashboard',
+                  element: <AuthenticatedDashboardRoute />,
+                },
+                {
+                  path: '/app/client/profile',
+                  element: <ProfilePage area="cliente" />,
+                },
+                {
+                  path: '/app/client/professionals',
+                  element: <ClientProfessionalsPage />,
+                },
+                {
+                  path: '/app/client/professionals/:professionalId',
+                  element: <ClientProfessionalDetailPage />,
+                },
+                {
+                  path: '/app/client/professionals/:professionalId/availability',
+                  element: <ClientProfessionalAvailabilityPage />,
+                },
+                {
+                  path: '/app/client/bookings',
+                  element: <ClientBookingsPage />,
+                },
+                {
+                  path: '/app/client/bookings/:bookingRequestId',
+                  element: <ClientBookingDetailPage />,
+                },
+              ],
+            },
+          ],
         },
         {
-          path: '/app/client/profile',
-          element: <ProfilePage area="cliente" />,
-        },
-        {
-          path: '/app/client/professionals',
-          element: <ClientProfessionalsPage />,
-        },
-        {
-          path: '/app/client/professionals/:professionalId',
-          element: <ClientProfessionalDetailPage />,
-        },
-        {
-          path: '/app/client/professionals/:professionalId/availability',
-          element: <ClientProfessionalAvailabilityPage />,
-        },
-        {
-          path: '/app/client/bookings',
-          element: <ClientBookingsPage />,
-        },
-        {
-          path: '/app/client/bookings/:bookingRequestId',
-          element: <ClientBookingDetailPage />,
-        },
-      ],
-    },
-    {
-      element: (
-        <AuthenticatedLayout profile={PERSONAL_TRAINER_ACCESS_PROFILE} />
-      ),
-      children: [
-        {
-          path: '/app/professional/dashboard',
-          element: <DashboardPage profile={PERSONAL_TRAINER_ACCESS_PROFILE} />,
-        },
-        {
-          path: '/app/professional/profile',
-          element: <ProfilePage area="professionista" />,
-        },
-        {
-          path: '/app/professional/clients',
-          element: <ProfessionalClientsPage />,
-        },
-        {
-          path: '/app/professional/clients/:clientId',
-          element: <ProfessionalClientDetailPage />,
-        },
-        {
-          path: '/app/professional/invites',
-          element: <ProfessionalInvitesPage />,
-        },
-        {
-          path: '/app/professional/availability',
-          element: <ProfessionalAvailabilityPage />,
-        },
-        {
-          path: '/app/professional/bookings',
-          element: <ProfessionalBookingsPage />,
-        },
-        {
-          path: '/app/professional/bookings/:bookingRequestId',
-          element: <ProfessionalBookingDetailPage />,
+          element: <RequireRole role="PROFESSIONAL" />,
+          children: [
+            {
+              element: <AuthenticatedRouteLayout />,
+              children: [
+                {
+                  path: '/app/professional/dashboard',
+                  element: <AuthenticatedDashboardRoute />,
+                },
+                {
+                  path: '/app/professional/profile',
+                  element: <ProfilePage area="professionista" />,
+                },
+                {
+                  path: '/app/professional/clients',
+                  element: <ProfessionalClientsPage />,
+                },
+                {
+                  path: '/app/professional/clients/:clientId',
+                  element: <ProfessionalClientDetailPage />,
+                },
+                {
+                  path: '/app/professional/invites',
+                  element: <ProfessionalInvitesPage />,
+                },
+                {
+                  element: (
+                    <RequireSpecialization specialization="PERSONAL_TRAINER" />
+                  ),
+                  children: [
+                    {
+                      path: '/app/professional/availability',
+                      element: <ProfessionalAvailabilityPage />,
+                    },
+                    {
+                      path: '/app/professional/bookings',
+                      element: <ProfessionalBookingsPage />,
+                    },
+                    {
+                      path: '/app/professional/bookings/:bookingRequestId',
+                      element: <ProfessionalBookingDetailPage />,
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
         },
       ],
     },
