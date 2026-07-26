@@ -1,16 +1,6 @@
 import pageTemplateStyles from '../../components/page/PageTemplate.module.css';
 import { PageTemplate } from '../../components/page/PageTemplate';
 
-export function LoginPage() {
-  return (
-    <PageTemplate
-      eyebrow="Accesso pubblico"
-      title="Login"
-      description="Questa pagina ospiterà l’accesso per clienti e professionisti. L’autenticazione non è implementata in questa fondazione."
-    />
-  );
-}
-
 export function RegisterProfessionalPage() {
   return (
     <PageTemplate

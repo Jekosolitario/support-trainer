@@ -6,6 +6,7 @@ import { renderApp } from '../../test/renderApp';
 import {
   createAuthenticatedAuthState,
   createAuthContextValue,
+  createUnauthenticatedAuthState,
   renderWithAuthContext,
 } from '../../test/renderWithAuthContext';
 import { AppRoutes } from './AppRoutes';
@@ -88,6 +89,14 @@ function renderAuthenticatedApp(
   );
 }
 
+function renderUnauthenticatedApp(path: string) {
+  return renderWithAuthContext(
+    <AppRoutes isDevelopment={false} />,
+    createAuthContextValue(createUnauthenticatedAuthState()),
+    { initialEntries: [path] },
+  );
+}
+
 function expectPageHeading(name: string): void {
   expect(screen.getByRole('heading', { level: 1, name })).toBeVisible();
 }
@@ -105,7 +114,11 @@ describe('AppRoutes', () => {
     ['/register/client', 'Registrazione cliente'],
     ['/verify-email', 'Verifica dell’indirizzo email'],
   ])('mantiene pubblica %s', (path, heading) => {
-    renderApp(path);
+    if (path === '/login') {
+      renderUnauthenticatedApp(path);
+    } else {
+      renderApp(path);
+    }
 
     expectPageHeading(heading);
   });
@@ -147,6 +160,37 @@ describe('AppRoutes', () => {
       expect(screen.queryByText('Area cliente')).not.toBeInTheDocument();
     },
   );
+
+  it('lascia ai guard il from CLIENT dopo login PROFESSIONAL', () => {
+    const state = createAuthenticatedAuthState({
+      role: 'PROFESSIONAL',
+      specialization: 'NUTRITIONIST',
+    });
+
+    renderWithAuthContext(
+      <AppRoutes isDevelopment={false} />,
+      createAuthContextValue(state),
+      {
+        initialEntries: [
+          {
+            pathname: '/login',
+            state: {
+              from: {
+                pathname: '/app/client/bookings',
+                search: '?filter=pending',
+                hash: '#request-11',
+              },
+            },
+          },
+        ],
+      },
+    );
+
+    expectForbidden();
+    expect(
+      screen.queryByRole('heading', { level: 1, name: 'Prenotazioni' }),
+    ).not.toBeInTheDocument();
+  });
 
   describe.each(professionalProfiles)(
     'route professional comuni per $label',

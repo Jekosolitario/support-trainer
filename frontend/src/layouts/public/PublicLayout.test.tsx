@@ -1,10 +1,20 @@
 import { screen, within } from '@testing-library/react';
 
+import { AppRoutes } from '../../app/router/AppRoutes';
 import { renderApp } from '../../test/renderApp';
+import {
+  createAuthContextValue,
+  createUnauthenticatedAuthState,
+  renderWithAuthContext,
+} from '../../test/renderWithAuthContext';
 
 describe('PublicLayout', () => {
   it('rende skip link, branding, main e navigazione pubblica', () => {
-    renderApp('/login');
+    renderWithAuthContext(
+      <AppRoutes isDevelopment={false} />,
+      createAuthContextValue(createUnauthenticatedAuthState()),
+      { initialEntries: ['/login'] },
+    );
 
     const skipLink = screen.getByRole('link', { name: 'Vai al contenuto' });
 

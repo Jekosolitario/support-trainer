@@ -1,6 +1,12 @@
 import { screen, within } from '@testing-library/react';
 
+import { AppRoutes } from '../../app/router/AppRoutes';
 import { renderApp } from '../../test/renderApp';
+import {
+  createAuthContextValue,
+  createUnauthenticatedAuthState,
+  renderWithAuthContext,
+} from '../../test/renderWithAuthContext';
 import {
   closingContent,
   futureContent,
@@ -213,7 +219,11 @@ describe('HomePage', () => {
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
     unmount();
 
-    renderApp('/login');
+    renderWithAuthContext(
+      <AppRoutes isDevelopment={false} />,
+      createAuthContextValue(createUnauthenticatedAuthState()),
+      { initialEntries: ['/login'] },
+    );
     expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
   });
 });

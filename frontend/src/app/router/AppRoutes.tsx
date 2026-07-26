@@ -24,8 +24,8 @@ import {
   ProfessionalInvitesPage,
 } from '../../pages/professional/ProfessionalPages';
 import { HomePage } from '../../pages/public/HomePage';
+import { LoginPage } from '../../pages/public/LoginPage';
 import {
-  LoginPage,
   RegisterClientPage,
   RegisterProfessionalPage,
   ValidateInvitePage,

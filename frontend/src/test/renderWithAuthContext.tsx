@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, type MemoryRouterProps } from 'react-router-dom';
 
 import type { MyAccountResponse, MyProfileResponse } from '../api/authTypes';
 import type { UserAccessProfile } from '../app/config/access';
@@ -9,6 +9,8 @@ import {
   type AuthContextValue,
   type AuthState,
   type AuthenticatedAuthState,
+  type UnauthenticatedAuthState,
+  type UnauthenticatedReason,
 } from '../auth/authState';
 
 type AuthOperations = Omit<AuthContextValue, 'state'>;
@@ -23,6 +25,19 @@ export function createAuthContextValue(
     logout: async () => undefined,
     reconcileSession: async () => undefined,
     ...overrides,
+  };
+}
+
+export function createUnauthenticatedAuthState(
+  reason: UnauthenticatedReason = 'no-session',
+): UnauthenticatedAuthState {
+  return {
+    status: 'unauthenticated',
+    operation: null,
+    reason,
+    account: null,
+    profile: null,
+    accessProfile: null,
   };
 }
 
@@ -103,10 +118,10 @@ export function renderWithAuthContext(
   value: AuthContextValue,
   {
     initialEntries = ['/'],
-  }: { readonly initialEntries?: readonly string[] } = {},
+  }: { readonly initialEntries?: MemoryRouterProps['initialEntries'] } = {},
 ) {
   return render(
-    <MemoryRouter initialEntries={[...initialEntries]}>
+    <MemoryRouter initialEntries={initialEntries}>
       <AuthContext.Provider value={value}>{element}</AuthContext.Provider>
     </MemoryRouter>,
   );
