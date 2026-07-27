@@ -2,9 +2,9 @@
 
 ## 1. Descrizione
 
-Support Trainer è un progetto full stack per la gestione del rapporto tra professionisti del benessere e clienti. Il backend MVP copre autenticazione, profili, inviti, collegamenti professionista-cliente, disponibilità e richieste di prenotazione. Il frontend dispone di una fondazione React e di una home pubblica implementata.
+Support Trainer è un progetto full stack per la gestione del rapporto tra professionisti del benessere e clienti. Il backend MVP copre autenticazione, profili, inviti, collegamenti professionista-cliente, disponibilità e richieste di prenotazione. Il frontend dispone di una fondazione React, home pubblica, autenticazione session-based (login/logout/CSRF/guards) e foundation API client.
 
-Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Le route e i layout frontend di base sono presenti, ma le pagine applicative sono ancora prevalentemente placeholder e non esistono ancora integrazione API né autenticazione di sessione lato frontend.
+Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Login, logout, routing protetto e foundation auth sono implementati; le pagine business (dashboard dati, profilo UI, clients, professionals, availability, bookings) e i flussi pubblici di registrazione/invito/verifica email restano prevalentemente placeholder.
 
 ## 2. Stato attuale del progetto
 
@@ -17,11 +17,12 @@ Stato sintetico:
 - 31 endpoint applicativi documentati; `/error` resta un fallback tecnico separato;
 - autenticazione session-based, CSRF e autorizzazione per ruolo presenti;
 - test di integrazione per auth, sessione, inviti, access control, profili, availability, booking e Security / Common presenti;
-- database applicativo MySQL con migrazioni Flyway fino a V7 (schema Spring Session JDBC);
+- database applicativo MySQL con migrazioni Flyway (schema di dominio e infrastruttura Spring Session JDBC);
 - fondazione frontend con routing, layout, navigazione per ruolo, pagine di errore e test automatici presente;
 - home pubblica responsive/mobile-first implementata sulla route `/`;
-- pagine applicative prevalentemente placeholder; integrazione API e auth di sessione frontend non ancora implementate;
-- pipeline CI GitHub Actions per build, test e package del backend presente; deploy non configurato;
+- autenticazione session-based frontend implementata (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap `/me`);
+- pagine business e flussi pubblici di registrazione/invito/verifica email ancora prevalentemente placeholder;
+- pipeline CI GitHub Actions per il backend presente; i gate frontend (lint/test/build) restano locali; deploy non configurato;
 - progetto non ancora considerato production-ready.
 
 ## 3. Stack tecnico
@@ -43,19 +44,21 @@ Stato sintetico:
 
 - MySQL per l'ambiente applicativo
 - H2 in memoria per i test
-- migrazioni Flyway versionate per le nove tabelle runtime MySQL e per lo schema Spring Session (V7)
+- migrazioni Flyway versionate per le nove tabelle di dominio MySQL e per lo schema Spring Session introdotto da V7
 - JUnit
 - Spring Test e MockMvc
 - AssertJ
 
 ### Frontend
 
-- React
+- React 19
 - TypeScript
 - Vite
 - React Router
 - CSS Modules
 - Vitest e React Testing Library
+- ESLint / Prettier
+- npm (`package-lock.json`)
 - Fontsource per gli asset tipografici locali della home
 
 ## 4. Funzionalità backend implementate
@@ -136,7 +139,8 @@ Le liste usano un riepilogo autosufficiente e create, dettaglio e transizioni re
 - recupero e reset della password;
 - upload dell'immagine profilo;
 - API dedicate alla gestione manuale dei collegamenti;
-- frontend integrato con il backend (auth di sessione/CSRF da adottare lato client; non ancora implementata);
+- pagine frontend business ancora placeholder (dashboard dati, profilo/account UI, clients, professionals, availability, bookings);
+- flussi frontend pubblici ancora placeholder (registrazione professionista/cliente, validazione invito, verifica email);
 - configurazione completa per il deploy.
 
 Chat in tempo reale, pagamenti, notifiche push e statistiche avanzate non fanno parte del perimetro attuale.
@@ -232,7 +236,7 @@ Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazi
 
 La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle nove tabelle runtime e dello schema Spring Session tramite `classpath:db/migration`.
 
-Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true`. Le 23 migrazioni runtime sono V1, V2, `V3_1`–`V3_9`, V4, `V5_1`–`V5_9`, V6 e V7. V4 prepara e verifica atomicamente la conversione delle 23 colonne temporali legacy da `Europe/Rome` a UTC; V5 trasferisce l'auditing all'applicazione; V6 aggiunge e verifica il backfill degli snapshot storici Booking; V7 crea lo schema Spring Session JDBC (`SPRING_SESSION`, `SPRING_SESSION_ATTRIBUTES`) senza auto-init di Boot. Tutti gli istanti runtime usano `DATETIME(6)` e Hibernate valida il contratto con `ddl-auto=validate`.
+Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true` e governa lo schema di dominio insieme all'infrastruttura Spring Session. V4 prepara e verifica atomicamente la conversione delle 23 colonne temporali legacy da `Europe/Rome` a UTC; V5 trasferisce l'auditing all'applicazione; V6 aggiunge e verifica il backfill degli snapshot storici Booking; V7 ha introdotto lo schema Spring Session JDBC (`SPRING_SESSION`, `SPRING_SESSION_ATTRIBUTES`) senza auto-init di Boot. L'elenco aggiornato delle migrazioni e i dettagli di schema restano in [docs/10-database-schema.md](docs/10-database-schema.md). Tutti gli istanti runtime usano `DATETIME(6)` e Hibernate valida il contratto con `ddl-auto=validate`.
 
 La validazione conclusiva del 16 luglio 2026 su MySQL 8.0.44 ha prodotto il verdetto **MYSQL VALIDATION PASSED WITH WARNINGS**. Gli schemi isolati `support_trainer_audit_empty_20260716_101232` e `support_trainer_audit_legacy_20260716_101232` hanno certificato i percorsi da schema vuoto e legacy simulato. Sono rimasti presenti e non devono essere eliminati senza autorizzazione.
 
@@ -323,7 +327,13 @@ Creare la build frontend di produzione, comprensiva del controllo TypeScript:
 npm run build
 ```
 
-L'output della build viene generato in `frontend/dist`. I comandi verificano la fondazione e la home implementata, ma non implicano che le pagine placeholder siano integrate con il backend.
+L'output della build viene generato in `frontend/dist`. I comandi verificano foundation, home e auth session-based; non implicano che le pagine business placeholder siano integrate con le API di dominio.
+
+### Sviluppo locale frontend + backend
+
+Avviare il backend su `http://localhost:8080` e il frontend Vite su `http://localhost:5173`.
+
+Il client usa path relativi `/api/v1/...` con `credentials: 'same-origin'`. In sviluppo Vite inoltra `/api` verso `http://localhost:8080`, così le richieste restano same-origin sul browser anche con processi separati.
 
 ## 11. Esecuzione dei test backend
 
@@ -355,7 +365,17 @@ La suite include test relativi a:
 
 ### Baseline certificata
 
-L'ultimo `clean verify` certificato ha prodotto il JAR e completato **50 suite, 312 test, 0 failure, 0 error e 1 skipped previsto**: `BookingHistoricalSnapshotMySqlIntegrationTest`, opt-in tramite `it.mysql.enabled=true`. Lo stesso test è stato eseguito separatamente contro MySQL 8.0.44 con **1 test, 0 failure, 0 error, 0 skipped e BUILD SUCCESS**. La pipeline [`backend-ci.yml`](.github/workflows/backend-ci.yml) usa il Maven Wrapper con Temurin 21 su Ubuntu e Windows, esegue `clean verify`, verifica il JAR, usa `contents: read`, concurrency e timeout di 20 minuti; non richiede MySQL locale né segreti reali.
+L'ultimo `clean verify` certificato ha prodotto il JAR e completato **50 suite, 312 test, 0 failure, 0 error e 1 skipped previsto**: `BookingHistoricalSnapshotMySqlIntegrationTest`, opt-in tramite `it.mysql.enabled=true`. Lo stesso test è stato eseguito separatamente contro MySQL 8.0.44 con **1 test, 0 failure, 0 error, 0 skipped e BUILD SUCCESS**.
+
+**CI automatica attuale** ([`backend-ci.yml`](.github/workflows/backend-ci.yml)):
+
+- backend su Ubuntu e Windows;
+- Temurin JDK 21 e Maven Wrapper;
+- `clean verify` + verifica del JAR;
+- job dedicato MySQL 8.4 per certificare Flyway V7 / Spring Session JDBC;
+- nessuna esecuzione automatica di lint, test o build frontend.
+
+**Gate locali frontend** (non CI GitHub): `npm run lint`, `npm run format:check`, `npm run test`, `npm run build`.
 
 La correzione conclusiva ha reso deterministico `EmailVerificationTransactionIntegrationTest`: la precedente scadenza assoluta è stata sostituita con scadenze relative al `MutableTestClock` fornito da `EmailTestClockConfiguration`. Il codice di produzione non è cambiato e il test non dipende più da data corrente, timezone host o orologio reale.
 
@@ -394,53 +414,63 @@ Il profilo tracciato `mailpit` è un aiuto manuale locale, non un profilo di pro
 
 ## 13. Documentazione disponibile
 
-La cartella `docs` contiene la documentazione funzionale e tecnica. I riferimenti principali sono:
+### Fonti correnti backend
 
-- [Project Brief](docs/00-project-brief.md)
+- [Endpoint Map](docs/08-endpoint-map.md)
+- [Security Flow](docs/09-security-flow.md)
+- [Database Schema](docs/10-database-schema.md)
+- [API Modules Overview](docs/07-api-modules-overview.md)
 - [Functional Scope](docs/01-functional-scope.md)
+- [Project Brief](docs/00-project-brief.md)
+
+### Frontend
+
+- [Frontend Functional Map MVP](docs/frontend/01-frontend-functional-map-mvp.md)
+- [Public Home Implementation](docs/frontend/02-public-home-implementation.md)
+- [Authentication Session Flow](docs/frontend/03-authentication-session-flow.md)
+
+### Roadmap
+
+- [Planned Endpoints Roadmap](docs/15-planned-endpoints-roadmap.md)
+
+### Dominio e regole
+
 - [Domain Model](docs/02-domain-model.md)
 - [Entity Fields](docs/03-entity-fields.md)
 - [Relationship Rules](docs/04-relationship-rules.md)
 - [JPA Strategy](docs/05-jpa-strategy.md)
 - [Validation Rules](docs/06-validation-rules.md)
-- [API Modules Overview](docs/07-api-modules-overview.md)
-- [Endpoint Map](docs/08-endpoint-map.md)
-- [Security Flow](docs/09-security-flow.md)
-- [Database Schema](docs/10-database-schema.md)
-- [Backend Implementation Roadmap](docs/11-backend-implementation-roadmap.md)
+
+### Storico / audit
+
+- [Backend implementation roadmap — storico](docs/11-backend-implementation-roadmap.md)
 - [Certificazione tecnica finale](docs/final-audit-mvp.md)
 - [Sprint Availability](docs/16-sprint-04-availability.md)
 - [Sprint Bookings](docs/17-sprint-05-bookings.md)
 - [Copertura test backend MVP](docs/codex/2026-06-28-codex-auth-test-coverage.md)
-- [Frontend Functional Map MVP](docs/frontend/01-frontend-functional-map-mvp.md)
-- [Public Home Implementation](docs/frontend/02-public-home-implementation.md)
 
 ## 14. Roadmap sintetica
 
-1. integrare la fondazione frontend esistente con i 31 endpoint applicativi, adottando sessione cookie + CSRF (contratto già backend);
-2. completare il lifecycle account (recupero/reset password);
-3. implementare le schede di allenamento;
-4. implementare i piani alimentari;
-5. aggiungere feedback, misurazioni e progressi;
-6. completare hardening, osservabilità e preparazione tecnica al deploy, mantenendo le future evoluzioni dello schema esclusivamente forward-only.
+1. pagine frontend business ancora placeholder (profilo/account UI, clients, professionals, availability, bookings, dashboard con dati);
+2. flussi pubblici frontend ancora placeholder (registrazioni, invito, verifica email);
+3. completare il lifecycle account (recupero/reset password);
+4. implementare le schede di allenamento;
+5. implementare i piani alimentari;
+6. aggiungere feedback, misurazioni e progressi;
+7. completare hardening, osservabilità e preparazione tecnica al deploy, con evoluzioni schema esclusivamente forward-only.
 
-La roadmap dettagliata è disponibile in [docs/11-backend-implementation-roadmap.md](docs/11-backend-implementation-roadmap.md) e [docs/15-planned-endpoints-roadmap.md](docs/15-planned-endpoints-roadmap.md).
+Dettaglio endpoint futuri: [docs/15-planned-endpoints-roadmap.md](docs/15-planned-endpoints-roadmap.md).
 
 ## 15. Stato del frontend
 
-La cartella `frontend` contiene una fondazione web basata su React, TypeScript e Vite. Sono presenti:
+La cartella `frontend` contiene un'applicazione React/TypeScript/Vite con:
 
-- routing con React Router;
-- layout pubblico, autenticato e di errore;
-- navigazione differenziata per cliente, personal trainer e nutrizionista;
+- routing, layout, navigazione per ruolo e pagine di errore;
 - home pubblica completa sulla route `/`;
-- pagine pubbliche e private di base;
-- CSS Modules e token globali;
-- test con Vitest, React Testing Library e `jsdom`;
-- lint, controllo di formattazione e build TypeScript/Vite.
+- autenticazione session-based: httpClient, CSRF memory-only, AuthProvider, login, logout, guards, bootstrap `/me`;
+- proxy Vite `/api` → `http://localhost:8080` in sviluppo;
+- test con Vitest / React Testing Library; gate locali lint/format/build.
 
-La home è responsive/mobile-first e usa una direzione visuale dark-tech circoscritta al layout pubblico. Le aree autenticate mantengono attualmente il tema legacy.
+Auth foundation e login/logout sono implementati. Restano placeholder i flussi pubblici di registrazione/invito/verifica email e le pagine business private. Nessun JWT/Bearer né storage di token nel client.
 
-Le route di login, registrazione, validazione invito, verifica email e delle aree private sono registrate, ma le relative pagine sono ancora prevalentemente placeholder. API client, chiamate al backend, autenticazione di sessione/CSRF, stato auth frontend e guard basate sul principal non sono implementati. Il contratto da adottare è descritto in [Security Flow](docs/09-security-flow.md) e nella mappa frontend: CSRF solo in memoria, cookie gestito dal browser, nessun JWT in `localStorage`/`sessionStorage`.
-
-Le funzionalità realmente disponibili nel backend e quelle future restano definite nella documentazione funzionale. La struttura e le decisioni della home sono descritte in [Public Home Implementation](docs/frontend/02-public-home-implementation.md). Una possibile evoluzione mobile con React Native ed Expo resta fuori dall'MVP corrente.
+Riferimenti: [Authentication Session Flow](docs/frontend/03-authentication-session-flow.md), [Frontend Functional Map](docs/frontend/01-frontend-functional-map-mvp.md), [Public Home](docs/frontend/02-public-home-implementation.md), [Security Flow](docs/09-security-flow.md).

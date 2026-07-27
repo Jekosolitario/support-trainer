@@ -1,5 +1,9 @@
 # Backend Implementation Roadmap — Support Trainer
 
+> **Documento storico.** Conserva la roadmap di implementazione backend della fase originaria del progetto. Alcune decisioni (incluso il modello JWT/refresh) sono state successivamente superate; **non** è la roadmap corrente.
+>
+> Per lo stato attuale consultare: [`README.md`](../README.md), [`08-endpoint-map.md`](./08-endpoint-map.md), [`09-security-flow.md`](./09-security-flow.md), [`10-database-schema.md`](./10-database-schema.md), [`15-planned-endpoints-roadmap.md`](./15-planned-endpoints-roadmap.md).
+
 ## 1. Obiettivo del documento
 Questo documento definisce l’ordine corretto di implementazione del backend di Support Trainer.
 

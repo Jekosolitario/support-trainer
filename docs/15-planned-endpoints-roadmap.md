@@ -51,16 +51,18 @@ Alla data attuale risultano già implementati:
 
 Availability e Bookings non devono più essere considerati endpoint pianificati.
 
-La stabilizzazione backend, i test, la documentazione, il Wrapper, la CI e Flyway sono certificati sul commit finale `b94936bf535f83fd012ac8490ec9d9792ed6613b`. Dopo il rehearsal riuscito sul clone legacy, il database originale è stato sottoposto a backup verificato, baseline Flyway V1 e 21 migrazioni da V2 a V6: la history finale contiene 22 righe tutte riuscite e i 27 record applicativi sono stati preservati. Il backend trasferito è quindi pronto per l'integrazione frontend; le evoluzioni future dello schema devono usare esclusivamente nuove migrazioni forward-only.
+Secondo `08-endpoint-map.md`, il backend espone **31 endpoint applicativi** già implementati (Auth 8 incluso login/logout/CSRF, Me 4, Client 2, Professional 3, Invite 2, Availability 5, Booking 7). L’autenticazione runtime è session-based (cookie HttpOnly + CSRF); login, logout e CSRF **non** sono lavoro futuro.
+
+Le evoluzioni future dello schema devono usare esclusivamente nuove migrazioni forward-only.
 
 I prossimi blocchi da valutare sono:
 
-1. integrazione frontend reale sui 29 endpoint applicativi già pronti
+1. integrazioni client ulteriori sulle API già disponibili (l’auth session-based non è più un next step)
 2. modulo workout
 3. modulo nutrition
 4. feedback
 5. measurements
-6. password reset / refresh token / logout
+6. password reset / forgot-reset password
 7. preparazione deploy
 
 ---
@@ -89,6 +91,8 @@ Questi endpoint erano stati ipotizzati nella documentazione iniziale, ma non ris
 
 L'infrastruttura applicativa di richiesta email è già presente: pubblicazione nella transazione, consegna sincrona `AFTER_COMMIT`, sender locale disabilitato, sender in-memory per test/CI e adapter SMTP JavaMail configurabile. Non introduce endpoint. Restano futuri un provider API, template HTML, una convenzione production esplicita e, se richiesta affidabilità di consegna, outbox e retry.
 
+Login (`POST /api/v1/auth/login`), logout (`POST /api/v1/auth/logout`) e CSRF (`GET /api/v1/auth/csrf`) sono **già implementati** nella mappa reale (`08-endpoint-map.md`, `09-security-flow.md`) e non appartengono a questa roadmap. Un endpoint di refresh JWT/Bearer **non** è previsto: l’architettura corrente è session-based e ha abbandonato quel modello.
+
 ### 5.1 Forgot password
 
 **POST** `/api/v1/auth/forgot-password`
@@ -101,21 +105,9 @@ Endpoint futuro per avviare il recupero password.
 
 Endpoint futuro per impostare una nuova password tramite token valido.
 
-### 5.3 Refresh token
-
-**POST** `/api/v1/auth/refresh`
-
-Endpoint futuro per rinnovare l’access token usando un refresh token persistente.
-
-### 5.4 Logout
-
-**POST** `/api/v1/auth/logout`
-
-Endpoint futuro per invalidare il refresh token o chiudere la sessione applicativa.
-
 ### Nota
 
-La documentazione iniziale prevede già concetti come refresh token e password reset, ma nel codice attuale non risultano ancora implementati.
+Forgot/reset password restano lavoro futuro. Refresh token JWT e logout non vanno ripianificati qui: il primo è architetturalmente superato; il secondo è già runtime.
 
 ---
 

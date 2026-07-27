@@ -74,7 +74,7 @@ Non risultano ancora implementate:
 - misurazioni e storico progressi;
 - recupero e reset password;
 - upload immagine profilo;
-- frontend reale integrato con il backend;
+- pagine frontend business e flussi pubblici ancora placeholder (auth session-based frontend già presente);
 - preparazione completa al deploy.
 
 ---
@@ -450,7 +450,8 @@ Risultano già implementati:
 - lettura relazioni cliente-professionista;
 - availability del personal trainer;
 - booking cliente-personal trainer;
-- gestione stato operativo utente.
+- gestione stato operativo utente;
+- foundation frontend con home pubblica e autenticazione session-based (login/logout/guards/bootstrap).
 
 ### 14.2 Parte della v1 ancora da implementare
 
@@ -460,7 +461,8 @@ Per completare il perimetro funzionale originariamente previsto restano da svilu
 - piani alimentari;
 - feedback o segnalazioni cliente;
 - eventuale gestione misurazioni/progressi;
-- frontend reale collegato al backend.
+- pagine frontend business (dashboard dati, profilo/account UI, clients, professionals, availability, bookings) ancora placeholder;
+- flussi frontend pubblici di registrazione/invito/verifica email ancora placeholder.
 
 ### 14.3 Funzionalità escluse dal perimetro attuale
 
@@ -476,9 +478,9 @@ Non fanno parte del perimetro attuale:
 
 ## 15. Prossima decisione funzionale
 
-Dopo la stabilizzazione tecnica e documentale del backend, il prossimo passo dovrà essere scelto tra:
+Dopo la foundation auth frontend, il prossimo passo dovrà essere scelto tra:
 
-1. integrazione frontend reale sui moduli già disponibili;
+1. vertical slice frontend su un modulo business già disponibile nel backend;
 2. introduzione del modulo Workout Plans.
 
-La scelta dovrà essere effettuata solo dopo la chiusura completa dell’audit.
+La scelta definitiva del prossimo slice resta una decisione di prodotto/progetto.

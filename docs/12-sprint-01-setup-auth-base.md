@@ -1,5 +1,9 @@
 # Sprint 01 — Setup + Auth Base
 
+> **Documento storico.** Fotografia dello Sprint 01 (setup e auth base). Il corpo può riflettere l'architettura di autenticazione precedente e **non** rappresenta necessariamente l'implementazione corrente.
+>
+> Per lo stato attuale consultare: [`09-security-flow.md`](./09-security-flow.md), [`08-endpoint-map.md`](./08-endpoint-map.md), [`README.md`](../README.md), [`frontend/03-authentication-session-flow.md`](./frontend/03-authentication-session-flow.md).
+
 ## 1. Obiettivo dello sprint
 Questo sprint ha lo scopo di costruire la base tecnica del backend di Support Trainer.
 

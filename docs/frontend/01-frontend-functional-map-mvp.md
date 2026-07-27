@@ -29,12 +29,12 @@ La baseline certificata richiede inoltre che il client usi la risposta neutra `2
 ## 2. Stato del frontend
 
 - La fondazione frontend è implementata con **React + TypeScript + Vite**.
-- React Router registra le route pubbliche, le aree cliente e professionista, le pagine di errore e una preview tecnica disponibile soltanto in sviluppo.
+- React Router registra le route pubbliche, le aree cliente e professionista, le pagine di errore e una preview tecnica disponibile soltanto in sviluppo (`/dev/role-preview`).
 - Sono presenti layout pubblico, autenticato e di errore, navigazione differenziata per ruolo, componenti condivisi e test automatici.
-- La home pubblica sulla route `/` è implementata; struttura, contenuto, sistema visuale e verifiche sono descritti in [Public Home Implementation](./02-public-home-implementation.md).
-- Le altre pagine pubbliche e private sono ancora prevalentemente placeholder: le route sono raggiungibili, ma non costituiscono flussi applicativi completi.
-- Non sono ancora presenti API client, gestione dello stato auth di sessione/CSRF né integrazione con il backend. **L’auth di sessione frontend non è implementata**: le sezioni seguenti descrivono il contratto che il FE dovrà adottare.
-- Il web frontend dovrà comunicare con API REST JSON sotto il prefisso `/api/v1`. In produzione la topologia è same-origin dietro reverse proxy (`/` frontend, `/api/v1/**` backend): non è richiesto CORS browser per l’auth.
+- La home pubblica sulla route `/` è **implementata**; dettagli in [Public Home Implementation](./02-public-home-implementation.md).
+- L’**auth session-based frontend è implementata**: httpClient, CSRF memory-only, AuthProvider, bootstrap/reconciliation `/me`, login, logout, guards e routing protetto. Dettagli in [Authentication Session Flow](./03-authentication-session-flow.md).
+- Le pagine business e i flussi pubblici di registrazione/invito/verifica email restano **placeholder**: le route esistono, ma non sono flussi applicativi completi.
+- Il client usa path relativi `/api/v1/...` con `credentials: 'same-origin'`. In sviluppo Vite proxya `/api` → `http://localhost:8080`. In produzione la topologia è same-origin dietro reverse proxy.
 - Un'app mobile con React Native + Expo è una possibile evoluzione futura, fuori dall'MVP.
 - L'implementazione corrente del frontend non modifica il contratto backend descritto in questa mappa.
 
@@ -90,8 +90,8 @@ Note di flusso verificate:
 
 | Area | Endpoint | Stato MVP | Note UX |
 |---|---|---|---|
-| Bootstrap sessione | `GET /api/v1/me/account`, `GET /api/v1/me/profile` | Contratto backend pronto; FE non implementato | Confermare ruolo, stato account, specializzazione e dati profilo dopo il login o il reload. Il ruolo non è nel cookie: va letto da `/me`. |
-| Profilo/account | stessi endpoint di lettura; `PATCH /api/v1/me/profile` | Implementabile ora | Un'unica pagina può avere sezioni “Profilo” e “Account”. Mostrare campi diversi per cliente e professionista. |
+| Bootstrap sessione | `GET /api/v1/me/account`, `GET /api/v1/me/profile` | **Implementato** nel client auth | Confermare ruolo, stato account, specializzazione e dati profilo dopo login/reload. Dettagli in [FE03](./03-authentication-session-flow.md). |
+| Profilo/account | stessi endpoint di lettura; `PATCH /api/v1/me/profile` | Contratto backend pronto; **UI placeholder** | Route presenti; form applicativo reale non ancora collegato. |
 | Stato operativo | `PATCH /api/v1/me/profile/operational-status` | Implementabile ora | Cliente: `ATTIVO`, `INFORTUNATO`, `PAUSA`. Professionista: `DISPONIBILE`, `ASSENTE`, `FERIE`, `MALATTIA`. |
 | Immagine profilo | Campo `profileImageUrl` in lettura | Solo visualizzazione se già valorizzato | Nessun upload o update immagine: usare iniziali/avatar di fallback e non mostrare un controllo file attivo. |
 
@@ -168,7 +168,6 @@ Il nutrizionista usa le funzionalità comuni del professionista, ma non dispone 
 | Feedback | Dettaglio futuro di workout/nutrition o area progressi | Nascosto: non esistono endpoint né dati. |
 | Measurements | Profilo/progressi cliente | Nascosta; niente grafici o inserimento misure. |
 | Reset password | Login / recupero account | Non mostrare un link attivo. Può apparire disabilitato solo in prototipi esplicitamente futuri. |
-| Logout | Menu utente | Contratto backend pronto: `POST /api/v1/auth/logout` con CSRF → `204`. Il FE deve ancora implementarlo: scartare CSRF in memoria e tornare allo stato anonimo. |
 | Upload immagine profilo | Profilo | Mostrare immagine esistente o avatar fallback; nessun controllo upload attivo. |
 | App mobile | Fuori dalla web app | Nessun elemento nell'MVP web. React Native + Expo resta un'evoluzione separata. |
 
@@ -176,7 +175,7 @@ Sono inoltre non presenti e da non esporre come attivi: cambio password autentic
 
 ## 7. Sitemap MVP
 
-I path seguenti sono registrati nel router frontend. La loro presenza non implica che la pagina sia già integrata con il backend: al momento la home `/` è implementata, mentre molte altre destinazioni rendono ancora contenuti placeholder. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
+I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzionalità completa.** Home e login/auth foundation sono implementati; registrazioni/invito/verify-email e pagine business restano placeholder. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
 
 ### Pubblico
 
@@ -220,6 +219,19 @@ Il contratto previsto dopo entrambe le registrazioni è mostrare “Controlla la
 
 Non servono route separate per personal trainer e nutrizionista: condividono il ruolo `PROFESSIONAL`; menu e guard specialistiche usano `specialization`.
 
+### 7.1 Maturity delle route frontend
+
+| Route / area | Audience | Maturity |
+|---|---|---|
+| `/` home | Pubblico | **Implementata** |
+| `/login` | Pubblico | **Implementata** |
+| `/register/professional`, `/invite/validate`, `/register/client`, `/verify-email` | Pubblico | **Placeholder** |
+| Guardie auth (`RequireAuth` / ruolo / specializzazione) | Privato | **Implementate** |
+| `/app/*/dashboard`, `/app/*/profile` | CLIENT / PROFESSIONAL | **Placeholder** (shell; senza dati business / form reali) |
+| Clients / professionals / invites | PROFESSIONAL o CLIENT | **Placeholder** |
+| Availability / bookings | CLIENT; PROFESSIONAL + PT | **Placeholder** |
+| `/dev/role-preview` | Dev-only | **Implementata** (solo `import.meta.env.DEV`) |
+
 ## 8. Protezione rotte frontend
 
 ### 8.1 Classificazione
@@ -232,23 +244,25 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 
 Le guard frontend migliorano navigazione e chiarezza, ma non sostituiscono l'autorizzazione backend.
 
-Nella fondazione corrente le route e i layout differenziati per ruolo sono registrati, ma non esistono ancora bootstrap della sessione, CSRF client, guard collegate a un principal autenticato o redirect basati sulla sessione. La classificazione seguente resta il contratto da applicare quando verrà introdotto lo stato auth.
+Nella fondazione corrente le guard `RequireAuth`, `RequireRole` e `RequireSpecialization` sono **implementate** e collegate allo stato auth. Le pagine dietro le guard possono restare placeholder di contenuto.
 
-### 8.2 Contratto sessione, CSRF e bootstrap (da adottare; FE non implementato)
+### 8.2 Sessione, CSRF e bootstrap (implementati)
 
-1. Prima delle mutazioni (incluso login), chiamare `GET /api/v1/auth/csrf` e conservare `token` + `headerName` **solo in memoria**.
-2. Inviare l’header CSRF (`headerName`, tipicamente `X-CSRF-TOKEN`) su ogni mutazione; usare `credentials: 'include'` / cookie same-origin gestiti dal browser.
-3. `POST /api/v1/auth/login` → `204 No Content`: nessun `accessToken`/`refreshToken`/`Authorization`. Il cookie HttpOnly è gestito dal browser.
-4. Subito dopo il login, richiamare `GET /csrf` (token ruotato), poi bootstrap con `GET /me/account` e `GET /me/profile` prima di costruire navigazione e route specialistiche.
-5. Non salvare JWT né CSRF in `localStorage`/`sessionStorage`. Non inventare Bearer auth.
-6. Logout: `POST /api/v1/auth/logout` con CSRF → `204`; scartare CSRF in memoria e tornare allo stato anonimo.
-7. Timeout backend: 30 min inattività, 8 h assolute; su `401` trattare la sessione come scaduta e riportare a `/login`.
+Reference operativa: [Authentication Session Flow](./03-authentication-session-flow.md). Sintesi:
+
+1. CSRF da `GET /api/v1/auth/csrf`, conservato **solo in memoria**.
+2. Mutazioni con header CSRF; `credentials: 'same-origin'`.
+3. Login `POST /api/v1/auth/login` → `204`; nessun JWT/Bearer/refresh.
+4. Dopo login: refresh CSRF + bootstrap `/me/account` e `/me/profile`.
+5. Nessun salvataggio auth in `localStorage`/`sessionStorage`.
+6. Logout `POST /api/v1/auth/logout` con CSRF → `204`.
+7. Timeout backend documentati in [`docs/09-security-flow.md`](../09-security-flow.md); su `401` session-bound il client invalida lo stato auth.
 
 ### 8.3 Topologia e CORS
 
 - in produzione: same-origin dietro reverse proxy; CORS non è il meccanismo di auth browser;
 - le chiamate JSON usano `Content-Type` e cookie di sessione; non `Authorization: Bearer`;
-- in sviluppo locale può servire un proxy Vite verso il backend, senza cambiare il contratto di produzione;
+- in sviluppo locale Vite proxya `/api` → `http://localhost:8080`, senza cambiare il contratto di produzione;
 - il frontend non deve codificare origini di produzione nel sorgente.
 
 ### 8.4 Risposte 401, 403 e 404
@@ -331,20 +345,19 @@ Ogni pagina privata deve prevedere anche gli stati trasversali `unauthorized` e 
 
 ## 11. Priorità implementazione React
 
-La fondazione corrente ha completato il setup React/Vite/TypeScript, il routing, i layout di base, le pagine 404/403 e la home pubblica. L'ordine pragmatico residuo è:
+Completati: setup React/Vite/TypeScript, routing, layout, home pubblica, foundation API/auth session-based (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap). Dettagli auth: [FE03](./03-authentication-session-flow.md).
 
-1. configurazione ambiente e API client tipizzato con normalizzazione `ErrorResponse`, `credentials: 'include'` e CSRF in memoria;
-2. auth state session-based (nessun JWT in storage), guard per ruolo e specializzazione;
-3. login `204`, re-fetch CSRF, logout backend;
-4. bootstrap con `/me/account` e `/me/profile`, poi profilo/account;
-5. dashboard base composte, senza analytics;
-6. flusso professionista comune: clienti e inviti;
-7. flusso cliente: professionisti collegati e dettaglio;
-8. availability e booking del personal trainer, poi booking cliente;
-9. registrazione professionista, verifica email e registrazione cliente tramite invito;
-10. hardening di errori, accessibilità, responsive e test dei flussi applicativi.
+Ordine pragmatico **residuo**:
 
-Login e bootstrap vanno completati prima delle aree business. Availability e Booking vanno sviluppati insieme sul piano UX perché le transizioni booking modificano la disponibilità degli slot.
+1. profilo/account UI reale collegata a `/me`;
+2. dashboard base composte, senza analytics;
+3. flusso professionista comune: clienti e inviti;
+4. flusso cliente: professionisti collegati e dettaglio;
+5. availability e booking del personal trainer, poi booking cliente;
+6. registrazione professionista, verifica email e registrazione cliente tramite invito;
+7. hardening di errori, accessibilità, responsive e test dei flussi applicativi business.
+
+La scelta del prossimo vertical slice business resta una decisione di prodotto. Availability e Booking vanno progettati insieme sul piano UX perché le transizioni booking modificano gli slot.
 
 ## 12. Cosa NON implementare nella prima fase frontend
 
@@ -436,7 +449,7 @@ Questi punti non impediscono la mappa funzionale, ma non sono determinabili come
 
 1. **Consegna verifica email:** registrazione e reinvio creano e salvano il token e, dopo commit, usano una porta di consegna con adapter SMTP configurabile. Il default locale resta disabilitato; la porta in-memory è solo per test/debug e non è esposta via endpoint. L'URL frontend remoto deve essere HTTPS; HTTP è ammesso solo per loopback locale. Non sono presenti outbox o retry, quindi la consegna non è garantita.
 2. **Contratto temporale:** audit e scadenze account/booking/inviti arrivano come `Instant` UTC con `Z`; gli orari degli slot e gli snapshot Booking arrivano con offset esplicito `Europe/Rome`, mentre le date civili restano `LocalDate`. La UI deve distinguere questi tre tipi e non applicare una timezone globale ai payload.
-3. **Auth client:** il contratto backend è chiuso (cookie HttpOnly + CSRF in memoria + bootstrap `/me`). Resta da implementare lato frontend; non usare JWT.
+3. **Auth client:** implementata session-based (vedi [FE03](./03-authentication-session-flow.md)); nessun JWT/Bearer/storage. Restano da collegare le pagine business e i flussi pubblici placeholder.
 4. **URL pubblico dei link:** `app.email.verification-page-url` configura la pagina di verifica, ma il valore pubblico definitivo di ciascun ambiente non è ancora definito; i link invito restano separati.
 5. **Liste:** non esistono paginazione e filtri API per clienti, professionisti, inviti, slot o booking; la prima UI non deve dipenderne. Per Booking l'ordine iniziale è `createdAt DESC, id DESC`.
 6. **Dashboard:** non esiste un contratto aggregato; contenuti e metriche devono restare una composizione minima dei dati già disponibili.

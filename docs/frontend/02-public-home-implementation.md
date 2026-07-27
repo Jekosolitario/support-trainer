@@ -4,7 +4,7 @@
 
 Questo documento descrive la home pubblica di Support Trainer e la parte di fondazione frontend necessaria a renderla disponibile sulla route `/`. Il perimetro comprende struttura narrativa, navigazione, componenti, copy, sistema visuale, tipografia, comportamento responsive, accessibilità e test automatici direttamente collegati alla pagina.
 
-La home pubblica è implementata. Sono presenti anche il progetto React, il routing, il layout pubblico, i layout autenticati, le pagine di errore e le route applicative di base. Questa disponibilità strutturale non equivale però a un frontend applicativo completo: login, registrazioni, verifica email e pagine private sono ancora prevalentemente placeholder e non esistono ancora API client, autenticazione JWT, gestione della sessione o integrazione con il backend.
+La home pubblica è implementata. Sono presenti anche il progetto React, il routing, il layout pubblico, i layout autenticati, le pagine di errore e le route applicative di base. L’autenticazione session-based frontend (login, logout, CSRF, guards, bootstrap) è implementata; vedi [Authentication Session Flow](./03-authentication-session-flow.md). Registrazioni, validazione invito, verifica email e pagine business private restano prevalentemente placeholder.
 
 Le fonti di verità implementative sono:
 
@@ -79,13 +79,13 @@ Le destinazioni principali sono:
 | “Scopri come funziona” | `#come-funziona` | Ancora interna operativa |
 | Registrazione professionista | `/register/professional` | Route registrata, flusso ancora placeholder |
 | Codice invito cliente | `/invite/validate` | Route registrata, flusso ancora placeholder |
-| Accesso | `/login` | Route registrata, autenticazione non integrata |
+| Accesso | `/login` | **Implementata** (LoginPage session-based) |
 
 La hero presenta l'ancora informativa, la validazione invito e la registrazione professionale. La sezione “Come funziona” aggiunge una CTA contestuale per il cliente con codice. La chiusura ripropone registrazione, invito e accesso secondo la gerarchia del pubblico.
 
 Il footer separa le destinazioni applicative nel gruppo “Accesso” e le ancore della pagina nel gruppo “Esplora”. Il branding conduce alla route `/`.
 
-Le CTA costituiscono navigazione disponibile verso route esistenti. Non devono essere descritte come flussi completi finché form, chiamate API, JWT e sessione frontend non saranno implementati.
+Le CTA costituiscono navigazione disponibile verso route esistenti. Login è un flusso auth reale; registrazione/invito/verifica email restano placeholder finché form e chiamate API di dominio non saranno completati.
 
 ## 5. Ruoli e funzionalità
 
@@ -259,12 +259,10 @@ Versioni e risoluzione restano governate da `package.json` e `package-lock.json`
 
 ## 16. Limiti e decisioni rimandate
 
-Non sono ancora implementati o definiti:
+Non sono ancora implementati o definiti in questo perimetro home:
 
-- API client e integrazione con il backend;
-- autenticazione JWT e gestione della sessione frontend;
-- flussi operativi completi delle pagine di login, registrazione, invito e verifica email;
-- contenuti applicativi delle pagine private, ancora prevalentemente placeholder;
+- flussi operativi completi di registrazione, invito e verifica email (route placeholder);
+- contenuti applicativi delle pagine business private, ancora prevalentemente placeholder;
 - Workout, Nutrition, Feedback e Measurements;
 - pagine Privacy, Cookie, Termini e Accessibilità;
 - collegamenti operativi per Instagram e segnalazione di problemi o idee;
@@ -272,5 +270,7 @@ Non sono ancora implementati o definiti:
 - deploy e URL pubblico definitivo;
 - matrice ufficiale di browser e dispositivi;
 - audit formale WCAG.
+
+API client e autenticazione session-based frontend sono invece implementati fuori dal perimetro di questo documento ([FE03](./03-authentication-session-flow.md)). Login non è più un gap strutturale della fondazione.
 
 Non sono definite date o priorità pubbliche per i moduli “In arrivo”.

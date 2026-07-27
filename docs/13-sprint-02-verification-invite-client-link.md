@@ -1,5 +1,9 @@
 # Sprint 02 — Verification + Invite + Client Link
 
+> **Documento storico.** Conserva scope e decisioni dello Sprint 02 (verifica email, inviti, collegamento cliente). Eventuali assunzioni di autenticazione sono contestuali a quel momento.
+>
+> Per endpoint e security correnti consultare: [`08-endpoint-map.md`](./08-endpoint-map.md), [`09-security-flow.md`](./09-security-flow.md), [`README.md`](../README.md).
+
 ## 1. Obiettivo dello sprint
 Questo sprint ha lo scopo di completare il primo vero flusso business del progetto dopo l’auth base.
 

@@ -1,5 +1,9 @@
 # Sprint 03 — Profile + Clients + Professionals Read
 
+> **Documento storico.** Conserva scope e stato dello Sprint 03 (profilo, lettura clienti/professionisti). Non è una reference dello stato HEAD.
+>
+> Per endpoint, security e overview correnti consultare: [`08-endpoint-map.md`](./08-endpoint-map.md), [`09-security-flow.md`](./09-security-flow.md), [`README.md`](../README.md).
+
 ## 1. Obiettivo dello sprint
 Questo sprint ha lo scopo di costruire il primo livello reale di consultazione e aggiornamento base del sistema dopo autenticazione, verifica email, inviti e collegamenti tra utenti.
 

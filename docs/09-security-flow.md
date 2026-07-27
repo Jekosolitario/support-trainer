@@ -155,6 +155,19 @@ Se la readiness o il timeout assoluto falliscono, la sessione viene invalidata e
 ## 6.4 Attributi di sessione rilevanti
 Al login valido viene impostato `authenticatedAt` (Instant). Il CSRF token di sessione viene ruotato dalle strategie di autenticazione sessione (rotazione session id + invalidazione CSRF).
 
+## 6.5 Policy sessioni multiple (MVP)
+Nell’MVP corrente **non** è configurato alcun limite di concorrenza sulle sessioni (`maximumSessions` / `SessionRegistry` / espulsione della sessione più vecchia assenti).
+
+Comportamento reale:
+
+- sessioni indipendenti da client/browser distinti **possono coesistere** per lo stesso utente;
+- inactivity timeout: **30 minuti**;
+- lifetime assoluta: **8 ore** da `authenticatedAt`;
+- il logout invalida **solo la sessione corrente** (quella del cookie presentato);
+- non esiste oggi gestione dispositivi/sessioni attive né un revoke-all implicito al logout.
+
+Limiti concorrenti, gestione dispositivi ed eventuale revoca globale delle sessioni restano **fuori dall’MVP attuale**.
+
 ---
 
 ## 7. CSRF
@@ -319,7 +332,7 @@ Non esistono `accessToken`, `refreshToken`, `tokenType` né header `Authorizatio
 - risponde `204 No Content`.
 
 ## 13.2 Significato pratico
-Il logout invalida la sessione server-side. Il client deve scartare il CSRF in memoria e tornare allo stato anonimo. Non esiste revoca di JWT perché non esiste JWT runtime.
+Il logout invalida **la sessione corrente** server-side (cookie presentato). Non è un revoke-all: altre sessioni indipendenti dello stesso utente restano valide finché non scadono o non vengono invalidate separatamente. Il client deve scartare il CSRF in memoria e tornare allo stato anonimo. Non esiste revoca di JWT perché non esiste JWT runtime.
 
 ---
 
@@ -738,7 +751,8 @@ Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti
 - Spring Security 7 + Spring Session JDBC
 - login `204` con cookie HttpOnly, senza JWT/Bearer/refresh
 - CSRF abilitato; `GET /api/v1/auth/csrf` espone token e `headerName`
-- logout `POST /api/v1/auth/logout` con CSRF → `204` e sessione invalidata
+- logout `POST /api/v1/auth/logout` con CSRF → `204` e invalidazione della sola sessione corrente (non revoke-all)
+- sessioni multiple indipendenti consentite; nessun limite di concorrenza né gestione dispositivi nell’MVP
 - timeout 30 min inattività + 8 h assolute da `authenticatedAt`
 - eligibilità login: `ACTIVE` + `emailVerified`; `profile.active=false` non blocca il login
 - readiness dinamica su ogni richiesta autenticata

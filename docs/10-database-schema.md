@@ -48,7 +48,7 @@ Le tabelle runtime MySQL usano esplicitamente:
 - collation `utf8mb4_0900_ai_ci`;
 - foreign key con `ON UPDATE RESTRICT` e `ON DELETE RESTRICT`.
 
-Flyway governa esclusivamente le nove tabelle runtime della sezione 3. La V1 riproduce lo schema legacy runtime; la V2 converge al contratto canonico iniziale; `V3_1`–`V3_9` ampliano a microsecondi le colonne. La V4 Java converte i valori legacy `Europe/Rome` in UTC dopo controlli completi su schema, InnoDB, precisione, gap/overlap, conteggi e digest. Essendo MySQL-specifica, la V4 verifica la precisione tramite `information_schema.COLUMNS.DATETIME_PRECISION`: `DatabaseMetaData.DECIMAL_DIGITS` non è autoritativo perché Connector/J può restituirlo nullo anche per `DATETIME(6)`. Le `V5_1`–`V5_9` rimuovono default e `ON UPDATE`; gli audit mappati restano `NOT NULL`, mentre i quattro timestamp ombra dei profili diventano nullable e congelati. Sugli ambienti MySQL Hibernate usa `ddl-auto=validate`.
+Flyway governa le nove tabelle di dominio runtime della sezione 3 e, con la V7, l’infrastruttura Spring Session JDBC della sezione 3.10. La V1 riproduce lo schema legacy runtime; la V2 converge al contratto canonico iniziale; `V3_1`–`V3_9` ampliano a microsecondi le colonne. La V4 Java converte i valori legacy `Europe/Rome` in UTC dopo controlli completi su schema, InnoDB, precisione, gap/overlap, conteggi e digest. Essendo MySQL-specifica, la V4 verifica la precisione tramite `information_schema.COLUMNS.DATETIME_PRECISION`: `DatabaseMetaData.DECIMAL_DIGITS` non è autoritativo perché Connector/J può restituirlo nullo anche per `DATETIME(6)`. Le `V5_1`–`V5_9` rimuovono default e `ON UPDATE`; gli audit mappati restano `NOT NULL`, mentre i quattro timestamp ombra dei profili diventano nullable e congelati. La V7 crea le tabelle di store sessione server-side; `spring.session.jdbc.initialize-schema=never`. Sugli ambienti MySQL Hibernate usa `ddl-auto=validate` sulle entity di dominio (non sulle tabelle Spring Session).
 
 ---
 
@@ -393,6 +393,47 @@ La tabella collega la richiesta allo slot availability selezionato e consente al
 
 ---
 
+## 3.10 Infrastruttura Spring Session JDBC (non domain)
+
+Le tabelle seguenti appartengono allo **storage delle sessioni server-side** (Spring Session JDBC), non al domain model applicativo. Non sono entity JPA di dominio e non devono essere interpretate come parte del modello business.
+
+Sono create da Flyway `V7__create_spring_session_jdbc_schema.sql` (schema ufficiale Spring Session 4.0.2 per MySQL, copiato senza alterazioni semantiche). L’inizializzazione automatica di Spring Session è disabilitata (`spring.session.jdbc.initialize-schema=never`).
+
+### `SPRING_SESSION`
+
+#### Colonne
+- `PRIMARY_ID` `CHAR(36) NOT NULL`
+- `SESSION_ID` `CHAR(36) NOT NULL`
+- `CREATION_TIME` `BIGINT NOT NULL`
+- `LAST_ACCESS_TIME` `BIGINT NOT NULL`
+- `MAX_INACTIVE_INTERVAL` `INT NOT NULL`
+- `EXPIRY_TIME` `BIGINT NOT NULL`
+- `PRINCIPAL_NAME` `VARCHAR(100)` nullable
+
+#### Vincoli e indici
+- PK `SPRING_SESSION_PK` su `PRIMARY_ID`
+- unique index `SPRING_SESSION_IX1` su `SESSION_ID`
+- index `SPRING_SESSION_IX2` su `EXPIRY_TIME`
+- index `SPRING_SESSION_IX3` su `PRINCIPAL_NAME`
+- `ENGINE=InnoDB` `ROW_FORMAT=DYNAMIC`
+
+### `SPRING_SESSION_ATTRIBUTES`
+
+#### Colonne
+- `SESSION_PRIMARY_ID` `CHAR(36) NOT NULL`
+- `ATTRIBUTE_NAME` `VARCHAR(200) NOT NULL`
+- `ATTRIBUTE_BYTES` `BLOB NOT NULL`
+
+#### Vincoli
+- PK `SPRING_SESSION_ATTRIBUTES_PK` su (`SESSION_PRIMARY_ID`, `ATTRIBUTE_NAME`)
+- FK `SPRING_SESSION_ATTRIBUTES_FK`: `SESSION_PRIMARY_ID` → `SPRING_SESSION(PRIMARY_ID)` `ON DELETE CASCADE`
+- `ENGINE=InnoDB` `ROW_FORMAT=DYNAMIC`
+
+### Relazione con l’autenticazione
+Lo store JDBC persiste le sessioni autenticate (cookie HttpOnly + attributi di sessione, incluso `authenticatedAt`). Non sostituisce né estende le tabelle di dominio della sezione 3.1–3.9.
+
+---
+
 ## 4. Tabelle già presenti nel database ma non ancora integrate nel codice
 
 Queste tabelle possono già essere presenti nel database MySQL locale come preparazione ai moduli successivi, ma **al momento non risultano ancora integrate nei flussi runtime del backend attuale e non sono governate da Flyway**.
@@ -419,10 +460,14 @@ Il perimetro legacy non governato comprende tredici tabelle: `refresh_tokens`, `
 - `revoked` `NOT NULL DEFAULT FALSE`
 
 ### Nota importante
-Nel backend attuale il refresh token:
-- viene generato
-- viene restituito nella risposta di login
-- **non viene ancora persistito e gestito tramite questa tabella**
+`refresh_tokens` è una **struttura legacy** eventualmente presente in database locali storici. **Non governa** l’autenticazione session-based corrente.
+
+Nel backend attuale:
+- il login **non** genera né restituisce un refresh token;
+- non esistono entity, repository o service runtime collegati a questa tabella;
+- l’autenticazione usa Spring Session JDBC e cookie HttpOnly (`docs/09-security-flow.md`).
+
+La tabella resta documentata qui solo come reperto legacy / non utilizzato dal flusso runtime corrente.
 
 ---
 
@@ -954,11 +999,12 @@ Le risorse versionate sono applicate in questo ordine:
 19. `V5_7__transfer_availability_audit_ownership_to_application.sql`;
 20. `V5_8__transfer_booking_request_audit_ownership_to_application.sql`;
 21. `V5_9__transfer_booking_item_audit_ownership_to_application.sql`;
-22. `V6__add_booking_historical_snapshots`.
+22. `V6__add_booking_historical_snapshots`;
+23. `V7__create_spring_session_jdbc_schema.sql`.
 
-Le risorse sono 22 in totale: V1, V2, nove V3, V4, nove V5 e V6.
+Questo è l’elenco delle migrazioni Flyway correnti. Lo schema runtime versionato **non termina più a V6**.
 
-La V1 crea esclusivamente le nove tabelle runtime, con PK, FK restrittive, unique, nullability, default, precisioni, engine, charset, collation e indici dello schema legacy. Non contiene dati applicativi.
+La V1 crea esclusivamente le nove tabelle di dominio runtime, con PK, FK restrittive, unique, nullability, default, precisioni, engine, charset, collation e indici dello schema legacy. Non contiene dati applicativi.
 
 La V2:
 
@@ -971,7 +1017,7 @@ Le nove V3 contengono esclusivamente un `ALTER TABLE` ciascuna. Portano a `DATET
 
 Il passaggio strutturale delle sole V3 da `DATETIME(0)` a `DATETIME(6)` mantiene invariati anno, mese, giorno, ora, minuto e secondo e aggiunge una frazione zero. Le V3 non usano `CONVERT_TZ` e non convertono i valori da `Europe/Rome` a UTC: questa responsabilità appartiene alla successiva V4, mentre le V5 trasferiscono l'ownership degli audit all'applicazione.
 
-La V4 Java verifica schema, precisione, gap/overlap e dati prima di convertire i datetime legacy `Europe/Rome` verso UTC. Le V5 rimuovono default e `ON UPDATE` dagli audit, trasferendone l'ownership a Spring Data JPA; i timestamp ombra dei profili diventano nullable e congelati. La V6 Java aggiunge gli snapshot storici Booking e ne esegue il backfill dopo preflight, senza inventare dati o orari.
+La V4 Java verifica schema, precisione, gap/overlap e dati prima di convertire i datetime legacy `Europe/Rome` verso UTC. Le V5 rimuovono default e `ON UPDATE` dagli audit, trasferendone l'ownership a Spring Data JPA; i timestamp ombra dei profili diventano nullable e congelati. La V6 Java aggiunge gli snapshot storici Booking e ne esegue il backfill dopo preflight, senza inventare dati o orari. La V7 crea `SPRING_SESSION` e `SPRING_SESSION_ATTRIBUTES` per lo store JDBC delle sessioni server-side (infrastruttura, non domain); dettagli in sezione 3.10.
 
 ### 12.2 Indici di convergenza
 

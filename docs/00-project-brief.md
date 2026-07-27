@@ -48,7 +48,7 @@ Questo progetto nasce con i seguenti obiettivi:
 
 Nel backend risultano completati:
 
-- autenticazione JWT;
+- autenticazione session-based (Spring Session JDBC + CSRF; nessun JWT runtime);
 - registrazione professionista;
 - verifica email obbligatoria per professionista e cliente;
 - codice invito;
@@ -73,9 +73,9 @@ professionista registrato e verificato
 
 ### Fondazione frontend implementata
 
-Il repository contiene una fondazione frontend basata su React, TypeScript e Vite. Sono implementati React Router, layout pubblico e autenticato, navigazione differenziata per ruolo, pagine di errore, test automatici e una home pubblica responsive/mobile-first.
+Il repository contiene un frontend React/TypeScript/Vite con routing, layout pubblico e autenticato, navigazione per ruolo, home pubblica, foundation API client e autenticazione session-based (login, logout, CSRF, guards, bootstrap `/me`).
 
-La presenza delle route non equivale a integrazione applicativa completa: API client, autenticazione JWT e stato di sessione frontend non sono ancora implementati. Login, registrazioni e pagine private restano prevalentemente placeholder.
+La presenza delle route private non equivale a funzionalità business complete: dashboard con dati, profilo/account UI, clients, professionals, availability, bookings e i flussi pubblici di registrazione/invito/verifica email restano prevalentemente placeholder.
 
 ---
 
@@ -141,7 +141,7 @@ Restano da sviluppare:
 3. feedback del cliente;
 4. monitoraggio progressi e misurazioni;
 5. eventuali API dedicate alla gestione manuale dei collegamenti;
-6. frontend reale integrato con il backend;
+6. pagine frontend business e flussi pubblici ancora placeholder (oltre auth già presente);
 7. completamento delle funzionalità tecniche necessarie al deploy.
 
 ---
@@ -166,7 +166,7 @@ Restano da sviluppare:
 
 ## 7.2 Funzionalità ancora da implementare per completare la v1 applicativa
 
-- [ ] integrazione frontend reale con il backend;
+- [ ] pagine frontend business e flussi pubblici ancora placeholder (auth session-based già presente);
 - [ ] creazione di una scheda di allenamento;
 - [ ] visualizzazione della scheda da parte del cliente;
 - [ ] dettaglio giornaliero dell’allenamento;
@@ -236,7 +236,7 @@ Per evitare di rendere la prima versione troppo complessa, queste funzionalità 
 - CSS Modules
 - Vitest
 - React Testing Library
-- futura comunicazione con backend tramite API REST JSON
+- comunicazione con backend tramite API REST JSON session-based (cookie + CSRF)
 
 ### Strategia mobile futura
 - possibile evoluzione con React Native + Expo;
@@ -265,7 +265,7 @@ Il backend è realizzato con:
 - Java;
 - Spring Boot;
 - Spring Security;
-- JWT;
+- Spring Session JDBC (nessun JWT runtime);
 - Spring Data JPA / Hibernate;
 - MySQL.
 
@@ -293,12 +293,12 @@ Il frontend web è sviluppato come applicazione separata dal backend, con:
 - Vitest e React Testing Library;
 - progettazione UI responsive/mobile-first già applicata alla home pubblica.
 
-La fondazione include routing e layout di base, ma non consuma ancora le API REST JSON esposte dal backend. Le pagine applicative restano prevalentemente placeholder e non sono presenti autenticazione JWT o sessione frontend.
+La fondazione include routing, layout, home pubblica e autenticazione session-based già collegata al backend per login/logout/bootstrap. Le pagine business e i flussi pubblici di registrazione/invito/verifica email restano prevalentemente placeholder.
 
 La futura evoluzione mobile potrà essere valutata con React Native + Expo, ma non fa parte dello sprint frontend iniziale.  
 Questa possibilità non implica il riuso automatico dei componenti React web su mobile; tuttavia flussi, logica applicativa e organizzazione API dovranno essere progettati in modo il più possibile riutilizzabile.
 
-La home pubblica e la fondazione frontend sono documentate separatamente dalla certificazione backend. L'integrazione tra i due livelli resta un obiettivo successivo.
+Home, mappa funzionale e lifecycle auth frontend sono documentati in `docs/frontend/`.
 
 ---
 
