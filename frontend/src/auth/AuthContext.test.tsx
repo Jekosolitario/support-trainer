@@ -17,6 +17,7 @@ import {
   useAuth,
   type AuthContextValue,
 } from './authState';
+import { AuthConsistencyError } from './mapAccessProfile';
 import * as sessionReconciliation from './sessionReconciliation';
 import type { SessionReconciliationOutcome } from './sessionReconciliation';
 
@@ -872,5 +873,202 @@ describe('AuthProvider', () => {
     expect(auth().state.profile).toBeNull();
     expect(auth().state.accessProfile).toBeNull();
     expect(logoutSpy).toHaveBeenCalledTimes(1);
+  });
+
+  describe('applyProfileSnapshot', () => {
+    it('sostituisce profile preservando account, status e accessProfile ricalcolato', async () => {
+      const reconcileSpy = vi
+        .spyOn(sessionReconciliation, 'reconcileSessionSnapshot')
+        .mockReturnValue(Promise.resolve(authenticatedOutcome()));
+      const fetchMock = vi.fn();
+      globalThis.fetch = fetchMock;
+      renderWithAuthProvider(<Probe />);
+      await waitForStatus('authenticated');
+
+      const epochBefore = currentEpoch();
+      const accountBefore = auth().state.account;
+      const updatedProfile = profile({
+        firstName: 'Augusta',
+        primaryGoal: 'Forza',
+        operationalStatus: 'PAUSA',
+      });
+
+      act(() => {
+        auth().applyProfileSnapshot(updatedProfile, epochBefore);
+      });
+
+      expect(auth().state.status).toBe('authenticated');
+      expect(auth().state.account).toEqual(accountBefore);
+      expect(auth().state.profile).toEqual(updatedProfile);
+      expect(auth().state.accessProfile).toEqual({
+        role: 'CLIENT',
+        specialization: null,
+      });
+      expect(currentEpoch()).toBe(epochBefore);
+      expect(reconcileSpy).toHaveBeenCalledTimes(1);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('rifiuta snapshot con epoch stale e lascia lo stato invariato', async () => {
+      vi.spyOn(
+        sessionReconciliation,
+        'reconcileSessionSnapshot',
+      ).mockReturnValue(Promise.resolve(authenticatedOutcome()));
+      renderWithAuthProvider(<Probe />);
+      await waitForStatus('authenticated');
+
+      const staleEpoch = currentEpoch();
+      const snapshotBefore = {
+        account: auth().state.account,
+        profile: auth().state.profile,
+        accessProfile: auth().state.accessProfile,
+      };
+
+      act(() => {
+        advanceEpoch();
+      });
+
+      let thrown: unknown;
+      act(() => {
+        try {
+          auth().applyProfileSnapshot(
+            profile({ firstName: 'Stale' }),
+            staleEpoch,
+          );
+        } catch (error) {
+          thrown = error;
+        }
+      });
+
+      expect(thrown).toBeInstanceOf(authApi.StaleAuthOperationError);
+      expect(auth().state.status).toBe('authenticated');
+      expect(auth().state.account).toEqual(snapshotBefore.account);
+      expect(auth().state.profile).toEqual(snapshotBefore.profile);
+      expect(auth().state.accessProfile).toEqual(snapshotBefore.accessProfile);
+      expect(currentEpoch()).toBe(staleEpoch + 1);
+    });
+
+    it('rifiuta applyProfileSnapshot da initializing senza mutare lo stato', async () => {
+      const deferredBootstrap = deferred<SessionReconciliationOutcome>();
+      vi.spyOn(
+        sessionReconciliation,
+        'reconcileSessionSnapshot',
+      ).mockReturnValue(deferredBootstrap.promise);
+      renderWithAuthProvider(<Probe />);
+      await waitForStatus('initializing');
+
+      let thrown: unknown;
+      act(() => {
+        try {
+          auth().applyProfileSnapshot(profile(), currentEpoch());
+        } catch (error) {
+          thrown = error;
+        }
+      });
+
+      expect(thrown).toBeInstanceOf(AuthOperationNotAllowedError);
+      expect(thrown).toMatchObject({
+        operation: 'applyProfileSnapshot',
+        status: 'initializing',
+      });
+      expect(auth().state.status).toBe('initializing');
+
+      await act(async () => {
+        deferredBootstrap.resolve(authenticatedOutcome());
+        await deferredBootstrap.promise;
+      });
+      await waitForStatus('authenticated');
+    });
+
+    it('rifiuta applyProfileSnapshot da unauthenticated', async () => {
+      vi.spyOn(
+        sessionReconciliation,
+        'reconcileSessionSnapshot',
+      ).mockReturnValue(Promise.resolve(unauthenticatedOutcome()));
+      renderWithAuthProvider(<Probe />);
+      await waitForStatus('unauthenticated');
+
+      let thrown: unknown;
+      act(() => {
+        try {
+          auth().applyProfileSnapshot(profile(), currentEpoch());
+        } catch (error) {
+          thrown = error;
+        }
+      });
+
+      expect(thrown).toBeInstanceOf(AuthOperationNotAllowedError);
+      expect(thrown).toMatchObject({
+        operation: 'applyProfileSnapshot',
+        status: 'unauthenticated',
+      });
+      expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated');
+      expect(auth().state.status).toBe('unauthenticated');
+      expect(auth().state.account).toBeNull();
+    });
+
+    it('rifiuta applyProfileSnapshot da unavailable senza mutare lo stato', async () => {
+      vi.spyOn(
+        sessionReconciliation,
+        'reconcileSessionSnapshot',
+      ).mockReturnValue(Promise.resolve(unavailableOutcome()));
+      renderWithAuthProvider(<Probe />);
+      await waitForStatus('unavailable');
+
+      const reasonBefore = auth().state.reason;
+      let thrown: unknown;
+
+      act(() => {
+        try {
+          auth().applyProfileSnapshot(profile(), currentEpoch());
+        } catch (error) {
+          thrown = error;
+        }
+      });
+
+      expect(thrown).toBeInstanceOf(AuthOperationNotAllowedError);
+      expect(thrown).toMatchObject({
+        operation: 'applyProfileSnapshot',
+        status: 'unavailable',
+      });
+      expect(screen.getByTestId('status')).toHaveTextContent('unavailable');
+      expect(auth().state.status).toBe('unavailable');
+      expect(auth().state.reason).toBe(reasonBefore);
+    });
+
+    it('rifiuta snapshot incoerente e non passa a unavailable', async () => {
+      vi.spyOn(
+        sessionReconciliation,
+        'reconcileSessionSnapshot',
+      ).mockReturnValue(Promise.resolve(authenticatedOutcome()));
+      renderWithAuthProvider(<Probe />);
+      await waitForStatus('authenticated');
+
+      const epochBefore = currentEpoch();
+      const snapshotBefore = {
+        account: auth().state.account,
+        profile: auth().state.profile,
+        accessProfile: auth().state.accessProfile,
+      };
+
+      let thrown: unknown;
+      act(() => {
+        try {
+          auth().applyProfileSnapshot(
+            profile({ id: 999, firstName: 'Mismatch' }),
+            epochBefore,
+          );
+        } catch (error) {
+          thrown = error;
+        }
+      });
+
+      expect(thrown).toBeInstanceOf(AuthConsistencyError);
+      expect(auth().state.status).toBe('authenticated');
+      expect(auth().state.account).toEqual(snapshotBefore.account);
+      expect(auth().state.profile).toEqual(snapshotBefore.profile);
+      expect(auth().state.accessProfile).toEqual(snapshotBefore.accessProfile);
+      expect(currentEpoch()).toBe(epochBefore);
+    });
   });
 });

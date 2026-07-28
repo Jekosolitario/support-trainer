@@ -13,7 +13,8 @@ export type AuthStatus =
 export type AuthOperation =
   'bootstrap' | 'login' | 'post-login-hydration' | 'logout' | 'reconciliation';
 
-export type AuthOperationName = 'login' | 'logout' | 'reconcileSession';
+export type AuthOperationName =
+  'login' | 'logout' | 'reconcileSession' | 'applyProfileSnapshot';
 
 export type UnauthenticatedReason =
   | 'no-session'
@@ -75,6 +76,7 @@ export interface AuthContextValue {
   login(credentials: LoginRequest): Promise<void>;
   logout(): Promise<void>;
   reconcileSession(): Promise<void>;
+  applyProfileSnapshot(profile: MyProfileResponse, expectedEpoch: number): void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

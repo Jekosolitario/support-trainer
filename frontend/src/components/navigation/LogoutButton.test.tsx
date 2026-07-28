@@ -102,6 +102,7 @@ function StatefulHarness({
     login: async () => undefined,
     logout: () => logoutBehavior(setState),
     reconcileSession: () => reconcileBehavior(setState),
+    applyProfileSnapshot: () => undefined,
   };
 
   return (

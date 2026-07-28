@@ -24,6 +24,7 @@ export function createAuthContextValue(
     login: async () => undefined,
     logout: async () => undefined,
     reconcileSession: async () => undefined,
+    applyProfileSnapshot: () => undefined,
     ...overrides,
   };
 }

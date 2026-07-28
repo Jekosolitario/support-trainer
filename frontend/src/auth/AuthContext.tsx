@@ -8,7 +8,7 @@ import {
 } from 'react';
 
 import * as authApi from '../api/authApi';
-import type { LoginRequest } from '../api/authTypes';
+import type { LoginRequest, MyProfileResponse } from '../api/authTypes';
 import { advanceEpoch, currentEpoch } from '../api/authEpoch';
 import { clearCsrf } from '../api/csrf';
 import { subscribe } from '../api/sessionInvalidation';
@@ -22,6 +22,7 @@ import {
   type UnauthenticatedReason,
   type UnavailableReason,
 } from './authState';
+import { mapAuthenticatedUserToAccessProfile } from './mapAccessProfile';
 import * as sessionReconciliation from './sessionReconciliation';
 import type { SessionReconciliationOutcome } from './sessionReconciliation';
 
@@ -406,6 +407,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
     runReconciliation,
   ]);
 
+  const applyProfileSnapshot = useCallback(
+    (profile: MyProfileResponse, expectedEpoch: number): void => {
+      const currentState = stateRef.current;
+
+      if (currentState.status !== 'authenticated') {
+        throw new AuthOperationNotAllowedError(
+          'applyProfileSnapshot',
+          currentState.status,
+        );
+      }
+
+      const actualEpoch = currentEpoch();
+      if (actualEpoch !== expectedEpoch) {
+        throw new authApi.StaleAuthOperationError(expectedEpoch, actualEpoch);
+      }
+
+      const accessProfile = mapAuthenticatedUserToAccessProfile(
+        currentState.account,
+        profile,
+      );
+
+      commitState({
+        status: 'authenticated',
+        operation: null,
+        reason: null,
+        account: currentState.account,
+        profile,
+        accessProfile,
+      });
+    },
+    [commitState],
+  );
+
   useEffect(() => {
     const mountGeneration = mountGenerationRef.current + 1;
     mountGenerationRef.current = mountGeneration;
@@ -453,8 +487,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       login,
       logout,
       reconcileSession,
+      applyProfileSnapshot,
     }),
-    [login, logout, reconcileSession, state],
+    [applyProfileSnapshot, login, logout, reconcileSession, state],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
