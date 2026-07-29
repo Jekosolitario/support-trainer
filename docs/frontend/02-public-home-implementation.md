@@ -4,7 +4,7 @@
 
 Questo documento descrive la home pubblica di Support Trainer e la parte di fondazione frontend necessaria a renderla disponibile sulla route `/`. Il perimetro comprende struttura narrativa, navigazione, componenti, copy, sistema visuale, tipografia, comportamento responsive, accessibilità e test automatici direttamente collegati alla pagina.
 
-La home pubblica è implementata. Sono presenti anche il progetto React, il routing, il layout pubblico, i layout autenticati, le pagine di errore e le route applicative di base. L’autenticazione session-based frontend (login, logout, CSRF, guards, bootstrap) è implementata; vedi [Authentication Session Flow](./03-authentication-session-flow.md). La pagina Profilo autenticata (Account in sola lettura e Operational Status) è implementata e allineata al linguaggio visuale dark-tech; dettagli funzionali in [Frontend Functional Map](./01-frontend-functional-map-mvp.md). Registrazioni, validazione invito, verifica email e le altre pagine business private restano prevalentemente placeholder.
+La home pubblica è implementata. Sono presenti anche il progetto React, il routing, il layout pubblico, i layout autenticati, le pagine di errore e le route applicative di base. L’autenticazione session-based frontend (login, logout, CSRF, guards, bootstrap) è implementata; vedi [Authentication Session Flow](./03-authentication-session-flow.md). La pagina Profilo autenticata (Account in sola lettura e Operational Status) è implementata e allineata al linguaggio visuale dark-tech; dettagli funzionali in [Frontend Functional Map](./01-frontend-functional-map-mvp.md). Registrazione PROFESSIONAL e verifica email sono implementate; validazione invito, registrazione CLIENT e le altre pagine business private restano prevalentemente placeholder.
 
 Le fonti di verità implementative per questa pagina sono il codice e i test frontend collegati:
 
@@ -74,18 +74,20 @@ Il testo completo non viene duplicato qui: [`homeContent.ts`](../../frontend/src
 
 Le destinazioni principali sono:
 
-| Intento | Destinazione | Stato |
-|---|---|---|
-| “Scopri come funziona” | `#come-funziona` | Ancora interna operativa |
-| Registrazione professionista | `/register/professional` | Route registrata, flusso ancora placeholder |
-| Codice invito cliente | `/invite/validate` | Route registrata, flusso ancora placeholder |
-| Accesso | `/login` | **Implementata** (LoginPage session-based) |
+| Intento                      | Destinazione             | Stato                                            |
+| ---------------------------- | ------------------------ | ------------------------------------------------ |
+| “Scopri come funziona”       | `#come-funziona`         | Ancora interna operativa                         |
+| Registrazione professionista | `/register/professional` | **Implementata** (form, API, check-email/resend) |
+| Verifica email               | `/verify-email`          | **Implementata** (confirm + resend)              |
+| Codice invito cliente        | `/invite/validate`       | Route registrata, flusso ancora placeholder      |
+| Registrazione cliente        | `/register/client`       | Route registrata, flusso ancora placeholder      |
+| Accesso                      | `/login`                 | **Implementata** (LoginPage session-based)       |
 
 La hero presenta l'ancora informativa, la validazione invito e la registrazione professionale. La sezione “Come funziona” aggiunge una CTA contestuale per il cliente con codice. La chiusura ripropone registrazione, invito e accesso secondo la gerarchia del pubblico.
 
 Il footer separa le destinazioni applicative nel gruppo “Accesso” e le ancore della pagina nel gruppo “Esplora”. Il branding conduce alla route `/`.
 
-Le CTA costituiscono navigazione disponibile verso route esistenti. Login è un flusso auth reale; registrazione/invito/verifica email restano placeholder finché form e chiamate API di dominio non saranno completati.
+Le CTA costituiscono navigazione disponibile verso route esistenti. Login, registrazione PROFESSIONAL e verifica email sono flussi reali; validazione invito e registrazione CLIENT restano placeholder finché form e chiamate API di dominio non saranno completati.
 
 ## 5. Ruoli e funzionalità
 
@@ -168,13 +170,13 @@ Il focus globale delle aree chiare usa il valore legacy. `PublicLayout` sovrascr
 
 Alla baseline corrente:
 
-| Superficie | Linguaggio visuale |
-|---|---|
-| Home pubblica `/` | Dark-tech (canvas, glass, Indigo/Violet/Teal, glow moderato) |
-| LoginPage `/login` | Coerente con lo stesso linguaggio (pannelli glass, accenti palette) |
-| ProfilePage autenticata | Allineata al dark-tech: superfici glass/panel, accenti Indigo/Violet/Teal, glow moderato, tipografia e gerarchia coerenti, mobile-first |
-| Shell / layout autenticato | Può conservare parti del linguaggio precedente (chrome, nav, sfondo di layout) |
-| Altre pagine business | Ancora placeholder o legacy; non ridisegnate |
+| Superficie                 | Linguaggio visuale                                                                                                                      |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Home pubblica `/`          | Dark-tech (canvas, glass, Indigo/Violet/Teal, glow moderato)                                                                            |
+| LoginPage `/login`         | Coerente con lo stesso linguaggio (pannelli glass, accenti palette)                                                                     |
+| ProfilePage autenticata    | Allineata al dark-tech: superfici glass/panel, accenti Indigo/Violet/Teal, glow moderato, tipografia e gerarchia coerenti, mobile-first |
+| Shell / layout autenticato | Può conservare parti del linguaggio precedente (chrome, nav, sfondo di layout)                                                          |
+| Altre pagine business      | Ancora placeholder o legacy; non ridisegnate                                                                                            |
 
 **Non** risulta ridisegnata l’intera area autenticata: l’allineamento dark-tech riguarda le superfici implementate citate sopra, non un redesign globale delle dashboard o delle altre route private.
 
@@ -279,7 +281,7 @@ Versioni e risoluzione restano governate da `package.json` e `package-lock.json`
 
 Non sono ancora implementati o definiti in questo perimetro home:
 
-- flussi operativi completi di registrazione, invito e verifica email (route placeholder);
+- validazione invito e registrazione CLIENT (route pubbliche ancora placeholder);
 - contenuti applicativi delle altre pagine business private (dashboard, clients, professionals, availability, bookings), ancora placeholder o legacy;
 - redesign globale della shell autenticata;
 - Workout, Nutrition, Feedback e Measurements;

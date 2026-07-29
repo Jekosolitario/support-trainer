@@ -16,11 +16,11 @@ Documentazione attiva di supporto:
 
 La mappa distingue sempre tre stati:
 
-| Stato | Significato per il frontend |
-|---|---|
-| **Implementabile ora** | Esiste un contratto backend utilizzabile nell'MVP. |
+| Stato                   | Significato per il frontend                                                  |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| **Implementabile ora**  | Esiste un contratto backend utilizzabile nell'MVP.                           |
 | **Futuro / non attivo** | La UX può prevederne la posizione, ma non deve presentarlo come funzionante. |
-| **Non presente** | Non deve comparire come azione attiva né generare chiamate API. |
+| **Non presente**        | Non deve comparire come azione attiva né generare chiamate API.              |
 
 La presenza di una pagina frontend non implica necessariamente un endpoint dedicato: una landing statica non ne richiede uno, mentre una dashboard MVP deve comporre dati restituiti da endpoint già esistenti. Nel backend risultano implementati **31 endpoint applicativi**: Auth 8, Me 4, Client 2, Professional 3, Invite 2, Availability 5 e Booking 7. `/error` è un fallback tecnico separato e non va trattato come endpoint funzionale.
 
@@ -34,7 +34,9 @@ La baseline certificata richiede inoltre che il client usi la risposta neutra `2
 - La home pubblica sulla route `/` è **implementata**; dettagli in [Public Home Implementation](./02-public-home-implementation.md).
 - L’**auth session-based frontend è implementata**: httpClient, CSRF memory-only, AuthProvider, bootstrap/reconciliation `/me`, login, logout, guards e routing protetto. Dettagli in [Authentication Session Flow](./03-authentication-session-flow.md).
 - La **pagina Profilo autenticata** è **implementata** (CLIENT e PROFESSIONAL), con Account in sola lettura e Operational Status modificabile. Soft commit e race protection: [FE03](./03-authentication-session-flow.md).
-- Le altre pagine business private (dashboard dati, clients, professionals, availability, bookings) e i flussi pubblici di registrazione/invito/verifica email restano **placeholder**: le route esistono, ma non sono flussi applicativi completi.
+- La **registrazione pubblica PROFESSIONAL** e la **verifica email** (confirm + resend pertinente) sono **implementate**.
+- Validazione invito e registrazione CLIENT restano **placeholder**.
+- Le altre pagine business private (dashboard dati, clients, professionals, availability, bookings) restano **placeholder**: le route esistono, ma non sono flussi applicativi completi.
 - Il client usa path relativi `/api/v1/...` con `credentials: 'same-origin'`. In sviluppo Vite proxya `/api` → `http://localhost:8080`. In produzione la topologia è same-origin dietro reverse proxy.
 - Un'app mobile con React Native + Expo è una possibile evoluzione futura, fuori dall'MVP.
 - L'implementazione corrente del frontend non modifica il contratto backend descritto in questa mappa.
@@ -43,13 +45,13 @@ La baseline certificata richiede inoltre che il client usi la risposta neutra `2
 
 Nel backend i soli ruoli di sicurezza sono `CLIENT` e `PROFESSIONAL`. `PERSONAL_TRAINER` e `NUTRITIONIST` sono specializzazioni business del ruolo `PROFESSIONAL`, non authority Spring Security distinte. Il visitatore pubblico non è un ruolo persistito.
 
-| Profilo UX | Identità backend | Può fare ora | Non può fare ora | Pagine private necessarie |
-|---|---|---|---|---|
-| Visitatore pubblico | Nessuna | Consultare contenuti statici, registrare un professionista, validare un invito, registrare un cliente, verificare l'email tramite token, fare login | Accedere a dati applicativi o registrarsi come cliente senza invito | Nessuna |
-| Cliente | `CLIENT` | Gestire profilo/account, vedere professionisti collegati, consultare disponibilità di personal trainer collegati, creare e gestire booking consentiti | Creare inviti/slot, vedere clienti, usare moduli Workout, Nutrition, Feedback o Measurements | Dashboard, profilo/account, professionisti, disponibilità, booking |
-| Professionista | `PROFESSIONAL` | Gestire profilo/account, vedere clienti collegati, generare e consultare inviti | Usare funzionalità non compatibili con la propria specializzazione; gestire manualmente i link | Dashboard, profilo/account, clienti, inviti; aree specialistiche solo quando supportate |
-| Personal trainer | `PROFESSIONAL` + `PERSONAL_TRAINER` | Tutte le funzioni comuni del professionista, più gestione availability e richieste booking | Workout, Feedback e Measurements, ancora non implementati | Anche availability e booking |
-| Nutrizionista | `PROFESSIONAL` + `NUTRITIONIST` | Funzioni comuni del professionista: profilo/account, clienti e inviti | Availability e booking basati su slot; piani Nutrition e Feedback, ancora non implementati | Nessuna area operativa Nutrition nell'MVP |
+| Profilo UX          | Identità backend                    | Può fare ora                                                                                                                                          | Non può fare ora                                                                               | Pagine private necessarie                                                               |
+| ------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Visitatore pubblico | Nessuna                             | Consultare contenuti statici, registrare un professionista, validare un invito, registrare un cliente, verificare l'email tramite token, fare login   | Accedere a dati applicativi o registrarsi come cliente senza invito                            | Nessuna                                                                                 |
+| Cliente             | `CLIENT`                            | Gestire profilo/account, vedere professionisti collegati, consultare disponibilità di personal trainer collegati, creare e gestire booking consentiti | Creare inviti/slot, vedere clienti, usare moduli Workout, Nutrition, Feedback o Measurements   | Dashboard, profilo/account, professionisti, disponibilità, booking                      |
+| Professionista      | `PROFESSIONAL`                      | Gestire profilo/account, vedere clienti collegati, generare e consultare inviti                                                                       | Usare funzionalità non compatibili con la propria specializzazione; gestire manualmente i link | Dashboard, profilo/account, clienti, inviti; aree specialistiche solo quando supportate |
+| Personal trainer    | `PROFESSIONAL` + `PERSONAL_TRAINER` | Tutte le funzioni comuni del professionista, più gestione availability e richieste booking                                                            | Workout, Feedback e Measurements, ancora non implementati                                      | Anche availability e booking                                                            |
+| Nutrizionista       | `PROFESSIONAL` + `NUTRITIONIST`     | Funzioni comuni del professionista: profilo/account, clienti e inviti                                                                                 | Availability e booking basati su slot; piani Nutrition e Feedback, ancora non implementati     | Nessuna area operativa Nutrition nell'MVP                                               |
 
 Conseguenze UX:
 
@@ -62,16 +64,16 @@ Conseguenze UX:
 
 Gli endpoint sotto `/api/v1/auth/**` sono pubblici.
 
-| Schermata | Scopo ed endpoint | Stati UI necessari | Errori principali |
-|---|---|---|---|
-| Home / landing | Pagina statica di ingresso. Nessun endpoint richiesto. CTA verso login e registrazione professionista; l'accesso cliente parte da un invito. | Contenuto pronto, eventuale fallback contenuti | Nessun errore API |
-| Login | Ottenere CSRF (`GET /api/v1/auth/csrf`), poi autenticare con `POST /api/v1/auth/login` + header CSRF. Campi: email e password. Risposta `204` senza token; il browser conserva il cookie HttpOnly. Dopo successo: nuovo `GET /csrf`, poi bootstrap `/me/account` e `/me/profile`. | Idle, invio, successo e redirect per ruolo, errore credenziali, account non attivo / email non verificata | `400` validazione/body, `401 AUTHENTICATION_ERROR`, `403 ACCOUNT_NOT_ACTIVE` / `EMAIL_NOT_VERIFIED`, `403 CSRF_VALIDATION_FAILED`. `profile.active=false` non blocca il login |
-| Registrazione professionista | Inviare `POST /api/v1/auth/register/professional`. Campi: nome, cognome, email, password, specializzazione `PERSONAL_TRAINER` o `NUTRITIONIST`. | Form, validazione, invio, `202` neutro, istruzione di verifica email | `400 VALIDATION_ERROR`; non cercare `EMAIL_ALREADY_REGISTERED` |
-| Verifica email | Ricevere `/verify-email#token=...`, rimuovere subito il fragment e inviare `POST /api/v1/auth/email-verification/confirm` con body `token`. | Verifica in corso, verificata, non valido o scaduto; secondo utilizzo idempotente; CTA al login dopo successo | `400` body/validazione, `404 EMAIL_VERIFICATION_TOKEN_NOT_FOUND`, `410 EMAIL_VERIFICATION_TOKEN_EXPIRED` |
-| Reinvio verifica | Dalla schermata “Controlla la tua email”, inviare `POST /api/v1/auth/email-verification/resend` con body `email`. | Messaggio sempre neutro; azione “Invia di nuovo”; pulsante UX disabilitato 60 secondi, senza assumere che il backend abbia creato un token | `400` validazione/body, `415` media type; ogni email valida riceve `202` identico |
-| Validazione invito | Verificare il codice prima di mostrare il form cliente con `POST /api/v1/auth/register/client/validate-invite`. Body: `code`. | Form codice, validazione, valido con scadenza, non valido/scaduto/usato, retry | `400 VALIDATION_ERROR` e codici `INVITE_CODE_*`; `404 INVITE_CODE_NOT_FOUND` |
-| Registrazione cliente | Inviare `POST /api/v1/auth/register/client` dopo validazione invito. Campi: nome, cognome, email, password, codice, data di nascita, altezza, obiettivo, genere; note mediche/infortuni/generali facoltative. | Form multi-sezione, validazione campo, invio, `202` neutro, schermata “Controlla la tua email” | `400` validazione o invito non più valido, `403` professionista non utilizzabile; nessun `EMAIL_ALREADY_REGISTERED` |
-| Pagine informative statiche | Eventuali pagine legali o informative non richiedono backend, ma vanno create solo quando contenuti e requisiti sono definiti. | Contenuto e pagina non trovata frontend | Nessun errore API |
+| Schermata                    | Scopo ed endpoint                                                                                                                                                                                                                                                                 | Stati UI necessari                                                                                                                         | Errori principali                                                                                                                                                             |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Home / landing               | Pagina statica di ingresso. Nessun endpoint richiesto. CTA verso login e registrazione professionista; l'accesso cliente parte da un invito.                                                                                                                                      | Contenuto pronto, eventuale fallback contenuti                                                                                             | Nessun errore API                                                                                                                                                             |
+| Login                        | Ottenere CSRF (`GET /api/v1/auth/csrf`), poi autenticare con `POST /api/v1/auth/login` + header CSRF. Campi: email e password. Risposta `204` senza token; il browser conserva il cookie HttpOnly. Dopo successo: nuovo `GET /csrf`, poi bootstrap `/me/account` e `/me/profile`. | Idle, invio, successo e redirect per ruolo, errore credenziali, account non attivo / email non verificata                                  | `400` validazione/body, `401 AUTHENTICATION_ERROR`, `403 ACCOUNT_NOT_ACTIVE` / `EMAIL_NOT_VERIFIED`, `403 CSRF_VALIDATION_FAILED`. `profile.active=false` non blocca il login |
+| Registrazione professionista | Inviare `POST /api/v1/auth/register/professional`. Campi: nome, cognome, email, password, specializzazione `PERSONAL_TRAINER` o `NUTRITIONIST`.                                                                                                                                   | Form, validazione, invio, `202` neutro, istruzione di verifica email                                                                       | `400 VALIDATION_ERROR`; non cercare `EMAIL_ALREADY_REGISTERED`                                                                                                                |
+| Verifica email               | Ricevere `/verify-email#token=...`, rimuovere subito il fragment e inviare `POST /api/v1/auth/email-verification/confirm` con body `token`.                                                                                                                                       | Verifica in corso, verificata, non valido o scaduto; secondo utilizzo idempotente; CTA al login dopo successo                              | `400` body/validazione, `404 EMAIL_VERIFICATION_TOKEN_NOT_FOUND`, `410 EMAIL_VERIFICATION_TOKEN_EXPIRED`                                                                      |
+| Reinvio verifica             | Dalla schermata “Controlla la tua email”, inviare `POST /api/v1/auth/email-verification/resend` con body `email`.                                                                                                                                                                 | Messaggio sempre neutro; azione “Invia di nuovo”; pulsante UX disabilitato 60 secondi, senza assumere che il backend abbia creato un token | `400` validazione/body, `415` media type; ogni email valida riceve `202` identico                                                                                             |
+| Validazione invito           | Verificare il codice prima di mostrare il form cliente con `POST /api/v1/auth/register/client/validate-invite`. Body: `code`.                                                                                                                                                     | Form codice, validazione, valido con scadenza, non valido/scaduto/usato, retry                                                             | `400 VALIDATION_ERROR` e codici `INVITE_CODE_*`; `404 INVITE_CODE_NOT_FOUND`                                                                                                  |
+| Registrazione cliente        | Inviare `POST /api/v1/auth/register/client` dopo validazione invito. Campi: nome, cognome, email, password, codice, data di nascita, altezza, obiettivo, genere; note mediche/infortuni/generali facoltative.                                                                     | Form multi-sezione, validazione campo, invio, `202` neutro, schermata “Controlla la tua email”                                             | `400` validazione o invito non più valido, `403` professionista non utilizzabile; nessun `EMAIL_ALREADY_REGISTERED`                                                           |
+| Pagine informative statiche  | Eventuali pagine legali o informative non richiedono backend, ma vanno create solo quando contenuti e requisiti sono definiti.                                                                                                                                                    | Contenuto e pagina non trovata frontend                                                                                                    | Nessun errore API                                                                                                                                                             |
 
 Note di flusso verificate:
 
@@ -80,30 +82,30 @@ Note di flusso verificate:
 - cliente e professionista nascono `PENDING_VERIFICATION`, con `emailVerified=false`, e non possono fare login prima della conferma;
 - per il cliente il link è già creato e l'invito consumato, ma il cliente pending non è visibile al professionista;
 - il backend genera e persiste per entrambi un token valido 24 ore e, dopo commit, affida un link con token nel fragment alla porta email; `SMTP` è disponibile ma il default locale resta disabilitato;
-- la futura pagina deve leggere il fragment, rimuoverlo immediatamente dall'URL prima di avviare analytics, monitoring o altre integrazioni, conservarlo solo in memoria e non inserirlo in `localStorage`; invia quindi il POST, mostra la CTA login in caso di successo e il messaggio neutro di reinvio in caso di 410;
-- la pagina di verifica deve restare compatibile con `BrowserRouter` e non deve usare `HashRouter`, perché il fragment è riservato al token, né trasmettere il token a strumenti di analytics o monitoring;
-- l'azione “Invia di nuovo” usa l'email della registrazione, non mostra se l'account esiste e non invia email o token ad analytics; il frontend può disabilitare il pulsante per 60 secondi, ma il backend resta autoritativo e non espone il tempo residuo;
+- la pagina `/verify-email` (implementata) legge il fragment, lo rimuove immediatamente dall'URL prima di avviare analytics, monitoring o altre integrazioni, conserva il token solo in memoria e non lo inserisce in `localStorage`; invia quindi il POST, mostra la CTA login in caso di successo e il messaggio neutro di reinvio in caso di 410;
+- la pagina di verifica resta compatibile con `BrowserRouter` e non usa `HashRouter`, perché il fragment è riservato al token, né trasmette il token a strumenti di analytics o monitoring;
+- l'azione “Invia di nuovo” richiede l'email dell'utente (inserita nella pagina di verifica), non mostra se l'account esiste e non invia email o token ad analytics; il frontend può disabilitare il pulsante per 60 secondi, ma il backend resta autoritativo e non espone il tempo residuo;
 - il codice invito è monouso, non è legato a una specifica email destinataria e scade dopo 7 giorni.
 
 ## 5. Funzionalità private implementabili ora
 
 ### 5.1 Area comune autenticata
 
-| Area | Endpoint | Stato MVP | Note UX |
-|---|---|---|---|
-| Bootstrap sessione | `GET /api/v1/me/account`, `GET /api/v1/me/profile` | **Implementato** nel client auth | Confermare ruolo, stato account, specializzazione e dati profilo dopo login/reload. Dettagli in [FE03](./03-authentication-session-flow.md). |
-| Profilo | lettura `/me/profile`; `PATCH /api/v1/me/profile` | **UI implementata** | Route reali sotto; form role-aware collegato al contratto. |
-| Account | lettura `/me/account` | **UI implementata (sola lettura)** | Nessun editing account in questa pagina. |
-| Stato operativo | `PATCH /api/v1/me/profile/operational-status` | **UI implementata** | Sezione indipendente dal form Profilo. Cliente: `ATTIVO`, `INFORTUNATO`, `PAUSA`. Professionista: `DISPONIBILE`, `ASSENTE`, `FERIE`, `MALATTIA`. |
-| Immagine profilo | Campo `profileImageUrl` in lettura | Visualizzazione + fallback | Nessun upload o update immagine: avatar con iniziali se assente. |
+| Area               | Endpoint                                           | Stato MVP                          | Note UX                                                                                                                                          |
+| ------------------ | -------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Bootstrap sessione | `GET /api/v1/me/account`, `GET /api/v1/me/profile` | **Implementato** nel client auth   | Confermare ruolo, stato account, specializzazione e dati profilo dopo login/reload. Dettagli in [FE03](./03-authentication-session-flow.md).     |
+| Profilo            | lettura `/me/profile`; `PATCH /api/v1/me/profile`  | **UI implementata**                | Route reali sotto; form role-aware collegato al contratto.                                                                                       |
+| Account            | lettura `/me/account`                              | **UI implementata (sola lettura)** | Nessun editing account in questa pagina.                                                                                                         |
+| Stato operativo    | `PATCH /api/v1/me/profile/operational-status`      | **UI implementata**                | Sezione indipendente dal form Profilo. Cliente: `ATTIVO`, `INFORTUNATO`, `PAUSA`. Professionista: `DISPONIBILE`, `ASSENTE`, `FERIE`, `MALATTIA`. |
+| Immagine profilo   | Campo `profileImageUrl` in lettura                 | Visualizzazione + fallback         | Nessun upload o update immagine: avatar con iniziali se assente.                                                                                 |
 
 Nel `PATCH` profilo professionista, `instagramUrl` e `websiteUrl` seguono un contratto a tre stati: campo omesso o `null` = invariato; URL `http://`/`https://` = aggiornato; stringa vuota = rimosso. Il form conserva esplicitamente questa distinzione.
 
 #### 5.1.1 Route Profile
 
-| Ruolo | Route | Componente |
-|---|---|---|
-| CLIENT | `/app/client/profile` | `ProfilePage` (`area="cliente"`) |
+| Ruolo        | Route                       | Componente                              |
+| ------------ | --------------------------- | --------------------------------------- |
+| CLIENT       | `/app/client/profile`       | `ProfilePage` (`area="cliente"`)        |
 | PROFESSIONAL | `/app/professional/profile` | `ProfilePage` (`area="professionista"`) |
 
 La stessa composizione è role-aware: campi e stati operativi dipendono dal ruolo autenticato. `PERSONAL_TRAINER` e `NUTRITIONIST` condividono la struttura Profile; la specialization è **sola lettura**.
@@ -159,41 +161,41 @@ Il follow-up auth **E2E-1** (safe redirect cross-role → `/forbidden`) è docum
 
 ### 5.2 Cliente
 
-| Area/pagina | Endpoint | Stato MVP | Note UX |
-|---|---|---|---|
-| Dashboard cliente | Composizione di `GET /api/v1/professionals/my` e `GET /api/v1/bookings/client` | Implementabile ora come composizione | Non esiste un endpoint dashboard. Mostrare riepiloghi derivati senza promettere statistiche avanzate. |
-| Profilo/account | Endpoint `/api/v1/me/**` | **UI implementata** | Vedi §5.1; form anagrafica e note cliente. |
-| Professionisti collegati | `GET /api/v1/professionals/my` | Implementabile ora | Lista, non singolo professionista. Empty state se non emergono collegamenti leggibili. |
-| Dettaglio professionista | `GET /api/v1/professionals/{professionalId}` | Implementabile ora | Accessibile soltanto con collegamento attivo. Un `404 PROFESSIONAL_NOT_FOUND` non permette di distinguere professionista inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista. |
-| Disponibilità professionista | `GET /api/v1/professionals/{professionalId}/availability` | Implementabile ora solo per personal trainer collegato | Mostrare solo slot restituiti dal server. Per un nutrizionista l'area non va offerta. Empty state distinto da errore. |
-| Crea booking | `POST /api/v1/bookings` | Implementabile ora | Body: un solo `availabilitySlotId` e nota facoltativa fino a 1000 caratteri. Confermare data/ora e professionista prima dell'invio. |
-| Lista booking | `GET /api/v1/bookings/client` | Implementabile ora | Usa `BookingSummaryResponse`: controparte, stato, intervallo e durata sono già disponibili senza chiamate aggiuntive. Ordine iniziale: creazione decrescente e id decrescente; paginazione e filtri sono futuri. |
-| Dettaglio booking | `GET /api/v1/bookings/{bookingRequestId}` | Implementabile ora | Usa `BookingDetailResponse`. Solo utenti coinvolti, anche dopo chiusura del collegamento: mostra nome storico, intervallo snapshot, stato, nota e item senza dipendere da `slotStatus`. |
-| Cancella booking | `PATCH /api/v1/bookings/{bookingRequestId}/cancel` | Implementabile ora | Il cliente può cancellare `PENDING` o `CONFIRMED`; usare conferma esplicita e aggiornare lo stato dalla risposta. |
+| Area/pagina                  | Endpoint                                                                       | Stato MVP                                              | Note UX                                                                                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard cliente            | Composizione di `GET /api/v1/professionals/my` e `GET /api/v1/bookings/client` | Implementabile ora come composizione                   | Non esiste un endpoint dashboard. Mostrare riepiloghi derivati senza promettere statistiche avanzate.                                                                                                            |
+| Profilo/account              | Endpoint `/api/v1/me/**`                                                       | **UI implementata**                                    | Vedi §5.1; form anagrafica e note cliente.                                                                                                                                                                       |
+| Professionisti collegati     | `GET /api/v1/professionals/my`                                                 | Implementabile ora                                     | Lista, non singolo professionista. Empty state se non emergono collegamenti leggibili.                                                                                                                           |
+| Dettaglio professionista     | `GET /api/v1/professionals/{professionalId}`                                   | Implementabile ora                                     | Accessibile soltanto con collegamento attivo. Un `404 PROFESSIONAL_NOT_FOUND` non permette di distinguere professionista inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista.          |
+| Disponibilità professionista | `GET /api/v1/professionals/{professionalId}/availability`                      | Implementabile ora solo per personal trainer collegato | Mostrare solo slot restituiti dal server. Per un nutrizionista l'area non va offerta. Empty state distinto da errore.                                                                                            |
+| Crea booking                 | `POST /api/v1/bookings`                                                        | Implementabile ora                                     | Body: un solo `availabilitySlotId` e nota facoltativa fino a 1000 caratteri. Confermare data/ora e professionista prima dell'invio.                                                                              |
+| Lista booking                | `GET /api/v1/bookings/client`                                                  | Implementabile ora                                     | Usa `BookingSummaryResponse`: controparte, stato, intervallo e durata sono già disponibili senza chiamate aggiuntive. Ordine iniziale: creazione decrescente e id decrescente; paginazione e filtri sono futuri. |
+| Dettaglio booking            | `GET /api/v1/bookings/{bookingRequestId}`                                      | Implementabile ora                                     | Usa `BookingDetailResponse`. Solo utenti coinvolti, anche dopo chiusura del collegamento: mostra nome storico, intervallo snapshot, stato, nota e item senza dipendere da `slotStatus`.                          |
+| Cancella booking             | `PATCH /api/v1/bookings/{bookingRequestId}/cancel`                             | Implementabile ora                                     | Il cliente può cancellare `PENDING` o `CONFIRMED`; usare conferma esplicita e aggiornare lo stato dalla risposta.                                                                                                |
 
 ### 5.3 Professionista: funzionalità comuni
 
-| Area/pagina | Endpoint | Stato MVP | Note UX |
-|---|---|---|---|
-| Dashboard professionista | Composizione di clienti, inviti e, solo per personal trainer, availability/booking | Implementabile ora come composizione | Nessun endpoint aggregato. I widget devono dipendere dalla specializzazione. |
-| Profilo/account | Endpoint `/api/v1/me/**` | **UI implementata** | Vedi §5.1; contatti, bio, luogo, città e link. |
-| Clienti collegati | `GET /api/v1/clients/my` | Implementabile ora | Ogni elemento contiene soltanto `id`, `firstName`, `lastName` e `profileImageUrl`; non mostrare obiettivo o stato operativo. |
-| Dettaglio cliente | `GET /api/v1/clients/{clientId}` | Implementabile ora | Solo con collegamento attivo. Contiene identità minima e `primaryGoal`. Un `404 CLIENT_NOT_FOUND` non permette di distinguere cliente inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista. |
-| Crea invito | `POST /api/v1/invites` | Implementabile ora | Nessun body. Dopo `201`, mostrare codice, scadenza e azione “Copia”. Non inventare invio email automatico. |
-| Lista inviti | `GET /api/v1/invites` | Implementabile ora | Mostrare attivo/usato/scaduto derivando lo scaduto da `expiresAt`. Non esistono dettaglio o disattivazione manuale. |
+| Area/pagina              | Endpoint                                                                           | Stato MVP                            | Note UX                                                                                                                                                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard professionista | Composizione di clienti, inviti e, solo per personal trainer, availability/booking | Implementabile ora come composizione | Nessun endpoint aggregato. I widget devono dipendere dalla specializzazione.                                                                                                                                         |
+| Profilo/account          | Endpoint `/api/v1/me/**`                                                           | **UI implementata**                  | Vedi §5.1; contatti, bio, luogo, città e link.                                                                                                                                                                       |
+| Clienti collegati        | `GET /api/v1/clients/my`                                                           | Implementabile ora                   | Ogni elemento contiene soltanto `id`, `firstName`, `lastName` e `profileImageUrl`; non mostrare obiettivo o stato operativo.                                                                                         |
+| Dettaglio cliente        | `GET /api/v1/clients/{clientId}`                                                   | Implementabile ora                   | Solo con collegamento attivo. Contiene identità minima e `primaryGoal`. Un `404 CLIENT_NOT_FOUND` non permette di distinguere cliente inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista. |
+| Crea invito              | `POST /api/v1/invites`                                                             | Implementabile ora                   | Nessun body. Dopo `201`, mostrare codice, scadenza e azione “Copia”. Non inventare invio email automatico.                                                                                                           |
+| Lista inviti             | `GET /api/v1/invites`                                                              | Implementabile ora                   | Mostrare attivo/usato/scaduto derivando lo scaduto da `expiresAt`. Non esistono dettaglio o disattivazione manuale.                                                                                                  |
 
 ### 5.4 Personal trainer
 
-| Area/pagina | Endpoint | Stato MVP | Note UX |
-|---|---|---|---|
-| Lista slot | `GET /api/v1/availability/my` | Implementabile ora | Stati `AVAILABLE`, `BLOCKED`, `BOOKED`; lista ordinata per inizio. Nessun calendario avanzato necessario. |
-| Crea slot | `POST /api/v1/availability` | Implementabile ora | Inizio e fine futuri, fine successiva all'inizio, nessuna sovrapposizione. |
-| Modifica slot | `PATCH /api/v1/availability/{slotId}` | Implementabile ora con vincoli | Solo slot `AVAILABLE`, mai coinvolti in booking e senza booking `PENDING`. Il `PATCH` è parziale. |
-| Blocca/sblocca slot | `PATCH .../{slotId}/block`, `PATCH .../{slotId}/unblock` | Implementabile ora | Azioni visibili solo negli stati coerenti. Uno slot con booking pending non è bloccabile. |
-| Lista booking ricevuti | `GET /api/v1/bookings/professional` | Implementabile ora | Usa `BookingSummaryResponse`: mostra richieste in ordine recente, stato, cliente e intervallo; nessuna chiamata aggiuntiva. |
-| Dettaglio booking | `GET /api/v1/bookings/{bookingRequestId}` | Implementabile ora | Usa `BookingDetailResponse`: mostra cliente, nota, stato, intervallo snapshot e timestamp della transizione quando presente. |
-| Conferma/rifiuta | `PATCH .../{id}/confirm`, `PATCH .../{id}/reject` | Implementabile ora | Solo da `PENDING`. Il rifiuto non accetta un motivo: non mostrare un campo motivo attivo. |
-| Cancella | `PATCH .../{id}/cancel` | Implementabile ora | Il professionista può cancellare soltanto un booking `CONFIRMED`. |
+| Area/pagina            | Endpoint                                                 | Stato MVP                      | Note UX                                                                                                                      |
+| ---------------------- | -------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| Lista slot             | `GET /api/v1/availability/my`                            | Implementabile ora             | Stati `AVAILABLE`, `BLOCKED`, `BOOKED`; lista ordinata per inizio. Nessun calendario avanzato necessario.                    |
+| Crea slot              | `POST /api/v1/availability`                              | Implementabile ora             | Inizio e fine futuri, fine successiva all'inizio, nessuna sovrapposizione.                                                   |
+| Modifica slot          | `PATCH /api/v1/availability/{slotId}`                    | Implementabile ora con vincoli | Solo slot `AVAILABLE`, mai coinvolti in booking e senza booking `PENDING`. Il `PATCH` è parziale.                            |
+| Blocca/sblocca slot    | `PATCH .../{slotId}/block`, `PATCH .../{slotId}/unblock` | Implementabile ora             | Azioni visibili solo negli stati coerenti. Uno slot con booking pending non è bloccabile.                                    |
+| Lista booking ricevuti | `GET /api/v1/bookings/professional`                      | Implementabile ora             | Usa `BookingSummaryResponse`: mostra richieste in ordine recente, stato, cliente e intervallo; nessuna chiamata aggiuntiva.  |
+| Dettaglio booking      | `GET /api/v1/bookings/{bookingRequestId}`                | Implementabile ora             | Usa `BookingDetailResponse`: mostra cliente, nota, stato, intervallo snapshot e timestamp della transizione quando presente. |
+| Conferma/rifiuta       | `PATCH .../{id}/confirm`, `PATCH .../{id}/reject`        | Implementabile ora             | Solo da `PENDING`. Il rifiuto non accetta un motivo: non mostrare un campo motivo attivo.                                    |
+| Cancella               | `PATCH .../{id}/cancel`                                  | Implementabile ora             | Il professionista può cancellare soltanto un booking `CONFIRMED`.                                                            |
 
 ### 5.5 Contratto Booking per il frontend
 
@@ -221,21 +223,21 @@ Il nutrizionista usa le funzionalità comuni del professionista, ma non dispone 
 
 ## 6. Funzionalità future da prevedere ma non attivare
 
-| Funzionalità | Posizione UX futura possibile | Come trattarla ora |
-|---|---|---|
-| Workout | Area personal trainer e area cliente | Nascosta nell'MVP operativo; placeholder solo nei wireframe, marcato “Futuro / non attivo”. |
-| Nutrition | Area nutrizionista e area cliente | Nascosta; non usare l'assenza di booking per simulare piani alimentari. |
-| Feedback | Dettaglio futuro di workout/nutrition o area progressi | Nascosto: non esistono endpoint né dati. |
-| Measurements | Profilo/progressi cliente | Nascosta; niente grafici o inserimento misure. |
-| Reset password | Login / recupero account | Non mostrare un link attivo. Può apparire disabilitato solo in prototipi esplicitamente futuri. |
-| Upload immagine profilo | Profilo | Mostrare immagine esistente o avatar fallback; nessun controllo upload attivo. |
-| App mobile | Fuori dalla web app | Nessun elemento nell'MVP web. React Native + Expo resta un'evoluzione separata. |
+| Funzionalità            | Posizione UX futura possibile                          | Come trattarla ora                                                                              |
+| ----------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Workout                 | Area personal trainer e area cliente                   | Nascosta nell'MVP operativo; placeholder solo nei wireframe, marcato “Futuro / non attivo”.     |
+| Nutrition               | Area nutrizionista e area cliente                      | Nascosta; non usare l'assenza di booking per simulare piani alimentari.                         |
+| Feedback                | Dettaglio futuro di workout/nutrition o area progressi | Nascosto: non esistono endpoint né dati.                                                        |
+| Measurements            | Profilo/progressi cliente                              | Nascosta; niente grafici o inserimento misure.                                                  |
+| Reset password          | Login / recupero account                               | Non mostrare un link attivo. Può apparire disabilitato solo in prototipi esplicitamente futuri. |
+| Upload immagine profilo | Profilo                                                | Mostrare immagine esistente o avatar fallback; nessun controllo upload attivo.                  |
+| App mobile              | Fuori dalla web app                                    | Nessun elemento nell'MVP web. React Native + Expo resta un'evoluzione separata.                 |
 
 Sono inoltre non presenti e da non esporre come attivi: cambio password autenticato, gestione manuale dei collegamenti, disattivazione inviti, motivo di rifiuto booking, notifiche, pagamenti, chat, amministrazione e statistiche avanzate.
 
 ## 7. Sitemap MVP
 
-I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzionalità completa.** Home, login/auth foundation e **Profilo/Account/Operational Status** sono implementati; registrazioni/invito/verify-email e le altre pagine business restano placeholder. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
+I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzionalità completa.** Home, login/auth foundation, **registrazione PROFESSIONAL**, **verifica email** e **Profilo/Account/Operational Status** sono implementati; validazione invito, registrazione CLIENT e le altre pagine business restano placeholder. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
 
 ### Pubblico
 
@@ -250,7 +252,7 @@ I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzi
 
 Flusso cliente consigliato: `/invite/validate` valida il codice e, in caso positivo, passa a `/register/client` conservando il codice. Non saltare la validazione lato server durante la registrazione: il backend la ripete correttamente.
 
-Il contratto previsto dopo entrambe le registrazioni è mostrare “Controlla la tua email”. Il link apre `/verify-email`, la pagina dovrà leggere e rimuovere il token dall'URL, effettuare il POST e presentare la CTA login. Un secondo utilizzo coerente resta un successo. La stessa schermata dovrà offrire “Invia di nuovo”, mostrare sempre il messaggio neutro e applicare un blocco UX di 60 secondi, senza sostituire il cooldown del backend. La route e gli stati descrittivi sono presenti, ma lettura del token, invio API e reinvio non sono ancora implementati. L'adapter SMTP backend invia un messaggio testuale con URL `#token=...`.
+Dopo la registrazione PROFESSIONAL (e, quando sarà collegata, anche quella CLIENT) la UI mostra “Controlla la tua email”. Il link apre `/verify-email`: la pagina legge e rimuove il token dall'URL (anche se il fragment non è valido), effettua il POST di conferma e presenta la CTA login. Un secondo utilizzo coerente resta un successo. La stessa schermata offre “Invia di nuovo” con messaggio neutro e blocco UX di 60 secondi, senza sostituire il cooldown del backend. L'adapter SMTP backend invia un messaggio testuale con URL `#token=...`. Validazione invito e registrazione CLIENT restano da collegare.
 
 ### Area cliente
 
@@ -281,17 +283,19 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 
 ### 7.1 Maturity delle route frontend
 
-| Route / area | Audience | Maturity |
-|---|---|---|
-| `/` home | Pubblico | **Implementata** |
-| `/login` | Pubblico | **Implementata** |
-| `/register/professional`, `/invite/validate`, `/register/client`, `/verify-email` | Pubblico | **Placeholder** |
-| Guardie auth (`RequireAuth` / ruolo / specializzazione) | Privato | **Implementate** |
-| `/app/client/profile`, `/app/professional/profile` | CLIENT / PROFESSIONAL | **Implementata** (Profilo + Account RO + Operational Status) |
-| `/app/*/dashboard` | CLIENT / PROFESSIONAL | **Placeholder** (shell; senza dati business aggregati) |
-| Clients / professionals / invites | PROFESSIONAL o CLIENT | **Placeholder** |
-| Availability / bookings | CLIENT; PROFESSIONAL + PT | **Placeholder** |
-| `/dev/role-preview` | Dev-only | **Implementata** (solo `import.meta.env.DEV`) |
+| Route / area                                            | Audience                  | Maturity                                                     |
+| ------------------------------------------------------- | ------------------------- | ------------------------------------------------------------ |
+| `/` home                                                | Pubblico                  | **Implementata**                                             |
+| `/login`                                                | Pubblico                  | **Implementata**                                             |
+| `/register/professional`                                | Pubblico                  | **Implementata**                                             |
+| `/verify-email`                                         | Pubblico                  | **Implementata**                                             |
+| `/invite/validate`, `/register/client`                  | Pubblico                  | **Placeholder**                                              |
+| Guardie auth (`RequireAuth` / ruolo / specializzazione) | Privato                   | **Implementate**                                             |
+| `/app/client/profile`, `/app/professional/profile`      | CLIENT / PROFESSIONAL     | **Implementata** (Profilo + Account RO + Operational Status) |
+| `/app/*/dashboard`                                      | CLIENT / PROFESSIONAL     | **Placeholder** (shell; senza dati business aggregati)       |
+| Clients / professionals / invites                       | PROFESSIONAL o CLIENT     | **Placeholder**                                              |
+| Availability / bookings                                 | CLIENT; PROFESSIONAL + PT | **Placeholder**                                              |
+| `/dev/role-preview`                                     | Dev-only                  | **Implementata** (solo `import.meta.env.DEV`)                |
 
 ## 8. Protezione rotte frontend
 
@@ -358,25 +362,25 @@ Il contratto comune reale è `ErrorResponse`:
 }
 ```
 
-| Campo | Uso frontend |
-|---|---|
-| `timestamp` | Istante UTC con `Z`, utile alla diagnostica ma non necessario nel messaggio principale. |
-| `status` | Comportamento HTTP generale. |
-| `code` | Identificatore macchina per comportamento e copy specifici. |
-| `message` | Solo fallback leggibile: non usarlo per decidere la logica. |
-| `path` | URI della richiesta senza query, utile per diagnostica locale. |
+| Campo         | Uso frontend                                                                                                                              |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `timestamp`   | Istante UTC con `Z`, utile alla diagnostica ma non necessario nel messaggio principale.                                                   |
+| `status`      | Comportamento HTTP generale.                                                                                                              |
+| `code`        | Identificatore macchina per comportamento e copy specifici.                                                                               |
+| `message`     | Solo fallback leggibile: non usarlo per decidere la logica.                                                                               |
+| `path`        | URI della richiesta senza query, utile per diagnostica locale.                                                                            |
 | `fieldErrors` | Presente solo per `VALIDATION_ERROR`: lista `{field?, code, message}`; può contenere più errori per campo e errori globali senza `field`. |
 
-| Status | Comportamento UX |
-|---|---|
-| `400 Bad Request` | Mostrare errori campo per `VALIDATION_ERROR`; per body, path o query malformati mostrare messaggio generale. Comprende anche alcune violazioni di stato/invito. |
-| `401 Unauthorized` | Invalidare lo stato auth client (CSRF in memoria). Codice tipico `UNAUTHORIZED`. Il backend **non** include `WWW-Authenticate: Bearer`. |
-| `403 Forbidden` | Ruolo, account, email o profilo non idonei, CSRF non valido (`CSRF_VALIDATION_FAILED`), oppure altra regola business non legata a una risorsa enumerabile. Non fare logout automatico salvo CSRF/sessione incoerente. |
-| `404 Not Found` | Stato neutro “Risorsa non trovata”; offrire ritorno alla lista. Include risorsa inesistente, non collegata o non appartenente al principal: Availability non collegata e Booking estraneo non vanno distinti nella UI. |
-| `409 Conflict` | Stato concorrente/obsoleto, slot sovrapposto o transizione booking non più valida. Non usare più questo status per email duplicata. Mostrare messaggio e ricaricare la risorsa quando opportuno. |
-| `410 Gone` | Per `EMAIL_VERIFICATION_TOKEN_EXPIRED`, proporre il reinvio della verifica email. |
-| `405/406/415` | Errore di integrazione del client: non ritentare invariando metodo, `Accept` o `Content-Type`; 405 include `Allow`. |
-| `500 Internal Server Error` | Messaggio neutro, possibilità di riprovare e nessun dettaglio tecnico. |
+| Status                      | Comportamento UX                                                                                                                                                                                                       |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Bad Request`           | Mostrare errori campo per `VALIDATION_ERROR`; per body, path o query malformati mostrare messaggio generale. Comprende anche alcune violazioni di stato/invito.                                                        |
+| `401 Unauthorized`          | Invalidare lo stato auth client (CSRF in memoria). Codice tipico `UNAUTHORIZED`. Il backend **non** include `WWW-Authenticate: Bearer`.                                                                                |
+| `403 Forbidden`             | Ruolo, account, email o profilo non idonei, CSRF non valido (`CSRF_VALIDATION_FAILED`), oppure altra regola business non legata a una risorsa enumerabile. Non fare logout automatico salvo CSRF/sessione incoerente.  |
+| `404 Not Found`             | Stato neutro “Risorsa non trovata”; offrire ritorno alla lista. Include risorsa inesistente, non collegata o non appartenente al principal: Availability non collegata e Booking estraneo non vanno distinti nella UI. |
+| `409 Conflict`              | Stato concorrente/obsoleto, slot sovrapposto o transizione booking non più valida. Non usare più questo status per email duplicata. Mostrare messaggio e ricaricare la risorsa quando opportuno.                       |
+| `410 Gone`                  | Per `EMAIL_VERIFICATION_TOKEN_EXPIRED`, proporre il reinvio della verifica email.                                                                                                                                      |
+| `405/406/415`               | Errore di integrazione del client: non ritentare invariando metodo, `Accept` o `Content-Type`; 405 include `Allow`.                                                                                                    |
+| `500 Internal Server Error` | Messaggio neutro, possibilità di riprovare e nessun dettaglio tecnico.                                                                                                                                                 |
 
 Il client deve trattare separatamente gli errori di rete senza response HTTP.
 
@@ -391,16 +395,16 @@ Regole pratiche:
 
 ## 10. Stati UI necessari
 
-| Tipo pagina/azione | Loading | Empty | Error/forbidden | Success e validazione |
-|---|---|---|---|---|
-| Login/registrazione | Disabilitare submit e mostrare progresso | Non applicabile | Errore generale e per campo; stato account distinto | Redirect o conferma; validazione client coerente ma il server resta autorevole |
-| Verifica email/invito | Stato iniziale automatico o submit in corso | Token/codice mancante | Non valido, usato, scaduto o non trovato | Conferma e CTA al passo successivo |
-| Dashboard | Skeleton dei widget | Messaggio utile senza dati inventati | Errore per singolo blocco, non pagina bianca se gli altri dati sono disponibili | Dati composti dagli endpoint esistenti |
-| Liste clienti/professionisti/inviti | Skeleton righe/card | “Nessun … disponibile” con CTA solo se esiste un'azione reale | Retry; `403` dedicato | Lista aggiornata dopo mutazioni |
-| Availability | Skeleton lista | Cliente: nessuno slot prenotabile; PT: nessuno slot creato | Conflitto, slot obsoleto, ruolo/specializzazione non valida | Slot creato/modificato/bloccato con feedback |
-| Booking | Skeleton lista/dettaglio | Nessuna richiesta | `403`, `404`, conflitto di transizione, slot non più disponibile | Stato aggiornato dalla risposta server |
-| Profilo/account | Skeleton / loading sezione | Non applicabile | Errori campo, globali, `401` via auth foundation | Conferma dopo soft commit; draft annullabile |
-| Azioni distruttive o irreversibili | Stato pending sulla singola azione | Non applicabile | Ripristinare controlli e mostrare errore | Conferma per cancellazione, rifiuto e blocco; evitare doppi click |
+| Tipo pagina/azione                  | Loading                                     | Empty                                                         | Error/forbidden                                                                 | Success e validazione                                                          |
+| ----------------------------------- | ------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Login/registrazione                 | Disabilitare submit e mostrare progresso    | Non applicabile                                               | Errore generale e per campo; stato account distinto                             | Redirect o conferma; validazione client coerente ma il server resta autorevole |
+| Verifica email/invito               | Stato iniziale automatico o submit in corso | Token/codice mancante                                         | Non valido, usato, scaduto o non trovato                                        | Conferma e CTA al passo successivo                                             |
+| Dashboard                           | Skeleton dei widget                         | Messaggio utile senza dati inventati                          | Errore per singolo blocco, non pagina bianca se gli altri dati sono disponibili | Dati composti dagli endpoint esistenti                                         |
+| Liste clienti/professionisti/inviti | Skeleton righe/card                         | “Nessun … disponibile” con CTA solo se esiste un'azione reale | Retry; `403` dedicato                                                           | Lista aggiornata dopo mutazioni                                                |
+| Availability                        | Skeleton lista                              | Cliente: nessuno slot prenotabile; PT: nessuno slot creato    | Conflitto, slot obsoleto, ruolo/specializzazione non valida                     | Slot creato/modificato/bloccato con feedback                                   |
+| Booking                             | Skeleton lista/dettaglio                    | Nessuna richiesta                                             | `403`, `404`, conflitto di transizione, slot non più disponibile                | Stato aggiornato dalla risposta server                                         |
+| Profilo/account                     | Skeleton / loading sezione                  | Non applicabile                                               | Errori campo, globali, `401` via auth foundation                                | Conferma dopo soft commit; draft annullabile                                   |
+| Azioni distruttive o irreversibili  | Stato pending sulla singola azione          | Non applicabile                                               | Ripristinare controlli e mostrare errore                                        | Conferma per cancellazione, rifiuto e blocco; evitare doppi click              |
 
 Ogni pagina privata deve prevedere anche gli stati trasversali `unauthorized` e `forbidden`. L'interfaccia deve rispettare i requisiti minimi di accessibilità: focus sull'errore, messaggi associati ai campi, indicatori non affidati al solo colore e pulsanti disabilitati durante le mutazioni.
 
@@ -414,7 +418,7 @@ Ordine pragmatico **residuo**:
 2. flusso professionista comune: clienti e inviti;
 3. flusso cliente: professionisti collegati e dettaglio;
 4. availability e booking del personal trainer, poi booking cliente;
-5. registrazione professionista, verifica email e registrazione cliente tramite invito;
+5. validazione invito e registrazione cliente tramite invito (registrazione PROFESSIONAL e verifica email sono già implementate);
 6. hardening di errori, accessibilità, responsive e test dei flussi applicativi business residui.
 
 La scelta del prossimo vertical slice business resta una decisione di prodotto. Availability e Booking vanno progettati insieme sul piano UX perché le transizioni booking modificano gli slot.
@@ -509,7 +513,7 @@ Questi punti non impediscono la mappa funzionale, ma non sono determinabili come
 
 1. **Consegna verifica email:** registrazione e reinvio creano e salvano il token e, dopo commit, usano una porta di consegna con adapter SMTP configurabile. Il default locale resta disabilitato; la porta in-memory è solo per test/debug e non è esposta via endpoint. L'URL frontend remoto deve essere HTTPS; HTTP è ammesso solo per loopback locale. Non sono presenti outbox o retry, quindi la consegna non è garantita.
 2. **Contratto temporale:** audit e scadenze account/booking/inviti arrivano come `Instant` UTC con `Z`; gli orari degli slot e gli snapshot Booking arrivano con offset esplicito `Europe/Rome`, mentre le date civili restano `LocalDate`. La UI deve distinguere questi tre tipi e non applicare una timezone globale ai payload.
-3. **Auth client:** implementata session-based (vedi [FE03](./03-authentication-session-flow.md)); nessun JWT/Bearer/storage. Profilo/Account/Status sono collegati; restano da collegare le altre pagine business e i flussi pubblici di registrazione/invito/verifica email.
+3. **Auth client:** implementata session-based (vedi [FE03](./03-authentication-session-flow.md)); nessun JWT/Bearer/storage. Profilo/Account/Status e onboarding PROFESSIONAL/verifica email sono collegati; restano da collegare le altre pagine business e i flussi pubblici di validazione invito/registrazione CLIENT.
 4. **URL pubblico dei link:** `app.email.verification-page-url` configura la pagina di verifica, ma il valore pubblico definitivo di ciascun ambiente non è ancora definito; i link invito restano separati.
 5. **Liste:** non esistono paginazione e filtri API per clienti, professionisti, inviti, slot o booking; la prima UI non deve dipenderne. Per Booking l'ordine iniziale è `createdAt DESC, id DESC`.
 6. **Dashboard:** non esiste un contratto aggregato; contenuti e metriche devono restare una composizione minima dei dati già disponibili.

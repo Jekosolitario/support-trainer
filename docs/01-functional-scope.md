@@ -75,8 +75,8 @@ Non risultano ancora implementate:
 - recupero e reset password;
 - upload immagine profilo;
 - editing account (email, password, cancellazione) e gestione dispositivi/sessioni;
-- altre pagine frontend business ancora placeholder (oltre auth e Profilo/Account/Operational Status già presenti);
-- flussi frontend pubblici di registrazione/invito/verifica email ancora placeholder;
+- altre pagine frontend business ancora placeholder (oltre auth, onboarding PROFESSIONAL/verifica email e Profilo/Account/Operational Status già presenti);
+- flussi frontend pubblici di validazione invito e registrazione CLIENT ancora placeholder;
 - preparazione completa al deploy.
 
 ---
@@ -365,13 +365,13 @@ La nota:
 
 ### 10.7 Transizioni implementate
 
-| Azione | Attore autorizzato | Stato iniziale | Stato finale | Effetto slot |
-|---|---|---|---|---|
-| Conferma | professionista coinvolto | `PENDING` | `CONFIRMED` | `AVAILABLE -> BOOKED` |
-| Rifiuto | professionista coinvolto | `PENDING` | `REJECTED` | resta `AVAILABLE` |
-| Cancellazione | cliente coinvolto | `PENDING` | `CANCELLED` | resta `AVAILABLE` |
-| Cancellazione | cliente coinvolto | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
-| Cancellazione | professionista coinvolto | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
+| Azione        | Attore autorizzato       | Stato iniziale | Stato finale | Effetto slot          |
+| ------------- | ------------------------ | -------------- | ------------ | --------------------- |
+| Conferma      | professionista coinvolto | `PENDING`      | `CONFIRMED`  | `AVAILABLE -> BOOKED` |
+| Rifiuto       | professionista coinvolto | `PENDING`      | `REJECTED`   | resta `AVAILABLE`     |
+| Cancellazione | cliente coinvolto        | `PENDING`      | `CANCELLED`  | resta `AVAILABLE`     |
+| Cancellazione | cliente coinvolto        | `CONFIRMED`    | `CANCELLED`  | `BOOKED -> AVAILABLE` |
+| Cancellazione | professionista coinvolto | `CONFIRMED`    | `CANCELLED`  | `BOOKED -> AVAILABLE` |
 
 ### 10.8 Protezioni temporali
 
@@ -539,7 +539,13 @@ Risultano già implementati:
 - booking cliente-personal trainer;
 - gestione stato operativo utente;
 - foundation frontend con home pubblica e autenticazione session-based (login/logout/guards/bootstrap);
-- frontend Profilo/Account/Operational Status autenticati (CLIENT e PROFESSIONAL).
+- frontend Profilo/Account/Operational Status autenticati (CLIENT e PROFESSIONAL);
+- frontend registrazione pubblica PROFESSIONAL e verifica email (confirm + resend).
+
+Restano fuori da questo vertical slice:
+
+- altre pagine frontend business (dashboard con dati, clients, professionals, availability, bookings) ancora placeholder;
+- flussi frontend pubblici di validazione invito e registrazione CLIENT ancora placeholder.
 
 ### 14.2 Parte della v1 ancora da implementare
 
@@ -550,7 +556,7 @@ Per completare il perimetro funzionale originariamente previsto restano da svilu
 - feedback o segnalazioni cliente;
 - eventuale gestione misurazioni/progressi;
 - altre pagine frontend business (dashboard con dati, clients, professionals, availability, bookings) ancora placeholder;
-- flussi frontend pubblici di registrazione/invito/verifica email ancora placeholder.
+- flussi frontend pubblici di validazione invito e registrazione CLIENT ancora placeholder.
 
 ### 14.3 Funzionalità escluse dal perimetro attuale
 

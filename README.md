@@ -4,7 +4,7 @@
 
 Support Trainer è un progetto full stack per la gestione del rapporto tra professionisti del benessere e clienti. Il backend MVP copre autenticazione, profili, inviti, collegamenti professionista-cliente, disponibilità e richieste di prenotazione. Il frontend dispone di una fondazione React, home pubblica (direzione visuale dark-tech), autenticazione session-based (login/logout/CSRF/guards) e foundation API client, oltre alla pagina Profilo autenticata con Account in sola lettura e Operational Status.
 
-Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Login, logout, routing protetto, foundation auth e Profilo/Account/Operational Status sono implementati. Restano prevalentemente placeholder le altre pagine business private (dashboard con dati, clients, professionals, availability, bookings) e i flussi pubblici di registrazione/invito/verifica email.
+Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Login, logout, routing protetto, foundation auth, registrazione pubblica PROFESSIONAL, verifica email con resend e Profilo/Account/Operational Status sono implementati. Restano prevalentemente placeholder le altre pagine business private (dashboard con dati, clients, professionals, availability, bookings) e i flussi pubblici di validazione invito e registrazione CLIENT.
 
 ## 2. Stato attuale del progetto
 
@@ -22,7 +22,8 @@ Stato sintetico:
 - home pubblica responsive/mobile-first implementata sulla route `/` (direzione visuale dark-tech);
 - autenticazione session-based frontend implementata (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap `/me`);
 - pagina Profilo autenticata role-aware implementata (CLIENT e PROFESSIONAL), con Account in sola lettura e Operational Status modificabile;
-- altre pagine business private e flussi pubblici di registrazione/invito/verifica email ancora prevalentemente placeholder;
+- registrazione pubblica PROFESSIONAL e verifica email (confirm + resend) implementate; validazione invito e registrazione CLIENT ancora placeholder;
+- altre pagine business private ancora prevalentemente placeholder;
 - pipeline CI GitHub Actions per il backend presente; i gate frontend (lint/test/build) restano locali; deploy non configurato;
 - progetto non ancora considerato production-ready.
 
@@ -145,7 +146,7 @@ Le liste usano un riepilogo autosufficiente e create, dettaglio e transizioni re
 - limite di sessioni concorrenti;
 - API dedicate alla gestione manuale dei collegamenti;
 - altre pagine frontend business ancora placeholder (dashboard con dati, clients, professionals, availability, bookings);
-- flussi frontend pubblici ancora placeholder (registrazione professionista/cliente, validazione invito, verifica email);
+- flussi frontend pubblici ancora placeholder: validazione invito e registrazione CLIENT (registrazione PROFESSIONAL e verifica email sono implementate);
 - configurazione completa per il deploy.
 
 Follow-up non bloccanti aperti (dettaglio in [Functional Scope](docs/01-functional-scope.md)):
@@ -212,35 +213,35 @@ Non è richiesta un'installazione globale di Maven. Il progetto frontend non dic
 
 3. Creare il database MySQL `support_trainer` e valorizzare le proprietà obbligatorie nel file locale ignorato oppure tramite environment:
 
-   | Proprietà | Variabile d'ambiente | Formato |
-   |---|---|---|
-   | `spring.datasource.url` | `SPRING_DATASOURCE_URL` | URL JDBC MySQL con `connectionTimeZone=%2B00:00` e `forceConnectionTimeZoneToSession=true` |
-   | `spring.datasource.username` | `SPRING_DATASOURCE_USERNAME` | utenza database |
-   | `spring.datasource.password` | `SPRING_DATASOURCE_PASSWORD` | password database |
-   | `spring.session.timeout` | `SPRING_SESSION_TIMEOUT` | durata positiva; default tracciato `30m` |
-   | `spring.session.jdbc.initialize-schema` | — | `never` (schema sessioni da Flyway V7) |
-   | `server.servlet.session.cookie.name` | — | produzione `__Host-STSESSION`; locale/test `STSESSION` |
-   | `server.servlet.session.cookie.http-only` | — | `true` |
-   | `server.servlet.session.cookie.secure` | — | produzione `true`; locale/test `false` |
-   | `server.servlet.session.cookie.same-site` | — | `strict` |
-   | `server.servlet.session.cookie.path` | — | `/` (non impostare `Domain`) |
-   | `app.time.business-zone` | `APP_TIME_BUSINESS_ZONE` | `ZoneId` business; default `Europe/Rome` |
-   | `app.time.clock-zone` | `APP_TIME_CLOCK_ZONE` | zona tecnica, deve rappresentare UTC |
-   | `app.email.mode` | `APP_EMAIL_MODE` | `DISABLED` (default locale sicuro), `IN_MEMORY` oppure `SMTP` |
-   | `app.email.verification-page-url` | `APP_EMAIL_VERIFICATION_PAGE_URL` | URL assoluto senza query/fragment; HTTPS per host remoti, HTTP solo loopback |
-   | `app.email.sender.address` | `APP_EMAIL_SENDER_ADDRESS` | indirizzo mittente obbligatorio in `SMTP` |
-   | `app.email.sender.name` | `APP_EMAIL_SENDER_NAME` | nome visualizzato obbligatorio in `SMTP` |
-   | `app.email.sender.reply-to` | `APP_EMAIL_SENDER_REPLY_TO` | indirizzo Reply-To SMTP facoltativo |
-   | `app.email.smtp.host` / `port` | `APP_EMAIL_SMTP_HOST` / `APP_EMAIL_SMTP_PORT` | host e porta (1–65535) obbligatori in `SMTP` |
-   | `app.email.smtp.username` / `password` | `APP_EMAIL_SMTP_USERNAME` / `APP_EMAIL_SMTP_PASSWORD` | obbligatori solo con `APP_EMAIL_SMTP_AUTH=true`; fornire solo tramite environment |
-   | `app.email.smtp.auth` / `start-tls` | `APP_EMAIL_SMTP_AUTH` / `APP_EMAIL_SMTP_START_TLS` | autenticazione e STARTTLS configurabili |
-   | `app.email.smtp.connect-timeout` / `read-timeout` / `write-timeout` | `APP_EMAIL_SMTP_CONNECT_TIMEOUT` / `APP_EMAIL_SMTP_READ_TIMEOUT` / `APP_EMAIL_SMTP_WRITE_TIMEOUT` | durate positive, ad esempio `5s` |
+   | Proprietà                                                           | Variabile d'ambiente                                                                              | Formato                                                                                    |
+   | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+   | `spring.datasource.url`                                             | `SPRING_DATASOURCE_URL`                                                                           | URL JDBC MySQL con `connectionTimeZone=%2B00:00` e `forceConnectionTimeZoneToSession=true` |
+   | `spring.datasource.username`                                        | `SPRING_DATASOURCE_USERNAME`                                                                      | utenza database                                                                            |
+   | `spring.datasource.password`                                        | `SPRING_DATASOURCE_PASSWORD`                                                                      | password database                                                                          |
+   | `spring.session.timeout`                                            | `SPRING_SESSION_TIMEOUT`                                                                          | durata positiva; default tracciato `30m`                                                   |
+   | `spring.session.jdbc.initialize-schema`                             | —                                                                                                 | `never` (schema sessioni da Flyway V7)                                                     |
+   | `server.servlet.session.cookie.name`                                | —                                                                                                 | produzione `__Host-STSESSION`; locale/test `STSESSION`                                     |
+   | `server.servlet.session.cookie.http-only`                           | —                                                                                                 | `true`                                                                                     |
+   | `server.servlet.session.cookie.secure`                              | —                                                                                                 | produzione `true`; locale/test `false`                                                     |
+   | `server.servlet.session.cookie.same-site`                           | —                                                                                                 | `strict`                                                                                   |
+   | `server.servlet.session.cookie.path`                                | —                                                                                                 | `/` (non impostare `Domain`)                                                               |
+   | `app.time.business-zone`                                            | `APP_TIME_BUSINESS_ZONE`                                                                          | `ZoneId` business; default `Europe/Rome`                                                   |
+   | `app.time.clock-zone`                                               | `APP_TIME_CLOCK_ZONE`                                                                             | zona tecnica, deve rappresentare UTC                                                       |
+   | `app.email.mode`                                                    | `APP_EMAIL_MODE`                                                                                  | `DISABLED` (default locale sicuro), `IN_MEMORY` oppure `SMTP`                              |
+   | `app.email.verification-page-url`                                   | `APP_EMAIL_VERIFICATION_PAGE_URL`                                                                 | URL assoluto senza query/fragment; HTTPS per host remoti, HTTP solo loopback               |
+   | `app.email.sender.address`                                          | `APP_EMAIL_SENDER_ADDRESS`                                                                        | indirizzo mittente obbligatorio in `SMTP`                                                  |
+   | `app.email.sender.name`                                             | `APP_EMAIL_SENDER_NAME`                                                                           | nome visualizzato obbligatorio in `SMTP`                                                   |
+   | `app.email.sender.reply-to`                                         | `APP_EMAIL_SENDER_REPLY_TO`                                                                       | indirizzo Reply-To SMTP facoltativo                                                        |
+   | `app.email.smtp.host` / `port`                                      | `APP_EMAIL_SMTP_HOST` / `APP_EMAIL_SMTP_PORT`                                                     | host e porta (1–65535) obbligatori in `SMTP`                                               |
+   | `app.email.smtp.username` / `password`                              | `APP_EMAIL_SMTP_USERNAME` / `APP_EMAIL_SMTP_PASSWORD`                                             | obbligatori solo con `APP_EMAIL_SMTP_AUTH=true`; fornire solo tramite environment          |
+   | `app.email.smtp.auth` / `start-tls`                                 | `APP_EMAIL_SMTP_AUTH` / `APP_EMAIL_SMTP_START_TLS`                                                | autenticazione e STARTTLS configurabili                                                    |
+   | `app.email.smtp.connect-timeout` / `read-timeout` / `write-timeout` | `APP_EMAIL_SMTP_CONNECT_TIMEOUT` / `APP_EMAIL_SMTP_READ_TIMEOUT` / `APP_EMAIL_SMTP_WRITE_TIMEOUT` | durate positive, ad esempio `5s`                                                           |
 
 Non sono più richieste proprietà `app.security.jwt.*` né `app.cors.allowed-origins`: non esiste JWT runtime e CORS applicativo è disabilitato. In produzione l’autenticazione browser assume topologia same-origin dietro reverse proxy. Il file `application.properties` resta escluso da Git.
 
-Anche `app.email` è tipizzata e fail-fast. `verification-page-url` rappresenta direttamente la futura pagina frontend e può includere un base path; il backend aggiunge il token codificato nel fragment `#token=...`. `DISABLED` è soltanto un default locale sicuro e non rende la configurazione pronta per produzione. `IN_MEMORY` conserva messaggi esclusivamente nel processo, non espone inbox HTTP e viene usato dal profilo `test`; non sono configurati host SMTP, credenziali o accessi di rete. `SMTP` richiede mittente valido, host, porta, tre timeout positivi e, quando `auth=true`, username e password; applica UTF-8, `mail.smtp.auth`, STARTTLS e i timeout JavaMail in millisecondi. Nessuna connessione viene eseguita durante la validazione. Le combinazioni incoerenti impediscono l'avvio e password o credenziali non sono incluse nei `toString` o nei log.
+Anche `app.email` è tipizzata e fail-fast. `verification-page-url` punta alla pagina frontend di verifica email (`/verify-email`, già implementata) e può includere un base path; il backend aggiunge il token codificato nel fragment `#token=...`. `DISABLED` è soltanto un default locale sicuro e non rende la configurazione pronta per produzione. `IN_MEMORY` conserva messaggi esclusivamente nel processo, non espone inbox HTTP e viene usato dal profilo `test`; non sono configurati host SMTP, credenziali o accessi di rete. `SMTP` richiede mittente valido, host, porta, tre timeout positivi e, quando `auth=true`, username e password; applica UTF-8, `mail.smtp.auth`, STARTTLS e i timeout JavaMail in millisecondi. Nessuna connessione viene eseguita durante la validazione. Le combinazioni incoerenti impediscono l'avvio e password o credenziali non sono incluse nei `toString` o nei log.
 
-La configurazione locale validata usa `app.email.verification-page-url=http://localhost:5173/verify-email`. La pagina frontend prevista è `/verify-email`; il backend aggiunge il token nel fragment e il frontend deve leggerlo e rimuoverlo prima di inviare la conferma al backend. Lo startup controllato è stato eseguito con email `DISABLED`, senza invii SMTP reali.
+La configurazione locale validata usa `app.email.verification-page-url=http://localhost:5173/verify-email`. La pagina frontend `/verify-email` è implementata: legge e rimuove il token dal fragment, conferma via API e offre il resend neutro. Lo startup controllato è stato eseguito con email `DISABLED`, senza invii SMTP reali.
 
 Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazione usa un unico `Clock` tecnico UTC; `ApplicationTimeProvider.nowInstant()` tronca, senza arrotondare, alla precisione canonica di sei cifre. Gli istanti persistiti e gli audit applicativi sono `Instant` su colonne `DATETIME(6)`, con `spring.jpa.properties.hibernate.jdbc.time_zone=UTC`; `Europe/Rome` resta soltanto la zona business. Spring Data JPA valorizza `createdAt` e `updatedAt`. Le scadenze email e invito sono rispettivamente 24 e 168 ore reali e sono esposte con `Z`. Sul confine HTTP gli orari degli slot restano `OffsetDateTime` al secondo, validati contro gap, overlap e offset di `Europe/Rome`. Anche il timestamp di `ErrorResponse` è un `Instant` UTC serializzato con `Z`.
 
@@ -337,7 +338,7 @@ Creare la build frontend di produzione, comprensiva del controllo TypeScript:
 npm run build
 ```
 
-L'output della build viene generato in `frontend/dist`. I comandi verificano foundation, home, auth session-based e Profilo/Account/Operational Status; non implicano che le altre pagine business placeholder o i flussi pubblici di registrazione/invito/verifica email siano già integrati con le API di dominio.
+L'output della build viene generato in `frontend/dist`. I comandi verificano foundation, home, auth session-based, onboarding PROFESSIONAL/verifica email e Profilo/Account/Operational Status; non implicano che le altre pagine business placeholder o i flussi pubblici di invito/registrazione CLIENT siano già integrati con le API di dominio.
 
 ### Sviluppo locale frontend + backend
 
@@ -464,7 +465,7 @@ Il profilo tracciato `mailpit` è un aiuto manuale locale, non un profilo di pro
 ## 14. Roadmap sintetica
 
 1. altre pagine frontend business ancora placeholder (clients, professionals, availability, bookings, dashboard con dati);
-2. flussi pubblici frontend ancora placeholder (registrazioni, invito, verifica email);
+2. flussi pubblici frontend ancora placeholder (validazione invito, registrazione CLIENT);
 3. completare il lifecycle account (recupero/reset password, editing account, upload immagine profilo);
 4. implementare le schede di allenamento;
 5. implementare i piani alimentari;
@@ -484,6 +485,6 @@ La cartella `frontend` contiene un'applicazione React/TypeScript/Vite con:
 - proxy Vite `/api` → `http://localhost:8080` in sviluppo;
 - test con Vitest / React Testing Library; gate locali lint/format/build.
 
-Auth foundation, login/logout e Profilo/Account/Operational Status sono implementati. Restano placeholder i flussi pubblici di registrazione/invito/verifica email e le altre pagine business private (dashboard con dati, clients, professionals, availability, bookings). Nessun JWT/Bearer né storage di token nel client.
+Auth foundation, login/logout, registrazione PROFESSIONAL, verifica email con resend e Profilo/Account/Operational Status sono implementati. Restano placeholder i flussi pubblici di validazione invito e registrazione CLIENT, oltre alle altre pagine business private (dashboard con dati, clients, professionals, availability, bookings). Nessun JWT/Bearer né storage di token nel client.
 
 Riferimenti: [Authentication Session Flow](docs/frontend/03-authentication-session-flow.md), [Frontend Functional Map](docs/frontend/01-frontend-functional-map-mvp.md), [Public Home](docs/frontend/02-public-home-implementation.md), [Security Flow](docs/09-security-flow.md), [Functional Scope](docs/01-functional-scope.md).

@@ -16,6 +16,30 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface RegisterProfessionalRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  specialization: ProfessionalSpecialization;
+}
+
+export interface RegistrationAcceptedResponse {
+  message: string;
+}
+
+export interface ConfirmEmailVerificationRequest {
+  token: string;
+}
+
+export interface ResendEmailVerificationRequest {
+  email: string;
+}
+
+export interface MessageResponse {
+  message: string;
+}
+
 export interface MyAccountResponse {
   id: number;
   email: string;

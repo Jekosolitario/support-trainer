@@ -1,6 +1,7 @@
 # Project Brief — Support Trainer
 
 ## 1. Nome del progetto
+
 **Nome:** Support Trainer
 
 ---
@@ -22,6 +23,7 @@ L’evoluzione futura del prodotto prevede anche schede di allenamento, piani al
 ---
 
 ## 3. Scopo del progetto
+
 Questo progetto nasce con i seguenti obiettivi:
 
 - consolidare le competenze in:
@@ -83,14 +85,16 @@ Il repository contiene un frontend React/TypeScript/Vite con routing, layout pub
 - sezione Account in sola lettura;
 - Operational Status modificabile in modo indipendente dal form profilo.
 
-La presenza di altre route private non equivale a funzionalità business complete: dashboard con dati, clients, professionals, availability, bookings e i flussi pubblici di registrazione/invito/verifica email restano prevalentemente placeholder.
+La presenza di altre route private non equivale a funzionalità business complete: dashboard con dati, clients, professionals, availability e bookings restano prevalentemente placeholder. Sul fronte pubblico, registrazione PROFESSIONAL e verifica email sono implementate; validazione invito e registrazione CLIENT restano placeholder.
 
 ---
 
 ## 4. Problema che risolve
+
 Molti personal trainer e professionisti simili gestiscono clienti, appuntamenti e programmi di lavoro in modo frammentato, spesso tramite chiamate, messaggi e documenti sparsi.
 
 Questo crea diversi problemi:
+
 - perdita di tempo nella gestione delle disponibilità
 - difficoltà nell’organizzare appuntamenti e modifiche
 - poca chiarezza nella condivisione delle schede
@@ -101,20 +105,26 @@ Vale la pena risolvere questo problema perché una gestione più ordinata miglio
 ---
 
 ## 5. Target utenti
+
 ### Utenti principali
+
 - Personal trainer
 - Clienti
 - Nutrizionisti
 
 ### Relazioni previste
+
 - un cliente può essere collegato fino a **3 professionisti**
 - tra questi possono esserci personal trainer e nutrizionisti
 
 ### Livello di esperienza degli utenti
+
 Gli utenti non sono necessariamente esperti di tecnologia, quindi l’app dovrà essere semplice, chiara e facile da usare.
 
 ### Contesto d’uso
+
 L’app sarà usata in ambito lavorativo e personale, soprattutto per:
+
 - organizzare appuntamenti
 - consultare disponibilità
 - visualizzare programmi assegnati
@@ -149,7 +159,7 @@ Restano da sviluppare:
 3. feedback del cliente;
 4. monitoraggio progressi e misurazioni;
 5. eventuali API dedicate alla gestione manuale dei collegamenti;
-6. altre pagine frontend business ancora placeholder (oltre auth e Profilo/Account/Operational Status già presenti) e flussi pubblici di registrazione/invito/verifica email ancora placeholder;
+6. altre pagine frontend business ancora placeholder (oltre auth, onboarding PROFESSIONAL/verifica email e Profilo/Account/Operational Status già presenti) e flussi pubblici di validazione invito/registrazione CLIENT ancora placeholder;
 7. completamento delle funzionalità tecniche necessarie al deploy.
 
 ---
@@ -175,7 +185,8 @@ Restano da sviluppare:
 ## 7.2 Funzionalità ancora da implementare per completare la v1 applicativa
 
 - [ ] altre pagine frontend business ancora placeholder (dashboard con dati, clients, professionals, availability, bookings);
-- [ ] flussi frontend pubblici di registrazione/invito/verifica email ancora placeholder;
+- [ ] flussi frontend pubblici di validazione invito e registrazione CLIENT ancora placeholder;
+- [x] registrazione pubblica PROFESSIONAL e verifica email (confirm + resend) sul frontend;
 - [ ] creazione di una scheda di allenamento;
 - [ ] visualizzazione della scheda da parte del cliente;
 - [ ] dettaglio giornaliero dell’allenamento;
@@ -223,6 +234,7 @@ Questa struttura resta una proposta funzionale futura, da confermare nello sprin
 ---
 
 ## 8. Fuori scope (non nella prima versione)
+
 Per evitare di rendere la prima versione troppo complessa, queste funzionalità restano fuori scope inizialmente:
 
 - [ ] grafici avanzati dei progressi
@@ -239,6 +251,7 @@ Per evitare di rendere la prima versione troppo complessa, queste funzionalità 
 ## 9. Stack tecnologico
 
 ### Backend
+
 - Java
 - Spring Boot
 - Spring Data JPA
@@ -247,6 +260,7 @@ Per evitare di rendere la prima versione troppo complessa, queste funzionalità 
 - MySQL
 
 ### Frontend web adottato
+
 - React
 - TypeScript
 - Vite
@@ -257,6 +271,7 @@ Per evitare di rendere la prima versione troppo complessa, queste funzionalità 
 - comunicazione con backend tramite API REST JSON session-based (cookie + CSRF)
 
 ### Strategia mobile futura
+
 - possibile evoluzione con React Native + Expo;
 - non parte dello sprint frontend iniziale;
 - da valutare dopo stabilizzazione della web app;
@@ -264,6 +279,7 @@ Per evitare di rendere la prima versione troppo complessa, queste funzionalità 
 - i flussi, la logica applicativa e l’organizzazione API dovranno però essere pensati in modo riutilizzabile.
 
 ### Strumenti di supporto
+
 - Git / GitHub
 - Postman
 - MySQL Workbench
@@ -311,7 +327,7 @@ Il frontend web è sviluppato come applicazione separata dal backend, con:
 - Vitest e React Testing Library;
 - progettazione UI responsive/mobile-first già applicata alla home pubblica.
 
-La fondazione include routing, layout, home pubblica e autenticazione session-based già collegata al backend per login/logout/bootstrap. È inoltre implementato il vertical slice Profilo/Account/Operational Status. Le altre pagine business e i flussi pubblici di registrazione/invito/verifica email restano prevalentemente placeholder.
+La fondazione include routing, layout, home pubblica e autenticazione session-based già collegata al backend per login/logout/bootstrap. Sono inoltre implementati il vertical slice Profilo/Account/Operational Status e l’onboarding pubblico PROFESSIONAL con verifica email. Le altre pagine business e i flussi pubblici di validazione invito/registrazione CLIENT restano prevalentemente placeholder.
 
 La futura evoluzione mobile potrà essere valutata con React Native + Expo, ma non fa parte dello sprint frontend iniziale.  
 Questa possibilità non implica il riuso automatico dei componenti React web su mobile; tuttavia flussi, logica applicativa e organizzazione API dovranno essere progettati in modo il più possibile riutilizzabile.
@@ -350,6 +366,7 @@ Il frontend possiede già:
 ---
 
 ## 12. Obiettivi di apprendimento personali
+
 Attraverso questo progetto voglio:
 
 - imparare meglio controller, service, repository, DTO e gestione degli endpoint
@@ -361,22 +378,27 @@ Attraverso questo progetto voglio:
 ---
 
 ## 13. Note iniziali e contesto storico
+
 Questa sezione conserva il contesto da cui è nato il progetto.  
 Diversi dubbi iniziali sono già stati affrontati attraverso la realizzazione del backend fino ai moduli Availability e Bookings.
 
 ### Idea generale
+
 Realizzare una piattaforma gestionale per professionisti del benessere e i loro clienti, con particolare attenzione a organizzazione, chiarezza e usabilità.
 
 ### Dubbi principali
+
 - da dove iniziare correttamente
 - come impostare bene la struttura del progetto
 - come trasformare l’idea in funzionalità reali e sostenibili
 - come gestire correttamente sicurezza, relazioni tra utenti e logica di prenotazione
 
 ### Vincoli tecnici
+
 - conoscenza ancora parziale di Spring Security
 - poca esperienza pratica nella progettazione completa di una web app
 - necessità di procedere un passo alla volta con documentazione chiara
 
 ### Priorità iniziale
+
 Capire il flusso corretto di progettazione e sviluppo, costruendo il progetto in modo ordinato senza fretta.

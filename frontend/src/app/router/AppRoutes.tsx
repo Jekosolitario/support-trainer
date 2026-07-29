@@ -27,10 +27,10 @@ import { HomePage } from '../../pages/public/HomePage';
 import { LoginPage } from '../../pages/public/LoginPage';
 import {
   RegisterClientPage,
-  RegisterProfessionalPage,
   ValidateInvitePage,
-  VerifyEmailPage,
 } from '../../pages/public/PublicPages';
+import { RegisterProfessionalPage } from '../../pages/public/RegisterProfessionalPage';
+import { VerifyEmailPage } from '../../pages/public/VerifyEmailPage';
 import { DashboardPage } from '../../pages/shared/DashboardPage';
 import { ForbiddenPage, NotFoundPage } from '../../pages/shared/ErrorPages';
 import { ProfilePage } from '../../pages/shared/ProfilePage';

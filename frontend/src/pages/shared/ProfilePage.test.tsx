@@ -15,6 +15,7 @@ import type {
   MyProfessionalProfileResponse,
   MyProfileResponse,
 } from '../../api/authTypes';
+import * as meProfileApi from '../../api/meProfileApi';
 import { HttpApiError, type ErrorResponse } from '../../api/types';
 import { StaleAuthOperationError } from '../../api/csrfMutation';
 import {
@@ -29,15 +30,6 @@ import {
   renderWithAuthContext,
 } from '../../test/renderWithAuthContext';
 import { ProfilePage } from './ProfilePage';
-
-const updateMyProfile = vi.fn();
-const updateMyOperationalStatus = vi.fn();
-
-vi.mock('../../api/meProfileApi', () => ({
-  updateMyProfile: (...args: unknown[]) => updateMyProfile(...args),
-  updateMyOperationalStatus: (...args: unknown[]) =>
-    updateMyOperationalStatus(...args),
-}));
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -176,13 +168,21 @@ function renderProfile(
   );
 }
 
+let updateMyProfile: ReturnType<typeof vi.spyOn>;
+let updateMyOperationalStatus: ReturnType<typeof vi.spyOn>;
+
 beforeEach(() => {
-  updateMyProfile.mockReset();
-  updateMyOperationalStatus.mockReset();
+  updateMyProfile = vi.spyOn(meProfileApi, 'updateMyProfile');
+  updateMyOperationalStatus = vi.spyOn(
+    meProfileApi,
+    'updateMyOperationalStatus',
+  );
 });
 
 afterEach(() => {
-  vi.clearAllMocks();
+  updateMyProfile.mockRestore();
+  updateMyOperationalStatus.mockRestore();
+  vi.restoreAllMocks();
 });
 
 describe('ProfilePage CLIENT rendering', () => {

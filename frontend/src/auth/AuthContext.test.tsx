@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -131,7 +131,7 @@ let latestContext: AuthContextValue | null = null;
 function Probe() {
   const context = useAuth();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     latestContext = context;
 
     return () => {
