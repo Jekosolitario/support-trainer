@@ -23,7 +23,7 @@ Questo approccio consente di:
 - separare responsabilità e regole business;
 - mantenere controller e service ordinati;
 - favorire l’evoluzione progressiva del backend;
-- collegare il futuro frontend a contratti API chiari.
+- collegare il frontend a contratti API chiari.
 
 ---
 
@@ -388,7 +388,7 @@ Oltre ai moduli business non ancora implementati, restano da valutare o sviluppa
 - upload immagine profilo;
 - cambio password autenticato;
 - API dedicate per gestione link;
-- integrazione frontend reale (adozione del contratto sessione/CSRF già esposto dal backend);
+- estendere l’integrazione frontend reale, già presente per autenticazione e Profilo/Account/Operational Status (`/me`), agli altri moduli applicativi ancora privi di UI completa;
 - preparazione deploy.
 
 ---

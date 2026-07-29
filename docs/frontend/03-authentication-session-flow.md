@@ -12,9 +12,12 @@ Documenta:
 - bootstrap / reconciliation;
 - CSRF client;
 - login / logout;
-- guards;
+- guards e safe redirect;
+- integrazione delle mutation Profilo / Operational Status con la source of truth auth (soft commit);
+- protezione race tramite auth epoch;
 - stato `unavailable`;
-- proxy di sviluppo.
+- proxy di sviluppo;
+- maturity sintetica delle aree auth e della prima pagina business reale.
 
 Non documenta:
 
@@ -22,7 +25,8 @@ Non documenta:
 - elenco completo degli endpoint → [`docs/08-endpoint-map.md`](../08-endpoint-map.md);
 - schema database / Flyway → [`docs/10-database-schema.md`](../10-database-schema.md);
 - roadmap business → [`docs/15-planned-endpoints-roadmap.md`](../15-planned-endpoints-roadmap.md);
-- mappa funzionale e maturity delle pagine → [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md).
+- campi profilo, layout UX, mappa funzionale delle pagine e dettaglio frontend del follow-up **M1-R** → [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md);
+- scope funzionale di prodotto (Account RO, enum status, follow-up high-level) → [`docs/01-functional-scope.md`](../01-functional-scope.md).
 
 ## 2. Principi
 
@@ -31,7 +35,9 @@ Non documenta:
 - **nessun** salvataggio di credenziali o CSRF in `localStorage` / `sessionStorage`;
 - chiamate API su path **relativi** sotto `/api/v1/...`;
 - `credentials: 'same-origin'`;
-- token CSRF **solo in memoria**.
+- token CSRF **solo in memoria**;
+- `AuthProvider` è l’unica source of truth dello stato autenticato (`account`, `profile`, `accessProfile`);
+- le pagine business non mantengono una seconda copia persistente dello stato server: eventuali draft di editing sono locali e temporanei.
 
 ## 3. Layer principali
 
@@ -41,11 +47,13 @@ Non documenta:
 | CSRF manager | Ensure / cache / invalidazione del token CSRF in memoria; header dinamico da `headerName` |
 | `csrfMutation` | Mutazioni CSRF-aware con **un solo** retry mirato su `403 CSRF_VALIDATION_FAILED` |
 | `authApi` | Contratti login, logout, CSRF, `/me/account`, `/me/profile`; lock globale di mutua esclusione su login/logout |
+| `meProfileApi` | `PATCH /me/profile` e `PATCH /me/profile/operational-status` tramite `csrfMutation` (`invalidateOn401: true`) |
 | `authEpoch` | Generazione monotona di epoch per scartare operazioni stale |
 | `sessionInvalidation` | Pub/sub quando una richiesta session-bound riceve `401` ancora corrente |
-| `AuthProvider` | Ownership dello stato auth, bootstrap, login, logout, reconciliation |
+| `AuthProvider` | Ownership dello stato auth, bootstrap, login, logout, reconciliation, soft commit profilo |
 | Guards | Fail-closed su autenticazione, ruolo e specializzazione |
 | `LoginPage` / `LogoutButton` | UI di ingresso e uscita allineate allo stato auth |
+| `ProfilePage` | Prima pagina business reale: draft locale, PATCH, soft commit race-safe |
 
 ## 4. Stato auth
 
@@ -57,6 +65,12 @@ Stati runtime (`AuthStatus`):
 | `unauthenticated` | Nessuna sessione utilizzabile; l'utente è trattato come anonimo |
 | `authenticated` | Sessione coerente con `account`, `profile` e profilo di accesso derivato |
 | `unavailable` | La sessione **non è verificabile** in modo affidabile: non equivale automaticamente ad anonimo |
+
+Quando lo stato è `authenticated`, la source of truth espone almeno:
+
+- `account` — dati account;
+- `profile` — snapshot profilo corrente;
+- `accessProfile` — vista di accesso derivata (ruolo, specializzazione, readiness di routing).
 
 Motivi tipici di `unauthenticated` includono assenza di sessione, invalidazione, login rifiutato, post-login senza sessione, logout completato.
 
@@ -78,6 +92,8 @@ Comportamento generale:
 
 I dettagli di payload restano in [`docs/08-endpoint-map.md`](../08-endpoint-map.md).
 
+Il bootstrap/reconciliation resta il percorso completo di allineamento sessione. Le mutation Profilo/Status **non** lo riutilizzano dopo un PATCH riuscito (vedi soft commit).
+
 ## 6. Auth epoch e operazioni stale
 
 L'epoch evita che richieste o lifecycle **vecchi** alterino lo stato dopo un cambio di sessione.
@@ -85,7 +101,8 @@ L'epoch evita che richieste o lifecycle **vecchi** alterino lo stato dopo un cam
 Esempi:
 
 - un `401` di una richiesta iniziata prima di un nuovo login non deve invalidare la sessione appena creata;
-- una reconciliation o un logout avviati in un'epoca precedente non devono fare commit su uno stato più recente.
+- una reconciliation o un logout avviati in un'epoca precedente non devono fare commit su uno stato più recente;
+- una response di PATCH profilo/status partita in un'epoca precedente non deve aggiornare logout, nuovo login o altro lifecycle corrente.
 
 Il client confronta l'epoch catturata all'inizio dell'operazione con quella corrente prima di pubblicare invalidazioni o aggiornare lo stato.
 
@@ -99,6 +116,8 @@ Per le richieste **session-bound** (tipicamente dopo autenticazione), un `401` p
 
 Login e bootstrap/reconciliation possono usare regole diverse (`invalidateOn401` disabilitato dove un `401` è un esito atteso di "nessuna sessione", non un evento di espulsione mid-flight).
 
+Le mutation Profilo e Operational Status usano `invalidateOn401: true` tramite la foundation CSRF/httpClient: non esiste un handling 401 locale alternativo nella ProfilePage.
+
 ## 8. CSRF lato client
 
 1. `GET /api/v1/auth/csrf` restituisce `{ token, headerName }` (`Cache-Control: no-store` lato server).
@@ -107,6 +126,8 @@ Login e bootstrap/reconciliation possono usare regole diverse (`invalidateOn401`
 4. Dopo login (e quando necessario) il CSRF viene invalidato/rinfrescato.
 5. Su `403 CSRF_VALIDATION_FAILED` è consentito **un solo** retry dopo refresh del token; non ci sono retry generici illimitati.
 6. Nessuna persistenza su disco o storage del browser.
+
+Le mutation Profile/Status riusano questa foundation (`csrfMutation`): non duplicano ensure/retry CSRF nella pagina.
 
 La configurazione CSRF backend resta in [`docs/09-security-flow.md`](../09-security-flow.md).
 
@@ -118,6 +139,8 @@ Login e logout condividono un **lock globale** (`AuthTransitionInProgressError`)
 - login/login, login/logout e logout/login concorrenti sono rifiutati;
 - non esiste una coda automatica;
 - la seconda richiesta viene rifiutata **prima** di avviare una nuova mutazione dello stato auth/epoch.
+
+Questo lock **non** è lo stesso meccanismo usato dalla ProfilePage per serializzare salvataggio profilo e aggiornamento status (vedi §11.4).
 
 ## 10. Login
 
@@ -139,7 +162,83 @@ Distinzioni importanti:
 
 Il contratto server (cookie, readiness, timeout) è in [`docs/09-security-flow.md`](../09-security-flow.md).
 
-## 11. Logout
+### 10.1 Safe redirect post-login e follow-up E2E-1
+
+Dopo login riuscito, il client può ripristinare una destinazione interna **safe** memorizzata dallo stato di navigazione (allowlist sotto `/app/client/...` o `/app/professional/...`).
+
+Il safe redirect valida canonicalità e sicurezza dell’URL interno (no open redirect). **Non** valida che il target sia compatibile con il nuovo `accessProfile` (ruolo/specializzazione).
+
+Follow-up **E2E-1** (MINOR, non bloccante):
+
+- un target ricordato da una sessione precedente può essere incompatibile col ruolo della nuova sessione;
+- esempio: route CLIENT → logout → login PROFESSIONAL → target CLIENT ancora considerato URL interno sicuro → `RequireRole` → `/forbidden`;
+- `RequireRole` / `RequireSpecialization` bloccano correttamente: **nessun bypass autorizzativo**;
+- impatto: UX (pagina forbidden invece dell’home di ruolo);
+- remediation non decisa in questo documento; follow-up auth/routing separato.
+
+## 11. Soft commit Profilo / Operational Status
+
+### 11.1 Ruolo rispetto all’auth
+
+La ProfilePage è la prima pagina business autenticata reale. Usa `AuthProvider` come source of truth:
+
+1. legge `account` / `profile` autenticati;
+2. mantiene un **draft locale** solo durante l’editing;
+3. valida e invia un PATCH differenziale;
+4. riceve `MyProfileResponse` dal server;
+5. applica uno **soft commit** nella source of truth auth.
+
+Il server response è autoritativo. **Non** c’è optimistic update. **Non** c’è refetch automatico di `/me/account` + `/me/profile` come conseguenza del salvataggio.
+
+### 11.2 Flow
+
+```text
+AuthProvider snapshot (authenticated)
+  → draft locale (temporaneo)
+  → validazione client
+  → PATCH /api/v1/me/profile
+     oppure PATCH /api/v1/me/profile/operational-status
+  → response MyProfileResponse
+  → applyProfileSnapshot(profile, expectedEpoch)
+```
+
+Motivazione del pattern:
+
+- applicare direttamente lo snapshot server autoritativo;
+- evitare un dual GET `/me/*` non necessario post-PATCH;
+- mantenere una sola source of truth auth;
+- proteggere l’applicazione della response da cambi di lifecycle tramite auth epoch.
+
+### 11.3 `applyProfileSnapshot(profile, expectedEpoch)`
+
+Dopo una mutation riuscita, `AuthProvider.applyProfileSnapshot`:
+
+- è consentito **solo** da stato `authenticated`;
+- confronta `expectedEpoch` con l’epoch corrente;
+- se l’epoch non coincide → `StaleAuthOperationError` e **nessun** aggiornamento dello stato;
+- se coerente: aggiorna `profile` con la response server, **preserva** `account`, ricalcola `accessProfile`;
+- **non** esegue bootstrap, reconcile o GET;
+- **non** avanza l’auth epoch;
+- **non** modifica il CSRF.
+
+`expectedEpoch` viene catturato dalla ProfilePage **prima** del PATCH (`currentEpoch()`). Se nel frattempo la sessione cambia (logout, nuovo login, invalidazione), la response non viene applicata al lifecycle corrente: nessun falso successo UI e nessun reconcile forzato dalla pagina.
+
+### 11.4 Serializzazione mutation nella ProfilePage
+
+Nella ProfilePage è consentita **una sola** transizione business Profilo/Status alla volta (salvataggio profilo e aggiornamento status non concorrenti; doppio submit bloccato).
+
+Questo meccanismo è **locale alla pagina** e distinto dal lock globale login/logout (§9).
+
+### 11.5 Route Profile
+
+| Area | Route |
+|---|---|
+| CLIENT | `/app/client/profile` |
+| PROFESSIONAL | `/app/professional/profile` |
+
+Campi editabili, Account read-only, enum Operational Status e confini funzionali: [`docs/01-functional-scope.md`](../01-functional-scope.md) e [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md).
+
+## 12. Logout
 
 `POST /api/v1/auth/logout` con CSRF. Il server invalida la **sessione corrente** (non revoke-all; vedi docs/09). Esiti frontend:
 
@@ -155,7 +254,7 @@ Quando il client non può sapere se il logout server-side sia avvenuto (es. netw
 ### Risultato stale
 Se nel frattempo l'epoch/transizione è diventata stale, il vecchio lifecycle **non** ripristina snapshot né sovrascrive lo stato più recente.
 
-## 12. Guards
+## 13. Guards
 
 | Guard | Ruolo |
 |---|---|
@@ -165,7 +264,9 @@ Se nel frattempo l'epoch/transizione è diventata stale, il vecchio lifecycle **
 
 Le guard migliorano UX e routing; **non** sostituiscono l'autorizzazione backend.
 
-## 13. Stato `unavailable`
+Le route Profile reali (`/app/client/profile`, `/app/professional/profile`) sono protette da `RequireAuth` + `RequireRole` del ruolo corrispondente.
+
+## 14. Stato `unavailable`
 
 `unavailable` significa: la sessione non può essere classificata in modo affidabile come autenticata o assente.
 
@@ -173,7 +274,7 @@ Le guard migliorano UX e routing; **non** sostituiscono l'autorizzazione backend
 - `AuthUnavailableBoundary` presenta retry tramite `reconcileSession()`;
 - le aree protette restano fail-closed finché la verifica non riesce.
 
-## 14. Development proxy
+## 15. Development proxy
 
 In sviluppo Vite espone:
 
@@ -182,25 +283,32 @@ In sviluppo Vite espone:
 
 Il client continua a usare path relativi `/api/v1/...` e `credentials: 'same-origin'`, così cookie e CSRF restano coerenti con il modello same-origin anche in locale. In produzione la topologia prevista è same-origin dietro reverse proxy.
 
-## 15. Maturity (sintesi)
+## 16. Maturity (sintesi)
 
 | Area | Stato |
 |---|---|
 | Foundation auth (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap) | **Implementata** |
+| Soft commit profilo / operational status (`applyProfileSnapshot`) | **Implementato** |
 | Home pubblica | **Implementata** |
-| Pagine business (dashboard dati, profilo UI, clients, professionals, availability, bookings) | **Placeholder** |
+| ProfilePage CLIENT (`/app/client/profile`) | **Reale** |
+| ProfilePage PROFESSIONAL (`/app/professional/profile`) | **Reale** |
+| Account (sezione read-only sulla ProfilePage) | **Reale** |
+| Operational Status (aggiornamento indipendente) | **Reale** |
+| Altre pagine business (dashboard dati, clients, professionals, availability, bookings) | **Placeholder** |
 | Flussi pubblici di registrazione / invito / verify-email | **Placeholder** (route presenti, senza integrazione API completa) |
 
-La matrice completa delle pagine resta in [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md).
+La matrice completa delle pagine resta in [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md). Il follow-up UI **M1-R** (fieldErrors dopo update Status) è high-level in [`docs/01-functional-scope.md`](../01-functional-scope.md) e nel dettaglio frontend/UX in [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md); FE03 non lo tratta come backlog dedicato. Il dettaglio tecnico di **E2E-1** resta in §10.1.
 
-## 16. Confini
+## 17. Confini
 
 FE03 **non** è fonte per:
 
 - flag cookie, timeout e readiness server;
 - schema DB o migrazioni;
 - catalogo endpoint completo;
-- roadmap business futura.
+- roadmap business futura;
+- elenco campi profilo CLIENT/PROFESSIONAL, layout CSS o design system;
+- enum Operational Status e confini Account oltre quanto necessario al lifecycle auth.
 
 Riferimenti primari:
 
@@ -209,3 +317,4 @@ Riferimenti primari:
 - [`docs/10-database-schema.md`](../10-database-schema.md)
 - [`docs/15-planned-endpoints-roadmap.md`](../15-planned-endpoints-roadmap.md)
 - [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md)
+- [`docs/01-functional-scope.md`](../01-functional-scope.md)

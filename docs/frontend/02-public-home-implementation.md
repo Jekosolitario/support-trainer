@@ -4,9 +4,9 @@
 
 Questo documento descrive la home pubblica di Support Trainer e la parte di fondazione frontend necessaria a renderla disponibile sulla route `/`. Il perimetro comprende struttura narrativa, navigazione, componenti, copy, sistema visuale, tipografia, comportamento responsive, accessibilità e test automatici direttamente collegati alla pagina.
 
-La home pubblica è implementata. Sono presenti anche il progetto React, il routing, il layout pubblico, i layout autenticati, le pagine di errore e le route applicative di base. L’autenticazione session-based frontend (login, logout, CSRF, guards, bootstrap) è implementata; vedi [Authentication Session Flow](./03-authentication-session-flow.md). Registrazioni, validazione invito, verifica email e pagine business private restano prevalentemente placeholder.
+La home pubblica è implementata. Sono presenti anche il progetto React, il routing, il layout pubblico, i layout autenticati, le pagine di errore e le route applicative di base. L’autenticazione session-based frontend (login, logout, CSRF, guards, bootstrap) è implementata; vedi [Authentication Session Flow](./03-authentication-session-flow.md). La pagina Profilo autenticata (Account in sola lettura e Operational Status) è implementata e allineata al linguaggio visuale dark-tech; dettagli funzionali in [Frontend Functional Map](./01-frontend-functional-map-mvp.md). Registrazioni, validazione invito, verifica email e le altre pagine business private restano prevalentemente placeholder.
 
-Le fonti di verità implementative sono:
+Le fonti di verità implementative per questa pagina sono il codice e i test frontend collegati:
 
 - [`AppRoutes.tsx`](../../frontend/src/app/router/AppRoutes.tsx);
 - [`PublicLayout.tsx`](../../frontend/src/layouts/public/PublicLayout.tsx);
@@ -19,7 +19,7 @@ Le fonti di verità implementative sono:
 - [`global.css`](../../frontend/src/styles/global.css), i CSS Module collegati e i relativi test;
 - [`package.json`](../../frontend/package.json).
 
-Per ruoli, endpoint e regole business restano autoritativi il [Functional Scope](../01-functional-scope.md), l'[Endpoint Map](../08-endpoint-map.md), il [Security Flow](../09-security-flow.md), i documenti di sprint relativi a [inviti e registrazione cliente](../13-sprint-02-verification-invite-client-link.md), [profili e relazioni](../14-sprint-03-profile-clients-professionals-read.md), [Availability](../16-sprint-04-availability.md) e [Booking](../17-sprint-05-bookings.md), oltre alla [certificazione tecnica finale](../final-audit-mvp.md).
+Per ruoli, endpoint e regole business, sullo **stato corrente** prevalgono codice, test, configurazioni e la documentazione attiva ([Functional Scope](../01-functional-scope.md), [Endpoint Map](../08-endpoint-map.md), [Security Flow](../09-security-flow.md)). I documenti di sprint ([inviti e registrazione cliente](../13-sprint-02-verification-invite-client-link.md), [profili e relazioni](../14-sprint-03-profile-clients-professionals-read.md), [Availability](../16-sprint-04-availability.md), [Booking](../17-sprint-05-bookings.md)) e la [certificazione tecnica finale](../final-audit-mvp.md) restano riferimenti storici delle rispettive baseline, non source of truth prevalente sullo stato attuale.
 
 ## 2. Obiettivo e pubblico
 
@@ -133,9 +133,9 @@ I moduli `FutureFeature` non contengono link o pulsanti. Il badge “In arrivo�
 
 ### Branding e CSS Modules
 
-[`Branding.tsx`](../../frontend/src/components/branding/Branding.tsx) è condiviso. Header e footer pubblici lo personalizzano tramite custom property, mentre le aree autenticate conservano i fallback legacy. Ogni area usa CSS Modules per limitare lo scope dei selettori; i token globali restano in [`global.css`](../../frontend/src/styles/global.css).
+[`Branding.tsx`](../../frontend/src/components/branding/Branding.tsx) è condiviso. Header e footer pubblici lo personalizzano tramite custom property. La shell autenticata può ancora usare fallback legacy per chrome e navigazione. Ogni area usa CSS Modules per limitare lo scope dei selettori; i token globali restano in [`global.css`](../../frontend/src/styles/global.css).
 
-Il tema pubblico è quindi isolato dal tema autenticato: la direzione dark-tech non è il tema globale dell'applicazione.
+Il linguaggio dark-tech non è più confinato esclusivamente alle superfici pubbliche: Login e ProfilePage lo applicano localmente. Non è ancora il tema globale dell’intera area autenticata (vedi §8.1).
 
 ## 7. Gestione del contenuto
 
@@ -150,9 +150,9 @@ Il documento descrive organizzazione e responsabilità, ma non replica integralm
 
 ## 8. Sistema visuale
 
-“Dark-tech” è il nome interno della direzione visuale della home pubblica. La composizione usa canvas scuri, pannelli glass, griglie di tipo bento, bordi sottili, indicatori tecnici e glow controllati. Questi elementi supportano la gerarchia senza sostituire testo, heading o label.
+“Dark-tech” è il nome interno della direzione visuale approvata per la home pubblica e ripresa sulle superfici autenticate già allineate. La composizione usa canvas scuri, pannelli glass, griglie di tipo bento (home), bordi sottili, indicatori tecnici e glow controllati. Questi elementi supportano la gerarchia senza sostituire testo, heading o label.
 
-La palette approvata per la home è definitiva e assegna ruoli distinti:
+La palette approvata è definitiva e assegna ruoli distinti:
 
 - **Deep Indigo** fornisce identità e profondità;
 - **Teal** identifica accenti operativi, azioni, stati e focus;
@@ -160,18 +160,32 @@ La palette approvata per la home è definitiva e assegna ruoli distinti:
 
 I colori di base e i token semantici per canvas, pannelli, testo, heading, superfici, bordi, glow, CTA, link, focus, callout e footer sono definiti in [`global.css`](../../frontend/src/styles/global.css). Il file resta la fonte dei valori aggiornati; questo documento non replica l'intero elenco degli HEX.
 
-Il focus globale delle aree chiare usa il valore legacy. `PublicLayout` sovrascrive per ereditarietà la custom property del focus con il Pale Teal adatto alle superfici scure, senza duplicare la regola globale `:focus-visible`.
+Il focus globale delle aree chiare usa il valore legacy. `PublicLayout` sovrascrive per ereditarietà la custom property del focus con il Pale Teal adatto alle superfici scure, senza duplicare la regola globale `:focus-visible`. Sulle superfici dark-tech (home, login, Profile) il focus resta ad alto contrasto e visibile.
 
-Le aree autenticate mantengono attualmente palette e componenti legacy. Anche `FutureFeature` e `Branding` usano il comportamento legacy come default e ricevono la personalizzazione dark-tech soltanto nel contesto pubblico autorizzato.
+`FutureFeature` e `Branding` conservano il comportamento legacy come default e ricevono la personalizzazione dark-tech nel contesto pubblico (e dove la pagina autenticata applica i token direttamente).
+
+### 8.1 Estensione del linguaggio visuale
+
+Alla baseline corrente:
+
+| Superficie | Linguaggio visuale |
+|---|---|
+| Home pubblica `/` | Dark-tech (canvas, glass, Indigo/Violet/Teal, glow moderato) |
+| LoginPage `/login` | Coerente con lo stesso linguaggio (pannelli glass, accenti palette) |
+| ProfilePage autenticata | Allineata al dark-tech: superfici glass/panel, accenti Indigo/Violet/Teal, glow moderato, tipografia e gerarchia coerenti, mobile-first |
+| Shell / layout autenticato | Può conservare parti del linguaggio precedente (chrome, nav, sfondo di layout) |
+| Altre pagine business | Ancora placeholder o legacy; non ridisegnate |
+
+**Non** risulta ridisegnata l’intera area autenticata: l’allineamento dark-tech riguarda le superfici implementate citate sopra, non un redesign globale delle dashboard o delle altre route private.
 
 ## 9. Tipografia e font
 
-La home usa:
+La home (e le superfici dark-tech allineate) usa:
 
-- **Bruno Ace SC** per H1, H2 e numerazioni display;
-- **Saira Condensed** per corpo, interfaccia, H3/H4, navigazione, CTA, FAQ, badge, micro-label, branding e footer.
+- **Bruno Ace SC** per H1, H2 e numerazioni display, con moderazione;
+- **Saira Condensed** come font prevalente per corpo, interfaccia, H3/H4, navigazione, CTA, FAQ, badge, micro-label, branding e footer.
 
-Gli asset vengono distribuiti localmente tramite Fontsource. [`main.tsx`](../../frontend/src/main.tsx) importa Bruno Ace SC 400 e Saira Condensed nei pesi 400, 600, 700 e 800. I CSS forniti dai pacchetti dichiarano `font-display: swap`; non vengono richieste risorse font remote.
+Su ProfilePage i titoli di sezione usano il token display; corpo, form e controlli restano sul body/UI. Gli asset vengono distribuiti localmente tramite Fontsource. [`main.tsx`](../../frontend/src/main.tsx) importa Bruno Ace SC 400 e Saira Condensed nei pesi 400, 600, 700 e 800. I CSS forniti dai pacchetti dichiarano `font-display: swap`; non vengono richieste risorse font remote.
 
 I token tipografici includono fallback `system-ui` e famiglie sans-serif. `font-synthesis: none` impedisce al browser di simulare stili non caricati.
 
@@ -186,6 +200,8 @@ Gli stili di base sono mobile-first. La pagina usa dimensioni fluide, `minmax(0,
 Su mobile l'header mantiene branding e destinazioni pubbliche accessibili senza introdurre un menu simulato. La hero dispone testo, diagramma e azioni secondo lo spazio disponibile. Card e bento ritornano a una colonna quando necessario. FAQ, chiusura e footer mantengono target e reflow senza dipendere da larghezze desktop fisse.
 
 La verifica manuale della home è stata svolta a 320, 390, 768 e 1440 CSS pixel, senza overflow orizzontale. Il controllo a larghezza ridotta copre anche il reflow equivalente allo zoom del 200% su una viewport desktop compatibile. Questo non costituisce una matrice ufficiale di browser o dispositivi.
+
+ProfilePage è stata verificata a livello visuale/E2E su viewport mobile circa 375px e desktop: nessun overflow orizzontale osservato, CTA raggiungibili, layout leggibile. Non è una certificazione completa multi-device.
 
 ## 11. Accessibilità
 
@@ -206,6 +222,8 @@ Le tecniche implementate comprendono:
 - navigazione e apertura delle FAQ da tastiera.
 
 I controlli automatici coprono struttura e comportamento, mentre contrasto, reflow, resa visuale, zoom, screen reader e combinazioni browser-tecnologie assistive richiedono anche verifiche manuali. La conformità WCAG formale rimane una decisione futura.
+
+ProfilePage mantiene le stesse priorità di accessibilità sulle superfici dark-tech: label reali, focus-visible, feedback testuale, informazioni non solo colore, avatar con fallback accessibile, badge di stato con testo, touch target adeguati, `prefers-reduced-motion` e layout responsive mobile-first. Non sostituisce un report WCAG dedicato.
 
 ## 12. FAQ
 
@@ -262,7 +280,8 @@ Versioni e risoluzione restano governate da `package.json` e `package-lock.json`
 Non sono ancora implementati o definiti in questo perimetro home:
 
 - flussi operativi completi di registrazione, invito e verifica email (route placeholder);
-- contenuti applicativi delle pagine business private, ancora prevalentemente placeholder;
+- contenuti applicativi delle altre pagine business private (dashboard, clients, professionals, availability, bookings), ancora placeholder o legacy;
+- redesign globale della shell autenticata;
 - Workout, Nutrition, Feedback e Measurements;
 - pagine Privacy, Cookie, Termini e Accessibilità;
 - collegamenti operativi per Instagram e segnalazione di problemi o idee;
@@ -271,6 +290,6 @@ Non sono ancora implementati o definiti in questo perimetro home:
 - matrice ufficiale di browser e dispositivi;
 - audit formale WCAG.
 
-API client e autenticazione session-based frontend sono invece implementati fuori dal perimetro di questo documento ([FE03](./03-authentication-session-flow.md)). Login non è più un gap strutturale della fondazione.
+API client e autenticazione session-based frontend sono implementati fuori dal perimetro home ([FE03](./03-authentication-session-flow.md)). Login non è più un gap strutturale della fondazione. Profilo/Account/Operational Status è documentato funzionalmente in [FE01](./01-frontend-functional-map-mvp.md); questo documento ne registra solo l’allineamento visuale dark-tech (§8.1).
 
 Non sono definite date o priorità pubbliche per i moduli “In arrivo”.

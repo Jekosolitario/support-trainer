@@ -4,14 +4,14 @@
 
 Questo documento traduce il backend MVP reale di Support Trainer in una mappa funzionale per UX/UI, prototipazione Figma e implementazione web con React. Non definisce nuove API e non amplia il perimetro del prodotto.
 
-Le fonti verificate sono:
+Le fonti per lo **stato corrente** sono il codice, i test, le configurazioni e la documentazione attiva coerente con la baseline (in particolare README, Endpoint Map, API Modules Overview, Security Flow). Sprint conclusi e [`final-audit-mvp.md`](../final-audit-mvp.md) restano riferimenti storici delle rispettive baseline, non source of truth prevalente sullo stato attuale.
+
+Documentazione attiva di supporto:
 
 - [`README.md`](../../README.md);
-- [`final-audit-mvp.md`](../final-audit-mvp.md);
 - [`08-endpoint-map.md`](../08-endpoint-map.md);
 - [`07-api-modules-overview.md`](../07-api-modules-overview.md);
 - [`09-security-flow.md`](../09-security-flow.md);
-- i documenti di sprint Profile, Availability e Booking;
 - controller, DTO, configurazione Spring Security, servizi ed enum presenti nel backend.
 
 La mappa distingue sempre tre stati:
@@ -33,7 +33,8 @@ La baseline certificata richiede inoltre che il client usi la risposta neutra `2
 - Sono presenti layout pubblico, autenticato e di errore, navigazione differenziata per ruolo, componenti condivisi e test automatici.
 - La home pubblica sulla route `/` è **implementata**; dettagli in [Public Home Implementation](./02-public-home-implementation.md).
 - L’**auth session-based frontend è implementata**: httpClient, CSRF memory-only, AuthProvider, bootstrap/reconciliation `/me`, login, logout, guards e routing protetto. Dettagli in [Authentication Session Flow](./03-authentication-session-flow.md).
-- Le pagine business e i flussi pubblici di registrazione/invito/verifica email restano **placeholder**: le route esistono, ma non sono flussi applicativi completi.
+- La **pagina Profilo autenticata** è **implementata** (CLIENT e PROFESSIONAL), con Account in sola lettura e Operational Status modificabile. Soft commit e race protection: [FE03](./03-authentication-session-flow.md).
+- Le altre pagine business private (dashboard dati, clients, professionals, availability, bookings) e i flussi pubblici di registrazione/invito/verifica email restano **placeholder**: le route esistono, ma non sono flussi applicativi completi.
 - Il client usa path relativi `/api/v1/...` con `credentials: 'same-origin'`. In sviluppo Vite proxya `/api` → `http://localhost:8080`. In produzione la topologia è same-origin dietro reverse proxy.
 - Un'app mobile con React Native + Expo è una possibile evoluzione futura, fuori dall'MVP.
 - L'implementazione corrente del frontend non modifica il contratto backend descritto in questa mappa.
@@ -91,18 +92,77 @@ Note di flusso verificate:
 | Area | Endpoint | Stato MVP | Note UX |
 |---|---|---|---|
 | Bootstrap sessione | `GET /api/v1/me/account`, `GET /api/v1/me/profile` | **Implementato** nel client auth | Confermare ruolo, stato account, specializzazione e dati profilo dopo login/reload. Dettagli in [FE03](./03-authentication-session-flow.md). |
-| Profilo/account | stessi endpoint di lettura; `PATCH /api/v1/me/profile` | Contratto backend pronto; **UI placeholder** | Route presenti; form applicativo reale non ancora collegato. |
-| Stato operativo | `PATCH /api/v1/me/profile/operational-status` | Implementabile ora | Cliente: `ATTIVO`, `INFORTUNATO`, `PAUSA`. Professionista: `DISPONIBILE`, `ASSENTE`, `FERIE`, `MALATTIA`. |
-| Immagine profilo | Campo `profileImageUrl` in lettura | Solo visualizzazione se già valorizzato | Nessun upload o update immagine: usare iniziali/avatar di fallback e non mostrare un controllo file attivo. |
+| Profilo | lettura `/me/profile`; `PATCH /api/v1/me/profile` | **UI implementata** | Route reali sotto; form role-aware collegato al contratto. |
+| Account | lettura `/me/account` | **UI implementata (sola lettura)** | Nessun editing account in questa pagina. |
+| Stato operativo | `PATCH /api/v1/me/profile/operational-status` | **UI implementata** | Sezione indipendente dal form Profilo. Cliente: `ATTIVO`, `INFORTUNATO`, `PAUSA`. Professionista: `DISPONIBILE`, `ASSENTE`, `FERIE`, `MALATTIA`. |
+| Immagine profilo | Campo `profileImageUrl` in lettura | Visualizzazione + fallback | Nessun upload o update immagine: avatar con iniziali se assente. |
 
-Nel `PATCH` profilo professionista, `instagramUrl` e `websiteUrl` seguono un contratto a tre stati: campo omesso o `null` = invariato; URL `http://`/`https://` = aggiornato; stringa vuota = rimosso. Il form deve conservare esplicitamente questa distinzione.
+Nel `PATCH` profilo professionista, `instagramUrl` e `websiteUrl` seguono un contratto a tre stati: campo omesso o `null` = invariato; URL `http://`/`https://` = aggiornato; stringa vuota = rimosso. Il form conserva esplicitamente questa distinzione.
+
+#### 5.1.1 Route Profile
+
+| Ruolo | Route | Componente |
+|---|---|---|
+| CLIENT | `/app/client/profile` | `ProfilePage` (`area="cliente"`) |
+| PROFESSIONAL | `/app/professional/profile` | `ProfilePage` (`area="professionista"`) |
+
+La stessa composizione è role-aware: campi e stati operativi dipendono dal ruolo autenticato. `PERSONAL_TRAINER` e `NUTRITIONIST` condividono la struttura Profile; la specialization è **sola lettura**.
+
+#### 5.1.2 Profilo CLIENT — editing
+
+Campi modificabili via PATCH differenziale:
+
+- `firstName`, `lastName`, `birthDate`, `heightCm`, `primaryGoal`, `gender`, `medicalNotes`, `injuryNotes`, `notes`.
+
+Nella sezione Profile (vista): oltre ai campi sopra sono mostrati anche `profileImageUrl` (o fallback accessibile) e `role`. Lo stato operativo è nella sezione dedicata, non nel form.
+
+Non editabili e **non** renderizzati dalla UI Profile: `id`, `active`, campi PROFESSIONAL. I dati account non appartengono a questa sezione: vedi §5.1.4.
+
+#### 5.1.3 Profilo PROFESSIONAL — editing
+
+Campi modificabili:
+
+- `firstName`, `lastName`, `phoneNumber`, `bio`, `workplaceName`, `city`, `instagramUrl`, `websiteUrl`.
+
+Nella sezione Profile (vista): oltre ai campi sopra sono mostrati anche `profileImageUrl` (o fallback), `role` e `specialization` (**sola lettura**). Lo stato operativo è nella sezione dedicata, non nel form.
+
+Non editabili e **non** renderizzati dalla UI Profile: `id`, `active`, campi CLIENT. I dati account non appartengono a questa sezione: vedi §5.1.4.
+
+#### 5.1.4 Account — sola lettura
+
+Campi mostrati dalla `AccountSection` (esattamente): `email`, `role`, `accountStatus`, `emailVerified`, `createdAt`.
+
+Non implementati: editing email, password, cancellazione account, role/specialization editing, session/device management.
+
+#### 5.1.5 Operational Status
+
+Sezione indipendente dal form Profilo: stato corrente, select e CTA di aggiornamento.
+
+- CLIENT: `ATTIVO`, `INFORTUNATO`, `PAUSA`.
+- PROFESSIONAL: `DISPONIBILE`, `ASSENTE`, `FERIE`, `MALATTIA`.
+
+Nella baseline corrente lo status **non** blocca automaticamente booking, availability, login o accesso applicativo: è informazione operativa modificabile.
+
+#### 5.1.6 View / edit e salvataggio
+
+- **View:** dati profilo in sola lettura; CTA «Modifica profilo».
+- **Edit:** form role-specific; Salva / Annulla; validazione; stato saving; errori inline/globali; feedback «Profilo aggiornato» / «Stato aggiornato».
+- Salvato solo il **delta** dei campi modificati; **nessun** update ottimistico; la UI applica la response server tramite soft commit nella source of truth auth ([FE03](./03-authentication-session-flow.md)). Dopo PATCH profilo/status **non** parte automaticamente un dual GET `/me/account` + `/me/profile`.
+- `401` e CSRF usano la foundation auth/mutation; nessun handling locale alternativo.
+- Validazione profilo (alto livello, coerente con il backend): required dove previsto; limiti di lunghezza; data di nascita nel passato; altezza valida; URL `http`/`https` per link professionista; campi cross-role non ammessi nel PATCH. Il dettaglio normativo resta in [Validation Rules](../06-validation-rules.md).
+
+#### 5.1.7 Follow-up UI — M1-R
+
+Dopo errori di campo sul form Profilo, un successivo aggiornamento indipendente dello Status riuscito può lasciare ancora visibili quei `fieldErrors`. Impatto UX, non bloccante; follow-up aperto (nessuna remediation decisa qui).
+
+Il follow-up auth **E2E-1** (safe redirect cross-role → `/forbidden`) è documentato in [FE03](./03-authentication-session-flow.md).
 
 ### 5.2 Cliente
 
 | Area/pagina | Endpoint | Stato MVP | Note UX |
 |---|---|---|---|
 | Dashboard cliente | Composizione di `GET /api/v1/professionals/my` e `GET /api/v1/bookings/client` | Implementabile ora come composizione | Non esiste un endpoint dashboard. Mostrare riepiloghi derivati senza promettere statistiche avanzate. |
-| Profilo/account | Endpoint `/api/v1/me/**` | Implementabile ora | Form per dati anagrafici e note pertinenti al cliente. |
+| Profilo/account | Endpoint `/api/v1/me/**` | **UI implementata** | Vedi §5.1; form anagrafica e note cliente. |
 | Professionisti collegati | `GET /api/v1/professionals/my` | Implementabile ora | Lista, non singolo professionista. Empty state se non emergono collegamenti leggibili. |
 | Dettaglio professionista | `GET /api/v1/professionals/{professionalId}` | Implementabile ora | Accessibile soltanto con collegamento attivo. Un `404 PROFESSIONAL_NOT_FOUND` non permette di distinguere professionista inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista. |
 | Disponibilità professionista | `GET /api/v1/professionals/{professionalId}/availability` | Implementabile ora solo per personal trainer collegato | Mostrare solo slot restituiti dal server. Per un nutrizionista l'area non va offerta. Empty state distinto da errore. |
@@ -116,7 +176,7 @@ Nel `PATCH` profilo professionista, `instagramUrl` e `websiteUrl` seguono un con
 | Area/pagina | Endpoint | Stato MVP | Note UX |
 |---|---|---|---|
 | Dashboard professionista | Composizione di clienti, inviti e, solo per personal trainer, availability/booking | Implementabile ora come composizione | Nessun endpoint aggregato. I widget devono dipendere dalla specializzazione. |
-| Profilo/account | Endpoint `/api/v1/me/**` | Implementabile ora | Campi professionista: contatti, bio, luogo di lavoro, città e link. |
+| Profilo/account | Endpoint `/api/v1/me/**` | **UI implementata** | Vedi §5.1; contatti, bio, luogo, città e link. |
 | Clienti collegati | `GET /api/v1/clients/my` | Implementabile ora | Ogni elemento contiene soltanto `id`, `firstName`, `lastName` e `profileImageUrl`; non mostrare obiettivo o stato operativo. |
 | Dettaglio cliente | `GET /api/v1/clients/{clientId}` | Implementabile ora | Solo con collegamento attivo. Contiene identità minima e `primaryGoal`. Un `404 CLIENT_NOT_FOUND` non permette di distinguere cliente inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista. |
 | Crea invito | `POST /api/v1/invites` | Implementabile ora | Nessun body. Dopo `201`, mostrare codice, scadenza e azione “Copia”. Non inventare invio email automatico. |
@@ -175,7 +235,7 @@ Sono inoltre non presenti e da non esporre come attivi: cambio password autentic
 
 ## 7. Sitemap MVP
 
-I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzionalità completa.** Home e login/auth foundation sono implementati; registrazioni/invito/verify-email e pagine business restano placeholder. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
+I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzionalità completa.** Home, login/auth foundation e **Profilo/Account/Operational Status** sono implementati; registrazioni/invito/verify-email e le altre pagine business restano placeholder. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
 
 ### Pubblico
 
@@ -227,7 +287,8 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 | `/login` | Pubblico | **Implementata** |
 | `/register/professional`, `/invite/validate`, `/register/client`, `/verify-email` | Pubblico | **Placeholder** |
 | Guardie auth (`RequireAuth` / ruolo / specializzazione) | Privato | **Implementate** |
-| `/app/*/dashboard`, `/app/*/profile` | CLIENT / PROFESSIONAL | **Placeholder** (shell; senza dati business / form reali) |
+| `/app/client/profile`, `/app/professional/profile` | CLIENT / PROFESSIONAL | **Implementata** (Profilo + Account RO + Operational Status) |
+| `/app/*/dashboard` | CLIENT / PROFESSIONAL | **Placeholder** (shell; senza dati business aggregati) |
 | Clients / professionals / invites | PROFESSIONAL o CLIENT | **Placeholder** |
 | Availability / bookings | CLIENT; PROFESSIONAL + PT | **Placeholder** |
 | `/dev/role-preview` | Dev-only | **Implementata** (solo `import.meta.env.DEV`) |
@@ -244,7 +305,7 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 
 Le guard frontend migliorano navigazione e chiarezza, ma non sostituiscono l'autorizzazione backend.
 
-Nella fondazione corrente le guard `RequireAuth`, `RequireRole` e `RequireSpecialization` sono **implementate** e collegate allo stato auth. Le pagine dietro le guard possono restare placeholder di contenuto.
+Nella fondazione corrente le guard `RequireAuth`, `RequireRole` e `RequireSpecialization` sono **implementate** e collegate allo stato auth. Profilo è una pagina business reale; le altre pagine dietro le guard possono restare placeholder di contenuto.
 
 ### 8.2 Sessione, CSRF e bootstrap (implementati)
 
@@ -338,24 +399,23 @@ Regole pratiche:
 | Liste clienti/professionisti/inviti | Skeleton righe/card | “Nessun … disponibile” con CTA solo se esiste un'azione reale | Retry; `403` dedicato | Lista aggiornata dopo mutazioni |
 | Availability | Skeleton lista | Cliente: nessuno slot prenotabile; PT: nessuno slot creato | Conflitto, slot obsoleto, ruolo/specializzazione non valida | Slot creato/modificato/bloccato con feedback |
 | Booking | Skeleton lista/dettaglio | Nessuna richiesta | `403`, `404`, conflitto di transizione, slot non più disponibile | Stato aggiornato dalla risposta server |
-| Profilo/account | Skeleton form | Non applicabile | Errori campo, `401`, `403` | Conferma salvataggio senza perdere valori non modificati |
+| Profilo/account | Skeleton / loading sezione | Non applicabile | Errori campo, globali, `401` via auth foundation | Conferma dopo soft commit; draft annullabile |
 | Azioni distruttive o irreversibili | Stato pending sulla singola azione | Non applicabile | Ripristinare controlli e mostrare errore | Conferma per cancellazione, rifiuto e blocco; evitare doppi click |
 
 Ogni pagina privata deve prevedere anche gli stati trasversali `unauthorized` e `forbidden`. L'interfaccia deve rispettare i requisiti minimi di accessibilità: focus sull'errore, messaggi associati ai campi, indicatori non affidati al solo colore e pulsanti disabilitati durante le mutazioni.
 
 ## 11. Priorità implementazione React
 
-Completati: setup React/Vite/TypeScript, routing, layout, home pubblica, foundation API/auth session-based (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap). Dettagli auth: [FE03](./03-authentication-session-flow.md).
+Completati: setup React/Vite/TypeScript, routing, layout, home pubblica, foundation API/auth session-based (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap), **Profilo/Account/Operational Status** collegati a `/me`. Dettagli auth e soft commit: [FE03](./03-authentication-session-flow.md).
 
 Ordine pragmatico **residuo**:
 
-1. profilo/account UI reale collegata a `/me`;
-2. dashboard base composte, senza analytics;
-3. flusso professionista comune: clienti e inviti;
-4. flusso cliente: professionisti collegati e dettaglio;
-5. availability e booking del personal trainer, poi booking cliente;
-6. registrazione professionista, verifica email e registrazione cliente tramite invito;
-7. hardening di errori, accessibilità, responsive e test dei flussi applicativi business.
+1. dashboard base composte, senza analytics;
+2. flusso professionista comune: clienti e inviti;
+3. flusso cliente: professionisti collegati e dettaglio;
+4. availability e booking del personal trainer, poi booking cliente;
+5. registrazione professionista, verifica email e registrazione cliente tramite invito;
+6. hardening di errori, accessibilità, responsive e test dei flussi applicativi business residui.
 
 La scelta del prossimo vertical slice business resta una decisione di prodotto. Availability e Booking vanno progettati insieme sul piano UX perché le transizioni booking modificano gli slot.
 
@@ -449,7 +509,7 @@ Questi punti non impediscono la mappa funzionale, ma non sono determinabili come
 
 1. **Consegna verifica email:** registrazione e reinvio creano e salvano il token e, dopo commit, usano una porta di consegna con adapter SMTP configurabile. Il default locale resta disabilitato; la porta in-memory è solo per test/debug e non è esposta via endpoint. L'URL frontend remoto deve essere HTTPS; HTTP è ammesso solo per loopback locale. Non sono presenti outbox o retry, quindi la consegna non è garantita.
 2. **Contratto temporale:** audit e scadenze account/booking/inviti arrivano come `Instant` UTC con `Z`; gli orari degli slot e gli snapshot Booking arrivano con offset esplicito `Europe/Rome`, mentre le date civili restano `LocalDate`. La UI deve distinguere questi tre tipi e non applicare una timezone globale ai payload.
-3. **Auth client:** implementata session-based (vedi [FE03](./03-authentication-session-flow.md)); nessun JWT/Bearer/storage. Restano da collegare le pagine business e i flussi pubblici placeholder.
+3. **Auth client:** implementata session-based (vedi [FE03](./03-authentication-session-flow.md)); nessun JWT/Bearer/storage. Profilo/Account/Status sono collegati; restano da collegare le altre pagine business e i flussi pubblici di registrazione/invito/verifica email.
 4. **URL pubblico dei link:** `app.email.verification-page-url` configura la pagina di verifica, ma il valore pubblico definitivo di ciascun ambiente non è ancora definito; i link invito restano separati.
 5. **Liste:** non esistono paginazione e filtri API per clienti, professionisti, inviti, slot o booking; la prima UI non deve dipenderne. Per Booking l'ordine iniziale è `createdAt DESC, id DESC`.
 6. **Dashboard:** non esiste un contratto aggregato; contenuti e metriche devono restare una composizione minima dei dati già disponibili.

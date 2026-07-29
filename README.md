@@ -2,9 +2,9 @@
 
 ## 1. Descrizione
 
-Support Trainer è un progetto full stack per la gestione del rapporto tra professionisti del benessere e clienti. Il backend MVP copre autenticazione, profili, inviti, collegamenti professionista-cliente, disponibilità e richieste di prenotazione. Il frontend dispone di una fondazione React, home pubblica, autenticazione session-based (login/logout/CSRF/guards) e foundation API client.
+Support Trainer è un progetto full stack per la gestione del rapporto tra professionisti del benessere e clienti. Il backend MVP copre autenticazione, profili, inviti, collegamenti professionista-cliente, disponibilità e richieste di prenotazione. Il frontend dispone di una fondazione React, home pubblica (direzione visuale dark-tech), autenticazione session-based (login/logout/CSRF/guards) e foundation API client, oltre alla pagina Profilo autenticata con Account in sola lettura e Operational Status.
 
-Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Login, logout, routing protetto e foundation auth sono implementati; le pagine business (dashboard dati, profilo UI, clients, professionals, availability, bookings) e i flussi pubblici di registrazione/invito/verifica email restano prevalentemente placeholder.
+Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Login, logout, routing protetto, foundation auth e Profilo/Account/Operational Status sono implementati. Restano prevalentemente placeholder le altre pagine business private (dashboard con dati, clients, professionals, availability, bookings) e i flussi pubblici di registrazione/invito/verifica email.
 
 ## 2. Stato attuale del progetto
 
@@ -19,9 +19,10 @@ Stato sintetico:
 - test di integrazione per auth, sessione, inviti, access control, profili, availability, booking e Security / Common presenti;
 - database applicativo MySQL con migrazioni Flyway (schema di dominio e infrastruttura Spring Session JDBC);
 - fondazione frontend con routing, layout, navigazione per ruolo, pagine di errore e test automatici presente;
-- home pubblica responsive/mobile-first implementata sulla route `/`;
+- home pubblica responsive/mobile-first implementata sulla route `/` (direzione visuale dark-tech);
 - autenticazione session-based frontend implementata (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap `/me`);
-- pagine business e flussi pubblici di registrazione/invito/verifica email ancora prevalentemente placeholder;
+- pagina Profilo autenticata role-aware implementata (CLIENT e PROFESSIONAL), con Account in sola lettura e Operational Status modificabile;
+- altre pagine business private e flussi pubblici di registrazione/invito/verifica email ancora prevalentemente placeholder;
 - pipeline CI GitHub Actions per il backend presente; i gate frontend (lint/test/build) restano locali; deploy non configurato;
 - progetto non ancora considerato production-ready.
 
@@ -94,10 +95,12 @@ Il reinvio accetta l'email nel body, risponde sempre `202 Accepted` con lo stess
 
 - lettura del proprio profilo;
 - lettura dei dati account;
-- aggiornamento del profilo;
-- aggiornamento dello stato operativo;
+- aggiornamento del profilo (campi consentiti per ruolo);
+- aggiornamento dello stato operativo, indipendente dall’editing del profilo;
 - distinzione tra professionista e cliente;
 - specializzazioni professionali `PERSONAL_TRAINER` e `NUTRITIONIST`.
+
+Lo stato operativo è un’informazione di profilo: nell’MVP non implica automaticamente blocco di booking, availability o altre policy applicative.
 
 ### Inviti e collegamenti
 
@@ -138,10 +141,17 @@ Le liste usano un riepilogo autosufficiente e create, dettaglio e transizioni re
 - misurazioni e monitoraggio dei progressi;
 - recupero e reset della password;
 - upload dell'immagine profilo;
+- editing account (email, password, cancellazione) e gestione dispositivi/sessioni;
+- limite di sessioni concorrenti;
 - API dedicate alla gestione manuale dei collegamenti;
-- pagine frontend business ancora placeholder (dashboard dati, profilo/account UI, clients, professionals, availability, bookings);
+- altre pagine frontend business ancora placeholder (dashboard con dati, clients, professionals, availability, bookings);
 - flussi frontend pubblici ancora placeholder (registrazione professionista/cliente, validazione invito, verifica email);
 - configurazione completa per il deploy.
+
+Follow-up non bloccanti aperti (dettaglio in [Functional Scope](docs/01-functional-scope.md)):
+
+- **E2E-1** — dopo login, un target autenticato ricordato ma incompatibile col ruolo corrente può portare a `/forbidden` (nessun bypass autorizzativo);
+- **M1-R** — eventuali errori di campo del form profilo possono restare visibili dopo un aggiornamento stato operativo riuscito e indipendente.
 
 Chat in tempo reale, pagamenti, notifiche push e statistiche avanzate non fanno parte del perimetro attuale.
 
@@ -327,7 +337,7 @@ Creare la build frontend di produzione, comprensiva del controllo TypeScript:
 npm run build
 ```
 
-L'output della build viene generato in `frontend/dist`. I comandi verificano foundation, home e auth session-based; non implicano che le pagine business placeholder siano integrate con le API di dominio.
+L'output della build viene generato in `frontend/dist`. I comandi verificano foundation, home, auth session-based e Profilo/Account/Operational Status; non implicano che le altre pagine business placeholder o i flussi pubblici di registrazione/invito/verifica email siano già integrati con le API di dominio.
 
 ### Sviluppo locale frontend + backend
 
@@ -376,6 +386,8 @@ L'ultimo `clean verify` certificato ha prodotto il JAR e completato **50 suite, 
 - nessuna esecuzione automatica di lint, test o build frontend.
 
 **Gate locali frontend** (non CI GitHub): `npm run lint`, `npm run format:check`, `npm run test`, `npm run build`.
+
+Alla baseline `99fa1d4` (`feat: realizza profilo e stato operativo autenticati`), la suite frontend completa conta **444 test** su **32 file**, tutti verdi, insieme a type-check, lint, format/check e build. Sullo stesso vertical slice Profilo/Account/Operational Status è stato eseguito un Browser E2E reale CLIENT + PROFESSIONAL, certificato con minor (follow-up non bloccanti già richiamati sopra). Questi numeri e l’esito E2E sono uno snapshot della baseline, non una garanzia permanente di conteggio.
 
 La correzione conclusiva ha reso deterministico `EmailVerificationTransactionIntegrationTest`: la precedente scadenza assoluta è stata sostituita con scadenze relative al `MutableTestClock` fornito da `EmailTestClockConfiguration`. Il codice di produzione non è cambiato e il test non dipende più da data corrente, timezone host o orologio reale.
 
@@ -451,9 +463,9 @@ Il profilo tracciato `mailpit` è un aiuto manuale locale, non un profilo di pro
 
 ## 14. Roadmap sintetica
 
-1. pagine frontend business ancora placeholder (profilo/account UI, clients, professionals, availability, bookings, dashboard con dati);
+1. altre pagine frontend business ancora placeholder (clients, professionals, availability, bookings, dashboard con dati);
 2. flussi pubblici frontend ancora placeholder (registrazioni, invito, verifica email);
-3. completare il lifecycle account (recupero/reset password);
+3. completare il lifecycle account (recupero/reset password, editing account, upload immagine profilo);
 4. implementare le schede di allenamento;
 5. implementare i piani alimentari;
 6. aggiungere feedback, misurazioni e progressi;
@@ -466,11 +478,12 @@ Dettaglio endpoint futuri: [docs/15-planned-endpoints-roadmap.md](docs/15-planne
 La cartella `frontend` contiene un'applicazione React/TypeScript/Vite con:
 
 - routing, layout, navigazione per ruolo e pagine di errore;
-- home pubblica completa sulla route `/`;
+- home pubblica completa sulla route `/` (direzione visuale dark-tech);
 - autenticazione session-based: httpClient, CSRF memory-only, AuthProvider, login, logout, guards, bootstrap `/me`;
+- pagina Profilo autenticata role-aware per CLIENT e PROFESSIONAL, con Account in sola lettura e Operational Status modificabile indipendentemente dal form profilo;
 - proxy Vite `/api` → `http://localhost:8080` in sviluppo;
 - test con Vitest / React Testing Library; gate locali lint/format/build.
 
-Auth foundation e login/logout sono implementati. Restano placeholder i flussi pubblici di registrazione/invito/verifica email e le pagine business private. Nessun JWT/Bearer né storage di token nel client.
+Auth foundation, login/logout e Profilo/Account/Operational Status sono implementati. Restano placeholder i flussi pubblici di registrazione/invito/verifica email e le altre pagine business private (dashboard con dati, clients, professionals, availability, bookings). Nessun JWT/Bearer né storage di token nel client.
 
-Riferimenti: [Authentication Session Flow](docs/frontend/03-authentication-session-flow.md), [Frontend Functional Map](docs/frontend/01-frontend-functional-map-mvp.md), [Public Home](docs/frontend/02-public-home-implementation.md), [Security Flow](docs/09-security-flow.md).
+Riferimenti: [Authentication Session Flow](docs/frontend/03-authentication-session-flow.md), [Frontend Functional Map](docs/frontend/01-frontend-functional-map-mvp.md), [Public Home](docs/frontend/02-public-home-implementation.md), [Security Flow](docs/09-security-flow.md), [Functional Scope](docs/01-functional-scope.md).

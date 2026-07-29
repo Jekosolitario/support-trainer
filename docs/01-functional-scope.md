@@ -74,7 +74,9 @@ Non risultano ancora implementate:
 - misurazioni e storico progressi;
 - recupero e reset password;
 - upload immagine profilo;
-- pagine frontend business e flussi pubblici ancora placeholder (auth session-based frontend già presente);
+- editing account (email, password, cancellazione) e gestione dispositivi/sessioni;
+- altre pagine frontend business ancora placeholder (oltre auth e Profilo/Account/Operational Status già presenti);
+- flussi frontend pubblici di registrazione/invito/verifica email ancora placeholder;
 - preparazione completa al deploy.
 
 ---
@@ -434,7 +436,92 @@ Il cliente può assumere uno dei seguenti stati operativi:
 - `INFORTUNATO`
 - `PAUSA`
 
+### 13.3 Significato nell’MVP
+
+Lo stato operativo è un’informazione di profilo modificabile in modo indipendente dall’editing degli altri campi profilo.
+
+Nell’MVP corrente **non** implica automaticamente:
+
+- blocco o sblocco di booking;
+- modifica automatica degli slot availability;
+- revoca dell’accesso applicativo;
+- altre policy business non esplicitamente implementate.
+
 ---
+
+## 13.A Frontend Profilo / Account / Operational Status — Implementato
+
+### 13.A.1 Area comune autenticata
+
+Esiste una pagina Profilo autenticata role-aware:
+
+- CLIENT: `/app/client/profile`
+- PROFESSIONAL: `/app/professional/profile`
+
+La pagina comprende tre sezioni:
+
+1. **Profilo** — editing dei campi consentiti dal contratto backend per il ruolo corrente;
+2. **Account** — sola lettura;
+3. **Operational Status** — aggiornamento indipendente dal form profilo.
+
+### 13.A.2 CLIENT — implementato
+
+Il cliente autenticato può:
+
+- visualizzare e aggiornare i campi profilo consentiti (anagrafica, obiettivo, note pertinenti);
+- consultare l’Account in sola lettura;
+- aggiornare lo stato operativo tra `ATTIVO`, `INFORTUNATO`, `PAUSA`.
+
+### 13.A.3 PROFESSIONAL — implementato
+
+Il professionista autenticato può:
+
+- visualizzare e aggiornare i campi profilo consentiti (anagrafica, contatti, bio, luogo di lavoro, città, link);
+- consultare la specialization in sola lettura;
+- consultare l’Account in sola lettura;
+- aggiornare lo stato operativo tra `DISPONIBILE`, `ASSENTE`, `FERIE`, `MALATTIA`.
+
+`PERSONAL_TRAINER` e `NUTRITIONIST` condividono la stessa struttura di pagina Profilo; si differenziano per la specialization e per le altre aree business ancora non integrate nel frontend.
+
+### 13.A.4 Account — sola lettura
+
+La sezione Account mostra soltanto:
+
+- `email`;
+- `role`;
+- `accountStatus`;
+- `emailVerified`;
+- `createdAt`.
+
+Non sono implementati:
+
+- editing email;
+- editing role;
+- editing specialization;
+- cambio password;
+- cancellazione account;
+- upload o cambio avatar;
+- gestione sessioni o dispositivi.
+
+### 13.A.5 Follow-up aperti (non bloccanti)
+
+#### E2E-1 — FOLLOW-UP
+
+Dopo il login, un target autenticato ricordato ma incompatibile con il ruolo della nuova sessione può terminare su `/forbidden`.
+
+- preesistente nella baseline auth/routing;
+- nessun bypass autorizzativo;
+- follow-up separato;
+- dettaglio tecnico: [`docs/frontend/03-authentication-session-flow.md`](frontend/03-authentication-session-flow.md).
+
+#### M1-R — FOLLOW-UP
+
+Dopo un aggiornamento riuscito dello stato operativo, eventuali errori di campo del form profilo possono restare visibili.
+
+- UX;
+- non bloccante;
+- follow-up separato;
+- dettaglio frontend/UX: [`docs/frontend/01-frontend-functional-map-mvp.md`](frontend/01-frontend-functional-map-mvp.md).
 
 ## 14. Perimetro della prima versione
 
@@ -451,7 +538,8 @@ Risultano già implementati:
 - availability del personal trainer;
 - booking cliente-personal trainer;
 - gestione stato operativo utente;
-- foundation frontend con home pubblica e autenticazione session-based (login/logout/guards/bootstrap).
+- foundation frontend con home pubblica e autenticazione session-based (login/logout/guards/bootstrap);
+- frontend Profilo/Account/Operational Status autenticati (CLIENT e PROFESSIONAL).
 
 ### 14.2 Parte della v1 ancora da implementare
 
@@ -461,7 +549,7 @@ Per completare il perimetro funzionale originariamente previsto restano da svilu
 - piani alimentari;
 - feedback o segnalazioni cliente;
 - eventuale gestione misurazioni/progressi;
-- pagine frontend business (dashboard dati, profilo/account UI, clients, professionals, availability, bookings) ancora placeholder;
+- altre pagine frontend business (dashboard con dati, clients, professionals, availability, bookings) ancora placeholder;
 - flussi frontend pubblici di registrazione/invito/verifica email ancora placeholder.
 
 ### 14.3 Funzionalità escluse dal perimetro attuale
@@ -478,9 +566,9 @@ Non fanno parte del perimetro attuale:
 
 ## 15. Prossima decisione funzionale
 
-Dopo la foundation auth frontend, il prossimo passo dovrà essere scelto tra:
+Dopo home, auth e Profilo/Account/Operational Status, il prossimo passo dovrà essere scelto tra:
 
-1. vertical slice frontend su un modulo business già disponibile nel backend;
+1. un ulteriore vertical slice frontend su un modulo business già disponibile nel backend (clients, professionals, availability o bookings);
 2. introduzione del modulo Workout Plans.
 
 La scelta definitiva del prossimo slice resta una decisione di prodotto/progetto.

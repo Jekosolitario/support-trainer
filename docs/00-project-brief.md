@@ -73,9 +73,17 @@ professionista registrato e verificato
 
 ### Fondazione frontend implementata
 
-Il repository contiene un frontend React/TypeScript/Vite con routing, layout pubblico e autenticato, navigazione per ruolo, home pubblica, foundation API client e autenticazione session-based (login, logout, CSRF, guards, bootstrap `/me`).
+Il repository contiene un frontend React/TypeScript/Vite con routing, layout pubblico e autenticato, navigazione per ruolo, home pubblica (direzione visuale dark-tech), foundation API client e autenticazione session-based (login, logout, CSRF, guards, bootstrap `/me`).
 
-La presenza delle route private non equivale a funzionalità business complete: dashboard con dati, profilo/account UI, clients, professionals, availability, bookings e i flussi pubblici di registrazione/invito/verifica email restano prevalentemente placeholder.
+### Vertical slice frontend già disponibile
+
+È implementata la pagina Profilo autenticata role-aware (CLIENT e PROFESSIONAL), con:
+
+- editing dei campi profilo consentiti dal contratto backend;
+- sezione Account in sola lettura;
+- Operational Status modificabile in modo indipendente dal form profilo.
+
+La presenza di altre route private non equivale a funzionalità business complete: dashboard con dati, clients, professionals, availability, bookings e i flussi pubblici di registrazione/invito/verifica email restano prevalentemente placeholder.
 
 ---
 
@@ -123,7 +131,7 @@ L’app consente già di:
 1. registrare professionisti con verifica email;
 2. registrare clienti esclusivamente tramite codice invito valido;
 3. creare automaticamente il collegamento tra cliente e professionista;
-4. leggere e aggiornare il proprio profilo/account;
+4. aggiornare il proprio profilo e consultare le informazioni dell’account;
 5. leggere clienti e professionisti collegati;
 6. permettere al personal trainer di impostare la propria disponibilità lavorativa;
 7. permettere al cliente collegato di consultare slot disponibili e non scaduti;
@@ -141,7 +149,7 @@ Restano da sviluppare:
 3. feedback del cliente;
 4. monitoraggio progressi e misurazioni;
 5. eventuali API dedicate alla gestione manuale dei collegamenti;
-6. pagine frontend business e flussi pubblici ancora placeholder (oltre auth già presente);
+6. altre pagine frontend business ancora placeholder (oltre auth e Profilo/Account/Operational Status già presenti) e flussi pubblici di registrazione/invito/verifica email ancora placeholder;
 7. completamento delle funzionalità tecniche necessarie al deploy.
 
 ---
@@ -166,13 +174,23 @@ Restano da sviluppare:
 
 ## 7.2 Funzionalità ancora da implementare per completare la v1 applicativa
 
-- [ ] pagine frontend business e flussi pubblici ancora placeholder (auth session-based già presente);
+- [ ] altre pagine frontend business ancora placeholder (dashboard con dati, clients, professionals, availability, bookings);
+- [ ] flussi frontend pubblici di registrazione/invito/verifica email ancora placeholder;
 - [ ] creazione di una scheda di allenamento;
 - [ ] visualizzazione della scheda da parte del cliente;
 - [ ] dettaglio giornaliero dell’allenamento;
 - [ ] eventuale gestione feedback;
 - [ ] eventuale gestione misurazioni e progressi;
 - [ ] completamento delle funzionalità tecniche necessarie al deploy.
+
+## 7.2.1 Frontend già raggiunto (oltre la foundation)
+
+- [x] home pubblica;
+- [x] login/logout e bootstrap sessione;
+- [x] protezione route per ruolo;
+- [x] Profilo autenticato role-aware;
+- [x] Account in sola lettura;
+- [x] Operational Status modificabile.
 
 ## 7.3 Nota sul perimetro attuale
 
@@ -293,12 +311,12 @@ Il frontend web è sviluppato come applicazione separata dal backend, con:
 - Vitest e React Testing Library;
 - progettazione UI responsive/mobile-first già applicata alla home pubblica.
 
-La fondazione include routing, layout, home pubblica e autenticazione session-based già collegata al backend per login/logout/bootstrap. Le pagine business e i flussi pubblici di registrazione/invito/verifica email restano prevalentemente placeholder.
+La fondazione include routing, layout, home pubblica e autenticazione session-based già collegata al backend per login/logout/bootstrap. È inoltre implementato il vertical slice Profilo/Account/Operational Status. Le altre pagine business e i flussi pubblici di registrazione/invito/verifica email restano prevalentemente placeholder.
 
 La futura evoluzione mobile potrà essere valutata con React Native + Expo, ma non fa parte dello sprint frontend iniziale.  
 Questa possibilità non implica il riuso automatico dei componenti React web su mobile; tuttavia flussi, logica applicativa e organizzazione API dovranno essere progettati in modo il più possibile riutilizzabile.
 
-Home, mappa funzionale e lifecycle auth frontend sono documentati in `docs/frontend/`.
+Home, mappa funzionale e lifecycle auth frontend sono documentati in `docs/frontend/`. Lo scope funzionale aggiornato (incluso Profilo) è in `docs/01-functional-scope.md`.
 
 ---
 
@@ -323,6 +341,11 @@ Il backend possiede già una base concreta e funzionante per:
 - relazioni cliente-professionista;
 - disponibilità;
 - prenotazioni.
+
+Il frontend possiede già:
+
+- home pubblica e autenticazione session-based;
+- Profilo/Account/Operational Status autenticati.
 
 ---
 
