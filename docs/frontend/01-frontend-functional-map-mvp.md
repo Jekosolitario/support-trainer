@@ -34,7 +34,7 @@ La baseline certificata richiede inoltre che il client usi la risposta neutra `2
 - La home pubblica sulla route `/` è **implementata**; dettagli in [Public Home Implementation](./02-public-home-implementation.md).
 - L’**auth session-based frontend è implementata**: httpClient, CSRF memory-only, AuthProvider, bootstrap/reconciliation `/me`, login, logout, guards e routing protetto. Dettagli in [Authentication Session Flow](./03-authentication-session-flow.md).
 - La **pagina Profilo autenticata** è **implementata** (CLIENT e PROFESSIONAL), con Account in sola lettura e Operational Status modificabile. Soft commit e race protection: [FE03](./03-authentication-session-flow.md).
-- La **registrazione pubblica PROFESSIONAL** e la **verifica email** (confirm + resend pertinente) sono **implementate**.
+- La **registrazione pubblica PROFESSIONAL** e la **verifica email** (confirm + resend pertinente) sono **implementate**. Dettaglio tecnico: [Professional Onboarding Implementation](./04-professional-onboarding-implementation.md).
 - Validazione invito e registrazione CLIENT restano **placeholder**.
 - Le altre pagine business private (dashboard dati, clients, professionals, availability, bookings) restano **placeholder**: le route esistono, ma non sono flussi applicativi completi.
 - Il client usa path relativi `/api/v1/...` con `credentials: 'same-origin'`. In sviluppo Vite proxya `/api` → `http://localhost:8080`. In produzione la topologia è same-origin dietro reverse proxy.
@@ -82,7 +82,7 @@ Note di flusso verificate:
 - cliente e professionista nascono `PENDING_VERIFICATION`, con `emailVerified=false`, e non possono fare login prima della conferma;
 - per il cliente il link è già creato e l'invito consumato, ma il cliente pending non è visibile al professionista;
 - il backend genera e persiste per entrambi un token valido 24 ore e, dopo commit, affida un link con token nel fragment alla porta email; `SMTP` è disponibile ma il default locale resta disabilitato;
-- la pagina `/verify-email` (implementata) legge il fragment, lo rimuove immediatamente dall'URL prima di avviare analytics, monitoring o altre integrazioni, conserva il token solo in memoria e non lo inserisce in `localStorage`; invia quindi il POST, mostra la CTA login in caso di successo e il messaggio neutro di reinvio in caso di 410;
+- la pagina `/verify-email` (implementata) legge il fragment, lo rimuove immediatamente dall'URL prima di avviare analytics, monitoring o altre integrazioni, conserva il token solo in memoria e non lo inserisce in `localStorage`; invia quindi il POST, mostra la CTA login in caso di successo e il messaggio neutro di reinvio in caso di 410. Dettaglio tecnico: [FE04](./04-professional-onboarding-implementation.md);
 - la pagina di verifica resta compatibile con `BrowserRouter` e non usa `HashRouter`, perché il fragment è riservato al token, né trasmette il token a strumenti di analytics o monitoring;
 - l'azione “Invia di nuovo” richiede l'email dell'utente (inserita nella pagina di verifica), non mostra se l'account esiste e non invia email o token ad analytics; il frontend può disabilitare il pulsante per 60 secondi, ma il backend resta autoritativo e non espone il tempo residuo;
 - il codice invito è monouso, non è legato a una specifica email destinataria e scade dopo 7 giorni.
@@ -252,7 +252,7 @@ I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzi
 
 Flusso cliente consigliato: `/invite/validate` valida il codice e, in caso positivo, passa a `/register/client` conservando il codice. Non saltare la validazione lato server durante la registrazione: il backend la ripete correttamente.
 
-Dopo la registrazione PROFESSIONAL (e, quando sarà collegata, anche quella CLIENT) la UI mostra “Controlla la tua email”. Il link apre `/verify-email`: la pagina legge e rimuove il token dall'URL (anche se il fragment non è valido), effettua il POST di conferma e presenta la CTA login. Un secondo utilizzo coerente resta un successo. La stessa schermata offre “Invia di nuovo” con messaggio neutro e blocco UX di 60 secondi, senza sostituire il cooldown del backend. L'adapter SMTP backend invia un messaggio testuale con URL `#token=...`. Validazione invito e registrazione CLIENT restano da collegare.
+Dopo la registrazione PROFESSIONAL (e, quando sarà collegata, anche quella CLIENT) la UI mostra “Controlla la tua email”. Il link apre `/verify-email`: la pagina legge e rimuove il token dall'URL (anche se il fragment non è valido), effettua il POST di conferma e presenta la CTA login. Un secondo utilizzo coerente resta un successo. La stessa schermata offre “Invia di nuovo” con messaggio neutro e blocco UX di 60 secondi, senza sostituire il cooldown del backend. L'adapter SMTP backend invia un messaggio testuale con URL `#token=...`. Validazione invito e registrazione CLIENT restano da collegare. Implementazione tecnica onboarding PROFESSIONAL: [FE04](./04-professional-onboarding-implementation.md).
 
 ### Area cliente
 
@@ -513,7 +513,7 @@ Questi punti non impediscono la mappa funzionale, ma non sono determinabili come
 
 1. **Consegna verifica email:** registrazione e reinvio creano e salvano il token e, dopo commit, usano una porta di consegna con adapter SMTP configurabile. Il default locale resta disabilitato; la porta in-memory è solo per test/debug e non è esposta via endpoint. L'URL frontend remoto deve essere HTTPS; HTTP è ammesso solo per loopback locale. Non sono presenti outbox o retry, quindi la consegna non è garantita.
 2. **Contratto temporale:** audit e scadenze account/booking/inviti arrivano come `Instant` UTC con `Z`; gli orari degli slot e gli snapshot Booking arrivano con offset esplicito `Europe/Rome`, mentre le date civili restano `LocalDate`. La UI deve distinguere questi tre tipi e non applicare una timezone globale ai payload.
-3. **Auth client:** implementata session-based (vedi [FE03](./03-authentication-session-flow.md)); nessun JWT/Bearer/storage. Profilo/Account/Status e onboarding PROFESSIONAL/verifica email sono collegati; restano da collegare le altre pagine business e i flussi pubblici di validazione invito/registrazione CLIENT.
+3. **Auth client:** implementata session-based (vedi [FE03](./03-authentication-session-flow.md)); nessun JWT/Bearer/storage. Profilo/Account/Status e onboarding PROFESSIONAL/verifica email sono collegati (dettaglio onboarding: [FE04](./04-professional-onboarding-implementation.md)); restano da collegare le altre pagine business e i flussi pubblici di validazione invito/registrazione CLIENT.
 4. **URL pubblico dei link:** `app.email.verification-page-url` configura la pagina di verifica, ma il valore pubblico definitivo di ciascun ambiente non è ancora definito; i link invito restano separati.
 5. **Liste:** non esistono paginazione e filtri API per clienti, professionisti, inviti, slot o booking; la prima UI non deve dipenderne. Per Booking l'ordine iniziale è `createdAt DESC, id DESC`.
 6. **Dashboard:** non esiste un contratto aggregato; contenuti e metriche devono restare una composizione minima dei dati già disponibili.

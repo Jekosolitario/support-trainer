@@ -26,7 +26,8 @@ Non documenta:
 - schema database / Flyway → [`docs/10-database-schema.md`](../10-database-schema.md);
 - roadmap business → [`docs/15-planned-endpoints-roadmap.md`](../15-planned-endpoints-roadmap.md);
 - campi profilo, layout UX, mappa funzionale delle pagine e dettaglio frontend del follow-up **M1-R** → [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md);
-- scope funzionale di prodotto (Account RO, enum status, follow-up high-level) → [`docs/01-functional-scope.md`](../01-functional-scope.md).
+- scope funzionale di prodotto (Account RO, enum status, follow-up high-level) → [`docs/01-functional-scope.md`](../01-functional-scope.md);
+- onboarding pubblico PROFESSIONAL (register, verify, resend) → [`04-professional-onboarding-implementation.md`](./04-professional-onboarding-implementation.md).
 
 ## 2. Principi
 
@@ -295,7 +296,8 @@ Il client continua a usare path relativi `/api/v1/...` e `credentials: 'same-ori
 | Account (sezione read-only sulla ProfilePage) | **Reale** |
 | Operational Status (aggiornamento indipendente) | **Reale** |
 | Altre pagine business (dashboard dati, clients, professionals, availability, bookings) | **Placeholder** |
-| Flussi pubblici di registrazione / invito / verify-email | **Placeholder** (route presenti, senza integrazione API completa) |
+| Registrazione pubblica PROFESSIONAL + verify/resend email | **Implementati** (dettaglio tecnico in [`04-professional-onboarding-implementation.md`](./04-professional-onboarding-implementation.md)) |
+| Validazione invito + registrazione CLIENT | **Placeholder** |
 
 La matrice completa delle pagine resta in [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md). Il follow-up UI **M1-R** (fieldErrors dopo update Status) è high-level in [`docs/01-functional-scope.md`](../01-functional-scope.md) e nel dettaglio frontend/UX in [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md); FE03 non lo tratta come backlog dedicato. Il dettaglio tecnico di **E2E-1** resta in §10.1.
 
@@ -308,7 +310,15 @@ FE03 **non** è fonte per:
 - catalogo endpoint completo;
 - roadmap business futura;
 - elenco campi profilo CLIENT/PROFESSIONAL, layout CSS o design system;
-- enum Operational Status e confini Account oltre quanto necessario al lifecycle auth.
+- enum Operational Status e confini Account oltre quanto necessario al lifecycle auth;
+- dettaglio tecnico dell’onboarding pubblico PROFESSIONAL (register, verify, resend, fragment, error UX) → [`04-professional-onboarding-implementation.md`](./04-professional-onboarding-implementation.md).
+
+Confini rispetto all’onboarding pubblico:
+
+- register / confirm / resend **non** creano sessione autenticata;
+- **Login** resta l’unico punto di creazione sessione autenticata documentato in FE03;
+- le mutazioni di onboarding **riusano** la foundation CSRF (`performCsrfMutation`) senza un secondo client HTTP/CSRF;
+- `AuthProvider` resta la source of truth dello stato autenticato; l’onboarding **non** lo modifica e non avanza l’auth epoch.
 
 Riferimenti primari:
 
@@ -317,4 +327,5 @@ Riferimenti primari:
 - [`docs/10-database-schema.md`](../10-database-schema.md)
 - [`docs/15-planned-endpoints-roadmap.md`](../15-planned-endpoints-roadmap.md)
 - [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md)
+- [`04-professional-onboarding-implementation.md`](./04-professional-onboarding-implementation.md)
 - [`docs/01-functional-scope.md`](../01-functional-scope.md)

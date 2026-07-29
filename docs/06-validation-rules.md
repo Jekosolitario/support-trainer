@@ -60,13 +60,13 @@ L’email deve:
 
 ### 3.3 Password
 La password deve rispettare almeno queste regole:
-- minimo **8 caratteri**
-- massimo **72 byte in codifica UTF-8**
-- almeno **una lettera maiuscola**
-- almeno **un numero**
-- almeno **un carattere speciale**
+- minimo **8 unità UTF-16** (`@Size(min=8)` / lunghezza `String` Java)
+- massimo **72 byte in codifica UTF-8** con semantica Java (`String.getBytes(UTF_8)`, inclusi i replacement sui surrogate isolati)
+- almeno **una lettera maiuscola ASCII** (`[A-Z]`)
+- almeno **un numero ASCII** (`[0-9]`)
+- almeno **un carattere speciale** fuori da `[A-Za-z0-9]`
 
-Il limite massimo è calcolato sui byte UTF-8, non sul solo numero di caratteri Java. Il backend rifiuta il valore oltre soglia prima dell’hashing e non tronca, normalizza o trasforma la password.
+Il limite massimo è calcolato sui byte UTF-8, non sul solo numero di unità UTF-16. Il backend rifiuta il valore oltre soglia prima dell’hashing e non tronca, normalizza, fa trim o trasforma la password. Il frontend della registrazione PROFESSIONAL pre-valida in modo coerente; il server resta autoritativo. Dettaglio client: [`docs/frontend/04-professional-onboarding-implementation.md`](frontend/04-professional-onboarding-implementation.md).
 
 ### 3.4 Stato iniziale account
 Alla registrazione, sia l’account professionista sia il cliente devono nascere con:
@@ -88,12 +88,9 @@ Il cliente non può registrarsi liberamente.
 La registrazione cliente richiede un codice invito valido.
 
 ### 4.2 Password cliente
-La password del cliente deve rispettare almeno queste regole:
-- minimo **8 caratteri**
-- massimo **72 byte in codifica UTF-8**
-- almeno **una lettera maiuscola**
-- almeno **un numero**
-- almeno **un carattere speciale**
+A livello di **contratto backend** la policy password del cliente è la stessa della registrazione professionista (§3.3): minimo 8 unità UTF-16, complessità ASCII reale, massimo 72 byte UTF-8 con semantica Java, senza trim/normalize/truncate lato server.
+
+Il frontend di registrazione CLIENT non è ancora collegato/implementato secondo la maturity corrente (vedi [`docs/frontend/01-frontend-functional-map-mvp.md`](frontend/01-frontend-functional-map-mvp.md)); questa sezione non afferma maturity frontend.
 
 ### 4.3 Validazioni sul codice invito
 Il codice deve:

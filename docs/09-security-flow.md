@@ -291,6 +291,20 @@ Il flusso gestisce almeno questi casi:
 
 Al boundary `now == latestToken.createdAt + 60 secondi` il reinvio è consentito. L'invalidazione tramite `used/usedAt` è un compromesso semantico dello schema esistente. Inviti e collegamenti non cambiano. Dopo la persistenza del token, Auth pubblica un evento immutabile nella transazione; il listener sincrono con `fallbackExecution=false` costruisce il link `#token=...` e chiama il sender soltanto `AFTER_COMMIT`. Rollback ed eventi senza transazione non producono invii. Gli errori sono assorbiti e registrati soltanto con correlation ID, motivo e tipo, senza email, token, URL o stack trace. Il sender SMTP reale usa JavaMail con credenziali esterne e trasforma i fallimenti di preparazione/consegna in un'eccezione sanitizzata; consegna durevole, retry e rate limiting distribuito non sono implementati.
 
+## 11.4 Invarianti frontend (onboarding pubblico)
+
+Il client pubblico di registrazione PROFESSIONAL e verifica email rispetta almeno questi invarianti:
+
+- neutralità UX di registration e resend (nessuna enumerazione account);
+- CSRF sulle mutazioni pubbliche di register / confirm / resend;
+- token di verifica trasportato nel fragment URL e sanitizzato immediatamente dall’address bar, anche se il fragment è invalido;
+- token memory-only: nessun `localStorage` / `sessionStorage`, nessun router state, nessuna esposizione in DOM/ARIA/log;
+- secondo consumo coerente gestito idempotentemente dal backend; il frontend tratta come successo solo una risposta di successo;
+- password rimossa dallo state frontend dopo il `202` di registrazione;
+- nessun auto-login dopo register o verify: la sessione autenticata nasce solo con login.
+
+Dettaglio tecnico frontend: [`docs/frontend/04-professional-onboarding-implementation.md`](frontend/04-professional-onboarding-implementation.md).
+
 ---
 
 ## 12. Flusso login

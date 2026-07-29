@@ -441,6 +441,7 @@ Il profilo tracciato `mailpit` è un aiuto manuale locale, non un profilo di pro
 - [Frontend Functional Map MVP](docs/frontend/01-frontend-functional-map-mvp.md)
 - [Public Home Implementation](docs/frontend/02-public-home-implementation.md)
 - [Authentication Session Flow](docs/frontend/03-authentication-session-flow.md)
+- [Professional Onboarding Implementation](docs/frontend/04-professional-onboarding-implementation.md) — implementazione onboarding pubblico PROFESSIONAL: register, verify, resend
 
 ### Roadmap
 
@@ -487,4 +488,4 @@ La cartella `frontend` contiene un'applicazione React/TypeScript/Vite con:
 
 Auth foundation, login/logout, registrazione PROFESSIONAL, verifica email con resend e Profilo/Account/Operational Status sono implementati. Restano placeholder i flussi pubblici di validazione invito e registrazione CLIENT, oltre alle altre pagine business private (dashboard con dati, clients, professionals, availability, bookings). Nessun JWT/Bearer né storage di token nel client.
 
-Riferimenti: [Authentication Session Flow](docs/frontend/03-authentication-session-flow.md), [Frontend Functional Map](docs/frontend/01-frontend-functional-map-mvp.md), [Public Home](docs/frontend/02-public-home-implementation.md), [Security Flow](docs/09-security-flow.md), [Functional Scope](docs/01-functional-scope.md).
+Riferimenti: [Authentication Session Flow](docs/frontend/03-authentication-session-flow.md), [Professional Onboarding Implementation](docs/frontend/04-professional-onboarding-implementation.md), [Frontend Functional Map](docs/frontend/01-frontend-functional-map-mvp.md), [Public Home](docs/frontend/02-public-home-implementation.md), [Security Flow](docs/09-security-flow.md), [Functional Scope](docs/01-functional-scope.md).
