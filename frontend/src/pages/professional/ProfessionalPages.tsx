@@ -1,6 +1,3 @@
-import { Link } from 'react-router-dom';
-
-import pageTemplateStyles from '../../components/page/PageTemplate.module.css';
 import { PageTemplate } from '../../components/page/PageTemplate';
 
 export function ProfessionalClientsPage() {
@@ -9,19 +6,7 @@ export function ProfessionalClientsPage() {
       eyebrow="Area professionista"
       title="Clienti"
       description="Questa pagina mostrerà in futuro i clienti collegati al professionista."
-    >
-      <aside
-        className={pageTemplateStyles.panel}
-        aria-labelledby="invites-access"
-      >
-        <h2 id="invites-access">Accesso secondario</h2>
-        <p>
-          Gli inviti restano disponibili senza occupare una voce primaria
-          aggiuntiva per il personal trainer.
-        </p>
-        <Link to="/app/professional/invites">Vai all’area inviti</Link>
-      </aside>
-    </PageTemplate>
+    />
   );
 }
 
@@ -31,16 +16,6 @@ export function ProfessionalClientDetailPage() {
       eyebrow="Area professionista"
       title="Dettaglio cliente"
       description="Struttura destinata alle informazioni minime del cliente collegato identificato dalla rotta."
-    />
-  );
-}
-
-export function ProfessionalInvitesPage() {
-  return (
-    <PageTemplate
-      eyebrow="Area professionista"
-      title="Inviti"
-      description="Questa pagina ospiterà la creazione e la consultazione degli inviti cliente. Non sono presenti azioni simulate."
     />
   );
 }

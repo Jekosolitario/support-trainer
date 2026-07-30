@@ -41,7 +41,10 @@ describe('AuthenticatedNavigation', () => {
   it('rende il menu personal trainer', () => {
     const navigation = renderNavigation(PERSONAL_TRAINER_ACCESS_PROFILE);
 
-    expect(within(navigation).getAllByRole('link')).toHaveLength(5);
+    expect(within(navigation).getAllByRole('link')).toHaveLength(6);
+    expect(
+      within(navigation).getByRole('link', { name: 'Inviti' }),
+    ).toBeVisible();
     expect(
       within(navigation).getByRole('link', { name: 'Disponibilità' }),
     ).toBeVisible();

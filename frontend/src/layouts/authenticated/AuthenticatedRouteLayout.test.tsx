@@ -38,8 +38,8 @@ it.each([
     },
     path: '/app/professional/dashboard',
     area: 'Area personal trainer',
-    visibleLink: 'Disponibilità',
-    hiddenLink: 'Inviti',
+    visibleLink: 'Inviti',
+    hiddenLink: 'Professionisti',
   },
   {
     label: 'NUTRITIONIST',

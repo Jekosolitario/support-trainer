@@ -21,8 +21,8 @@ import {
   ProfessionalBookingsPage,
   ProfessionalClientDetailPage,
   ProfessionalClientsPage,
-  ProfessionalInvitesPage,
 } from '../../pages/professional/ProfessionalPages';
+import { ProfessionalInvitesPage } from '../../pages/professional/ProfessionalInvitesPage';
 import { HomePage } from '../../pages/public/HomePage';
 import { LoginPage } from '../../pages/public/LoginPage';
 import {

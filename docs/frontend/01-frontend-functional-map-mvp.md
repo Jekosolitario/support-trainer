@@ -35,6 +35,7 @@ La baseline certificata richiede inoltre che il client usi la risposta neutra `2
 - L’**auth session-based frontend è implementata**: httpClient, CSRF memory-only, AuthProvider, bootstrap/reconciliation `/me`, login, logout, guards e routing protetto. Dettagli in [Authentication Session Flow](./03-authentication-session-flow.md).
 - La **pagina Profilo autenticata** è **implementata** (CLIENT e PROFESSIONAL), con Account in sola lettura e Operational Status modificabile. Soft commit e race protection: [FE03](./03-authentication-session-flow.md).
 - La **registrazione pubblica PROFESSIONAL** e la **verifica email** (confirm + resend pertinente) sono **implementate**. Dettaglio tecnico: [Professional Onboarding Implementation](./04-professional-onboarding-implementation.md).
+- La **gestione inviti PROFESSIONAL** (`/app/professional/invites`: lista, genera, copia codice valido) è **implementata**. Dettaglio tecnico: [Professional Invites Implementation](./05-professional-invites-implementation.md).
 - Validazione invito e registrazione CLIENT restano **placeholder**.
 - Le altre pagine business private (dashboard dati, clients, professionals, availability, bookings) restano **placeholder**: le route esistono, ma non sono flussi applicativi completi.
 - Il client usa path relativi `/api/v1/...` con `credentials: 'same-origin'`. In sviluppo Vite proxya `/api` → `http://localhost:8080`. In produzione la topologia è same-origin dietro reverse proxy.
@@ -181,8 +182,8 @@ Il follow-up auth **E2E-1** (safe redirect cross-role → `/forbidden`) è docum
 | Profilo/account          | Endpoint `/api/v1/me/**`                                                           | **UI implementata**                  | Vedi §5.1; contatti, bio, luogo, città e link.                                                                                                                                                                       |
 | Clienti collegati        | `GET /api/v1/clients/my`                                                           | Implementabile ora                   | Ogni elemento contiene soltanto `id`, `firstName`, `lastName` e `profileImageUrl`; non mostrare obiettivo o stato operativo.                                                                                         |
 | Dettaglio cliente        | `GET /api/v1/clients/{clientId}`                                                   | Implementabile ora                   | Solo con collegamento attivo. Contiene identità minima e `primaryGoal`. Un `404 CLIENT_NOT_FOUND` non permette di distinguere cliente inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista. |
-| Crea invito              | `POST /api/v1/invites`                                                             | Implementabile ora                   | Nessun body. Dopo `201`, mostrare codice, scadenza e azione “Copia”. Non inventare invio email automatico.                                                                                                           |
-| Lista inviti             | `GET /api/v1/invites`                                                              | Implementabile ora                   | Mostrare attivo/usato/scaduto derivando lo scaduto da `expiresAt`. Non esistono dettaglio o disattivazione manuale.                                                                                                  |
+| Crea invito              | `POST /api/v1/invites`                                                             | **UI implementata**                  | Nessun body. Dopo `201`, mostra codice/scadenza; Copia solo se Valido. Fail-closed su `expiresAt` invalido (`Non disponibile`). Dettaglio: [FE05](./05-professional-invites-implementation.md).                      |
+| Lista inviti             | `GET /api/v1/invites`                                                              | **UI implementata**                  | Stati Non attivo / Usato / Scaduto / Non disponibile / Valido. Nessun dettaglio o disattivazione manuale.                                                                                                            |
 
 ### 5.4 Personal trainer
 
@@ -237,7 +238,7 @@ Sono inoltre non presenti e da non esporre come attivi: cambio password autentic
 
 ## 7. Sitemap MVP
 
-I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzionalità completa.** Home, login/auth foundation, **registrazione PROFESSIONAL**, **verifica email** e **Profilo/Account/Operational Status** sono implementati; validazione invito, registrazione CLIENT e le altre pagine business restano placeholder. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
+I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzionalità completa.** Home, login/auth foundation, **registrazione PROFESSIONAL**, **verifica email**, **Profilo/Account/Operational Status** e **gestione inviti PROFESSIONAL** sono implementati; validazione invito, registrazione CLIENT e le altre pagine business restano placeholder. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
 
 ### Pubblico
 
@@ -292,8 +293,9 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 | `/invite/validate`, `/register/client`                  | Pubblico                  | **Placeholder**                                              |
 | Guardie auth (`RequireAuth` / ruolo / specializzazione) | Privato                   | **Implementate**                                             |
 | `/app/client/profile`, `/app/professional/profile`      | CLIENT / PROFESSIONAL     | **Implementata** (Profilo + Account RO + Operational Status) |
+| `/app/professional/invites`                             | PROFESSIONAL              | **Implementata** (lista, genera, copia se Valido)            |
 | `/app/*/dashboard`                                      | CLIENT / PROFESSIONAL     | **Placeholder** (shell; senza dati business aggregati)       |
-| Clients / professionals / invites                       | PROFESSIONAL o CLIENT     | **Placeholder**                                              |
+| Clients / professionals                                 | PROFESSIONAL o CLIENT     | **Placeholder**                                              |
 | Availability / bookings                                 | CLIENT; PROFESSIONAL + PT | **Placeholder**                                              |
 | `/dev/role-preview`                                     | Dev-only                  | **Implementata** (solo `import.meta.env.DEV`)                |
 
@@ -410,15 +412,15 @@ Ogni pagina privata deve prevedere anche gli stati trasversali `unauthorized` e 
 
 ## 11. Priorità implementazione React
 
-Completati: setup React/Vite/TypeScript, routing, layout, home pubblica, foundation API/auth session-based (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap), **Profilo/Account/Operational Status** collegati a `/me`. Dettagli auth e soft commit: [FE03](./03-authentication-session-flow.md).
+Completati: setup React/Vite/TypeScript, routing, layout, home pubblica, foundation API/auth session-based (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap), **Profilo/Account/Operational Status** collegati a `/me`, onboarding PROFESSIONAL/verifica email, **gestione inviti PROFESSIONAL**. Dettagli auth: [FE03](./03-authentication-session-flow.md); inviti: [FE05](./05-professional-invites-implementation.md).
 
 Ordine pragmatico **residuo**:
 
 1. dashboard base composte, senza analytics;
-2. flusso professionista comune: clienti e inviti;
+2. flusso professionista comune: clienti collegati;
 3. flusso cliente: professionisti collegati e dettaglio;
 4. availability e booking del personal trainer, poi booking cliente;
-5. validazione invito e registrazione cliente tramite invito (registrazione PROFESSIONAL e verifica email sono già implementate);
+5. validazione invito e registrazione cliente tramite invito (registrazione PROFESSIONAL, verifica email e gestione inviti PROFESSIONAL sono già implementate);
 6. hardening di errori, accessibilità, responsive e test dei flussi applicativi business residui.
 
 La scelta del prossimo vertical slice business resta una decisione di prodotto. Availability e Booking vanno progettati insieme sul piano UX perché le transizioni booking modificano gli slot.
@@ -513,7 +515,7 @@ Questi punti non impediscono la mappa funzionale, ma non sono determinabili come
 
 1. **Consegna verifica email:** registrazione e reinvio creano e salvano il token e, dopo commit, usano una porta di consegna con adapter SMTP configurabile. Il default locale resta disabilitato; la porta in-memory è solo per test/debug e non è esposta via endpoint. L'URL frontend remoto deve essere HTTPS; HTTP è ammesso solo per loopback locale. Non sono presenti outbox o retry, quindi la consegna non è garantita.
 2. **Contratto temporale:** audit e scadenze account/booking/inviti arrivano come `Instant` UTC con `Z`; gli orari degli slot e gli snapshot Booking arrivano con offset esplicito `Europe/Rome`, mentre le date civili restano `LocalDate`. La UI deve distinguere questi tre tipi e non applicare una timezone globale ai payload.
-3. **Auth client:** implementata session-based (vedi [FE03](./03-authentication-session-flow.md)); nessun JWT/Bearer/storage. Profilo/Account/Status e onboarding PROFESSIONAL/verifica email sono collegati (dettaglio onboarding: [FE04](./04-professional-onboarding-implementation.md)); restano da collegare le altre pagine business e i flussi pubblici di validazione invito/registrazione CLIENT.
+3. **Auth client:** implementata session-based (vedi [FE03](./03-authentication-session-flow.md)); nessun JWT/Bearer/storage. Profilo/Account/Status, onboarding PROFESSIONAL/verifica email e gestione inviti PROFESSIONAL sono collegati (dettaglio: [FE04](./04-professional-onboarding-implementation.md), [FE05](./05-professional-invites-implementation.md)); restano da collegare le altre pagine business e i flussi pubblici di validazione invito/registrazione CLIENT.
 4. **URL pubblico dei link:** `app.email.verification-page-url` configura la pagina di verifica, ma il valore pubblico definitivo di ciascun ambiente non è ancora definito; i link invito restano separati.
 5. **Liste:** non esistono paginazione e filtri API per clienti, professionisti, inviti, slot o booking; la prima UI non deve dipenderne. Per Booking l'ordine iniziale è `createdAt DESC, id DESC`.
 6. **Dashboard:** non esiste un contratto aggregato; contenuti e metriche devono restare una composizione minima dei dati già disponibili.

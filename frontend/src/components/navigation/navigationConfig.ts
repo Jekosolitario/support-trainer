@@ -27,6 +27,7 @@ const personalTrainerNavigation: NavigationItem[] = [
     path: '/app/professional/dashboard',
   },
   { id: 'clients', label: 'Clienti', path: '/app/professional/clients' },
+  { id: 'invites', label: 'Inviti', path: '/app/professional/invites' },
   {
     id: 'availability',
     label: 'Disponibilità',

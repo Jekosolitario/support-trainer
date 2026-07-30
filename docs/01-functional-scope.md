@@ -75,7 +75,7 @@ Non risultano ancora implementate:
 - recupero e reset password;
 - upload immagine profilo;
 - editing account (email, password, cancellazione) e gestione dispositivi/sessioni;
-- altre pagine frontend business ancora placeholder (oltre auth, onboarding PROFESSIONAL/verifica email e Profilo/Account/Operational Status già presenti);
+- altre pagine frontend business ancora placeholder (oltre auth, onboarding PROFESSIONAL/verifica email, Profilo/Account/Operational Status e gestione inviti PROFESSIONAL già presenti);
 - flussi frontend pubblici di validazione invito e registrazione CLIENT ancora placeholder;
 - preparazione completa al deploy.
 
@@ -540,7 +540,8 @@ Risultano già implementati:
 - gestione stato operativo utente;
 - foundation frontend con home pubblica e autenticazione session-based (login/logout/guards/bootstrap);
 - frontend Profilo/Account/Operational Status autenticati (CLIENT e PROFESSIONAL);
-- frontend registrazione pubblica PROFESSIONAL e verifica email (confirm + resend).
+- frontend registrazione pubblica PROFESSIONAL e verifica email (confirm + resend);
+- frontend gestione inviti PROFESSIONAL (lista, genera, copia codice valido).
 
 Restano fuori da questo vertical slice:
 

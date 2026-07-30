@@ -1,7 +1,9 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, vi } from 'vitest';
 
 import type { UserAccessProfile } from '../config/access';
+import * as invitesApi from '../../api/invitesApi';
 import { renderApp } from '../../test/renderApp';
 import {
   createAuthenticatedAuthState,
@@ -106,6 +108,14 @@ function expectForbidden(): void {
 }
 
 describe('AppRoutes', () => {
+  beforeEach(() => {
+    vi.spyOn(invitesApi, 'listMyInvites').mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it.each([
     ['/', 'Il tuo lavoro, più semplice da organizzare.'],
     ['/login', 'Login'],
@@ -270,6 +280,33 @@ describe('AppRoutes', () => {
     expect(
       screen.getByRole('article', { name: 'Nutrition: In arrivo' }),
     ).toBeVisible();
+  });
+
+  it('include Inviti nella primary navigation del personal trainer', () => {
+    renderAuthenticatedApp('/app/professional/dashboard', {
+      role: 'PROFESSIONAL',
+      specialization: 'PERSONAL_TRAINER',
+    });
+
+    const navigation = screen.getByRole('navigation', {
+      name: 'Navigazione principale',
+    });
+    expect(within(navigation).getAllByRole('link')).toHaveLength(6);
+    expect(
+      within(navigation).getByRole('link', { name: 'Inviti' }),
+    ).toHaveAttribute('href', '/app/professional/invites');
+  });
+
+  it('non espone più Accesso secondario nella pagina Clienti', () => {
+    renderAuthenticatedApp('/app/professional/clients', {
+      role: 'PROFESSIONAL',
+      specialization: 'PERSONAL_TRAINER',
+    });
+
+    expect(screen.queryByText('Accesso secondario')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Vai all’area inviti' }),
+    ).not.toBeInTheDocument();
   });
 
   it('registra la preview dei ruoli in sviluppo', () => {
