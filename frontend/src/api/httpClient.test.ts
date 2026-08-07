@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { advanceEpoch, currentEpoch } from './authEpoch';
-import { request } from './httpClient';
+import { observeHttpRequest, request } from './httpClient';
 import { subscribe } from './sessionInvalidation';
 import {
   HttpApiError,
@@ -438,5 +438,132 @@ describe('httpClient', () => {
 
     await expect(pending).rejects.toBeInstanceOf(HttpApiError);
     expect(onInvalidate).not.toHaveBeenCalled();
+  });
+});
+
+describe('observeHttpRequest', () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+    advanceEpoch();
+  });
+
+  it('espone status 200 e body JSON valido senza interpretarlo', async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ valid: true, code: 'INV-ABC' }));
+
+    const observed = await observeHttpRequest(
+      '/auth/register/client/validate-invite',
+      {
+        method: 'POST',
+      },
+    );
+
+    expect(observed.status).toBe(200);
+    expect(observed.ok).toBe(true);
+    expect(observed.body).toEqual({
+      kind: 'json',
+      value: { valid: true, code: 'INV-ABC' },
+    });
+  });
+
+  it('espone status 202 con body JSON', async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ message: 'neutro' }, { status: 202 }));
+
+    const observed = await observeHttpRequest('/auth/register/client', {
+      method: 'POST',
+    });
+
+    expect(observed.status).toBe(202);
+    expect(observed.ok).toBe(true);
+    expect(observed.body).toEqual({
+      kind: 'json',
+      value: { message: 'neutro' },
+    });
+  });
+
+  it('espone body vuoto senza fallire', async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(new Response('', { status: 202 }));
+
+    const observed = await observeHttpRequest('/auth/register/client', {
+      method: 'POST',
+    });
+
+    expect(observed.status).toBe(202);
+    expect(observed.body).toEqual({ kind: 'empty' });
+  });
+
+  it('espone parse_error per body malformato', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response('<html>nope</html>', {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      }),
+    );
+
+    const observed = await observeHttpRequest(
+      '/auth/register/client/validate-invite',
+    );
+
+    expect(observed.status).toBe(200);
+    expect(observed.body.kind).toBe('parse_error');
+  });
+
+  it('non lancia su non-2xx e conserva status/body', async () => {
+    const body: ErrorResponse = {
+      timestamp: '2026-07-31T10:00:00Z',
+      status: 400,
+      code: 'INVITE_CODE_EXPIRED',
+      message: 'Codice invito scaduto',
+      path: '/api/v1/auth/register/client/validate-invite',
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(body));
+
+    const observed = await observeHttpRequest(
+      '/auth/register/client/validate-invite',
+      { method: 'POST' },
+    );
+
+    expect(observed.status).toBe(400);
+    expect(observed.ok).toBe(false);
+    expect(observed.body).toEqual({ kind: 'json', value: body });
+  });
+
+  it('propaga NetworkError su transport failure', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('offline'));
+
+    await expect(
+      observeHttpRequest('/auth/register/client', { method: 'POST' }),
+    ).rejects.toBeInstanceOf(NetworkError);
+  });
+
+  it('classifica read_error quando la lettura del body fallisce', async () => {
+    const readFailure = new TypeError('stream failed');
+    const textMock = vi.fn().mockRejectedValue(readFailure);
+    const response = new Response('payload', {
+      status: 202,
+      headers: { 'Content-Type': 'application/json' },
+    });
+    Object.defineProperty(response, 'text', {
+      configurable: true,
+      value: textMock,
+    });
+    globalThis.fetch = vi.fn().mockResolvedValue(response);
+
+    const observed = await observeHttpRequest('/auth/register/client', {
+      method: 'POST',
+    });
+
+    expect(observed.status).toBe(202);
+    expect(observed.ok).toBe(true);
+    expect(observed.body).toEqual({ kind: 'read_error', cause: readFailure });
+    expect(textMock).toHaveBeenCalledTimes(1);
   });
 });

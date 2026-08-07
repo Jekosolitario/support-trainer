@@ -5,8 +5,13 @@ import {
   invalidateCsrfIfCurrent,
   type CsrfValue,
 } from './csrf';
-import { request, type HttpRequestOptions } from './httpClient';
-import { HttpApiError } from './types';
+import {
+  observeHttpRequest,
+  request,
+  type HttpRequestOptions,
+  type ObservedHttpResponse,
+} from './httpClient';
+import { HttpApiError, isErrorResponse } from './types';
 
 export interface CsrfMutationOptions extends HttpRequestOptions {
   readonly invalidateCsrfOnCommit?: boolean;
@@ -53,18 +58,44 @@ function isCsrfValidationFailure(error: unknown): error is HttpApiError {
   );
 }
 
+function isObservedCsrfValidationFailure(
+  observed: ObservedHttpResponse,
+): boolean {
+  return (
+    observed.status === 403 &&
+    observed.body.kind === 'json' &&
+    isErrorResponse(observed.body.value) &&
+    observed.body.value.code === 'CSRF_VALIDATION_FAILED'
+  );
+}
+
+function withCsrfHeaders(
+  requestOptions: HttpRequestOptions,
+  csrf: CsrfValue,
+): HttpRequestOptions {
+  const headers = new Headers(requestOptions.headers);
+  headers.set(csrf.headerName, csrf.token);
+
+  return {
+    ...requestOptions,
+    headers,
+  };
+}
+
 function requestWithCsrf<T>(
   path: string,
   requestOptions: HttpRequestOptions,
   csrf: CsrfValue,
 ): Promise<T> {
-  const headers = new Headers(requestOptions.headers);
-  headers.set(csrf.headerName, csrf.token);
+  return request<T>(path, withCsrfHeaders(requestOptions, csrf));
+}
 
-  return request<T>(path, {
-    ...requestOptions,
-    headers,
-  });
+function observeWithCsrf(
+  path: string,
+  requestOptions: HttpRequestOptions,
+  csrf: CsrfValue,
+): Promise<ObservedHttpResponse> {
+  return observeHttpRequest(path, withCsrfHeaders(requestOptions, csrf));
 }
 
 function commitProtocolSideEffects(invalidateCsrfOnCommit: boolean): void {
@@ -113,4 +144,49 @@ export async function performCsrfMutation<T = unknown>(
     assertCurrentEpoch(expectedEpoch);
     throw error;
   }
+}
+
+/**
+ * CSRF-protected mutation that returns the observed HTTP exchange instead of
+ * interpreting 2xx as typed success. Preserves one CSRF retry and epoch fencing.
+ * Transport/abort and stale-epoch failures still throw.
+ */
+export async function performCsrfObservedMutation(
+  path: string,
+  options: CsrfMutationOptions = {},
+): Promise<ObservedHttpResponse> {
+  const expectedEpoch = currentEpoch();
+  const { invalidateCsrfOnCommit = false, ...requestOptions } = options;
+  const initialCsrf = await ensureCurrentCsrf(expectedEpoch);
+
+  const firstObservation = await observeWithCsrf(
+    path,
+    requestOptions,
+    initialCsrf,
+  );
+
+  if (!isObservedCsrfValidationFailure(firstObservation)) {
+    if (firstObservation.ok) {
+      commitProtocolSideEffects(invalidateCsrfOnCommit);
+    }
+    assertCurrentEpoch(expectedEpoch);
+    return firstObservation;
+  }
+
+  assertCurrentEpoch(expectedEpoch);
+  invalidateCsrfIfCurrent(initialCsrf);
+
+  const refreshedCsrf = await ensureCurrentCsrf(expectedEpoch);
+  assertCurrentEpoch(expectedEpoch);
+
+  const secondObservation = await observeWithCsrf(
+    path,
+    requestOptions,
+    refreshedCsrf,
+  );
+  if (secondObservation.ok) {
+    commitProtocolSideEffects(invalidateCsrfOnCommit);
+  }
+  assertCurrentEpoch(expectedEpoch);
+  return secondObservation;
 }

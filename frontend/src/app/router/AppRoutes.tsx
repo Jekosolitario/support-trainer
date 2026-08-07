@@ -1,5 +1,6 @@
 import { useRoutes, type RouteObject } from 'react-router-dom';
 
+import { ClientOnboardingProviderLayout } from '../../auth/ClientOnboardingProviderLayout';
 import { RequireAuth } from '../../auth/RequireAuth';
 import { RequireRole } from '../../auth/RequireRole';
 import { RequireSpecialization } from '../../auth/RequireSpecialization';
@@ -25,11 +26,9 @@ import {
 import { ProfessionalInvitesPage } from '../../pages/professional/ProfessionalInvitesPage';
 import { HomePage } from '../../pages/public/HomePage';
 import { LoginPage } from '../../pages/public/LoginPage';
-import {
-  RegisterClientPage,
-  ValidateInvitePage,
-} from '../../pages/public/PublicPages';
+import { RegisterClientPage } from '../../pages/public/PublicPages';
 import { RegisterProfessionalPage } from '../../pages/public/RegisterProfessionalPage';
+import { ValidateInvitePage } from '../../pages/public/ValidateInvitePage';
 import { VerifyEmailPage } from '../../pages/public/VerifyEmailPage';
 import { DashboardPage } from '../../pages/shared/DashboardPage';
 import { ForbiddenPage, NotFoundPage } from '../../pages/shared/ErrorPages';
@@ -56,8 +55,13 @@ function createAppRoutes(isDevelopment: boolean): RouteObject[] {
           path: '/register/professional',
           element: <RegisterProfessionalPage />,
         },
-        { path: '/invite/validate', element: <ValidateInvitePage /> },
-        { path: '/register/client', element: <RegisterClientPage /> },
+        {
+          element: <ClientOnboardingProviderLayout />,
+          children: [
+            { path: '/invite/validate', element: <ValidateInvitePage /> },
+            { path: '/register/client', element: <RegisterClientPage /> },
+          ],
+        },
         { path: '/verify-email', element: <VerifyEmailPage /> },
       ],
     },

@@ -184,6 +184,8 @@ con `Cache-Control: no-store`. `headerName` è quello esposto dal token Spring (
 ## 7.2 Uso
 Le mutazioni (POST/PATCH e logout) devono inviare l’header CSRF indicato da `headerName`. Un fallimento CSRF produce `403` con codice `CSRF_VALIDATION_FAILED`.
 
+La foundation frontend può invalidare il token, ottenerne uno nuovo e ripetere **una sola volta** la mutation dopo quella coppia esatta status/code. Il replay è tecnico e centralizzato: le pagine non implementano un secondo livello di retry applicativo.
+
 ## 7.3 Rotazione dopo login
 Il login invalida/ruota il CSRF di sessione. Dopo un login riuscito il client deve richiamare `GET /api/v1/auth/csrf` e usare il nuovo token. Il token CSRF va tenuto solo in memoria, non in storage persistente del browser.
 
@@ -293,17 +295,24 @@ Al boundary `now == latestToken.createdAt + 60 secondi` il reinvio è consentito
 
 ## 11.4 Invarianti frontend (onboarding pubblico)
 
-Il client pubblico di registrazione PROFESSIONAL e verifica email rispetta almeno questi invarianti:
+Il client pubblico di onboarding PROFESSIONAL e CLIENT e la verifica email rispettano almeno questi invarianti:
 
 - neutralità UX di registration e resend (nessuna enumerazione account);
-- CSRF sulle mutazioni pubbliche di register / confirm / resend;
+- CSRF sulle mutazioni pubbliche di validate-invite / register / confirm / resend;
 - token di verifica trasportato nel fragment URL e sanitizzato immediatamente dall’address bar, anche se il fragment è invalido;
 - token memory-only: nessun `localStorage` / `sessionStorage`, nessun router state, nessuna esposizione in DOM/ARIA/log;
-- secondo consumo coerente gestito idempotentemente dal backend; il frontend tratta come successo solo una risposta di successo;
-- password rimossa dallo state frontend dopo il `202` di registrazione;
+- codice invito CLIENT conservato soltanto in un provider React limitato a `/invite/validate` e `/register/client`; nessun query parameter, fragment, pathname dinamico, `location.state` o storage del browser;
+- accesso diretto/reload a `/register/client` senza invito memory-only fail-closed con redirect `replace` a `/invite/validate`;
+- gate locale sulle route CLIENT: `initializing` non monta le pagine, `unavailable` resta fail-closed, `authenticated` pulisce l'invito e redirige alla dashboard del ruolo, `unauthenticated` consente il flusso;
+- validazione invito con successo soltanto su `200` e body runtime-decoded coerente; rete, `5xx`, body illeggibile e response anomale falliscono chiuse;
+- registrazione CLIENT confermata soltanto su `202`, indipendentemente dal body; `5xx`, altri `2xx`, transport e coppie status/code incoerenti restano outcome ambigui;
+- una sola chiamata applicativa a `registerClient` per submit, nessun retry della pagina e al massimo un replay tecnico CSRF centralizzato;
+- secondo consumo email coerente gestito idempotentemente dal backend; il frontend tratta come successo solo una risposta di successo;
+- password e draft CLIENT rimossi dallo state frontend negli outcome terminali insieme all'invito; al massimo resta separata la sola email normalizzata necessaria al resend;
+- reinvio CLIENT neutro, fenced same-tick e con cooldown UX di 60 secondi basato su deadline, senza ripristino dell'invito;
 - nessun auto-login dopo register o verify: la sessione autenticata nasce solo con login.
 
-Dettaglio tecnico frontend: [`docs/frontend/04-professional-onboarding-implementation.md`](frontend/04-professional-onboarding-implementation.md).
+Dettaglio tecnico frontend: [`docs/frontend/04-professional-onboarding-implementation.md`](frontend/04-professional-onboarding-implementation.md) per PROFESSIONAL/Verify e [`docs/frontend/06-client-onboarding-implementation.md`](frontend/06-client-onboarding-implementation.md) per CLIENT.
 
 ---
 
@@ -775,6 +784,8 @@ Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti
 - specializzazione business: `PERSONAL_TRAINER`, `NUTRITIONIST`
 - verifica email obbligatoria per professionista e cliente
 - cliente registrabile solo tramite codice invito valido
+- onboarding CLIENT frontend memory-only, senza secret in URL/storage e senza auto-login
+- registrazione CLIENT confermata soltanto da `202`; outcome incerti trattati in modo conservativo e senza retry applicativo
 - business authorization gestita nel service layer
 - password hashata con BCrypt
 - forgot password / reset password non ancora implementati

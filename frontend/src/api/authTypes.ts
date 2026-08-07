@@ -24,6 +24,32 @@ export interface RegisterProfessionalRequest {
   specialization: ProfessionalSpecialization;
 }
 
+export interface ValidateInviteCodeRequest {
+  code: string;
+}
+
+export interface ValidateInviteCodeResponse {
+  valid: true;
+  code: string;
+  professionalId: number;
+  expiresAt: string;
+}
+
+export interface RegisterClientRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  inviteCode: string;
+  birthDate: string;
+  heightCm: number;
+  primaryGoal: string;
+  gender: Gender;
+  medicalNotes?: string;
+  injuryNotes?: string;
+  notes?: string;
+}
+
 export interface RegistrationAcceptedResponse {
   message: string;
 }

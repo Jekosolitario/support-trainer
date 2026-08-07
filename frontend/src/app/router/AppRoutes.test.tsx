@@ -1,9 +1,17 @@
-import { screen, within } from '@testing-library/react';
+import { useState } from 'react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { UserAccessProfile } from '../config/access';
+import * as authOnboardingApi from '../../api/authOnboardingApi';
 import * as invitesApi from '../../api/invitesApi';
+import {
+  AuthContext,
+  type AuthContextValue,
+  type AuthState,
+} from '../../auth/authState';
 import { renderApp } from '../../test/renderApp';
 import {
   createAuthenticatedAuthState,
@@ -121,10 +129,9 @@ describe('AppRoutes', () => {
     ['/login', 'Login'],
     ['/register/professional', 'Registrazione professionista'],
     ['/invite/validate', 'Validazione invito'],
-    ['/register/client', 'Registrazione cliente'],
     ['/verify-email', 'Verifica dell’indirizzo email'],
   ])('mantiene pubblica %s', (path, heading) => {
-    if (path === '/login') {
+    if (path === '/login' || path === '/invite/validate') {
       renderUnauthenticatedApp(path);
     } else {
       renderApp(path);
@@ -342,5 +349,207 @@ describe('AppRoutes', () => {
     renderApp('/dev/role-preview', false);
 
     expectPageHeading('Pagina non trovata');
+  });
+});
+
+describe('AppRoutes CLIENT onboarding foundation gate', () => {
+  const initializingState: AuthState = {
+    status: 'initializing',
+    operation: 'bootstrap',
+    reason: null,
+    account: null,
+    profile: null,
+    accessProfile: null,
+  };
+
+  const unavailableState: AuthState = {
+    status: 'unavailable',
+    operation: null,
+    reason: 'bootstrap-failed',
+    account: null,
+    profile: null,
+    accessProfile: null,
+  };
+
+  function ControllableAppAuth({
+    initialState,
+    path,
+  }: {
+    readonly initialState: AuthState;
+    readonly path: string;
+  }) {
+    const [state, setState] = useState<AuthState>(initialState);
+    const value: AuthContextValue = {
+      ...createAuthContextValue(state),
+      state,
+    };
+
+    return (
+      <MemoryRouter initialEntries={[path]}>
+        <AuthContext.Provider value={value}>
+          <AppRoutes isDevelopment={false} />
+          <button
+            type="button"
+            onClick={() => {
+              setState(
+                createAuthenticatedAuthState({
+                  role: 'CLIENT',
+                  specialization: null,
+                }),
+              );
+            }}
+          >
+            become-authenticated-client
+          </button>
+        </AuthContext.Provider>
+      </MemoryRouter>
+    );
+  }
+
+  function renderAppWithAuth(path: string, state: AuthState) {
+    return renderWithAuthContext(
+      <AppRoutes isDevelopment={false} />,
+      createAuthContextValue(state),
+      { initialEntries: [path] },
+    );
+  }
+
+  it('unauthenticated mostra la pagina reale ValidateInvite su /invite/validate', () => {
+    renderAppWithAuth('/invite/validate', createUnauthenticatedAuthState());
+
+    expectPageHeading('Validazione invito');
+    expect(screen.getByLabelText('Codice invito')).toBeVisible();
+    expect(
+      screen.getByRole('textbox', { name: 'Codice invito' }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        'Usa il codice fornito dal professionista. Massimo 100 caratteri.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Verifica codice' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByText(/La futura procedura verificherà il codice/),
+    ).not.toBeInTheDocument();
+  });
+
+  it('direct access unauthenticated a /register/client fail-closed su validate', () => {
+    renderAppWithAuth('/register/client', createUnauthenticatedAuthState());
+
+    expectPageHeading('Validazione invito');
+    expect(
+      screen.queryByRole('heading', { name: 'Registrazione cliente' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('route production validate → register mostra il form CLIENT reale con provider condiviso', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(authOnboardingApi, 'validateInviteCode').mockResolvedValue({
+      valid: true,
+      code: 'INV-ROUTER0001',
+      professionalId: 7,
+      expiresAt: '2026-12-31T23:59:59Z',
+    });
+    renderAppWithAuth('/invite/validate', createUnauthenticatedAuthState());
+
+    await user.type(screen.getByLabelText('Codice invito'), 'INV-ROUTER0001');
+    await user.click(screen.getByRole('button', { name: 'Verifica codice' }));
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Continua con la registrazione',
+      }),
+    );
+
+    expectPageHeading('Registrazione cliente');
+    expect(screen.getByLabelText('Nome')).toBeVisible();
+    expect(screen.getByLabelText('Data di nascita')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Crea account cliente' }),
+    ).toBeVisible();
+  });
+
+  it.each(['/invite/validate', '/register/client'] as const)(
+    'initializing non mostra la pagina onboarding su %s',
+    (path) => {
+      const childHeading =
+        path === '/invite/validate'
+          ? 'Validazione invito'
+          : 'Registrazione cliente';
+
+      renderAppWithAuth(path, initializingState);
+
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Verifica della sessione in corso.',
+      );
+      expect(
+        screen.queryByRole('heading', { level: 1, name: childHeading }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it('authenticated CLIENT redirecta da /invite/validate al dashboard cliente', () => {
+    renderAppWithAuth(
+      '/invite/validate',
+      createAuthenticatedAuthState({
+        role: 'CLIENT',
+        specialization: null,
+      }),
+    );
+
+    expectPageHeading('Dashboard');
+    expect(
+      screen.queryByRole('heading', { name: 'Validazione invito' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('authenticated PROFESSIONAL redirecta da /register/client al dashboard professionista', () => {
+    renderAppWithAuth(
+      '/register/client',
+      createAuthenticatedAuthState({
+        role: 'PROFESSIONAL',
+        specialization: 'NUTRITIONIST',
+      }),
+    );
+
+    expectPageHeading('Dashboard');
+    expect(
+      screen.queryByRole('heading', { name: 'Registrazione cliente' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('unavailable mostra AuthUnavailableBoundary sulle route onboarding', () => {
+    renderAppWithAuth('/invite/validate', unavailableState);
+
+    expectPageHeading('Sessione non verificabile');
+    expect(
+      screen.queryByRole('heading', { name: 'Validazione invito' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('transizione initializing to authenticated su AppRoutes reale non mostra ValidateInvite', () => {
+    render(
+      <ControllableAppAuth
+        initialState={initializingState}
+        path="/invite/validate"
+      />,
+    );
+
+    expect(screen.getByRole('status')).toBeVisible();
+    expect(
+      screen.queryByRole('heading', { name: 'Validazione invito' }),
+    ).not.toBeInTheDocument();
+
+    act(() => {
+      screen
+        .getByRole('button', { name: 'become-authenticated-client' })
+        .click();
+    });
+
+    expectPageHeading('Dashboard');
+    expect(
+      screen.queryByRole('heading', { name: 'Validazione invito' }),
+    ).not.toBeInTheDocument();
   });
 });

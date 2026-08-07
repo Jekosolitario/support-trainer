@@ -4,7 +4,7 @@
 
 Questo documento descrive la home pubblica di Support Trainer e la parte di fondazione frontend necessaria a renderla disponibile sulla route `/`. Il perimetro comprende struttura narrativa, navigazione, componenti, copy, sistema visuale, tipografia, comportamento responsive, accessibilità e test automatici direttamente collegati alla pagina.
 
-La home pubblica è implementata. Sono presenti anche il progetto React, il routing, il layout pubblico, i layout autenticati, le pagine di errore e le route applicative di base. L’autenticazione session-based frontend (login, logout, CSRF, guards, bootstrap) è implementata; vedi [Authentication Session Flow](./03-authentication-session-flow.md). La pagina Profilo autenticata (Account in sola lettura e Operational Status) è implementata e allineata al linguaggio visuale dark-tech; dettagli funzionali in [Frontend Functional Map](./01-frontend-functional-map-mvp.md). Registrazione PROFESSIONAL e verifica email sono implementate; validazione invito, registrazione CLIENT e le altre pagine business private restano prevalentemente placeholder.
+La home pubblica è implementata. Sono presenti anche il progetto React, il routing, il layout pubblico, i layout autenticati, le pagine di errore e le route applicative di base. L’autenticazione session-based frontend (login, logout, CSRF, guards, bootstrap) è implementata; vedi [Authentication Session Flow](./03-authentication-session-flow.md). La pagina Profilo autenticata (Account in sola lettura e Operational Status) è implementata e allineata al linguaggio visuale dark-tech; dettagli funzionali in [Frontend Functional Map](./01-frontend-functional-map-mvp.md). Onboarding pubblico PROFESSIONAL e CLIENT e verifica email sono implementati; le altre pagine business private restano prevalentemente placeholder.
 
 Le fonti di verità implementative per questa pagina sono il codice e i test frontend collegati:
 
@@ -79,15 +79,15 @@ Le destinazioni principali sono:
 | “Scopri come funziona”       | `#come-funziona`         | Ancora interna operativa                         |
 | Registrazione professionista | `/register/professional` | **Implementata** (form, API, check-email/resend) |
 | Verifica email               | `/verify-email`          | **Implementata** (confirm + resend)              |
-| Codice invito cliente        | `/invite/validate`       | Route registrata, flusso ancora placeholder      |
-| Registrazione cliente        | `/register/client`       | Route registrata, flusso ancora placeholder      |
+| Codice invito cliente        | `/invite/validate`       | **Implementata** (validate fail-closed)           |
+| Registrazione cliente        | `/register/client`       | **Implementata** (invite memory-only richiesto)   |
 | Accesso                      | `/login`                 | **Implementata** (LoginPage session-based)       |
 
 La hero presenta l'ancora informativa, la validazione invito e la registrazione professionale. La sezione “Come funziona” aggiunge una CTA contestuale per il cliente con codice. La chiusura ripropone registrazione, invito e accesso secondo la gerarchia del pubblico.
 
 Il footer separa le destinazioni applicative nel gruppo “Accesso” e le ancore della pagina nel gruppo “Esplora”. Il branding conduce alla route `/`.
 
-Le CTA costituiscono navigazione disponibile verso route esistenti. Login, registrazione PROFESSIONAL e verifica email sono flussi reali; validazione invito e registrazione CLIENT restano placeholder finché form e chiamate API di dominio non saranno completati.
+Le CTA costituiscono navigazione disponibile verso route esistenti. Login, onboarding PROFESSIONAL e CLIENT e verifica email sono flussi reali. Il percorso CLIENT parte da Validate, conserva soltanto il codice canonico nel provider memory-only e non inserisce il secret nella URL; dettaglio in [Client Onboarding Implementation](./06-client-onboarding-implementation.md).
 
 ## 5. Ruoli e funzionalità
 
@@ -281,7 +281,6 @@ Versioni e risoluzione restano governate da `package.json` e `package-lock.json`
 
 Non sono ancora implementati o definiti in questo perimetro home:
 
-- validazione invito e registrazione CLIENT (route pubbliche ancora placeholder);
 - contenuti applicativi delle altre pagine business private (dashboard, clients, professionals, availability, bookings), ancora placeholder o legacy;
 - redesign globale della shell autenticata;
 - Workout, Nutrition, Feedback e Measurements;
@@ -292,6 +291,6 @@ Non sono ancora implementati o definiti in questo perimetro home:
 - matrice ufficiale di browser e dispositivi;
 - audit formale WCAG.
 
-API client e autenticazione session-based frontend sono implementati fuori dal perimetro home ([FE03](./03-authentication-session-flow.md)). Login non è più un gap strutturale della fondazione. Profilo/Account/Operational Status è documentato funzionalmente in [FE01](./01-frontend-functional-map-mvp.md); questo documento ne registra solo l’allineamento visuale dark-tech (§8.1).
+API client e autenticazione session-based frontend sono implementati fuori dal perimetro home ([FE03](./03-authentication-session-flow.md)). Login non è più un gap strutturale della fondazione. Profilo/Account/Operational Status è documentato funzionalmente in [FE01](./01-frontend-functional-map-mvp.md); onboarding CLIENT è documentato in [FE06](./06-client-onboarding-implementation.md). Questo documento ne registra soltanto l'accesso dalla home.
 
 Non sono definite date o priorità pubbliche per i moduli “In arrivo”.

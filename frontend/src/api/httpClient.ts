@@ -108,6 +108,99 @@ async function parseSuccessBody<T>(response: Response): Promise<T> {
   }
 }
 
+/**
+ * Body observation for callers that need exact status semantics without treating
+ * every 2xx as a typed success payload.
+ * Does not interpret domain/business meaning.
+ */
+export type ObservedHttpBody =
+  | { readonly kind: 'json'; readonly value: unknown }
+  | { readonly kind: 'empty' }
+  | {
+      readonly kind: 'parse_error';
+      readonly rawText: string;
+      readonly cause: unknown;
+    }
+  | { readonly kind: 'read_error'; readonly cause: unknown };
+
+export interface ObservedHttpResponse {
+  readonly status: number;
+  readonly ok: boolean;
+  readonly response: Response;
+  readonly body: ObservedHttpBody;
+}
+
+async function observeResponseBody(
+  response: Response,
+): Promise<ObservedHttpBody> {
+  if (
+    response.status === 204 ||
+    response.headers.get('content-length') === '0'
+  ) {
+    return { kind: 'empty' };
+  }
+
+  let rawText: string;
+  try {
+    rawText = await response.text();
+  } catch (cause) {
+    return { kind: 'read_error', cause };
+  }
+
+  if (rawText.trim() === '') {
+    return { kind: 'empty' };
+  }
+
+  try {
+    return { kind: 'json', value: JSON.parse(rawText) as unknown };
+  } catch (cause) {
+    return { kind: 'parse_error', rawText, cause };
+  }
+}
+
+/**
+ * Response-aware HTTP primitive: returns status + body observation for any
+ * completed HTTP exchange. Transport/abort failures still throw
+ * (`NetworkError` / `AbortError`). Never maps business success from status alone.
+ */
+export async function observeHttpRequest(
+  path: string,
+  options: HttpRequestOptions = {},
+): Promise<ObservedHttpResponse> {
+  const { invalidateOn401 = false, ...init } = options;
+  const url = resolveApiUrl(path);
+  const expectedEpoch = invalidateOn401 ? currentEpoch() : null;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      credentials: 'same-origin',
+    });
+  } catch (cause) {
+    if (isAbortError(cause)) {
+      throw cause;
+    }
+
+    throw new NetworkError(cause);
+  }
+
+  if (response.status === 401 && expectedEpoch !== null) {
+    if (invalidateIfCurrent(expectedEpoch)) {
+      notifySessionInvalidated();
+    }
+  }
+
+  const body = await observeResponseBody(response);
+
+  return {
+    status: response.status,
+    ok: response.ok,
+    response,
+    body,
+  };
+}
+
 export async function request<T = unknown>(
   path: string,
   options: HttpRequestOptions = {},

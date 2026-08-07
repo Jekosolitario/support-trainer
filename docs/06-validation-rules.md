@@ -90,14 +90,33 @@ La registrazione cliente richiede un codice invito valido.
 ### 4.2 Password cliente
 A livello di **contratto backend** la policy password del cliente è la stessa della registrazione professionista (§3.3): minimo 8 unità UTF-16, complessità ASCII reale, massimo 72 byte UTF-8 con semantica Java, senza trim/normalize/truncate lato server.
 
-Il frontend di registrazione CLIENT non è ancora collegato/implementato secondo la maturity corrente (vedi [`docs/frontend/01-frontend-functional-map-mvp.md`](frontend/01-frontend-functional-map-mvp.md)); questa sezione non afferma maturity frontend.
+Il frontend di registrazione CLIENT applica la stessa policy senza modificare il valore e invia la password invariata. Il server resta autoritativo. Dettaglio client: [`docs/frontend/06-client-onboarding-implementation.md`](frontend/06-client-onboarding-implementation.md).
+
+### 4.2.1 Form e payload frontend CLIENT
+
+Il form CLIENT richiede `firstName`, `lastName`, `email`, `password`, `birthDate`, `heightCm`, `primaryGoal` e `gender`. `medicalNotes`, `injuryNotes` e `notes` sono facoltativi e non vengono presentati come dati destinati al professionista.
+
+Regole applicate prima della request:
+
+- nomi: non blank, massimo 100 caratteri;
+- email: formato valido, massimo 100, `trim` e lowercase nel payload;
+- data di nascita: `YYYY-MM-DD` civile valido e strettamente precedente a oggi, senza soglia d'età aggiuntiva;
+- altezza: da `0.01` a `999.99`, massimo tre cifre intere e due decimali, punto o virgola accettati, payload numerico;
+- obiettivo principale: non blank, massimo 255 caratteri;
+- genere: `MALE`, `FEMALE`, `OTHER`, `NOT_SPECIFIED`, senza preselezione;
+- note: massimo 5000 caratteri, `trim`, proprietà omessa se blank.
+
+Il codice invito del payload proviene esclusivamente dal provider memory-only e non da un controllo editabile del form Register. Prima della mutation la pagina costruisce uno snapshot immutabile.
 
 ### 4.3 Validazioni sul codice invito
 Il codice deve:
 - esistere
+- avere `active = true`
 - essere associato a un professionista esistente
 - non essere già usato
 - non essere scaduto
+
+Per la validazione pubblica, il professionista proprietario deve inoltre avere profilo `active = true`, email verificata e `accountStatus = ACTIVE`. La registrazione ripete autoritativamente i controlli pertinenti sotto lock; la validazione preventiva non prenota né consuma il codice.
 
 ### 4.4 Registrazione entro scadenza
 L’utente che utilizza il codice invito deve completare la registrazione entro la scadenza del codice.

@@ -34,11 +34,9 @@ Non documenta:
 - conferma email da fragment `#token=...`;
 - handoff esplicito verso Login (nessuna sessione creata da register/verify).
 
-### Fuori scope / ancora non implementato
+### Fuori scope del documento
 
-- `/invite/validate`;
-- `/register/client`;
-- onboarding CLIENT;
+- `/invite/validate`, `/register/client` e onboarding CLIENT → implementati e documentati in [`06-client-onboarding-implementation.md`](./06-client-onboarding-implementation.md);
 - auto-login dopo register o verify;
 - password reset / forgot password;
 - dashboard o altre pagine business.
@@ -228,6 +226,7 @@ Non documentare come stato permanente: conteggi test, hash commit, seed specific
 | [`02-public-home-implementation.md`](./02-public-home-implementation.md) | Home pubblica e navigazione di ingresso |
 | [`03-authentication-session-flow.md`](./03-authentication-session-flow.md) | Session authentication (login, logout, bootstrap, guards) |
 | **Questo documento (FE04)** | Onboarding pubblico PROFESSIONAL (register, verify, resend) |
+| [`06-client-onboarding-implementation.md`](./06-client-onboarding-implementation.md) | Validazione invito e onboarding pubblico CLIENT |
 | [`docs/06-validation-rules.md`](../06-validation-rules.md) | Validation / password (source of truth) |
 | [`docs/08-endpoint-map.md`](../08-endpoint-map.md) | Catalogo endpoint |
 | [`docs/09-security-flow.md`](../09-security-flow.md) | Security flow di piattaforma |

@@ -76,7 +76,6 @@ Non risultano ancora implementate:
 - upload immagine profilo;
 - editing account (email, password, cancellazione) e gestione dispositivi/sessioni;
 - altre pagine frontend business ancora placeholder (oltre auth, onboarding PROFESSIONAL/verifica email, Profilo/Account/Operational Status e gestione inviti PROFESSIONAL già presenti);
-- flussi frontend pubblici di validazione invito e registrazione CLIENT ancora placeholder;
 - preparazione completa al deploy.
 
 ---
@@ -106,9 +105,13 @@ Può completare la registrazione solo se possiede un codice invito:
 - non utilizzato;
 - non scaduto.
 
-La registrazione crea atomicamente cliente pending, token email, link attivo e consumo dell'invito. Fino alla conferma il cliente resta `PENDING_VERIFICATION`, con `emailVerified=false`, non può fare login e non è leggibile dal professionista collegato. Dopo il POST di conferma passa a `ACTIVE` ed `emailVerified=true`.
+La validazione pubblica richiede inoltre che il professionista proprietario abbia profilo attivo, email verificata e account `ACTIVE`. Il backend ripete i controlli autoritativi durante la registrazione.
 
-Professionista e cliente possono richiedere il reinvio con `POST /api/v1/auth/email-verification/resend`. Il backend restituisce sempre lo stesso `202 Accepted` per email sintatticamente valide, senza rivelare esistenza o stato dell'account. Solo un profilo attivo, pending e non verificato riceve logicamente un nuovo token; il cooldown è 60 secondi dal token più recente e termina al boundary esatto. Il reinvio invalida tramite `used/usedAt` tutti i precedenti token non usati, lascia un solo token utilizzabile da 24 ore e non modifica invito o link. Registrazioni e reinvii idonei pubblicano nella propria transazione una richiesta immutabile, consegnata sincronicamente soltanto `AFTER_COMMIT`; rollback o pubblicazioni senza transazione non inviano nulla. Il link usa il fragment `#token=...`. Il sender locale predefinito è disabilitato, quello di test è in-memory senza rete e la modalità `SMTP` invia email testuali UTF-8 con mittente configurato. Un fallimento SMTP è assorbito dopo il commit e non cambia `201`/`202`; garanzia durevole tramite outbox e retry restano assenti.
+Nel ramo di una nuova registrazione, il backend crea atomicamente cliente pending, token email, link attivo e consumo dell'invito. Fino alla conferma il nuovo cliente resta `PENDING_VERIFICATION`, con `emailVerified=false`, non può fare login e non è leggibile dal professionista collegato. Dopo il POST di conferma passa a `ACTIVE` ed `emailVerified=true`.
+
+Il contratto pubblico mantiene l'anti-enumeration: `202 Accepted` è una risposta neutra e non dimostra che il ramo di nuova registrazione o alcuno dei suoi effetti persistenti siano avvenuti. Se l'email esiste già, il backend può terminare anticipatamente senza creare account, link o token e senza consumare l'invito; il client non può distinguere questo caso dal solo `202`.
+
+Professionista e cliente possono richiedere il reinvio con `POST /api/v1/auth/email-verification/resend`. Il backend restituisce sempre lo stesso `202 Accepted` per email sintatticamente valide, senza rivelare esistenza o stato dell'account. Solo un profilo attivo, pending e non verificato riceve logicamente un nuovo token; il cooldown è 60 secondi dal token più recente e termina al boundary esatto. Il reinvio invalida tramite `used/usedAt` tutti i precedenti token non usati, lascia un solo token utilizzabile da 24 ore e non modifica invito o link. Registrazioni e reinvii idonei pubblicano nella propria transazione una richiesta immutabile, consegnata sincronicamente soltanto `AFTER_COMMIT`; rollback o pubblicazioni senza transazione non inviano nulla. Il link usa il fragment `#token=...`. Il sender locale predefinito è disabilitato, quello di test è in-memory senza rete e la modalità `SMTP` invia email testuali UTF-8 con mittente configurato. Un fallimento SMTP è assorbito dopo il commit e non cambia le risposte `202`; garanzia durevole tramite outbox e retry restano assenti.
 
 ### 4.3 Collegamento cliente-professionista — Implementato
 
@@ -523,6 +526,23 @@ Dopo un aggiornamento riuscito dello stato operativo, eventuali errori di campo 
 - follow-up separato;
 - dettaglio frontend/UX: [`docs/frontend/01-frontend-functional-map-mvp.md`](frontend/01-frontend-functional-map-mvp.md).
 
+## 13.B Frontend Validazione invito + Onboarding CLIENT — Implementato
+
+Il vertical slice pubblico CLIENT comprende:
+
+1. inserimento e validazione del codice su `/invite/validate`;
+2. conservazione memory-only del solo codice canonico nel subtree onboarding;
+3. handoff senza secret nella URL verso `/register/client`;
+4. registrazione CLIENT con campi obbligatori e note facoltative;
+5. outcome confermato soltanto su `202 Accepted`, failure deterministiche per coppie status/code allowlisted e fallback ambiguo conservativo;
+6. cleanup dell'invito e del draft sensibile negli outcome terminali;
+7. schermata neutra di controllo email e reinvio con cooldown UX;
+8. verifica email sulla route condivisa `/verify-email` e Login separato.
+
+L'accesso diretto o il reload di `/register/client` senza invito nel provider non mostra il form e redirige con `replace` a `/invite/validate`. Il codice non viene conservato in query, fragment, router state, `localStorage` o `sessionStorage`.
+
+Registrazione e verifica email non autenticano l'utente e non creano automaticamente una sessione. La documentazione tecnica completa è in [`docs/frontend/06-client-onboarding-implementation.md`](frontend/06-client-onboarding-implementation.md).
+
 ## 14. Perimetro della prima versione
 
 ### 14.1 Parte della v1 già implementata
@@ -541,12 +561,12 @@ Risultano già implementati:
 - foundation frontend con home pubblica e autenticazione session-based (login/logout/guards/bootstrap);
 - frontend Profilo/Account/Operational Status autenticati (CLIENT e PROFESSIONAL);
 - frontend registrazione pubblica PROFESSIONAL e verifica email (confirm + resend);
-- frontend gestione inviti PROFESSIONAL (lista, genera, copia codice valido).
+- frontend gestione inviti PROFESSIONAL (lista, genera, copia codice valido);
+- frontend validazione invito e registrazione pubblica CLIENT con provider memory-only, outcome conservativi e reinvio neutro.
 
 Restano fuori da questo vertical slice:
 
-- altre pagine frontend business (dashboard con dati, clients, professionals, availability, bookings) ancora placeholder;
-- flussi frontend pubblici di validazione invito e registrazione CLIENT ancora placeholder.
+- altre pagine frontend business (dashboard con dati, clients, professionals, availability, bookings) ancora placeholder.
 
 ### 14.2 Parte della v1 ancora da implementare
 
@@ -556,8 +576,7 @@ Per completare il perimetro funzionale originariamente previsto restano da svilu
 - piani alimentari;
 - feedback o segnalazioni cliente;
 - eventuale gestione misurazioni/progressi;
-- altre pagine frontend business (dashboard con dati, clients, professionals, availability, bookings) ancora placeholder;
-- flussi frontend pubblici di validazione invito e registrazione CLIENT ancora placeholder.
+- altre pagine frontend business (dashboard con dati, clients, professionals, availability, bookings) ancora placeholder.
 
 ### 14.3 Funzionalità escluse dal perimetro attuale
 
@@ -573,7 +592,7 @@ Non fanno parte del perimetro attuale:
 
 ## 15. Prossima decisione funzionale
 
-Dopo home, auth e Profilo/Account/Operational Status, il prossimo passo dovrà essere scelto tra:
+Dopo home, auth, onboarding pubblico PROFESSIONAL e CLIENT, Profilo/Account/Operational Status e gestione inviti PROFESSIONAL, il prossimo passo dovrà essere scelto tra:
 
 1. un ulteriore vertical slice frontend su un modulo business già disponibile nel backend (clients, professionals, availability o bookings);
 2. introduzione del modulo Workout Plans.

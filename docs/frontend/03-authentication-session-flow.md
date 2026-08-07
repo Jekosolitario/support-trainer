@@ -27,7 +27,8 @@ Non documenta:
 - roadmap business → [`docs/15-planned-endpoints-roadmap.md`](../15-planned-endpoints-roadmap.md);
 - campi profilo, layout UX, mappa funzionale delle pagine e dettaglio frontend del follow-up **M1-R** → [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md);
 - scope funzionale di prodotto (Account RO, enum status, follow-up high-level) → [`docs/01-functional-scope.md`](../01-functional-scope.md);
-- onboarding pubblico PROFESSIONAL (register, verify, resend) → [`04-professional-onboarding-implementation.md`](./04-professional-onboarding-implementation.md).
+- onboarding pubblico PROFESSIONAL (register, verify, resend) → [`04-professional-onboarding-implementation.md`](./04-professional-onboarding-implementation.md);
+- validazione invito e onboarding pubblico CLIENT → [`06-client-onboarding-implementation.md`](./06-client-onboarding-implementation.md).
 
 ## 2. Principi
 
@@ -53,6 +54,7 @@ Non documenta:
 | `sessionInvalidation` | Pub/sub quando una richiesta session-bound riceve `401` ancora corrente |
 | `AuthProvider` | Ownership dello stato auth, bootstrap, login, logout, reconciliation, soft commit profilo |
 | Guards | Fail-closed su autenticazione, ruolo e specializzazione |
+| `ClientOnboardingProvider` / auth gate locale | Invite memory-only e accesso fail-closed alle route pubbliche CLIENT in base allo stato auth |
 | `LoginPage` / `LogoutButton` | UI di ingresso e uscita allineate allo stato auth |
 | `ProfilePage` | Prima pagina business reale: draft locale, PATCH, soft commit race-safe |
 
@@ -267,6 +269,8 @@ Le guard migliorano UX e routing; **non** sostituiscono l'autorizzazione backend
 
 Le route Profile reali (`/app/client/profile`, `/app/professional/profile`) sono protette da `RequireAuth` + `RequireRole` del ruolo corrispondente.
 
+Le route pubbliche `/invite/validate` e `/register/client` usano un gate locale distinto dalle guard private. Solo `unauthenticated` monta le pagine; `initializing` attende, `unavailable` resta fail-closed e `authenticated` pulisce l'invito memory-only e redirige con `replace` alla dashboard del ruolo. Dettaglio in [FE06](./06-client-onboarding-implementation.md).
+
 ## 14. Stato `unavailable`
 
 `unavailable` significa: la sessione non può essere classificata in modo affidabile come autenticata o assente.
@@ -297,7 +301,7 @@ Il client continua a usare path relativi `/api/v1/...` e `credentials: 'same-ori
 | Operational Status (aggiornamento indipendente) | **Reale** |
 | Altre pagine business (dashboard dati, clients, professionals, availability, bookings) | **Placeholder** |
 | Registrazione pubblica PROFESSIONAL + verify/resend email | **Implementati** (dettaglio tecnico in [`04-professional-onboarding-implementation.md`](./04-professional-onboarding-implementation.md)) |
-| Validazione invito + registrazione CLIENT | **Placeholder** |
+| Validazione invito + registrazione CLIENT | **Implementate** (provider memory-only e auth gate locale; dettaglio in [`06-client-onboarding-implementation.md`](./06-client-onboarding-implementation.md)) |
 
 La matrice completa delle pagine resta in [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md). Il follow-up UI **M1-R** (fieldErrors dopo update Status) è high-level in [`docs/01-functional-scope.md`](../01-functional-scope.md) e nel dettaglio frontend/UX in [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md); FE03 non lo tratta come backlog dedicato. Il dettaglio tecnico di **E2E-1** resta in §10.1.
 
@@ -311,7 +315,8 @@ FE03 **non** è fonte per:
 - roadmap business futura;
 - elenco campi profilo CLIENT/PROFESSIONAL, layout CSS o design system;
 - enum Operational Status e confini Account oltre quanto necessario al lifecycle auth;
-- dettaglio tecnico dell’onboarding pubblico PROFESSIONAL (register, verify, resend, fragment, error UX) → [`04-professional-onboarding-implementation.md`](./04-professional-onboarding-implementation.md).
+- dettaglio tecnico dell’onboarding pubblico PROFESSIONAL (register, verify, resend, fragment, error UX) → [`04-professional-onboarding-implementation.md`](./04-professional-onboarding-implementation.md);
+- dettaglio tecnico dell’onboarding pubblico CLIENT (invite memory-only, validate, register, outcome, cleanup, resend) → [`06-client-onboarding-implementation.md`](./06-client-onboarding-implementation.md).
 
 Confini rispetto all’onboarding pubblico:
 
@@ -328,4 +333,5 @@ Riferimenti primari:
 - [`docs/15-planned-endpoints-roadmap.md`](../15-planned-endpoints-roadmap.md)
 - [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md)
 - [`04-professional-onboarding-implementation.md`](./04-professional-onboarding-implementation.md)
+- [`06-client-onboarding-implementation.md`](./06-client-onboarding-implementation.md)
 - [`docs/01-functional-scope.md`](../01-functional-scope.md)

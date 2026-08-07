@@ -85,7 +85,7 @@ Il repository contiene un frontend React/TypeScript/Vite con routing, layout pub
 - sezione Account in sola lettura;
 - Operational Status modificabile in modo indipendente dal form profilo.
 
-La presenza di altre route private non equivale a funzionalità business complete: dashboard con dati, clients, professionals, availability e bookings restano prevalentemente placeholder. Sul fronte pubblico, registrazione PROFESSIONAL e verifica email sono implementate; validazione invito e registrazione CLIENT restano placeholder.
+La presenza di altre route private non equivale a funzionalità business complete: dashboard con dati, clients, professionals, availability e bookings restano prevalentemente placeholder. Sul fronte pubblico sono implementati registrazione PROFESSIONAL, verifica email, validazione invito e registrazione CLIENT. Il flusso CLIENT conserva il codice validato soltanto in memoria, termina con il controllo email e richiede un Login separato dopo la verifica.
 
 ---
 
@@ -159,7 +159,7 @@ Restano da sviluppare:
 3. feedback del cliente;
 4. monitoraggio progressi e misurazioni;
 5. eventuali API dedicate alla gestione manuale dei collegamenti;
-6. altre pagine frontend business ancora placeholder (oltre auth, onboarding PROFESSIONAL/verifica email e Profilo/Account/Operational Status già presenti) e flussi pubblici di validazione invito/registrazione CLIENT ancora placeholder;
+6. altre pagine frontend business ancora placeholder (oltre auth, onboarding pubblico PROFESSIONAL e CLIENT, verifica email e Profilo/Account/Operational Status già presenti);
 7. completamento delle funzionalità tecniche necessarie al deploy.
 
 ---
@@ -185,7 +185,6 @@ Restano da sviluppare:
 ## 7.2 Funzionalità ancora da implementare per completare la v1 applicativa
 
 - [ ] altre pagine frontend business ancora placeholder (dashboard con dati, clients, professionals, availability, bookings);
-- [ ] flussi frontend pubblici di validazione invito e registrazione CLIENT ancora placeholder;
 - [x] registrazione pubblica PROFESSIONAL e verifica email (confirm + resend) sul frontend;
 - [ ] creazione di una scheda di allenamento;
 - [ ] visualizzazione della scheda da parte del cliente;
@@ -199,9 +198,25 @@ Restano da sviluppare:
 - [x] home pubblica;
 - [x] login/logout e bootstrap sessione;
 - [x] protezione route per ruolo;
+- [x] registrazione pubblica PROFESSIONAL e verifica email con reinvio;
+- [x] gestione inviti PROFESSIONAL;
+- [x] validazione invito e registrazione pubblica CLIENT con provider memory-only;
 - [x] Profilo autenticato role-aware;
 - [x] Account in sola lettura;
 - [x] Operational Status modificabile.
+
+## 7.2.2 Stato vertical slice onboarding CLIENT
+
+Il vertical slice **Validazione invito + Onboarding CLIENT pubblico** è completato funzionalmente nel working tree:
+
+- Lotto 1 — foundation onboarding CLIENT: certificato;
+- Lotto 2 — Validate Invite UI: certificato;
+- Lotto 3 — Register CLIENT UI: certificato;
+- Lotto 4 — allineamento documentale corrente.
+
+Le route consegnate sono `/invite/validate` e `/register/client`; il flusso prosegue sulla `/verify-email` già esistente e termina con Login separato. Suite mirata e suite frontend completa risultano verdi nell'audit conclusivo dei Lotti 1–3.
+
+Commit, push, merge, import nel repository originale e deploy appartengono alla fase Git successiva e non sono dichiarati come eseguiti.
 
 ## 7.3 Nota sul perimetro attuale
 
@@ -327,7 +342,7 @@ Il frontend web è sviluppato come applicazione separata dal backend, con:
 - Vitest e React Testing Library;
 - progettazione UI responsive/mobile-first già applicata alla home pubblica.
 
-La fondazione include routing, layout, home pubblica e autenticazione session-based già collegata al backend per login/logout/bootstrap. Sono inoltre implementati il vertical slice Profilo/Account/Operational Status e l’onboarding pubblico PROFESSIONAL con verifica email. Le altre pagine business e i flussi pubblici di validazione invito/registrazione CLIENT restano prevalentemente placeholder.
+La fondazione include routing, layout, home pubblica e autenticazione session-based già collegata al backend per login/logout/bootstrap. Sono inoltre implementati il vertical slice Profilo/Account/Operational Status, l’onboarding pubblico PROFESSIONAL con verifica email e l’onboarding CLIENT con validazione invito memory-only e registrazione pubblica. Le altre pagine business restano prevalentemente placeholder.
 
 La futura evoluzione mobile potrà essere valutata con React Native + Expo, ma non fa parte dello sprint frontend iniziale.  
 Questa possibilità non implica il riuso automatico dei componenti React web su mobile; tuttavia flussi, logica applicativa e organizzazione API dovranno essere progettati in modo il più possibile riutilizzabile.
@@ -361,6 +376,7 @@ Il backend possiede già una base concreta e funzionante per:
 Il frontend possiede già:
 
 - home pubblica e autenticazione session-based;
+- onboarding pubblico PROFESSIONAL e CLIENT con verifica email e Login separato;
 - Profilo/Account/Operational Status autenticati.
 
 ---

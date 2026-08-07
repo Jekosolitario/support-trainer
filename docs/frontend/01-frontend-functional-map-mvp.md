@@ -12,6 +12,7 @@ Documentazione attiva di supporto:
 - [`08-endpoint-map.md`](../08-endpoint-map.md);
 - [`07-api-modules-overview.md`](../07-api-modules-overview.md);
 - [`09-security-flow.md`](../09-security-flow.md);
+- [`06-client-onboarding-implementation.md`](./06-client-onboarding-implementation.md);
 - controller, DTO, configurazione Spring Security, servizi ed enum presenti nel backend.
 
 La mappa distingue sempre tre stati:
@@ -36,7 +37,7 @@ La baseline certificata richiede inoltre che il client usi la risposta neutra `2
 - La **pagina Profilo autenticata** è **implementata** (CLIENT e PROFESSIONAL), con Account in sola lettura e Operational Status modificabile. Soft commit e race protection: [FE03](./03-authentication-session-flow.md).
 - La **registrazione pubblica PROFESSIONAL** e la **verifica email** (confirm + resend pertinente) sono **implementate**. Dettaglio tecnico: [Professional Onboarding Implementation](./04-professional-onboarding-implementation.md).
 - La **gestione inviti PROFESSIONAL** (`/app/professional/invites`: lista, genera, copia codice valido) è **implementata**. Dettaglio tecnico: [Professional Invites Implementation](./05-professional-invites-implementation.md).
-- Validazione invito e registrazione CLIENT restano **placeholder**.
+- La **validazione invito e registrazione pubblica CLIENT** sono **implementate** con provider memory-only, auth gate locale, outcome conservativi e cleanup del draft. Dettaglio tecnico: [Client Onboarding Implementation](./06-client-onboarding-implementation.md).
 - Le altre pagine business private (dashboard dati, clients, professionals, availability, bookings) restano **placeholder**: le route esistono, ma non sono flussi applicativi completi.
 - Il client usa path relativi `/api/v1/...` con `credentials: 'same-origin'`. In sviluppo Vite proxya `/api` → `http://localhost:8080`. In produzione la topologia è same-origin dietro reverse proxy.
 - Un'app mobile con React Native + Expo è una possibile evoluzione futura, fuori dall'MVP.
@@ -79,14 +80,17 @@ Gli endpoint sotto `/api/v1/auth/**` sono pubblici.
 Note di flusso verificate:
 
 - tutte le mutazioni Auth (login, registrazioni, confirm/resend, validate-invite, logout) richiedono CSRF: prima `GET /api/v1/auth/csrf`, poi header `headerName` (tipicamente `X-CSRF-TOKEN`); il token va solo in memoria;
-- entrambe le registrazioni restituiscono sempre lo stesso `202 Accepted` con messaggio neutro: il frontend non deve dedurre che l'account sia stato creato né cercare `EMAIL_ALREADY_REGISTERED`; deve invitare a controllare la posta o usare resend;
-- cliente e professionista nascono `PENDING_VERIFICATION`, con `emailVerified=false`, e non possono fare login prima della conferma;
-- per il cliente il link è già creato e l'invito consumato, ma il cliente pending non è visibile al professionista;
-- il backend genera e persiste per entrambi un token valido 24 ore e, dopo commit, affida un link con token nel fragment alla porta email; `SMTP` è disponibile ma il default locale resta disabilitato;
+- entrambe le registrazioni usano una risposta pubblica `202 Accepted` intenzionalmente neutra: il frontend non può dedurre se l'email fosse già registrata né quali effetti persistenti siano stati eseguiti e non deve cercare `EMAIL_ALREADY_REGISTERED`;
+- nel ramo di una nuova registrazione, cliente e professionista nascono `PENDING_VERIFICATION`, con `emailVerified=false`, e non possono fare login prima della conferma;
+- nel ramo di una nuova registrazione CLIENT il backend crea account e collegamento, consuma l'invito e genera il token di verifica; per un'email già esistente può terminare anticipatamente mantenendo la risposta neutra, quindi nessuno di questi effetti è inferibile dal solo `202`;
+- per una nuova registrazione idonea il token resta valido 24 ore e, dopo commit, il backend affida alla porta email una richiesta con link nel fragment; anche questa predisposizione non è deducibile dal `202`, `SMTP` è disponibile ma il default locale resta disabilitato;
 - la pagina `/verify-email` (implementata) legge il fragment, lo rimuove immediatamente dall'URL prima di avviare analytics, monitoring o altre integrazioni, conserva il token solo in memoria e non lo inserisce in `localStorage`; invia quindi il POST, mostra la CTA login in caso di successo e il messaggio neutro di reinvio in caso di 410. Dettaglio tecnico: [FE04](./04-professional-onboarding-implementation.md);
 - la pagina di verifica resta compatibile con `BrowserRouter` e non usa `HashRouter`, perché il fragment è riservato al token, né trasmette il token a strumenti di analytics o monitoring;
 - l'azione “Invia di nuovo” richiede l'email dell'utente (inserita nella pagina di verifica), non mostra se l'account esiste e non invia email o token ad analytics; il frontend può disabilitare il pulsante per 60 secondi, ma il backend resta autoritativo e non espone il tempo residuo;
 - il codice invito è monouso, non è legato a una specifica email destinataria e scade dopo 7 giorni.
+- Validate e Register CLIENT condividono un provider limitato al proprio subtree che conserva soltanto il codice canonico. Il codice non passa in URL, router state o storage; reload e uscita dal subtree lo eliminano.
+- l'accesso diretto a `/register/client` senza invito memory-only è fail-closed e usa redirect `replace` verso `/invite/validate`;
+- Register CLIENT considera confermato soltanto `202`, tratta gli outcome incerti come ambigui e non ripete automaticamente la registrazione. Dettaglio: [FE06](./06-client-onboarding-implementation.md).
 
 ## 5. Funzionalità private implementabili ora
 
@@ -238,7 +242,7 @@ Sono inoltre non presenti e da non esporre come attivi: cambio password autentic
 
 ## 7. Sitemap MVP
 
-I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzionalità completa.** Home, login/auth foundation, **registrazione PROFESSIONAL**, **verifica email**, **Profilo/Account/Operational Status** e **gestione inviti PROFESSIONAL** sono implementati; validazione invito, registrazione CLIENT e le altre pagine business restano placeholder. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
+I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzionalità completa.** Home, login/auth foundation, onboarding pubblico **PROFESSIONAL e CLIENT**, **verifica email**, **Profilo/Account/Operational Status** e **gestione inviti PROFESSIONAL** sono implementati; le altre pagine business restano placeholder. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
 
 ### Pubblico
 
@@ -251,9 +255,9 @@ I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzi
 /verify-email#token=...
 ```
 
-Flusso cliente consigliato: `/invite/validate` valida il codice e, in caso positivo, passa a `/register/client` conservando il codice. Non saltare la validazione lato server durante la registrazione: il backend la ripete correttamente.
+Flusso cliente implementato: `/invite/validate` valida il codice e, in caso positivo, passa a `/register/client` conservando soltanto il codice canonico nel provider memory-only condiviso. Il codice non entra nella URL o nello stato del router. Il backend ripete la validazione durante la registrazione.
 
-Dopo la registrazione PROFESSIONAL (e, quando sarà collegata, anche quella CLIENT) la UI mostra “Controlla la tua email”. Il link apre `/verify-email`: la pagina legge e rimuove il token dall'URL (anche se il fragment non è valido), effettua il POST di conferma e presenta la CTA login. Un secondo utilizzo coerente resta un successo. La stessa schermata offre “Invia di nuovo” con messaggio neutro e blocco UX di 60 secondi, senza sostituire il cooldown del backend. L'adapter SMTP backend invia un messaggio testuale con URL `#token=...`. Validazione invito e registrazione CLIENT restano da collegare. Implementazione tecnica onboarding PROFESSIONAL: [FE04](./04-professional-onboarding-implementation.md).
+Dopo la registrazione PROFESSIONAL o CLIENT la UI mostra “Controlla la tua email”. Il link apre `/verify-email`: la pagina legge e rimuove il token dall'URL (anche se il fragment non è valido), effettua il POST di conferma e presenta la CTA login. Un secondo utilizzo coerente resta un successo. Le schermate terminali offrono “Invia di nuovo” con messaggio neutro e blocco UX di 60 secondi, senza sostituire il cooldown del backend. L'adapter SMTP backend invia un messaggio testuale con URL `#token=...`. Dettagli: onboarding PROFESSIONAL e Verify in [FE04](./04-professional-onboarding-implementation.md), onboarding CLIENT in [FE06](./06-client-onboarding-implementation.md).
 
 ### Area cliente
 
@@ -290,7 +294,7 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 | `/login`                                                | Pubblico                  | **Implementata**                                             |
 | `/register/professional`                                | Pubblico                  | **Implementata**                                             |
 | `/verify-email`                                         | Pubblico                  | **Implementata**                                             |
-| `/invite/validate`, `/register/client`                  | Pubblico                  | **Placeholder**                                              |
+| `/invite/validate`, `/register/client`                  | Pubblico                  | **Implementate** (provider memory-only e auth gate locale)   |
 | Guardie auth (`RequireAuth` / ruolo / specializzazione) | Privato                   | **Implementate**                                             |
 | `/app/client/profile`, `/app/professional/profile`      | CLIENT / PROFESSIONAL     | **Implementata** (Profilo + Account RO + Operational Status) |
 | `/app/professional/invites`                             | PROFESSIONAL              | **Implementata** (lista, genera, copia se Valido)            |
@@ -312,6 +316,8 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 Le guard frontend migliorano navigazione e chiarezza, ma non sostituiscono l'autorizzazione backend.
 
 Nella fondazione corrente le guard `RequireAuth`, `RequireRole` e `RequireSpecialization` sono **implementate** e collegate allo stato auth. Profilo è una pagina business reale; le altre pagine dietro le guard possono restare placeholder di contenuto.
+
+Il subtree CLIENT pubblico usa inoltre `ClientOnboardingAuthGate`: non monta le pagine durante `initializing`, resta fail-closed su `unavailable`, consente l'outlet soltanto a `unauthenticated` e redirige un utente `authenticated` alla dashboard coerente col ruolo dopo aver pulito l'invito.
 
 ### 8.2 Sessione, CSRF e bootstrap (implementati)
 
@@ -412,7 +418,7 @@ Ogni pagina privata deve prevedere anche gli stati trasversali `unauthorized` e 
 
 ## 11. Priorità implementazione React
 
-Completati: setup React/Vite/TypeScript, routing, layout, home pubblica, foundation API/auth session-based (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap), **Profilo/Account/Operational Status** collegati a `/me`, onboarding PROFESSIONAL/verifica email, **gestione inviti PROFESSIONAL**. Dettagli auth: [FE03](./03-authentication-session-flow.md); inviti: [FE05](./05-professional-invites-implementation.md).
+Completati: setup React/Vite/TypeScript, routing, layout, home pubblica, foundation API/auth session-based (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap), **Profilo/Account/Operational Status** collegati a `/me`, onboarding pubblico PROFESSIONAL e CLIENT/verifica email, **gestione inviti PROFESSIONAL**. Dettagli auth: [FE03](./03-authentication-session-flow.md); inviti: [FE05](./05-professional-invites-implementation.md); onboarding CLIENT: [FE06](./06-client-onboarding-implementation.md).
 
 Ordine pragmatico **residuo**:
 
@@ -420,8 +426,7 @@ Ordine pragmatico **residuo**:
 2. flusso professionista comune: clienti collegati;
 3. flusso cliente: professionisti collegati e dettaglio;
 4. availability e booking del personal trainer, poi booking cliente;
-5. validazione invito e registrazione cliente tramite invito (registrazione PROFESSIONAL, verifica email e gestione inviti PROFESSIONAL sono già implementate);
-6. hardening di errori, accessibilità, responsive e test dei flussi applicativi business residui.
+5. hardening di errori, accessibilità, responsive e test dei flussi applicativi business residui.
 
 La scelta del prossimo vertical slice business resta una decisione di prodotto. Availability e Booking vanno progettati insieme sul piano UX perché le transizioni booking modificano gli slot.
 
@@ -513,9 +518,9 @@ Il backend resta la fonte autoritativa e ripete tutte le validazioni. Gli audit 
 
 Questi punti non impediscono la mappa funzionale, ma non sono determinabili come contratto frontend completo dal repository attuale:
 
-1. **Consegna verifica email:** registrazione e reinvio creano e salvano il token e, dopo commit, usano una porta di consegna con adapter SMTP configurabile. Il default locale resta disabilitato; la porta in-memory è solo per test/debug e non è esposta via endpoint. L'URL frontend remoto deve essere HTTPS; HTTP è ammesso solo per loopback locale. Non sono presenti outbox o retry, quindi la consegna non è garantita.
+1. **Consegna verifica email:** nel ramo di una nuova registrazione e nei reinvii idonei il backend crea e salva il token e, dopo commit, usa una porta di consegna con adapter SMTP configurabile; la risposta pubblica neutra non prova che questo ramo sia stato eseguito. Il default locale resta disabilitato; la porta in-memory è solo per test/debug e non è esposta via endpoint. L'URL frontend remoto deve essere HTTPS; HTTP è ammesso solo per loopback locale. Non sono presenti outbox o retry, quindi la consegna non è garantita.
 2. **Contratto temporale:** audit e scadenze account/booking/inviti arrivano come `Instant` UTC con `Z`; gli orari degli slot e gli snapshot Booking arrivano con offset esplicito `Europe/Rome`, mentre le date civili restano `LocalDate`. La UI deve distinguere questi tre tipi e non applicare una timezone globale ai payload.
-3. **Auth client:** implementata session-based (vedi [FE03](./03-authentication-session-flow.md)); nessun JWT/Bearer/storage. Profilo/Account/Status, onboarding PROFESSIONAL/verifica email e gestione inviti PROFESSIONAL sono collegati (dettaglio: [FE04](./04-professional-onboarding-implementation.md), [FE05](./05-professional-invites-implementation.md)); restano da collegare le altre pagine business e i flussi pubblici di validazione invito/registrazione CLIENT.
+3. **Auth client:** implementata session-based (vedi [FE03](./03-authentication-session-flow.md)); nessun JWT/Bearer/storage. Profilo/Account/Status, onboarding PROFESSIONAL/verifica email, onboarding CLIENT e gestione inviti PROFESSIONAL sono collegati (dettaglio: [FE04](./04-professional-onboarding-implementation.md), [FE05](./05-professional-invites-implementation.md), [FE06](./06-client-onboarding-implementation.md)); restano da collegare le altre pagine business.
 4. **URL pubblico dei link:** `app.email.verification-page-url` configura la pagina di verifica, ma il valore pubblico definitivo di ciascun ambiente non è ancora definito; i link invito restano separati.
 5. **Liste:** non esistono paginazione e filtri API per clienti, professionisti, inviti, slot o booking; la prima UI non deve dipenderne. Per Booking l'ordine iniziale è `createdAt DESC, id DESC`.
 6. **Dashboard:** non esiste un contratto aggregato; contenuti e metriche devono restare una composizione minima dei dati già disponibili.

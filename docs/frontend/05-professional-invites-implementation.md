@@ -24,7 +24,8 @@ Non documenta:
 - catalogo endpoint completo → [`docs/08-endpoint-map.md`](../08-endpoint-map.md);
 - security/session/CSRF backend → [`docs/09-security-flow.md`](../09-security-flow.md);
 - lifecycle sessione generico → [`03-authentication-session-flow.md`](./03-authentication-session-flow.md);
-- mappa funzionale complessiva → [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md).
+- mappa funzionale complessiva → [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md);
+- validazione e consumo dell'invito nel flusso pubblico CLIENT → [`06-client-onboarding-implementation.md`](./06-client-onboarding-implementation.md).
 
 ### Implementato
 
@@ -42,14 +43,14 @@ Non documenta:
 
 - revoke / deactivate / delete / modifica invito;
 - email/SMS/WhatsApp/share;
-- onboarding CLIENT / validate-invite / register CLIENT;
+- dettaglio onboarding CLIENT / validate-invite / register CLIENT, implementato separatamente in FE06;
 - clients/professionals/availability/booking/dashboard dati;
 - E2E-1, M1-R;
 - nuove API backend.
 
 ## 2. Workflow
 
-`Login PROFESSIONAL` → `/app/professional/invites` → caricamento lista → genera → visualizza codice/stato/scadenza → copia se Valido → handoff fuori app verso futuro onboarding CLIENT.
+`Login PROFESSIONAL` → `/app/professional/invites` → caricamento lista → genera → visualizza codice/stato/scadenza → copia se Valido → condivisione fuori app → onboarding CLIENT pubblico implementato a partire da `/invite/validate`.
 
 La validità **reale** del codice resta autoritativa sul server.
 
