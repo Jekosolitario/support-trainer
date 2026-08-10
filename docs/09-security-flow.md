@@ -476,16 +476,18 @@ I dettagli `GET /api/v1/clients/{clientId}` e `GET /api/v1/professionals/{profes
 
 Un risultato vuoto produce sempre il medesimo 404 specifico dell'endpoint, sia per ID inesistente sia per collegamento assente o inattivo e profilo non leggibile. La policy non modifica i confini di Spring Security: richiesta anonima e sessione non valida restano 401, mentre un ruolo non ammesso sull'endpoint resta 403. Gli stati operativi, come `PAUSA` o `FERIE`, restano informazioni di dominio e non sono criteri di occultamento del dettaglio.
 
+Le guard di ruolo frontend impediscono navigazioni incoerenti e richieste evitabili, ma non sostituiscono l'autorizzazione backend: lo scope della relazione attiva e la neutralità del 404 sono applicati dal server.
+
 ### Minimizzazione del profilo cliente condiviso
 
 Superato il controllo scoped, il professionista non riceve l'entity completa:
 
 - la lista espone soltanto `id`, `firstName`, `lastName` e `profileImageUrl`;
-- il dettaglio aggiunge soltanto `primaryGoal`;
-- stato operativo, flag `active`, dati fisici, note, stato account e audit non vengono serializzati;
-- `PERSONAL_TRAINER` e `NUTRITIONIST` ricevono intenzionalmente lo stesso contratto minimo nell'MVP.
+- il dettaglio aggiunge `primaryGoal`, `operationalStatus`, `birthDate`, `heightCm` e `gender`;
+- `medicalNotes`, `injuryNotes`, `notes`, flag `active`, dati account, dati tecnici del collegamento e audit non vengono serializzati;
+- `PERSONAL_TRAINER` e `NUTRITIONIST` ricevono intenzionalmente lo stesso contratto condiviso.
 
-Il profilo owner `/me` resta separato e completo. La modifica non introduce consenso, scope, revoca, audit delle visualizzazioni o una differenziazione per specializzazione; tali aspetti richiedono decisioni future dedicate.
+Il profilo owner `/me` resta separato e completo. Le note sensibili sono persistite ma non condivise nel contratto corrente; un'eventuale condivisione richiede una decisione futura dedicata. La modifica non introduce consenso, scope, revoca, audit delle visualizzazioni o una differenziazione per specializzazione.
 
 ---
 

@@ -145,9 +145,15 @@ Il modulo **Clients** consente al professionista autenticato di leggere i client
 - `lastName`;
 - `profileImageUrl`.
 
-`GET /api/v1/clients/{clientId}` restituisce esclusivamente gli stessi campi e `primaryGoal`.
+`GET /api/v1/clients/{clientId}` restituisce gli stessi campi e aggiunge:
 
-PT e nutrizionista collegati ricevono lo stesso payload minimo. Dati fisici, note, stato operativo, stati tecnici e audit restano owner-only tramite i moduli `/me`. La query scoped può ancora caricare internamente l'entity completa, ma i dati esclusi non vengono serializzati.
+- `primaryGoal`;
+- `operationalStatus`;
+- `birthDate`;
+- `heightCm`;
+- `gender`.
+
+PT e nutrizionista collegati ricevono lo stesso payload condiviso. `medicalNotes`, `injuryNotes`, `notes`, dati account, stato tecnico `active`, dati del collegamento e audit restano esclusi. La query scoped può ancora caricare internamente l'entity completa, ma i dati esclusi non vengono serializzati.
 
 ---
 
@@ -171,6 +177,12 @@ Il modulo **Professionals** consente al cliente autenticato di leggere i profess
 - professionista inesistente o non accessibile restituiscono lo stesso `404 PROFESSIONAL_NOT_FOUND`; il `403` resta riservato al ruolo non autorizzato sull'endpoint;
 - lettura availability consentita solo verso professionisti collegati;
 - vengono esposti solo slot disponibili, non scaduti e privi di richieste booking `PENDING` attive.
+
+### Payload condivisi
+
+`GET /api/v1/professionals/my` restituisce `id`, `firstName`, `lastName`, `profileImageUrl`, `specialization`, `operationalStatus` e il flag tecnico `active`.
+
+`GET /api/v1/professionals/{professionalId}` aggiunge `phoneNumber`, `bio`, `workplaceName`, `city`, `instagramUrl` e `websiteUrl`. Il frontend delle relazioni valida l'intero contratto ma non presenta `active` all'utente.
 
 ### Nota architetturale
 

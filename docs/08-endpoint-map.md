@@ -141,7 +141,7 @@ Restituisce l’elenco clienti collegati al professionista autenticato con il se
 - `lastName`;
 - `profileImageUrl`.
 
-La lista non espone obiettivo, stato operativo, stato tecnico, dati fisici o note.
+La lista non espone obiettivo, stato operativo, stato tecnico, dati fisici o note. Il frontend la usa nella route implementata `/app/professional/clients` per PT e nutrizionisti.
 
 ### 6.2 Dettaglio cliente
 **GET** `/api/v1/clients/{clientId}`  
@@ -153,9 +153,13 @@ Il payload di successo contiene esclusivamente:
 - `firstName`;
 - `lastName`;
 - `profileImageUrl`;
-- `primaryGoal`.
+- `primaryGoal`;
+- `operationalStatus`;
+- `birthDate`;
+- `heightCm`;
+- `gender`.
 
-PT e nutrizionista usano lo stesso contratto. Il link attivo autorizza il profilo condiviso minimo, non l'intero profilo personale.
+PT e nutrizionista usano lo stesso contratto. Il link attivo autorizza il profilo condiviso approvato, non l'intero profilo personale: note sensibili, dati account, stato tecnico e dati del collegamento restano esclusi. Il frontend usa il dettaglio nella route implementata `/app/professional/clients/:clientId`.
 
 ---
 
@@ -163,11 +167,13 @@ PT e nutrizionista usano lo stesso contratto. Il link attivo autorizza il profil
 
 ### 7.1 Professionisti collegati al cliente autenticato
 **GET** `/api/v1/professionals/my`  
-Restituisce i professionisti collegati al cliente autenticato.
+Restituisce i professionisti collegati al cliente autenticato con `id`, `firstName`, `lastName`, `profileImageUrl`, `specialization`, `operationalStatus` e il flag tecnico `active`. Il frontend valida il payload ma non presenta `active`; la lista è implementata in `/app/client/professionals`.
 
 ### 7.2 Dettaglio professionista
 **GET** `/api/v1/professionals/{professionalId}`  
-Restituisce il dettaglio di un professionista solo se una ricerca scoped trova ID, cliente autenticato, collegamento attivo e stati leggibili. ID inesistente, collegamento assente o inattivo e profilo non leggibile producono lo stesso `404 PROFESSIONAL_NOT_FOUND`; un principal con ruolo `PROFESSIONAL` riceve invece `403`. Il payload di successo non cambia in questo intervento.
+Restituisce il dettaglio di un professionista solo se una ricerca scoped trova ID, cliente autenticato, collegamento attivo e stati leggibili. ID inesistente, collegamento assente o inattivo e profilo non leggibile producono lo stesso `404 PROFESSIONAL_NOT_FOUND`; un principal con ruolo `PROFESSIONAL` riceve invece `403`.
+
+Il payload aggiunge alla summary `phoneNumber`, `bio`, `workplaceName`, `city`, `instagramUrl` e `websiteUrl`. Il frontend usa il dettaglio nella route implementata `/app/client/professionals/:professionalId`, non mostra `active` e rende link esterni soltanto per URL HTTP/HTTPS validi.
 
 ---
 

@@ -1,5 +1,7 @@
 package it.zuperman.support_trainer;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -27,7 +29,10 @@ import com.jayway.jsonpath.JsonPath;
 
 import it.zuperman.support_trainer.auth.repository.EmailVerificationTokenRepository;
 import it.zuperman.support_trainer.auth.token.EmailVerificationToken;
+import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.common.entity.User;
+import it.zuperman.support_trainer.common.enums.ClientOperationalStatus;
+import it.zuperman.support_trainer.common.enums.Gender;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.repository.UserRepository;
 import it.zuperman.support_trainer.support.SessionAuthTestSupport;
@@ -53,18 +58,27 @@ class ClientDataMinimizationIntegrationTest {
             "firstName",
             "lastName",
             "profileImageUrl",
-            "primaryGoal"
-    );
-    private static final Set<String> EXCLUDED_PROFESSIONAL_FIELDS = Set.of(
+            "primaryGoal",
             "operationalStatus",
-            "active",
             "birthDate",
             "heightCm",
-            "gender",
+            "gender"
+    );
+    private static final Set<String> DETAIL_ONLY_FIELDS = Set.of(
+            "primaryGoal",
+            "operationalStatus",
+            "birthDate",
+            "heightCm",
+            "gender"
+    );
+    private static final Set<String> FORBIDDEN_PROFESSIONAL_FIELDS = Set.of(
+            "active",
             "medicalNotes",
             "injuryNotes",
             "notes",
             "email",
+            "password",
+            "role",
             "accountStatus",
             "emailVerified",
             "createdAt",
@@ -95,7 +109,14 @@ class ClientDataMinimizationIntegrationTest {
         String inviteCode = createInvite(professionalAuth);
         String clientEmail = "client-" + suffix + "@test.com";
         CsrfSession clientAuth = registerAndLoginClient(inviteCode, clientEmail);
-        Long clientId = userRepository.findByEmail(clientEmail).orElseThrow().getId();
+        ClientProfile client = (ClientProfile) userRepository.findByEmail(clientEmail).orElseThrow();
+        client.setOperationalStatus(ClientOperationalStatus.INFORTUNATO);
+        client.setBirthDate(LocalDate.of(1992, 2, 3));
+        client.setHeightCm(new BigDecimal("181.25"));
+        client.setPrimaryGoal("Recupero funzionale");
+        client.setGender(Gender.OTHER);
+        userRepository.saveAndFlush(client);
+        Long clientId = client.getId();
 
         MvcResult listResult = mockMvc.perform(get("/api/v1/clients/my")
                         .with(SessionAuthTestSupport.withSession(professionalAuth)))
@@ -114,8 +135,15 @@ class ClientDataMinimizationIntegrationTest {
                 .andReturn();
 
         Map<String, Object> detail = readObject(detailResult);
-        assertDetailContract(detail);
-        assertThat(detail.get("primaryGoal")).isEqualTo("Migliorare la forma fisica");
+        assertDetailContract(
+                detail,
+                clientId,
+                "INFORTUNATO",
+                "1992-02-03",
+                181.25,
+                "Recupero funzionale",
+                "OTHER"
+        );
     }
 
     @Test
@@ -173,23 +201,47 @@ class ClientDataMinimizationIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        assertDetailContract(readObject(detailResult));
+        assertDetailContract(
+                readObject(detailResult),
+                clientId,
+                "ATTIVO",
+                "1996-04-15",
+                175.50,
+                "Migliorare la forma fisica",
+                "MALE"
+        );
     }
 
     private void assertSummaryContract(Map<String, Object> summary) {
         assertThat(summary.keySet()).containsExactlyInAnyOrderElementsOf(SUMMARY_FIELDS);
         assertThat(summary.keySet())
-                .doesNotContain("primaryGoal")
-                .doesNotContainAnyElementsOf(EXCLUDED_PROFESSIONAL_FIELDS);
+                .doesNotContainAnyElementsOf(DETAIL_ONLY_FIELDS)
+                .doesNotContainAnyElementsOf(FORBIDDEN_PROFESSIONAL_FIELDS);
         assertThat(summary).containsKey("profileImageUrl");
         assertThat(summary.get("profileImageUrl")).isNull();
     }
 
-    private void assertDetailContract(Map<String, Object> detail) {
+    private void assertDetailContract(
+            Map<String, Object> detail,
+            Long expectedId,
+            String expectedOperationalStatus,
+            String expectedBirthDate,
+            double expectedHeightCm,
+            String expectedPrimaryGoal,
+            String expectedGender
+    ) {
         assertThat(detail.keySet()).containsExactlyInAnyOrderElementsOf(DETAIL_FIELDS);
-        assertThat(detail.keySet()).doesNotContainAnyElementsOf(EXCLUDED_PROFESSIONAL_FIELDS);
+        assertThat(detail.keySet()).doesNotContainAnyElementsOf(FORBIDDEN_PROFESSIONAL_FIELDS);
+        assertThat(((Number) detail.get("id")).longValue()).isEqualTo(expectedId);
+        assertThat(detail.get("firstName")).isEqualTo("Luca");
+        assertThat(detail.get("lastName")).isEqualTo("Ferri");
         assertThat(detail).containsKey("profileImageUrl");
         assertThat(detail.get("profileImageUrl")).isNull();
+        assertThat(detail.get("primaryGoal")).isEqualTo(expectedPrimaryGoal);
+        assertThat(detail.get("operationalStatus")).isEqualTo(expectedOperationalStatus);
+        assertThat(detail.get("birthDate")).isEqualTo(expectedBirthDate);
+        assertThat(detail.get("heightCm")).isEqualTo(expectedHeightCm);
+        assertThat(detail.get("gender")).isEqualTo(expectedGender);
     }
 
     private void assertUpdatedOwnerProfile(Map<String, Object> profile) {

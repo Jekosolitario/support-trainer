@@ -1,6 +1,11 @@
 package it.zuperman.support_trainer.client.dto.response;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 import it.zuperman.support_trainer.client.entity.ClientProfile;
+import it.zuperman.support_trainer.common.enums.ClientOperationalStatus;
+import it.zuperman.support_trainer.common.enums.Gender;
 
 public class ClientDetailResponse {
 
@@ -9,6 +14,10 @@ public class ClientDetailResponse {
     private String lastName;
     private String profileImageUrl;
     private String primaryGoal;
+    private ClientOperationalStatus operationalStatus;
+    private LocalDate birthDate;
+    private BigDecimal heightCm;
+    private Gender gender;
 
     public ClientDetailResponse() {
     }
@@ -20,6 +29,10 @@ public class ClientDetailResponse {
         response.setLastName(client.getLastName());
         response.setProfileImageUrl(client.getProfileImageUrl());
         response.setPrimaryGoal(client.getPrimaryGoal());
+        response.setOperationalStatus(client.getOperationalStatus());
+        response.setBirthDate(client.getBirthDate());
+        response.setHeightCm(client.getHeightCm());
+        response.setGender(client.getGender());
 
         return response;
     }
@@ -62,5 +75,37 @@ public class ClientDetailResponse {
 
     public void setPrimaryGoal(String primaryGoal) {
         this.primaryGoal = primaryGoal;
+    }
+
+    public ClientOperationalStatus getOperationalStatus() {
+        return operationalStatus;
+    }
+
+    public void setOperationalStatus(ClientOperationalStatus operationalStatus) {
+        this.operationalStatus = operationalStatus;
+    }
+
+    public LocalDate getBirthDate() {
+        return birthDate;
+    }
+
+    public void setBirthDate(LocalDate birthDate) {
+        this.birthDate = birthDate;
+    }
+
+    public BigDecimal getHeightCm() {
+        return heightCm;
+    }
+
+    public void setHeightCm(BigDecimal heightCm) {
+        this.heightCm = heightCm;
+    }
+
+    public Gender getGender() {
+        return gender;
+    }
+
+    public void setGender(Gender gender) {
+        this.gender = gender;
     }
 }

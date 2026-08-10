@@ -170,8 +170,8 @@ Il follow-up auth **E2E-1** (safe redirect cross-role → `/forbidden`) è docum
 | ---------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Dashboard cliente            | Composizione di `GET /api/v1/professionals/my` e `GET /api/v1/bookings/client` | Implementabile ora come composizione                   | Non esiste un endpoint dashboard. Mostrare riepiloghi derivati senza promettere statistiche avanzate.                                                                                                            |
 | Profilo/account              | Endpoint `/api/v1/me/**`                                                       | **UI implementata**                                    | Vedi §5.1; form anagrafica e note cliente.                                                                                                                                                                       |
-| Professionisti collegati     | `GET /api/v1/professionals/my`                                                 | Implementabile ora                                     | Lista, non singolo professionista. Empty state se non emergono collegamenti leggibili.                                                                                                                           |
-| Dettaglio professionista     | `GET /api/v1/professionals/{professionalId}`                                   | Implementabile ora                                     | Accessibile soltanto con collegamento attivo. Un `404 PROFESSIONAL_NOT_FOUND` non permette di distinguere professionista inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista.          |
+| Professionisti collegati     | `GET /api/v1/professionals/my`                                                 | **UI implementata**                                    | Route `/app/client/professionals`; lista responsive con loading, empty state, error e retry.                                                                                                                       |
+| Dettaglio professionista     | `GET /api/v1/professionals/{professionalId}`                                   | **UI implementata**                                    | Route `/app/client/professionals/:professionalId`; solo collegamento attivo, 404 neutro, contatti e link esterni sicuri. Il flag tecnico `active` non è presentato.                                                |
 | Disponibilità professionista | `GET /api/v1/professionals/{professionalId}/availability`                      | Implementabile ora solo per personal trainer collegato | Mostrare solo slot restituiti dal server. Per un nutrizionista l'area non va offerta. Empty state distinto da errore.                                                                                            |
 | Crea booking                 | `POST /api/v1/bookings`                                                        | Implementabile ora                                     | Body: un solo `availabilitySlotId` e nota facoltativa fino a 1000 caratteri. Confermare data/ora e professionista prima dell'invio.                                                                              |
 | Lista booking                | `GET /api/v1/bookings/client`                                                  | Implementabile ora                                     | Usa `BookingSummaryResponse`: controparte, stato, intervallo e durata sono già disponibili senza chiamate aggiuntive. Ordine iniziale: creazione decrescente e id decrescente; paginazione e filtri sono futuri. |
@@ -184,8 +184,8 @@ Il follow-up auth **E2E-1** (safe redirect cross-role → `/forbidden`) è docum
 | ------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Dashboard professionista | Composizione di clienti, inviti e, solo per personal trainer, availability/booking | Implementabile ora come composizione | Nessun endpoint aggregato. I widget devono dipendere dalla specializzazione.                                                                                                                                         |
 | Profilo/account          | Endpoint `/api/v1/me/**`                                                           | **UI implementata**                  | Vedi §5.1; contatti, bio, luogo, città e link.                                                                                                                                                                       |
-| Clienti collegati        | `GET /api/v1/clients/my`                                                           | Implementabile ora                   | Ogni elemento contiene soltanto `id`, `firstName`, `lastName` e `profileImageUrl`; non mostrare obiettivo o stato operativo.                                                                                         |
-| Dettaglio cliente        | `GET /api/v1/clients/{clientId}`                                                   | Implementabile ora                   | Solo con collegamento attivo. Contiene identità minima e `primaryGoal`. Un `404 CLIENT_NOT_FOUND` non permette di distinguere cliente inesistente e non accessibile: mostrare uno stato neutro e tornare alla lista. |
+| Clienti collegati        | `GET /api/v1/clients/my`                                                           | **UI implementata**                  | Route `/app/professional/clients`; disponibile sia a PT sia a nutrizionisti, con lista responsive, loading, empty state, error e retry.                                                                               |
+| Dettaglio cliente        | `GET /api/v1/clients/{clientId}`                                                   | **UI implementata**                  | Route `/app/professional/clients/:clientId`; profilo condiviso approvato, collegamento attivo e 404 neutro. Le note sensibili e i dati account restano esclusi.                                                       |
 | Crea invito              | `POST /api/v1/invites`                                                             | **UI implementata**                  | Nessun body. Dopo `201`, mostra codice/scadenza; Copia solo se Valido. Fail-closed su `expiresAt` invalido (`Non disponibile`). Dettaglio: [FE05](./05-professional-invites-implementation.md).                      |
 | Lista inviti             | `GET /api/v1/invites`                                                              | **UI implementata**                  | Stati Non attivo / Usato / Scaduto / Non disponibile / Valido. Nessun dettaglio o disattivazione manuale.                                                                                                            |
 
@@ -221,10 +221,10 @@ Il nutrizionista usa le funzionalità comuni del professionista, ma non dispone 
 
 - PT e nutrizionista usano temporaneamente lo stesso contratto minimo;
 - la lista non deve mostrare o conservare `primaryGoal`, `operationalStatus` o altri campi assenti;
-- il dettaglio aggiunge soltanto `primaryGoal` all'identità della lista;
-- dati fisici e note non devono entrare nello state della pagina professionista, in cache persistenti o analytics;
+- il dettaglio aggiunge `primaryGoal`, `operationalStatus`, `birthDate`, `heightCm` e `gender` all'identità della lista;
+- `medicalNotes`, `injuryNotes`, `notes`, dati account, stato tecnico e dati del collegamento non devono entrare nello state della pagina professionista, in cache persistenti o analytics;
 - il profilo personale del cliente ottenuto da `/api/v1/me/**` è un contratto distinto e non va riutilizzato nelle schermate professionista;
-- schermate anamnesi, infortuni o note professionali non fanno parte dell'MVP corrente.
+- schermate anamnesi, infortuni o note professionali non fanno parte dell'MVP corrente; un'eventuale condivisione futura richiede una decisione dedicata.
 
 ## 6. Funzionalità future da prevedere ma non attivare
 
@@ -299,7 +299,8 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 | `/app/client/profile`, `/app/professional/profile`      | CLIENT / PROFESSIONAL     | **Implementata** (Profilo + Account RO + Operational Status) |
 | `/app/professional/invites`                             | PROFESSIONAL              | **Implementata** (lista, genera, copia se Valido)            |
 | `/app/*/dashboard`                                      | CLIENT / PROFESSIONAL     | **Placeholder** (shell; senza dati business aggregati)       |
-| Clients / professionals                                 | PROFESSIONAL o CLIENT     | **Placeholder**                                              |
+| `/app/professional/clients` e dettaglio                 | PROFESSIONAL (PT + NUT)   | **Implementate**                                             |
+| `/app/client/professionals` e dettaglio                 | CLIENT                    | **Implementate**                                             |
 | Availability / bookings                                 | CLIENT; PROFESSIONAL + PT | **Placeholder**                                              |
 | `/dev/role-preview`                                     | Dev-only                  | **Implementata** (solo `import.meta.env.DEV`)                |
 
@@ -315,7 +316,7 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 
 Le guard frontend migliorano navigazione e chiarezza, ma non sostituiscono l'autorizzazione backend.
 
-Nella fondazione corrente le guard `RequireAuth`, `RequireRole` e `RequireSpecialization` sono **implementate** e collegate allo stato auth. Profilo è una pagina business reale; le altre pagine dietro le guard possono restare placeholder di contenuto.
+Nella fondazione corrente le guard `RequireAuth`, `RequireRole` e `RequireSpecialization` sono **implementate** e collegate allo stato auth. Profilo, inviti PROFESSIONAL e le quattro pagine di lista/dettaglio CLIENT ↔ PROFESSIONAL sono pagine business reali; dashboard, Availability e Booking restano placeholder di contenuto.
 
 Il subtree CLIENT pubblico usa inoltre `ClientOnboardingAuthGate`: non monta le pagine durante `initializing`, resta fail-closed su `unavailable`, consente l'outlet soltanto a `unauthenticated` e redirige un utente `authenticated` alla dashboard coerente col ruolo dopo aver pulito l'invito.
 
@@ -418,15 +419,13 @@ Ogni pagina privata deve prevedere anche gli stati trasversali `unauthorized` e 
 
 ## 11. Priorità implementazione React
 
-Completati: setup React/Vite/TypeScript, routing, layout, home pubblica, foundation API/auth session-based (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap), **Profilo/Account/Operational Status** collegati a `/me`, onboarding pubblico PROFESSIONAL e CLIENT/verifica email, **gestione inviti PROFESSIONAL**. Dettagli auth: [FE03](./03-authentication-session-flow.md); inviti: [FE05](./05-professional-invites-implementation.md); onboarding CLIENT: [FE06](./06-client-onboarding-implementation.md).
+Completati: setup React/Vite/TypeScript, routing, layout, home pubblica, foundation API/auth session-based (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap), **Profilo/Account/Operational Status** collegati a `/me`, onboarding pubblico PROFESSIONAL e CLIENT/verifica email, **gestione inviti PROFESSIONAL** e liste/dettagli delle relazioni CLIENT ↔ PROFESSIONAL. Dettagli auth: [FE03](./03-authentication-session-flow.md); inviti: [FE05](./05-professional-invites-implementation.md); onboarding CLIENT: [FE06](./06-client-onboarding-implementation.md); relazioni: [FE07](./07-client-professional-relationships-implementation.md).
 
 Ordine pragmatico **residuo**:
 
 1. dashboard base composte, senza analytics;
-2. flusso professionista comune: clienti collegati;
-3. flusso cliente: professionisti collegati e dettaglio;
-4. availability e booking del personal trainer, poi booking cliente;
-5. hardening di errori, accessibilità, responsive e test dei flussi applicativi business residui.
+2. Availability e Booking del personal trainer, poi Booking cliente;
+3. hardening di errori, accessibilità, responsive e test dei flussi applicativi business residui.
 
 La scelta del prossimo vertical slice business resta una decisione di prodotto. Availability e Booking vanno progettati insieme sul piano UX perché le transizioni booking modificano gli slot.
 

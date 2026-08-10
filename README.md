@@ -2,9 +2,9 @@
 
 ## 1. Descrizione
 
-Support Trainer è un progetto full stack per la gestione del rapporto tra professionisti del benessere e clienti. Il backend MVP copre autenticazione, profili, inviti, collegamenti professionista-cliente, disponibilità e richieste di prenotazione. Il frontend dispone di una fondazione React, home pubblica (direzione visuale dark-tech), autenticazione session-based (login/logout/CSRF/guards) e foundation API client, oltre alla pagina Profilo autenticata con Account in sola lettura e Operational Status.
+Support Trainer è un progetto full stack per la gestione del rapporto tra professionisti del benessere e clienti. Il backend MVP copre autenticazione, profili, inviti, collegamenti professionista-cliente, disponibilità e richieste di prenotazione. Il frontend dispone di una fondazione React, home pubblica (direzione visuale dark-tech), autenticazione session-based (login/logout/CSRF/guards) e foundation API client, oltre alle pagine Profilo autenticata, gestione inviti PROFESSIONAL e liste/dettagli delle relazioni CLIENT ↔ PROFESSIONAL.
 
-Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Login, logout, routing protetto, foundation auth, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status e **gestione inviti PROFESSIONAL** sono implementati. Restano prevalentemente placeholder le altre pagine business private (dashboard con dati, clients, professionals, availability, bookings).
+Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Login, logout, routing protetto, foundation auth, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status, **gestione inviti PROFESSIONAL** e navigazione delle relazioni collegate nelle due direzioni sono implementati. Restano placeholder dashboard con dati, Availability e Booking.
 
 ## 2. Stato attuale del progetto
 
@@ -25,7 +25,8 @@ Stato sintetico:
 - registrazione pubblica PROFESSIONAL e verifica email (confirm + resend) implementate;
 - validazione invito e registrazione pubblica CLIENT implementate con handoff memory-only, outcome conservativi e cleanup dei dati sensibili;
 - gestione inviti PROFESSIONAL implementata (`/app/professional/invites`: lista, genera, copia codice valido);
-- altre pagine business private ancora prevalentemente placeholder;
+- liste e dettagli dei Client collegati per PT/NUT e dei Professional collegati per CLIENT implementati;
+- dashboard con dati, Availability e Booking frontend ancora placeholder;
 - pipeline CI GitHub Actions per il backend presente; i gate frontend (lint/test/build) restano locali; deploy non configurato;
 - progetto non ancora considerato production-ready.
 
@@ -147,7 +148,7 @@ Le liste usano un riepilogo autosufficiente e create, dettaglio e transizioni re
 - editing account (email, password, cancellazione) e gestione dispositivi/sessioni;
 - limite di sessioni concorrenti;
 - API dedicate alla gestione manuale dei collegamenti;
-- altre pagine frontend business ancora placeholder (dashboard con dati, clients, professionals, availability, bookings);
+- pagine frontend business ancora placeholder (dashboard con dati, Availability e Booking);
 - configurazione completa per il deploy.
 
 Follow-up non bloccanti aperti (dettaglio in [Functional Scope](docs/01-functional-scope.md)):
@@ -339,7 +340,7 @@ Creare la build frontend di produzione, comprensiva del controllo TypeScript:
 npm run build
 ```
 
-L'output della build viene generato in `frontend/dist`. I comandi verificano foundation, home, auth session-based, onboarding pubblico PROFESSIONAL e CLIENT, verifica email, Profilo/Account/Operational Status e gestione inviti PROFESSIONAL; non implicano che le altre pagine business placeholder siano già integrate con le API di dominio.
+L'output della build viene generato in `frontend/dist`. I comandi verificano foundation, home, auth session-based, onboarding pubblico PROFESSIONAL e CLIENT, verifica email, Profilo/Account/Operational Status, gestione inviti PROFESSIONAL e liste/dettagli delle relazioni CLIENT ↔ PROFESSIONAL; non implicano che dashboard, Availability o Booking siano già integrate nel frontend.
 
 ### Sviluppo locale frontend + backend
 
@@ -445,6 +446,7 @@ Il profilo tracciato `mailpit` è un aiuto manuale locale, non un profilo di pro
 - [Professional Onboarding Implementation](docs/frontend/04-professional-onboarding-implementation.md) — implementazione onboarding pubblico PROFESSIONAL: register, verify, resend
 - [Professional Invites Implementation](docs/frontend/05-professional-invites-implementation.md) — gestione autenticata degli inviti PROFESSIONAL
 - [Client Onboarding Implementation](docs/frontend/06-client-onboarding-implementation.md) — validazione invito e registrazione pubblica CLIENT
+- [Client-Professional Relationships Implementation](docs/frontend/07-client-professional-relationships-implementation.md) — liste e dettagli collegati nelle due direzioni
 
 ### Roadmap
 
@@ -468,7 +470,7 @@ Il profilo tracciato `mailpit` è un aiuto manuale locale, non un profilo di pro
 
 ## 14. Roadmap sintetica
 
-1. altre pagine frontend business ancora placeholder (clients, professionals, availability, bookings, dashboard con dati);
+1. pagine frontend business ancora placeholder (Availability, Booking e dashboard con dati);
 2. completare il lifecycle account (recupero/reset password, editing account, upload immagine profilo);
 3. implementare le schede di allenamento;
 4. implementare i piani alimentari;
@@ -489,6 +491,6 @@ La cartella `frontend` contiene un'applicazione React/TypeScript/Vite con:
 - proxy Vite `/api` → `http://localhost:8080` in sviluppo;
 - test con Vitest / React Testing Library; gate locali lint/format/build.
 
-Auth foundation, login/logout, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status e gestione inviti PROFESSIONAL sono implementati. Restano placeholder le altre pagine business private (dashboard con dati, clients, professionals, availability, bookings). Nessun JWT/Bearer né storage di token o codici invito nel client.
+Auth foundation, login/logout, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status, gestione inviti PROFESSIONAL e liste/dettagli delle relazioni CLIENT ↔ PROFESSIONAL sono implementati. Restano placeholder dashboard con dati, Availability e Booking. Nessun JWT/Bearer né storage di token o codici invito nel client.
 
-Riferimenti: [Authentication Session Flow](docs/frontend/03-authentication-session-flow.md), [Professional Onboarding Implementation](docs/frontend/04-professional-onboarding-implementation.md), [Professional Invites Implementation](docs/frontend/05-professional-invites-implementation.md), [Client Onboarding Implementation](docs/frontend/06-client-onboarding-implementation.md), [Frontend Functional Map](docs/frontend/01-frontend-functional-map-mvp.md), [Public Home](docs/frontend/02-public-home-implementation.md), [Security Flow](docs/09-security-flow.md), [Functional Scope](docs/01-functional-scope.md).
+Riferimenti: [Authentication Session Flow](docs/frontend/03-authentication-session-flow.md), [Professional Onboarding Implementation](docs/frontend/04-professional-onboarding-implementation.md), [Professional Invites Implementation](docs/frontend/05-professional-invites-implementation.md), [Client Onboarding Implementation](docs/frontend/06-client-onboarding-implementation.md), [Client-Professional Relationships Implementation](docs/frontend/07-client-professional-relationships-implementation.md), [Frontend Functional Map](docs/frontend/01-frontend-functional-map-mvp.md), [Public Home](docs/frontend/02-public-home-implementation.md), [Security Flow](docs/09-security-flow.md), [Functional Scope](docs/01-functional-scope.md).

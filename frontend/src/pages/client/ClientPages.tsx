@@ -1,24 +1,7 @@
 import { PageTemplate } from '../../components/page/PageTemplate';
 
-export function ClientProfessionalsPage() {
-  return (
-    <PageTemplate
-      eyebrow="Area cliente"
-      title="Professionisti"
-      description="Questa pagina mostrerà in futuro i professionisti collegati al cliente. Nessun dato dimostrativo è stato inserito."
-    />
-  );
-}
-
-export function ClientProfessionalDetailPage() {
-  return (
-    <PageTemplate
-      eyebrow="Area cliente"
-      title="Dettaglio professionista"
-      description="Struttura per le informazioni del professionista collegato identificato dalla rotta."
-    />
-  );
-}
+export { ClientProfessionalDetailPage } from './ClientProfessionalDetailPage';
+export { ClientProfessionalsPage } from './ClientProfessionalsPage';
 
 export function ClientProfessionalAvailabilityPage() {
   return (

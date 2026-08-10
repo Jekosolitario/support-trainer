@@ -150,10 +150,13 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 
 La struttura persistita di `ClientProfile` non coincide con il profilo condiviso ai professionisti.
 
+- il profilo owner ottenuto tramite `/api/v1/me/profile` resta un contratto separato e comprende i campi CLIENT previsti per la gestione del proprio profilo;
 - `GET /api/v1/clients/my` espone soltanto `id`, `firstName`, `lastName` e `profileImageUrl`;
-- `GET /api/v1/clients/{clientId}` aggiunge esclusivamente `primaryGoal`;
-- `operationalStatus`, `active`, `birthDate`, `heightCm`, `gender`, `medicalNotes`, `injuryNotes`, `notes`, stati account e audit restano fuori dai DTO Clients;
-- `PERSONAL_TRAINER` e `NUTRITIONIST` usano lo stesso contratto minimo nell'MVP.
+- `GET /api/v1/clients/{clientId}` espone gli stessi campi e aggiunge `primaryGoal`, `operationalStatus`, `birthDate`, `heightCm` e `gender`;
+- `medicalNotes`, `injuryNotes`, `notes`, `active`, dati account, dati tecnici del collegamento e audit restano fuori dai DTO Clients condivisi;
+- `PERSONAL_TRAINER` e `NUTRITIONIST` usano lo stesso contratto condiviso.
+
+Le note sensibili sono persistite nel profilo owner ma non sono condivise dal contratto corrente. Una loro eventuale condivisione futura richiede una decisione dedicata su finalità, visibilità e protezioni.
 
 Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/profile` e `/api/v1/me/account`. La minimizzazione riguarda soltanto la risposta HTTP condivisa e non modifica entity, colonne o dati già persistiti. Eventuali sezioni specialistiche future richiederanno uno scopo e una policy dedicati.
 

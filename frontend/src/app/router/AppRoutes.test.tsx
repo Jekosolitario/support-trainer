@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { UserAccessProfile } from '../config/access';
 import * as authOnboardingApi from '../../api/authOnboardingApi';
+import * as clientsApi from '../../api/clientsApi';
 import * as invitesApi from '../../api/invitesApi';
+import * as professionalsApi from '../../api/professionalsApi';
 import {
   AuthContext,
   type AuthContextValue,
@@ -118,6 +120,34 @@ function expectForbidden(): void {
 describe('AppRoutes', () => {
   beforeEach(() => {
     vi.spyOn(invitesApi, 'listMyInvites').mockResolvedValue([]);
+    vi.spyOn(clientsApi, 'listMyClients').mockResolvedValue([]);
+    vi.spyOn(clientsApi, 'getClientById').mockResolvedValue({
+      id: 7,
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      profileImageUrl: null,
+      primaryGoal: 'Migliorare la mobilità',
+      operationalStatus: 'ATTIVO',
+      birthDate: '1995-08-10',
+      heightCm: 168.5,
+      gender: 'FEMALE',
+    });
+    vi.spyOn(professionalsApi, 'listMyProfessionals').mockResolvedValue([]);
+    vi.spyOn(professionalsApi, 'getProfessionalById').mockResolvedValue({
+      id: 11,
+      firstName: 'Grace',
+      lastName: 'Hopper',
+      profileImageUrl: null,
+      specialization: 'NUTRITIONIST',
+      operationalStatus: 'DISPONIBILE',
+      active: true,
+      phoneNumber: null,
+      bio: null,
+      workplaceName: null,
+      city: null,
+      instagramUrl: null,
+      websiteUrl: null,
+    });
   });
 
   afterEach(() => {
@@ -223,14 +253,35 @@ describe('AppRoutes', () => {
     },
   );
 
-  it('manda un CLIENT a forbidden su una route professional comune', () => {
-    renderAuthenticatedApp('/app/professional/clients', {
-      role: 'CLIENT',
-      specialization: null,
-    });
+  it.each(['/app/professional/clients', '/app/professional/clients/7'])(
+    'manda un CLIENT a forbidden sulla route professional %s',
+    (path) => {
+      renderAuthenticatedApp(path, {
+        role: 'CLIENT',
+        specialization: null,
+      });
 
-    expectForbidden();
-  });
+      expectForbidden();
+      expect(clientsApi.listMyClients).not.toHaveBeenCalled();
+      expect(clientsApi.getClientById).not.toHaveBeenCalled();
+    },
+  );
+
+  describe.each(professionalProfiles)(
+    'route CLIENT Professionals negate a $label',
+    ({ accessProfile }) => {
+      it.each(['/app/client/professionals', '/app/client/professionals/11'])(
+        'nega %s senza chiamare API',
+        (path) => {
+          renderAuthenticatedApp(path, accessProfile);
+
+          expectForbidden();
+          expect(professionalsApi.listMyProfessionals).not.toHaveBeenCalled();
+          expect(professionalsApi.getProfessionalById).not.toHaveBeenCalled();
+        },
+      );
+    },
+  );
 
   it.each(personalTrainerRoutes)(
     'consente a PERSONAL_TRAINER la route PT-only $path',

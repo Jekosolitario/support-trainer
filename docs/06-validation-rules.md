@@ -667,11 +667,13 @@ Il campo `profileImageUrl` non rientra ancora in un flusso frontend/API dedicato
 La validità del collegamento autorizza l'accesso all'endpoint, ma non rende visibile l'intero `ClientProfile`.
 
 - la lista `/api/v1/clients/my` ammette come chiavi pubbliche soltanto `id`, `firstName`, `lastName` e `profileImageUrl`;
-- il dettaglio `/api/v1/clients/{clientId}` ammette le stesse chiavi e `primaryGoal`;
+- il dettaglio `/api/v1/clients/{clientId}` ammette le stesse chiavi e `primaryGoal`, `operationalStatus`, `birthDate`, `heightCm` e `gender`;
+- `profileImageUrl` resta nullable; gli altri campi del dettaglio condiviso rispettano i tipi e gli enum del contratto backend;
+- `medicalNotes`, `injuryNotes`, `notes`, dati account, dati tecnici del collegamento e audit non sono chiavi del contratto condiviso corrente;
 - i test HTTP confrontano l'insieme completo delle proprietà, senza dipendere dall'ordine JSON;
-- PT e nutrizionista ricevono lo stesso payload minimo.
+- PT e nutrizionista ricevono lo stesso payload condiviso.
 
-Le regole di registrazione e aggiornamento del profilo owner restano invariate. Questa è una regola di minimizzazione tecnica del contratto API e non costituisce una dichiarazione di conformità legale.
+Le regole di registrazione e aggiornamento del profilo owner restano invariate. Le note sensibili sono oggi escluse; una futura condivisione richiede una decisione specifica. Questa è una regola di minimizzazione tecnica del contratto API e non costituisce una dichiarazione di conformità legale.
 
 ---
 

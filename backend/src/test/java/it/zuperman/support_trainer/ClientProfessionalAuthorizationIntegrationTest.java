@@ -353,6 +353,31 @@ class ClientProfessionalAuthorizationIntegrationTest {
         inactiveClient.setActive(false);
         userRepository.saveAndFlush(inactiveClient);
 
+        ClientProfile pendingAccountClient = saveActiveClient("client.pending-account@example.com");
+        professionalClientLinkRepository.saveAndFlush(new ProfessionalClientLink(professional, pendingAccountClient));
+        pendingAccountClient.setAccountStatus(AccountStatus.PENDING_VERIFICATION);
+        userRepository.saveAndFlush(pendingAccountClient);
+
+        ClientProfile unverifiedEmailClient = saveActiveClient("client.unverified-email@example.com");
+        professionalClientLinkRepository.saveAndFlush(new ProfessionalClientLink(professional, unverifiedEmailClient));
+        unverifiedEmailClient.setEmailVerified(false);
+        userRepository.saveAndFlush(unverifiedEmailClient);
+
+        assertThat(pendingAccountClient.getActive()).isTrue();
+        assertThat(pendingAccountClient.getEmailVerified()).isTrue();
+        assertThat(pendingAccountClient.getAccountStatus()).isEqualTo(AccountStatus.PENDING_VERIFICATION);
+        assertThat(unverifiedEmailClient.getActive()).isTrue();
+        assertThat(unverifiedEmailClient.getEmailVerified()).isFalse();
+        assertThat(unverifiedEmailClient.getAccountStatus()).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(professionalClientLinkRepository.existsByProfessional_IdAndClient_IdAndActiveTrue(
+                professional.getId(),
+                pendingAccountClient.getId()
+        )).isTrue();
+        assertThat(professionalClientLinkRepository.existsByProfessional_IdAndClient_IdAndActiveTrue(
+                professional.getId(),
+                unverifiedEmailClient.getId()
+        )).isTrue();
+
         List<Map<String, Object>> payloads = List.of(
                 getComparableNotFoundPayload(
                         "/api/v1/clients/{resourceId}",
@@ -372,6 +397,16 @@ class ClientProfessionalAuthorizationIntegrationTest {
                 getComparableNotFoundPayload(
                         "/api/v1/clients/{resourceId}",
                         inactiveClient.getId(),
+                        professionalAuth
+                ),
+                getComparableNotFoundPayload(
+                        "/api/v1/clients/{resourceId}",
+                        pendingAccountClient.getId(),
+                        professionalAuth
+                ),
+                getComparableNotFoundPayload(
+                        "/api/v1/clients/{resourceId}",
+                        unverifiedEmailClient.getId(),
                         professionalAuth
                 )
         );
