@@ -26,7 +26,8 @@ class BookingHistoricalSnapshotMigrationTest {
             statement.execute("CREATE TABLE client_profiles (id BIGINT PRIMARY KEY)");
             statement.execute("CREATE TABLE professional_profiles (id BIGINT PRIMARY KEY)");
             statement.execute("CREATE TABLE availability_slots (id BIGINT PRIMARY KEY, "
-                    + "start_date_time DATETIME(6) NOT NULL, end_date_time DATETIME(6) NOT NULL)");
+                    + "professional_id BIGINT NOT NULL, start_date_time DATETIME(6) NOT NULL, "
+                    + "end_date_time DATETIME(6) NOT NULL, status VARCHAR(50) NOT NULL, active BOOLEAN NOT NULL)");
             statement.execute("CREATE TABLE booking_requests (id BIGINT PRIMARY KEY, client_id BIGINT NOT NULL, "
                     + "professional_id BIGINT NOT NULL, status VARCHAR(50) NOT NULL, updated_at DATETIME(6) NOT NULL)");
             statement.execute("CREATE TABLE booking_request_items (id BIGINT PRIMARY KEY, booking_request_id BIGINT NOT NULL, "
@@ -41,10 +42,14 @@ class BookingHistoricalSnapshotMigrationTest {
                     + "(12, 1, 2, 'REJECTED', '2026-07-15 15:30:45.123456'), "
                     + "(13, 1, 2, 'CANCELLED', '2026-07-16 15:30:45.123456')");
             statement.execute("INSERT INTO availability_slots VALUES "
-                    + "(100, '2026-08-01 09:00:00.123456', '2026-08-01 10:00:00.123456'), "
-                    + "(101, '2026-08-02 09:00:00.123456', '2026-08-02 10:00:00.123456'), "
-                    + "(102, '2026-08-03 09:00:00.123456', '2026-08-03 10:00:00.123456'), "
-                    + "(103, '2026-08-04 09:00:00.123456', '2026-08-04 10:00:00.123456')");
+                    + "(100, 2, '2026-08-01 09:00:00.123456', '2026-08-01 10:00:00.123456', "
+                    + "'AVAILABLE', TRUE), "
+                    + "(101, 2, '2026-08-02 09:00:00.123456', '2026-08-02 10:00:00.123456', "
+                    + "'BOOKED', TRUE), "
+                    + "(102, 2, '2026-08-03 09:00:00.123456', '2026-08-03 10:00:00.123456', "
+                    + "'AVAILABLE', TRUE), "
+                    + "(103, 2, '2026-08-04 09:00:00.123456', '2026-08-04 10:00:00.123456', "
+                    + "'BLOCKED', TRUE)");
             statement.execute("INSERT INTO booking_request_items VALUES "
                     + "(1000, 10, 100), (1001, 11, 101), (1002, 12, 102), (1003, 13, 103)");
         }
@@ -59,7 +64,7 @@ class BookingHistoricalSnapshotMigrationTest {
                 .baselineVersion("5.9")
                 .load();
 
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(3);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
 
         try (Connection connection = DriverManager.getConnection(JDBC_URL, "sa", "");
@@ -70,6 +75,15 @@ class BookingHistoricalSnapshotMigrationTest {
             )) {
                 assertThat(resultSet.next()).isTrue();
                 assertThat(resultSet.getInt(1)).isEqualTo(2);
+            }
+            try (ResultSet resultSet = statement.executeQuery(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
+                            + "WHERE UPPER(TABLE_NAME) IN ('WEEKLY_AVAILABILITY_RULES', "
+                            + "'WEEKLY_AVAILABILITY_RULE_DURATIONS', 'AVAILABILITY_RULE_CHANGES', "
+                            + "'AVAILABILITY_SLOT_CHANGES')"
+            )) {
+                assertThat(resultSet.next()).isTrue();
+                assertThat(resultSet.getInt(1)).isEqualTo(4);
             }
             try (ResultSet resultSet = statement.executeQuery(
                     "SELECT client_display_name, professional_display_name, confirmed_at, rejected_at, cancelled_at "
@@ -100,6 +114,27 @@ class BookingHistoricalSnapshotMigrationTest {
                         .isEqualTo(LocalDateTime.parse("2026-08-01T09:00:00.123456"));
                 assertThat(resultSet.getObject("scheduled_end", LocalDateTime.class))
                         .isEqualTo(LocalDateTime.parse("2026-08-01T10:00:00.123456"));
+            }
+            try (ResultSet resultSet = statement.executeQuery(
+                    "SELECT location_label_snapshot FROM booking_request_items WHERE id = 1000"
+            )) {
+                assertThat(resultSet.next()).isTrue();
+                assertThat(resultSet.getString("location_label_snapshot")).isNull();
+            }
+            try (ResultSet resultSet = statement.executeQuery(
+                    "SELECT id, weekly_rule_id, capacity, blocked "
+                            + "FROM availability_slots WHERE id IN (101, 103) ORDER BY id"
+            )) {
+                assertThat(resultSet.next()).isTrue();
+                assertThat(resultSet.getLong("id")).isEqualTo(101);
+                assertThat(resultSet.getObject("weekly_rule_id")).isNull();
+                assertThat(resultSet.getInt("capacity")).isEqualTo(1);
+                assertThat(resultSet.getBoolean("blocked")).isFalse();
+                assertThat(resultSet.next()).isTrue();
+                assertThat(resultSet.getLong("id")).isEqualTo(103);
+                assertThat(resultSet.getObject("weekly_rule_id")).isNull();
+                assertThat(resultSet.getInt("capacity")).isEqualTo(1);
+                assertThat(resultSet.getBoolean("blocked")).isTrue();
             }
             try (ResultSet resultSet = statement.executeQuery(
                     "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS "

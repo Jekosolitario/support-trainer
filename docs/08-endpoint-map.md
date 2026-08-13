@@ -41,7 +41,7 @@ Regola generale:
 ## 3. Stato del documento
 Questo file include **solo endpoint realmente presenti nel codice attuale**.
 
-Il conteggio è di **31 endpoint applicativi**: Auth 8, Me 4, Client 2, Professional 3, Invite 2, Availability 5 e Booking 7. `/error` è un endpoint tecnico di fallback e non è contato fra le API funzionali.
+Il conteggio è di **36 endpoint applicativi**: Auth 8, Me 4, Client 2, Professional 3, Invite 2, Availability 10 e Booking 7. `/error` è un endpoint tecnico di fallback e non è contato fra le API funzionali.
 
 Gli endpoint futuri o ancora da definire non vengono elencati qui.  
 Devono essere mantenuti in un documento separato dedicato agli endpoint pianificati.
@@ -191,9 +191,34 @@ Restituisce i codici invito generati dal professionista autenticato.
 
 ## 9. Modulo Availability
 
-### 9.1 Creazione slot disponibilità
+### 9.1 Creazione regola settimanale
+
+**POST** `/api/v1/availability/weekly-rules`
+Crea una finestra ricorrente del Personal Trainer e materializza immediatamente una occorrenza per data nella rolling horizon oggi → sei mesi. Il payload contiene `allowedDurations`: insieme non vuoto di durate uniche, multiple di 15, comprese fra 15 e 180 minuti e contenute nella finestra. Gli estremi della finestra sono allineati a 15 minuti.
+
+### 9.2 Elenco regole settimanali
+
+**GET** `/api/v1/availability/weekly-rules/my`
+Restituisce le regole attive del Personal Trainer autenticato.
+
+### 9.3 Anteprima impatto modifica
+
+**GET** `/api/v1/availability/weekly-rules/{ruleId}/impact`
+Conta i Booking `PENDING` e `CONFIRMED` coinvolti da una modifica immediata, senza applicarla.
+
+### 9.4 Modifica regola settimanale
+
+**PUT** `/api/v1/availability/weekly-rules/{ruleId}`
+Sostituisce immediatamente giorno, finestra, durate consentite, luogo e capacità per le occorrenze future. Se l'impatto è maggiore di zero, `changeReason` è obbligatorio. La capacità non può scendere sotto la massima occupancy concorrente delle finestre interessate.
+
+### 9.5 Disattivazione regola settimanale
+
+**PATCH** `/api/v1/availability/weekly-rules/{ruleId}/deactivate`
+Disattiva immediatamente la ricorrenza futura senza eliminare o spostare Booking e senza riscrivere il passato. Anche questa operazione richiede `changeReason` quando coinvolge prenotazioni.
+
+### 9.6 Creazione manuale slot — compatibilità legacy
 **POST** `/api/v1/availability`  
-Crea un nuovo slot di disponibilità per il professionista autenticato.
+Crea un singolo slot per il professionista autenticato. Resta disponibile per compatibilità, ma la nuova UI usa le regole settimanali.
 
 Payload temporale:
 
@@ -206,11 +231,11 @@ Payload temporale:
 
 In inverno l'offset atteso è normalmente `+01:00`, per esempio `2026-01-13T17:30:00+01:00`. Lo stesso formato con offset è restituito dalle response.
 
-### 9.2 Elenco slot del professionista autenticato
+### 9.7 Elenco slot del professionista autenticato
 **GET** `/api/v1/availability/my`  
 Restituisce gli slot di disponibilità del professionista autenticato.
 
-### 9.3 Elenco slot disponibili di un professionista
+### 9.8 Elenco slot disponibili di un professionista
 **GET** `/api/v1/professionals/{professionalId}/availability`  
 Restituisce al cliente collegato gli slot realmente prenotabili di un professionista.
 
@@ -219,11 +244,13 @@ Professional inesistente, inattivo, non verificato o non collegato al Client pro
 Vengono restituiti solo slot:
 
 - attivi;
-- in stato `AVAILABLE`;
+- non bloccati;
 - con data iniziale futura;
-- senza una richiesta booking `PENDING` attiva collegata.
+- per i quali esiste almeno una combinazione inizio/durata futura con capacità temporale disponibile, contando `PENDING` e `CONFIRMED`.
 
-### 9.4 Aggiornamento slot disponibilità
+La response minimizzata contiene `occurrenceId`, `windowStart`, `windowEnd`, `allowedDurations`, `startIntervalMinutes`, `location`, `capacity` e `bookableOptions`. Ogni elemento di `bookableOptions` espone uno `startDateTime` e le sole `allowedDurations` ancora prenotabili per quello start; non espone occupancy, capacità residua o dati degli altri Client. Le opzioni sono calcolate server-side su un caricamento batch dei Booking occupanti.
+
+### 9.9 Aggiornamento manuale slot — compatibilità legacy
 **PATCH** `/api/v1/availability/{slotId}`  
 Aggiorna parzialmente data/ora di uno slot appartenente al professionista autenticato.
 
@@ -238,35 +265,46 @@ L’aggiornamento è consentito solo se:
 
 Uno slot già collegato ad almeno una richiesta booking non può essere ripianificato modificandone data o ora, anche se la richiesta è stata successivamente rifiutata o cancellata.
 
+Un'occorrenza generata da una regola settimanale non è mai ripianificabile tramite questo endpoint e produce `WEEKLY_AVAILABILITY_OCCURRENCE_NOT_PATCHABLE`.
+
 Per proporre una disponibilità in un nuovo intervallo temporale, il professionista deve creare un nuovo slot.
 
-### 9.5 Blocco slot disponibilità
+### 9.10 Blocco slot disponibilità
 **PATCH** `/api/v1/availability/{slotId}/block`  
-Blocca uno slot disponibile appartenente al professionista autenticato.
+Blocca una occorrenza futura appartenente al professionista autenticato. I Booking esistenti sono preservati; se sono presenti Booking `PENDING` o `CONFIRMED`, il body deve fornire `changeReason`. L'operazione viene auditata.
 
-### 9.6 Sblocco slot disponibilità
+### 9.11 Sblocco slot disponibilità
 **PATCH** `/api/v1/availability/{slotId}/unblock`  
-Sblocca uno slot bloccato appartenente al professionista autenticato.
+Sblocca una occorrenza futura appartenente al professionista autenticato e registra l'audit.
 
-### 9.7 Regole attualmente implementate
+### 9.12 Regole attualmente implementate
 
 Le operazioni Availability applicano i seguenti controlli:
 
-- solo il professionista autenticato può creare e gestire i propri slot
+- solo il Personal Trainer autenticato può gestire regole e slot
 - il professionista deve avere account attivo, email verificata e profilo attivo
 - un cliente può leggere gli slot disponibili solo di un professionista a lui collegato
 - slot inesistente e slot di altro Professional producono lo stesso `404 AVAILABILITY_SLOT_NOT_FOUND` sulle mutate; la query scoped acquisisce il lock solo dopo aver applicato la ownership
 - l’intervallo temporale deve essere valido
 - l'offset è obbligatorio e deve essere coerente con `Europe/Rome`;
 - gap e overlap DST sono rifiutati, senza normalizzazione o scelta automatica dell'offset;
+- regole dello stesso giorno non possono sovrapporsi, mentre possono essere adiacenti;
+- ogni regola genera una sola occorrenza-finestra per data, non righe per tutte le combinazioni inizio/durata;
+- inizi e durate sono multipli di 15 minuti; le durate ammesse sono 15–180 minuti e devono rientrare nella finestra;
+- la materializzazione è idempotente, coordinata tramite lock con update/deactivate e usa una regola ricaricata dal database dopo il lock anche se la persistence context ne aveva precaricato una versione precedente;
+- il caricamento iniziale PT sincronizza l'horizon tramite la lettura delle occurrence; l'elenco regole non avvia una seconda sincronizzazione;
+- `PENDING` e `CONFIRMED` occupano capacità, `REJECTED` e `CANCELLED` la liberano;
+- la capacità è verificata sugli intervalli temporali sovrapposti, non come contatore globale dell'occorrenza;
+- la verifica della capacità e la creazione Booking sono atomiche sotto lock pessimista dell'occorrenza;
+- il Client è lockato prima della creazione: due Booking occupanti dello stesso Client non possono sovrapporsi neppure in race;
 - la precisione massima è al secondo e le frazioni non nulle sono rifiutate;
 - inizio e fine sono confrontati come istanti;
 - uno slot creato o aggiornato deve iniziare nel futuro
 - non sono ammessi slot sovrapposti per lo stesso professionista
-- solo slot `AVAILABLE` possono essere aggiornati o bloccati
+- solo slot manuali legacy `AVAILABLE` possono essere ripianificati; le occorrenze generate devono essere gestite dalla regola
 - solo slot `BLOCKED` possono essere sbloccati
 - la lettura lato cliente esclude gli slot `AVAILABLE` ormai scaduti;
-- la lettura lato cliente esclude gli slot che hanno già una richiesta booking `PENDING` attiva.
+- le letture operative e le azioni block/unblock escludono o rifiutano le occorrenze passate;
 - uno slot già coinvolto in una richiesta booking non può essere ripianificato modificandone data o ora;
 - la regola di immutabilità temporale preserva lo storico della richiesta originaria;
 - dopo un booking rifiutato o cancellato, lo slot può essere nuovamente prenotabile solo sullo stesso intervallo temporale originario.
@@ -285,7 +323,12 @@ Slot inesistente, non collegato o non visibile al Client producono lo stesso `40
 
 Regole attuali:
 
-- la richiesta viene creata a partire da un singolo `availabilitySlotId`
+- la richiesta viene creata a partire da un singolo `availabilitySlotId`/`occurrenceId`;
+- il Client invia sempre `startDateTime` e `durationMinutes`; la fine è derivata dal server;
+- soltanto le occurrence generate da una regola settimanale accettano nuove prenotazioni; uno slot manuale legacy usa il contratto neutro `404 AVAILABILITY_SLOT_NOT_FOUND`, come una risorsa assente o non accessibile;
+- l'inizio deve essere allineato a 15 minuti, la durata deve essere ammessa e l'intervallo deve rientrare nella finestra;
+- gap e overlap DST sono rifiutati;
+- lo stesso Client non può avere Booking `PENDING` o `CONFIRMED` temporalmente sovrapposti;
 - la `note` è facoltativa
 - la `note`, se presente, viene normalizzata rimuovendo gli spazi iniziali e finali
 - una `note` vuota dopo la normalizzazione viene salvata come assente
@@ -302,7 +345,7 @@ Anche in caso di booking successivamente `REJECTED` o `CANCELLED`, lo slot non p
 - `BookingSummaryResponse` contiene `id`, `status`, `counterparty`, `scheduledStart`, `scheduledEnd`, `durationMinutes`, `note` e `createdAt`.
 - `BookingDetailResponse` contiene `id`, `status`, partecipanti, aggregati temporali, `note`, audit, timestamp di transizione e `items`.
 - Un partecipante ha `id`, `displayName` storico, `profileImageUrl` corrente opzionale e, solo per il professionista, `specialization` corrente.
-- Un item ha `id`, `availabilitySlotId`, orari snapshot e durata. I nomi, gli orari e la nota rendono la response autosufficiente; non sono esposti `primaryGoal`, dati sanitari, email, telefono o campi operativi dei profili.
+- Un item ha `id`, `availabilitySlotId`, orari snapshot, durata e `locationLabel` snapshot. I nomi, gli orari, il luogo e la nota rendono la response autosufficiente; non sono esposti `primaryGoal`, dati sanitari, email, telefono o campi operativi dei profili.
 
 Le liste sono ordinate per `createdAt DESC, id DESC`; paginazione, filtri e ricerca sono rinviati. Lo storico creato resta leggibile dai partecipanti originari anche dopo la disattivazione del `ProfessionalClientLink`, che resta invece obbligatorio per creare nuove richieste.
 
@@ -324,7 +367,7 @@ Permette al professionista proprietario dello slot di confermare una richiesta `
 
 Quando la richiesta viene confermata:
 - la booking passa a `CONFIRMED`
-- lo slot collegato passa a `BOOKED`
+- l'occupancy non cambia perché il posto era già riservato in `PENDING`
 - `confirmedAt` viene valorizzato e la response restituisce il dettaglio completo
 
 ### 10.6 Rifiuto richiesta prenotazione
@@ -333,7 +376,7 @@ Permette al professionista proprietario dello slot di rifiutare una richiesta `P
 
 Quando la richiesta viene rifiutata:
 - la booking passa a `REJECTED`
-- lo slot resta disponibile se non era già occupato
+- il posto occupato dal `PENDING` viene liberato
 - `rejectedAt` viene valorizzato e la response restituisce il dettaglio completo
 
 ### 10.7 Cancellazione richiesta prenotazione
@@ -347,7 +390,7 @@ Regole attuali:
 
 Quando una richiesta `CONFIRMED` viene cancellata:
 - la booking passa a `CANCELLED`
-- lo slot collegato torna `AVAILABLE`
+- il posto occupato viene liberato senza mutare uno stato binario dello slot
 
 Ogni cancellazione consentita valorizza `cancelledAt`, conserva un eventuale `confirmedAt` già presente e restituisce il dettaglio completo. Non sono ancora previsti motivo o autore della cancellazione.
 
@@ -421,16 +464,15 @@ Per Support Trainer si confermano le seguenti scelte:
 - lettura relazioni professionista-cliente già disponibile
 - inviti già esposti come modulo reale
 - endpoint futuri mantenuti fuori da questa mappa, in documento separato
-- modulo availability implementato con creazione, lettura, update, block e unblock degli slot
+- modulo Availability implementato con finestre settimanali, durate multiple, rolling horizon, capacità temporale e blocco auditato delle occorrenze
 - modulo bookings implementato con creazione, lettura, conferma, rifiuto e cancellazione delle richieste
-- creazione booking attualmente basata su un singolo slot
+- creazione booking basata su una singola occorrenza con inizio e durata selezionati
 - regole di ruolo Booking esplicitate in `SecurityConfig`
 - ownership delle risorse e transizioni di stato controllate nel service layer
 - Availability valida che gli slot creati o modificati inizino nel futuro
-- uno slot con booking `PENDING` attivo non viene più esposto come disponibilità prenotabile al cliente.
-- uno slot già coinvolto in una richiesta booking mantiene immutabile il proprio intervallo temporale;
-- la ripianificazione richiede la creazione di un nuovo slot availability;
-- questa regola impedisce che lo storico booking mostri date diverse da quelle originariamente selezionate dal cliente.
+- il Client vede soltanto finestre con almeno una combinazione prenotabile e un payload minimizzato senza occupancy o dati sugli altri partecipanti;
+- le modifiche alle regole non eliminano né spostano Booking e conservano la motivazione quando hanno impatto;
+- gli snapshot Booking impediscono che lo storico mostri orari o luogo diversi da quelli originariamente selezionati;
 - `instagramUrl` e `websiteUrl` del profilo professionista, se valorizzati, devono iniziare con `http://` oppure `https://`;
 - nel `PATCH /api/v1/me/profile`, l’invio di un valore vuoto per `instagramUrl` o `websiteUrl` rimuove il link precedentemente salvato;
 - il frontend dovrà gestire separatamente valore invariato, nuovo URL e rimozione esplicita del link.

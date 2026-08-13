@@ -9,9 +9,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +39,9 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
+import it.zuperman.support_trainer.availability.entity.WeeklyAvailabilityRule;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
+import it.zuperman.support_trainer.availability.repository.WeeklyAvailabilityRuleRepository;
 import it.zuperman.support_trainer.booking.entity.BookingRequest;
 import it.zuperman.support_trainer.booking.repository.BookingRequestRepository;
 import it.zuperman.support_trainer.booking.service.BookingService;
@@ -63,6 +68,7 @@ import it.zuperman.support_trainer.support.SessionAuthTestSupport.CsrfSession;
 class BookingHistoricalResponseIntegrationTest {
 
     private static final Instant FIXED_NOW = Instant.parse("2026-01-15T10:00:00Z");
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Europe/Rome");
     private static final String PASSWORD = "Password123!";
 
     @Autowired
@@ -79,6 +85,9 @@ class BookingHistoricalResponseIntegrationTest {
 
     @Autowired
     private AvailabilitySlotRepository availabilitySlotRepository;
+
+    @Autowired
+    private WeeklyAvailabilityRuleRepository weeklyAvailabilityRuleRepository;
 
     @Autowired
     private BookingRequestRepository bookingRequestRepository;
@@ -125,7 +134,7 @@ class BookingHistoricalResponseIntegrationTest {
         mockMvc.perform(post("/api/v1/bookings")
                         .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"availabilitySlotId\":" + slot.getId() + ",\"note\":\"Richiesta sicura\"}"))
+                        .content(bookingPayload(slot, "Richiesta sicura")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.client.displayName").value("Luigi Bianchi"))
@@ -137,6 +146,7 @@ class BookingHistoricalResponseIntegrationTest {
                 .andExpect(jsonPath("$.durationMinutes").value(60))
                 .andExpect(jsonPath("$.items[0].availabilitySlotId").value(slot.getId()))
                 .andExpect(jsonPath("$.items[0].scheduledStart").value("2026-07-20T17:30:00+02:00"))
+                .andExpect(jsonPath("$.items[0].locationLabel").value("Studio"))
                 .andExpect(jsonPath("$.active").doesNotExist())
                 .andExpect(jsonPath("$.slotStatus").doesNotExist())
                 .andExpect(jsonPath("$.primaryGoal").doesNotExist())
@@ -203,7 +213,7 @@ class BookingHistoricalResponseIntegrationTest {
         mockMvc.perform(post("/api/v1/bookings")
                 .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"availabilitySlotId\":" + slot.getId() + "}"))
+                .content(bookingPayload(slot, null)))
                 .andExpect(status().isNotFound());
     }
 
@@ -274,7 +284,7 @@ class BookingHistoricalResponseIntegrationTest {
         mockMvc.perform(post("/api/v1/bookings")
                         .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"availabilitySlotId\":" + slot.getId() + "}"))
+                        .content(bookingPayload(slot, null)))
                 .andExpect(status().isCreated());
         return bookingRequestRepository.findAll().stream()
                 .map(BookingRequest::getId)
@@ -283,11 +293,44 @@ class BookingHistoricalResponseIntegrationTest {
     }
 
     private AvailabilitySlot saveSlot(String start, String end) {
+        Instant startInstant = Instant.parse(start);
+        Instant endInstant = Instant.parse(end);
+        var businessStart = startInstant.atZone(BUSINESS_ZONE);
+        var businessEnd = endInstant.atZone(BUSINESS_ZONE);
+        int durationMinutes = Math.toIntExact(Duration.between(startInstant, endInstant).toMinutes());
+        WeeklyAvailabilityRule rule = weeklyAvailabilityRuleRepository.saveAndFlush(
+                new WeeklyAvailabilityRule(
+                        professional,
+                        businessStart.getDayOfWeek(),
+                        businessStart.toLocalTime(),
+                        businessEnd.toLocalTime(),
+                        Set.of(durationMinutes),
+                        "Studio",
+                        1,
+                        businessStart.toLocalDate()
+                )
+        );
         return availabilitySlotRepository.saveAndFlush(new AvailabilitySlot(
                 professional,
-                Instant.parse(start),
-                Instant.parse(end)
+                rule,
+                startInstant,
+                endInstant,
+                "Studio",
+                1
         ));
+    }
+
+    private static String bookingPayload(AvailabilitySlot slot, String note) {
+        String startDateTime = slot.getStartDateTime()
+                .atZone(BUSINESS_ZONE)
+                .toOffsetDateTime()
+                .toString();
+        long durationMinutes = Duration.between(slot.getStartDateTime(), slot.getEndDateTime()).toMinutes();
+        String noteProperty = note == null ? "" : ",\"note\":\"" + note + "\"";
+        return "{\"availabilitySlotId\":" + slot.getId()
+                + ",\"startDateTime\":\"" + startDateTime
+                + "\",\"durationMinutes\":" + durationMinutes
+                + noteProperty + "}";
     }
 
     private ProfessionalProfile activeProfessional(String email) {

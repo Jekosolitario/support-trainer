@@ -190,15 +190,28 @@ Rappresenta il codice invito generato da un professionista per permettere la reg
 
 ---
 
+## 3.6.1 WeeklyAvailabilityRule
+Definisce una fascia ricorrente della settimana lavorativa del Personal Trainer.
+
+I campi correnti sono `id`, `professional`, `dayOfWeek`, `startTime`, `endTime`, `allowedDurations`, `locationLabel`, `capacityPerSlot`, `active`, `validFrom` e audit. `allowedDurations` è una collezione normalizzata di durate da 15 a 180 minuti, multiple di 15 e interamente contenute nella finestra. Anche gli estremi della finestra sono allineati a 15 minuti. Le regole attive dello stesso giorno non possono sovrapporsi, mentre possono essere adiacenti.
+
+Update e deactivate modificano immediatamente il futuro dalla data/ora corrente. L'eventuale impatto sui Booking occupanti richiede una motivazione, registrata in `AvailabilityRuleChange`.
+
+---
+
 ## 3.7 AvailabilitySlot
-Rappresenta una fascia di disponibilità del personal trainer.
+Rappresenta un'occorrenza-finestra limitata nel tempo e materializzata da una regola settimanale. Non rappresenta una singola combinazione inizio/durata: una sola occorrenza espone più inizi a intervalli di 15 minuti e più durate consentite.
 
 ### Campi attualmente implementati
 - `id`
 - `professional`
+- `weeklyRule` opzionale per gli slot legacy
 - `startDateTime`
 - `endDateTime`
-- `status`
+- `locationLabel`
+- `capacity`
+- `blocked`
+- `status` legacy
 - `active`
 - `createdAt`
 - `updatedAt`
@@ -207,16 +220,14 @@ Rappresenta una fascia di disponibilità del personal trainer.
 Questa entità è utilizzata solo per i professionisti con specializzazione:
 - `PERSONAL_TRAINER`
 
-### Stati slot implementati
-- `AVAILABLE`
-- `BOOKED`
-- `BLOCKED`
-
 ### Regole principali implementate
 - lo slot appartiene a un solo professionista;
-- lo slot deve iniziare nel futuro in fase di creazione o aggiornamento;
-- gli slot attivi dello stesso professionista non possono sovrapporsi;
-- lo stato `BOOKED` viene gestito dal flusso Booking.
+- l'occupancy è derivata da Booking `PENDING` e `CONFIRMED`;
+- la capacità misura il massimo numero di Client contemporaneamente presenti, calcolato sugli intervalli Booking sovrapposti;
+- il Booking è ammesso soltanto se lo slot è attivo, futuro, non bloccato e la combinazione scelta ha capacità residua;
+- una singola occorrenza futura può essere bloccata senza cancellare i Booking; se ne coinvolge almeno uno serve una motivazione conservata in `AvailabilitySlotChange`;
+- le occorrenze passate non sono elencate fra le azioni operative e non sono modificabili;
+- `BOOKED` resta un valore legacy e non costituisce più l'unica authority per la prenotabilità.
 
 ---
 
@@ -244,7 +255,9 @@ Una richiesta di prenotazione appartiene a:
 - un solo cliente;
 - un solo personal trainer.
 
-Nel backend attuale la richiesta viene creata a partire da un singolo `availabilitySlotId`.
+Nel backend attuale la richiesta viene creata a partire da una singola occorrenza settimanale identificata da `availabilitySlotId`, con `startDateTime` e `durationMinutes` scelti dal Client. Il server deriva e valida la fine. Gli slot manuali legacy restano conservati esclusivamente per compatibilità e Booking storici: non possono essere usati per creare nuove richieste.
+
+Il lock del Client rende race-safe il vincolo che vieta allo stesso Client due Booking `PENDING` o `CONFIRMED` temporalmente sovrapposti; intervalli adiacenti sono ammessi.
 
 La richiesta viene mantenuta nello storico tramite stato e flag `active`, senza eliminazione fisica nel normale ciclo operativo.
 
@@ -257,11 +270,14 @@ Rappresenta il dettaglio dello slot collegato a una richiesta di prenotazione.
 - `id`
 - `bookingRequest`
 - `availabilitySlot`
+- `scheduledStart`
+- `scheduledEnd`
+- `locationLabelSnapshot`
 - `createdAt`
 - `updatedAt`
 
 ### Stato attuale dell’implementazione
-Nel backend attuale ogni richiesta creata tramite API contiene un solo `BookingRequestItem`, collegato allo slot indicato da `availabilitySlotId`.
+Nel backend attuale ogni richiesta creata tramite API contiene un solo `BookingRequestItem`, collegato all'occorrenza indicata da `availabilitySlotId`. Inizio, fine e luogo sono snapshot immutabili della scelta concordata e non seguono successive modifiche alla regola o all'occorrenza.
 
 ### Evoluzione possibile
 La presenza di questa entità mantiene il modello estendibile a una futura gestione multi-slot, ma tale comportamento non è attualmente implementato nel contratto API.
@@ -513,8 +529,8 @@ Le entità pianificate restano valide come ipotesi di dominio futuro, ma non rap
 - un professionista non può collegarsi a sé stesso come cliente
 - le prenotazioni tramite app riguardano solo i personal trainer
 - un cliente può creare booking solo verso professionisti a lui collegati
-- uno slot confermato tramite booking passa allo stato `BOOKED`
-- nel backend attuale una richiesta di prenotazione viene creata su un singolo slot
+- le richieste `PENDING` e `CONFIRMED` occupano una unità di capacità per il rispettivo intervallo; confermare una richiesta non modifica globalmente la prenotabilità della finestra
+- nel backend attuale una richiesta di prenotazione viene creata su una singola occorrenza con inizio e durata scelti
 - il modello `BookingRequestItem` resta predisposto per una futura gestione multi-slot
 - workout plan e nutrition plan restano separati
 - le misurazioni fisiche del cliente devono essere storicizzate in una entità dedicata

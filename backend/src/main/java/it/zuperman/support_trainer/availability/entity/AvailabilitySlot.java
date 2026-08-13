@@ -32,6 +32,10 @@ public class AvailabilitySlot extends BaseEntity {
     @JoinColumn(name = "professional_id", nullable = false)
     private ProfessionalProfile professional;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "weekly_rule_id")
+    private WeeklyAvailabilityRule weeklyRule;
+
     @JdbcTypeCode(SqlTypes.TIMESTAMP)
     @Column(name = "start_date_time", nullable = false, columnDefinition = "DATETIME(6)")
     private Instant startDateTime;
@@ -39,6 +43,15 @@ public class AvailabilitySlot extends BaseEntity {
     @JdbcTypeCode(SqlTypes.TIMESTAMP)
     @Column(name = "end_date_time", nullable = false, columnDefinition = "DATETIME(6)")
     private Instant endDateTime;
+
+    @Column(name = "location_label", length = 255)
+    private String locationLabel;
+
+    @Column(name = "capacity", nullable = false)
+    private Integer capacity = 1;
+
+    @Column(name = "blocked", nullable = false)
+    private Boolean blocked = false;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
@@ -55,6 +68,27 @@ public class AvailabilitySlot extends BaseEntity {
         this.professional = professional;
         this.startDateTime = startDateTime;
         this.endDateTime = endDateTime;
+        this.status = AvailabilitySlotStatus.AVAILABLE;
+        this.capacity = 1;
+        this.blocked = false;
+        this.active = true;
+    }
+
+    public AvailabilitySlot(
+            ProfessionalProfile professional,
+            WeeklyAvailabilityRule weeklyRule,
+            Instant startDateTime,
+            Instant endDateTime,
+            String locationLabel,
+            Integer capacity
+    ) {
+        this.professional = professional;
+        this.weeklyRule = weeklyRule;
+        this.startDateTime = startDateTime;
+        this.endDateTime = endDateTime;
+        this.locationLabel = locationLabel;
+        this.capacity = capacity;
+        this.blocked = false;
         this.status = AvailabilitySlotStatus.AVAILABLE;
         this.active = true;
     }

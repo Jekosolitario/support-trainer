@@ -2,16 +2,7 @@ import { PageTemplate } from '../../components/page/PageTemplate';
 
 export { ProfessionalClientDetailPage } from './ProfessionalClientDetailPage';
 export { ProfessionalClientsPage } from './ProfessionalClientsPage';
-
-export function ProfessionalAvailabilityPage() {
-  return (
-    <PageTemplate
-      eyebrow="Area personal trainer"
-      title="Disponibilità"
-      description="Struttura per la futura gestione degli slot del personal trainer."
-    />
-  );
-}
+export { ProfessionalAvailabilityPage } from './ProfessionalAvailabilityPage';
 
 export function ProfessionalBookingsPage() {
   return (

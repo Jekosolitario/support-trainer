@@ -129,7 +129,8 @@ public class BookingResponseMapper {
                     item.getAvailabilitySlot().getId(),
                     toBusinessOffset(item.getScheduledStart()),
                     toBusinessOffset(item.getScheduledEnd()),
-                    itemDurationMinutes
+                    itemDurationMinutes,
+                    item.getLocationLabelSnapshot()
             ));
         }
 

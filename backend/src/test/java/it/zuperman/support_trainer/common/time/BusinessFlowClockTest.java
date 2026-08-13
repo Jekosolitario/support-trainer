@@ -18,6 +18,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import it.zuperman.support_trainer.availability.dto.request.CreateAvailabilitySlotRequest;
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
+import it.zuperman.support_trainer.availability.repository.AvailabilitySlotChangeRepository;
+import it.zuperman.support_trainer.availability.repository.WeeklyAvailabilityRuleRepository;
+import it.zuperman.support_trainer.availability.service.AvailabilityCapacityService;
+import it.zuperman.support_trainer.availability.service.AvailabilityMaterializationService;
 import it.zuperman.support_trainer.availability.service.AvailabilityService;
 import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
 import it.zuperman.support_trainer.booking.mapper.BookingResponseMapper;
@@ -25,6 +29,7 @@ import it.zuperman.support_trainer.booking.repository.BookingRequestItemReposito
 import it.zuperman.support_trainer.booking.repository.BookingRequestRepository;
 import it.zuperman.support_trainer.booking.service.BookingService;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
+import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
@@ -58,6 +63,7 @@ class BusinessFlowClockTest {
         ProfessionalProfileRepository professionalRepository = mock(ProfessionalProfileRepository.class);
         ProfessionalClientLinkRepository linkRepository = mock(ProfessionalClientLinkRepository.class);
         BookingRequestItemRepository bookingItemRepository = mock(BookingRequestItemRepository.class);
+        WeeklyAvailabilityRuleRepository weeklyRuleRepository = mock(WeeklyAvailabilityRuleRepository.class);
         ProfessionalProfile professional = mock(ProfessionalProfile.class);
         authenticate(1L, "professional@example.com", "PROFESSIONAL");
         when(userRepository.findById(1L)).thenReturn(Optional.of(professional));
@@ -67,15 +73,21 @@ class BusinessFlowClockTest {
         when(professional.getSpecialization()).thenReturn(ProfessionalSpecialization.PERSONAL_TRAINER);
         when(professional.getId()).thenReturn(1L);
         when(professionalRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(professional));
+        when(weeklyRuleRepository.lockProfessionalAvailability(1L)).thenReturn(Optional.of(1L));
+        when(professionalRepository.findById(1L)).thenReturn(Optional.of(professional));
         AvailabilityService service = new AvailabilityService(
                 slotRepository,
+                mock(AvailabilitySlotChangeRepository.class),
                 authenticatedUserLoader(userRepository),
                 professionalRepository,
                 linkRepository,
                 bookingItemRepository,
                 fixedTimeProvider(),
                 businessDateTimeMapper(),
-                new it.zuperman.support_trainer.common.security.UserReadinessValidator()
+                new it.zuperman.support_trainer.common.security.UserReadinessValidator(),
+                weeklyRuleRepository,
+                mock(AvailabilityMaterializationService.class),
+                mock(AvailabilityCapacityService.class)
         );
         CreateAvailabilitySlotRequest request = new CreateAvailabilitySlotRequest(
                 businessOffset(FIXED_BUSINESS_DATE_TIME),
@@ -93,6 +105,7 @@ class BusinessFlowClockTest {
         BookingRequestRepository bookingRepository = mock(BookingRequestRepository.class);
         BookingRequestItemRepository bookingItemRepository = mock(BookingRequestItemRepository.class);
         AvailabilitySlotRepository slotRepository = mock(AvailabilitySlotRepository.class);
+        ClientProfileRepository clientRepository = mock(ClientProfileRepository.class);
         UserRepository userRepository = mock(UserRepository.class);
         ClientProfile client = mock(ClientProfile.class);
         ProfessionalProfile professional = mock(ProfessionalProfile.class);
@@ -103,6 +116,7 @@ class BusinessFlowClockTest {
         when(client.getEmailVerified()).thenReturn(true);
         when(client.getActive()).thenReturn(true);
         when(client.getId()).thenReturn(2L);
+        when(clientRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(client));
         when(slotRepository.findActiveAccessibleByIdAndClientIdForUpdate(
                 10L,
                 2L,
@@ -120,13 +134,21 @@ class BusinessFlowClockTest {
                 bookingRepository,
                 bookingItemRepository,
                 slotRepository,
+                clientRepository,
                 authenticatedUserLoader(userRepository),
                 fixedTimeProvider(),
                 bookingResponseMapper(),
-                new it.zuperman.support_trainer.common.security.UserReadinessValidator()
+                new it.zuperman.support_trainer.common.security.UserReadinessValidator(),
+                businessDateTimeMapper(),
+                mock(AvailabilityCapacityService.class)
         );
 
-        assertThatThrownBy(() -> service.createBookingRequest(new CreateBookingRequest(10L, null)))
+        assertThatThrownBy(() -> service.createBookingRequest(new CreateBookingRequest(
+                10L,
+                FIXED_INSTANT.atOffset(ZoneOffset.UTC),
+                60,
+                null
+        )))
                 .isInstanceOfSatisfying(AppException.class, exception ->
                         org.assertj.core.api.Assertions.assertThat(exception.getErrorCode())
                                 .isEqualTo("AVAILABILITY_SLOT_NOT_BOOKABLE"));

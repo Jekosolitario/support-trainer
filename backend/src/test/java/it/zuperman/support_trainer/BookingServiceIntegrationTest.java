@@ -3,7 +3,9 @@ package it.zuperman.support_trainer;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
@@ -23,7 +25,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
+import it.zuperman.support_trainer.availability.entity.WeeklyAvailabilityRule;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
+import it.zuperman.support_trainer.availability.repository.WeeklyAvailabilityRuleRepository;
 import it.zuperman.support_trainer.availability.service.AvailabilityService;
 import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
 import it.zuperman.support_trainer.booking.dto.response.BookingDetailResponse;
@@ -53,6 +57,9 @@ class BookingServiceIntegrationTest {
 
     @Autowired
     private BookingService bookingService;
+
+    @Autowired
+    private WeeklyAvailabilityRuleRepository weeklyAvailabilityRuleRepository;
 
     @Autowired
     private ProfessionalProfileRepository professionalProfileRepository;
@@ -90,7 +97,7 @@ class BookingServiceIntegrationTest {
                 new ProfessionalClientLink(professional, client)
         );
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(13).withNano(0);
+        LocalDateTime startDateTime = futureStart(13);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
@@ -99,10 +106,7 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client);
 
-        CreateBookingRequest request = new CreateBookingRequest(
-                slot.getId(),
-                " Vorrei prenotare questo slot. "
-        );
+        CreateBookingRequest request = bookingRequestFor(slot, " Vorrei prenotare questo slot. ");
 
         BookingDetailResponse response = bookingService.createBookingRequest(request);
 
@@ -128,24 +132,24 @@ class BookingServiceIntegrationTest {
         professionalClientLinkRepository.save(new ProfessionalClientLink(professionalA, clientA));
         professionalClientLinkRepository.save(new ProfessionalClientLink(professionalB, clientB));
 
-        LocalDateTime startDateTimeA = LocalDateTime.now().plusDays(30).withNano(0);
+        LocalDateTime startDateTimeA = futureStart(30);
         AvailabilitySlot slotA = availabilitySlotRepository.save(
                 new AvailabilitySlot(professionalA, asBusinessInstant(startDateTimeA), asBusinessInstant(startDateTimeA.plusHours(1)))
         );
 
-        LocalDateTime startDateTimeB = LocalDateTime.now().plusDays(31).withNano(0);
+        LocalDateTime startDateTimeB = futureStart(31);
         AvailabilitySlot slotB = availabilitySlotRepository.save(
                 new AvailabilitySlot(professionalB, asBusinessInstant(startDateTimeB), asBusinessInstant(startDateTimeB.plusHours(1)))
         );
 
         authenticateAs(clientA);
         BookingDetailResponse bookingA = bookingService.createBookingRequest(
-                new CreateBookingRequest(slotA.getId(), "Richiesta coppia A.")
+                bookingRequestFor(slotA, "Richiesta coppia A.")
         );
 
         authenticateAs(clientB);
         BookingDetailResponse bookingB = bookingService.createBookingRequest(
-                new CreateBookingRequest(slotB.getId(), "Richiesta coppia B.")
+                bookingRequestFor(slotB, "Richiesta coppia B.")
         );
 
         authenticateAs(clientA);
@@ -178,14 +182,14 @@ class BookingServiceIntegrationTest {
         professionalClientLinkRepository.save(new ProfessionalClientLink(professionalA, clientA));
         professionalClientLinkRepository.save(new ProfessionalClientLink(professionalB, clientB));
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(32).withNano(0);
+        LocalDateTime startDateTime = futureStart(32);
         AvailabilitySlot slot = availabilitySlotRepository.save(
                 new AvailabilitySlot(professionalA, asBusinessInstant(startDateTime), asBusinessInstant(startDateTime.plusHours(1)))
         );
 
         authenticateAs(clientA);
         BookingDetailResponse booking = bookingService.createBookingRequest(
-                new CreateBookingRequest(slot.getId(), "Richiesta coppia A.")
+                bookingRequestFor(slot, "Richiesta coppia A.")
         );
 
         authenticateAs(professionalB);
@@ -281,7 +285,7 @@ class BookingServiceIntegrationTest {
         ProfessionalProfile professional = createActivePersonalTrainer();
         ClientProfile client = createActiveClient();
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(14).withNano(0);
+        LocalDateTime startDateTime = futureStart(14);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
@@ -290,10 +294,7 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client);
 
-        CreateBookingRequest request = new CreateBookingRequest(
-                slot.getId(),
-                "Vorrei prenotare questo slot."
-        );
+        CreateBookingRequest request = bookingRequestFor(slot, "Vorrei prenotare questo slot.");
 
         assertThatThrownBy(() -> bookingService.createBookingRequest(request))
                 .isInstanceOfSatisfying(AppException.class, exception ->
@@ -309,14 +310,14 @@ class BookingServiceIntegrationTest {
         clientProfileRepository.saveAndFlush(client);
         professionalClientLinkRepository.saveAndFlush(new ProfessionalClientLink(professional, client));
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(14).withNano(0);
+        LocalDateTime startDateTime = futureStart(14);
         AvailabilitySlot slot = availabilitySlotRepository.saveAndFlush(
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(startDateTime.plusHours(1)))
         );
 
         authenticateAs(client);
 
-        assertThatThrownBy(() -> bookingService.createBookingRequest(new CreateBookingRequest(slot.getId(), null)))
+        assertThatThrownBy(() -> bookingService.createBookingRequest(bookingRequestFor(slot, null)))
                 .isInstanceOfSatisfying(AppException.class, exception -> {
                     assertThat(exception.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN);
                     assertThat(exception.getErrorCode()).isEqualTo("EMAIL_NOT_VERIFIED");
@@ -334,7 +335,7 @@ class BookingServiceIntegrationTest {
                 new ProfessionalClientLink(professional, client)
         );
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(33).withNano(0);
+        LocalDateTime startDateTime = futureStart(33);
         AvailabilitySlot slot = availabilitySlotRepository.save(
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(startDateTime.plusHours(1)))
         );
@@ -345,7 +346,7 @@ class BookingServiceIntegrationTest {
         authenticateAs(client);
 
         assertThatThrownBy(() -> bookingService.createBookingRequest(
-                new CreateBookingRequest(slot.getId(), "Richiesta su slot bloccato.")
+                bookingRequestFor(slot, "Richiesta su slot bloccato.")
         )).isInstanceOfSatisfying(AppException.class, exception ->
                 assertThat(exception.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_NOT_BOOKABLE"));
 
@@ -366,14 +367,14 @@ class BookingServiceIntegrationTest {
                 new ProfessionalClientLink(professional, client)
         );
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(34).withNano(0);
+        LocalDateTime startDateTime = futureStart(34);
         AvailabilitySlot slot = availabilitySlotRepository.save(
                 new AvailabilitySlot(professional, asBusinessInstant(startDateTime), asBusinessInstant(startDateTime.plusHours(1)))
         );
 
         authenticateAs(client);
         BookingDetailResponse pendingBooking = bookingService.createBookingRequest(
-                new CreateBookingRequest(slot.getId(), "Prima richiesta.")
+                bookingRequestFor(slot, "Prima richiesta.")
         );
 
         authenticateAs(professional);
@@ -382,20 +383,20 @@ class BookingServiceIntegrationTest {
         authenticateAs(client);
 
         assertThatThrownBy(() -> bookingService.createBookingRequest(
-                new CreateBookingRequest(slot.getId(), "Seconda richiesta.")
+                bookingRequestFor(slot, "Seconda richiesta.")
         )).isInstanceOfSatisfying(AppException.class, exception ->
-                assertThat(exception.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_NOT_BOOKABLE"));
+                assertThat(exception.getErrorCode()).isEqualTo("CLIENT_BOOKING_TIME_OVERLAP"));
 
         AvailabilitySlot unchangedSlot = availabilitySlotRepository.findById(slot.getId())
                 .orElseThrow();
 
-        assertThat(unchangedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.BOOKED);
+        assertThat(unchangedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
         assertThat(bookingRequestRepository.findAll()).hasSize(1);
     }
 
     @Test
-    @DisplayName("Professionista deve confermare una richiesta booking e segnare lo slot come booked")
-    void shouldConfirmBookingRequestAndMarkSlotAsBooked() {
+    @DisplayName("Professionista deve confermare una richiesta senza rendere binario lo stato dello slot")
+    void shouldConfirmBookingRequestWithoutChangingSlotStatus() {
         ProfessionalProfile professional = createActivePersonalTrainer();
         ClientProfile client = createActiveClient();
 
@@ -403,7 +404,7 @@ class BookingServiceIntegrationTest {
                 new ProfessionalClientLink(professional, client)
         );
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(15).withNano(0);
+        LocalDateTime startDateTime = futureStart(15);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
@@ -412,10 +413,7 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client);
 
-        CreateBookingRequest request = new CreateBookingRequest(
-                slot.getId(),
-                "Vorrei prenotare questo slot."
-        );
+        CreateBookingRequest request = bookingRequestFor(slot, "Vorrei prenotare questo slot.");
 
         BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
@@ -430,7 +428,7 @@ class BookingServiceIntegrationTest {
         AvailabilitySlot updatedSlot = availabilitySlotRepository.findById(slot.getId())
                 .orElseThrow();
 
-        assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.BOOKED);
+        assertThat(updatedSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
     }
 
     @Test
@@ -443,7 +441,7 @@ class BookingServiceIntegrationTest {
                 new ProfessionalClientLink(professional, client)
         );
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(16).withNano(0);
+        LocalDateTime startDateTime = futureStart(16);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
@@ -452,10 +450,7 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client);
 
-        CreateBookingRequest request = new CreateBookingRequest(
-                slot.getId(),
-                "Vorrei prenotare questo slot."
-        );
+        CreateBookingRequest request = bookingRequestFor(slot, "Vorrei prenotare questo slot.");
 
         BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
@@ -483,7 +478,7 @@ class BookingServiceIntegrationTest {
                 new ProfessionalClientLink(professional, client)
         );
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(17).withNano(0);
+        LocalDateTime startDateTime = futureStart(17);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
@@ -492,10 +487,7 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client);
 
-        CreateBookingRequest request = new CreateBookingRequest(
-                slot.getId(),
-                "Vorrei prenotare questo slot."
-        );
+        CreateBookingRequest request = bookingRequestFor(slot, "Vorrei prenotare questo slot.");
 
         BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
@@ -521,7 +513,7 @@ class BookingServiceIntegrationTest {
                 new ProfessionalClientLink(professional, client)
         );
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(18).withNano(0);
+        LocalDateTime startDateTime = futureStart(18);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
@@ -530,10 +522,7 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client);
 
-        CreateBookingRequest request = new CreateBookingRequest(
-                slot.getId(),
-                "Vorrei prenotare questo slot."
-        );
+        CreateBookingRequest request = bookingRequestFor(slot, "Vorrei prenotare questo slot.");
 
         BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
@@ -568,7 +557,7 @@ class BookingServiceIntegrationTest {
                 new ProfessionalClientLink(professional, client)
         );
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(19).withNano(0);
+        LocalDateTime startDateTime = futureStart(19);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
@@ -577,10 +566,7 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client);
 
-        CreateBookingRequest request = new CreateBookingRequest(
-                slot.getId(),
-                "Vorrei prenotare questo slot."
-        );
+        CreateBookingRequest request = bookingRequestFor(slot, "Vorrei prenotare questo slot.");
 
         BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
@@ -615,7 +601,7 @@ class BookingServiceIntegrationTest {
                 new ProfessionalClientLink(professional, client)
         );
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(20).withNano(0);
+        LocalDateTime startDateTime = futureStart(20);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
@@ -624,10 +610,7 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client);
 
-        CreateBookingRequest request = new CreateBookingRequest(
-                slot.getId(),
-                "Vorrei prenotare questo slot."
-        );
+        CreateBookingRequest request = bookingRequestFor(slot, "Vorrei prenotare questo slot.");
 
         BookingDetailResponse bookingResponse
                 = bookingService.createBookingRequest(request);
@@ -678,14 +661,11 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client);
 
-        CreateBookingRequest request = new CreateBookingRequest(
-                expiredSlot.getId(),
-                "Vorrei prenotare questo slot."
-        );
+        CreateBookingRequest request = bookingRequestFor(expiredSlot, "Vorrei prenotare questo slot.");
 
         assertThatThrownBy(() -> bookingService.createBookingRequest(request))
                 .isInstanceOf(AppException.class)
-                .hasMessage("Lo slot selezionato è scaduto e non è prenotabile");
+                .hasMessage("La disponibilità selezionata è scaduta e non è prenotabile");
     }
 
     @Test
@@ -713,7 +693,7 @@ class BookingServiceIntegrationTest {
                 new ProfessionalClientLink(nutritionist, client)
         );
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(23).withNano(0);
+        LocalDateTime startDateTime = futureStart(23);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot invalidSlot = availabilitySlotRepository.save(
@@ -722,10 +702,7 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client);
 
-        CreateBookingRequest request = new CreateBookingRequest(
-                invalidSlot.getId(),
-                "Vorrei prenotare questo slot."
-        );
+        CreateBookingRequest request = bookingRequestFor(invalidSlot, "Vorrei prenotare questo slot.");
 
         assertThatThrownBy(() -> bookingService.createBookingRequest(request))
                 .isInstanceOf(AppException.class)
@@ -742,7 +719,7 @@ class BookingServiceIntegrationTest {
                 new ProfessionalClientLink(professional, client)
         );
 
-        LocalDateTime futureStartDateTime = LocalDateTime.now().plusDays(22).withNano(0);
+        LocalDateTime futureStartDateTime = futureStart(22);
         LocalDateTime futureEndDateTime = futureStartDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
@@ -751,10 +728,7 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client);
 
-        CreateBookingRequest request = new CreateBookingRequest(
-                slot.getId(),
-                "Vorrei prenotare questo slot."
-        );
+        CreateBookingRequest request = bookingRequestFor(slot, "Vorrei prenotare questo slot.");
 
         BookingDetailResponse pendingResponse
                 = bookingService.createBookingRequest(request);
@@ -793,7 +767,7 @@ class BookingServiceIntegrationTest {
 
         ClientProfile client = createActiveClient();
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(24).withNano(0);
+        LocalDateTime startDateTime = futureStart(24);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot invalidSlot = availabilitySlotRepository.save(
@@ -840,7 +814,7 @@ class BookingServiceIntegrationTest {
                 new ProfessionalClientLink(professional, client)
         );
 
-        LocalDateTime startDateTime = LocalDateTime.now().plusDays(25).withNano(0);
+        LocalDateTime startDateTime = futureStart(25);
         LocalDateTime endDateTime = startDateTime.plusHours(1);
 
         AvailabilitySlot slot = availabilitySlotRepository.save(
@@ -849,23 +823,446 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(client);
 
-        CreateBookingRequest firstRequest = new CreateBookingRequest(
-                slot.getId(),
-                "Prima richiesta."
-        );
+        CreateBookingRequest firstRequest = bookingRequestFor(slot, "Prima richiesta.");
 
         bookingService.createBookingRequest(firstRequest);
 
-        CreateBookingRequest secondRequest = new CreateBookingRequest(
-                slot.getId(),
-                "Seconda richiesta."
-        );
+        CreateBookingRequest secondRequest = bookingRequestFor(slot, "Seconda richiesta.");
 
         assertThatThrownBy(() -> bookingService.createBookingRequest(secondRequest))
-                .isInstanceOf(AppException.class)
-                .hasMessage("Esiste già una richiesta di prenotazione in attesa per questo slot");
+                .isInstanceOfSatisfying(AppException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo("CLIENT_BOOKING_TIME_OVERLAP"));
     }
+
+    @Test
+    @DisplayName("PENDING deve riservare capacità e un esito negativo deve liberarla")
+    void shouldReserveAndReleaseCapacityAcrossDifferentClients() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile firstClient = createActiveClient();
+        ClientProfile secondClient = createActiveClient();
+        ClientProfile thirdClient = createActiveClient();
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professional, firstClient));
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professional, secondClient));
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professional, thirdClient));
+
+        LocalDateTime start = futureStart(31);
+        AvailabilitySlot unsavedSlot = new AvailabilitySlot(
+                professional,
+                asBusinessInstant(start),
+                asBusinessInstant(start.plusHours(1))
+        );
+        unsavedSlot.setCapacity(2);
+        AvailabilitySlot slot = availabilitySlotRepository.save(unsavedSlot);
+
+        authenticateAs(firstClient);
+        BookingDetailResponse first = bookingService.createBookingRequest(
+                bookingRequestFor(slot, "Primo posto")
+        );
+        authenticateAs(secondClient);
+        bookingService.createBookingRequest(bookingRequestFor(slot, "Secondo posto"));
+
+        authenticateAs(thirdClient);
+        assertThatThrownBy(() -> bookingService.createBookingRequest(
+                bookingRequestFor(slot, "Posto esaurito")
+        )).isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_CAPACITY_EXHAUSTED"));
+
+        authenticateAs(professional);
+        bookingService.rejectBookingRequest(first.getId());
+
+        authenticateAs(thirdClient);
+        BookingDetailResponse replacement = bookingService.createBookingRequest(
+                bookingRequestFor(slot, "Posto liberato")
+        );
+        assertThat(replacement.getStatus()).isEqualTo("PENDING");
+    }
+
+    @Test
+    @DisplayName("CONFIRMED occupa capacitÃ  e CANCELLED la libera")
+    void shouldKeepCapacityReservedUntilConfirmedBookingIsCancelled() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile firstClient = createActiveClient();
+        ClientProfile secondClient = createActiveClient();
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professional, firstClient));
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professional, secondClient));
+
+        LocalDateTime start = futureStart(32);
+        AvailabilitySlot slot = availabilitySlotRepository.save(new AvailabilitySlot(
+                professional,
+                asBusinessInstant(start),
+                asBusinessInstant(start.plusHours(1))
+        ));
+
+        authenticateAs(firstClient);
+        BookingDetailResponse pending = bookingService.createBookingRequest(
+                bookingRequestFor(slot, "Prenotazione da confermare")
+        );
+
+        authenticateAs(professional);
+        bookingService.confirmBookingRequest(pending.getId());
+
+        authenticateAs(secondClient);
+        Long slotId = slot.getId();
+        assertThatThrownBy(() -> bookingService.createBookingRequest(
+                bookingRequestFor(slot, "CapacitÃ  ancora occupata")
+        )).isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_CAPACITY_EXHAUSTED"));
+
+        authenticateAs(firstClient);
+        bookingService.cancelBookingRequest(pending.getId());
+
+        authenticateAs(secondClient);
+        BookingDetailResponse replacement = bookingService.createBookingRequest(
+                bookingRequestFor(slot, "Posto liberato dopo cancellazione")
+        );
+        assertThat(replacement.getStatus()).isEqualTo("PENDING");
+    }
+
+    @Test
+    @DisplayName("Capacità è verificata su ogni sotto-intervallo con durate differenti")
+    void shouldEnforceCapacityAcrossOverlappingIntervalsWithDifferentDurations() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile firstClient = createActiveClient();
+        ClientProfile secondClient = createActiveClient();
+        ClientProfile thirdClient = createActiveClient();
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professional, firstClient));
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professional, secondClient));
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professional, thirdClient));
+
+        LocalDate date = LocalDate.now(ZoneId.of("Europe/Rome")).plusDays(40);
+        AvailabilitySlot window = createWeeklyWindow(professional, date, 2);
+
+        authenticateAs(firstClient);
+        BookingDetailResponse firstBooking = bookingService.createBookingRequest(new CreateBookingRequest(
+                window.getId(),
+                date.atTime(9, 0).atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime(),
+                45,
+                "Sessione breve"
+        ));
+        window.setLocationLabel("Studio trasferito");
+        availabilitySlotRepository.saveAndFlush(window);
+        assertThat(bookingService.getBookingRequestDetail(firstBooking.getId()).getItems())
+                .singleElement()
+                .satisfies(item -> assertThat(item.getLocationLabel()).isEqualTo("Studio"));
+        authenticateAs(secondClient);
+        bookingService.createBookingRequest(new CreateBookingRequest(
+                window.getId(),
+                date.atTime(9, 0).atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime(),
+                120,
+                "Sessione completa"
+        ));
+
+        authenticateAs(thirdClient);
+        assertThatThrownBy(() -> bookingService.createBookingRequest(new CreateBookingRequest(
+                window.getId(),
+                date.atTime(9, 30).atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime(),
+                60,
+                "Intervallo saturo"
+        ))).isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo("AVAILABILITY_SLOT_CAPACITY_EXHAUSTED"));
+    }
+
+    @Test
+    @DisplayName("Lo stesso Client può prenotare in sequenza ma non in sovrapposizione")
+    void shouldRejectSameClientOverlapAndAllowAdjacentIntervals() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professional, client));
+        LocalDate date = LocalDate.now(ZoneId.of("Europe/Rome")).plusDays(41);
+        AvailabilitySlot window = createWeeklyWindow(professional, date, 3);
+        authenticateAs(client);
+
+        bookingService.createBookingRequest(new CreateBookingRequest(
+                window.getId(),
+                date.atTime(9, 0).atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime(),
+                45,
+                null
+        ));
+        bookingService.createBookingRequest(new CreateBookingRequest(
+                window.getId(),
+                date.atTime(9, 45).atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime(),
+                45,
+                null
+        ));
+
+        assertThatThrownBy(() -> bookingService.createBookingRequest(new CreateBookingRequest(
+                window.getId(),
+                date.atTime(9, 30).atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime(),
+                60,
+                null
+        ))).isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("CLIENT_BOOKING_TIME_OVERLAP"));
+        assertThat(bookingRequestRepository.findAll()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Start non allineato e combinazione fuori finestra sono rifiutati")
+    void shouldRejectInvalidStartGranularityAndWindowFit() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professional, client));
+        LocalDate date = LocalDate.now(ZoneId.of("Europe/Rome")).plusDays(42);
+        AvailabilitySlot window = createWeeklyWindow(professional, date, 2);
+        authenticateAs(client);
+
+        assertThatThrownBy(() -> bookingService.createBookingRequest(new CreateBookingRequest(
+                window.getId(),
+                date.atTime(9, 7).atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime(),
+                45,
+                null
+        ))).isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("VALIDATION_ERROR"));
+        assertThatThrownBy(() -> bookingService.createBookingRequest(new CreateBookingRequest(
+                window.getId(),
+                date.atTime(10, 30).atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime(),
+                60,
+                null
+        ))).isInstanceOfSatisfying(AppException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("Durata 180 minuti è prenotabile in una finestra compatibile")
+    void shouldCreateBookingWithMaximumSupportedDuration() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professional, client));
+        LocalDate date = LocalDate.now(ZoneId.of("Europe/Rome")).plusDays(43);
+        WeeklyAvailabilityRule rule = weeklyAvailabilityRuleRepository.saveAndFlush(
+                new WeeklyAvailabilityRule(
+                        professional,
+                        date.getDayOfWeek(),
+                        LocalTime.of(9, 0),
+                        LocalTime.of(12, 0),
+                        java.util.Set.of(180),
+                        "Studio",
+                        1,
+                        date
+                )
+        );
+        AvailabilitySlot slot = availabilitySlotRepository.saveAndFlush(new AvailabilitySlot(
+                professional,
+                rule,
+                asBusinessInstant(date.atTime(9, 0)),
+                asBusinessInstant(date.atTime(12, 0)),
+                "Studio",
+                1
+        ));
+        authenticateAs(client);
+
+        BookingDetailResponse response = bookingService.createBookingRequest(new CreateBookingRequest(
+                slot.getId(),
+                date.atTime(9, 0).atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime(),
+                180,
+                null
+        ));
+
+        assertThat(response.getItems()).singleElement().satisfies(item ->
+                assertThat(java.time.Duration.between(
+                        item.getScheduledStart().toInstant(),
+                        item.getScheduledEnd().toInstant()
+                ).toMinutes()).isEqualTo(180));
+    }
+
+    @Test
+    @DisplayName("Nuove prenotazioni su slot manuali legacy restituiscono il contratto neutro")
+    void shouldRejectNewBookingOnLegacyManualAvailability() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+        professionalClientLinkRepository.save(new ProfessionalClientLink(professional, client));
+        LocalDateTime start = futureStart(44);
+        AvailabilitySlot legacy = availabilitySlotRepository.saveAndFlush(new AvailabilitySlot(
+                professional,
+                asBusinessInstant(start),
+                asBusinessInstant(start.plusHours(1))
+        ));
+        authenticateAs(client);
+
+        AppException legacyError = catchThrowableOfType(
+                () -> bookingService.createBookingRequest(new CreateBookingRequest(
+                        legacy.getId(),
+                        start.atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime(),
+                        60,
+                        null
+                )),
+                AppException.class
+        );
+        AppException missingError = catchThrowableOfType(
+                () -> bookingService.createBookingRequest(new CreateBookingRequest(
+                        Long.MAX_VALUE,
+                        start.atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime(),
+                        60,
+                        null
+                )),
+                AppException.class
+        );
+
+        assertThat(legacyError).isNotNull();
+        assertThat(missingError).isNotNull();
+        assertThat(legacyError.getStatus()).isEqualTo(missingError.getStatus());
+        assertThat(legacyError.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_NOT_FOUND");
+        assertThat(legacyError.getErrorCode()).isEqualTo(missingError.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("Booking legacy esistenti restano leggibili e completano le transizioni")
+    void shouldPreserveHistoricalLegacyBookingStateMachine() {
+        ProfessionalProfile professional = createActivePersonalTrainer();
+        ClientProfile client = createActiveClient();
+        LocalDateTime start = futureStart(45);
+        AvailabilitySlot unsavedLegacy = new AvailabilitySlot(
+                professional,
+                asBusinessInstant(start),
+                asBusinessInstant(start.plusHours(1))
+        );
+        unsavedLegacy.setLocationLabel("Studio storico");
+        AvailabilitySlot legacy = availabilitySlotRepository.saveAndFlush(unsavedLegacy);
+        BookingRequest cancellable = historicalBooking(client, professional, legacy, "Storico confermabile");
+        legacy.setLocationLabel("Studio corrente");
+        availabilitySlotRepository.saveAndFlush(legacy);
+        OffsetDateTime expectedStart = start.atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime();
+        OffsetDateTime expectedEnd = start.plusHours(1).atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime();
+
+        authenticateAs(client);
+        assertThat(bookingService.getClientBookingRequests())
+                .singleElement()
+                .satisfies(summary -> {
+                    assertThat(summary.getId()).isEqualTo(cancellable.getId());
+                    assertThat(summary.getStatus()).isEqualTo("PENDING");
+                    assertThat(summary.getScheduledStart()).isEqualTo(expectedStart);
+                    assertThat(summary.getScheduledEnd()).isEqualTo(expectedEnd);
+                });
+        BookingDetailResponse detail = bookingService.getBookingRequestDetail(cancellable.getId());
+        assertThat(detail.getStatus()).isEqualTo("PENDING");
+        assertThat(detail.getScheduledStart()).isEqualTo(expectedStart);
+        assertThat(detail.getScheduledEnd()).isEqualTo(expectedEnd);
+        assertThat(detail.getItems())
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.getAvailabilitySlotId()).isEqualTo(legacy.getId());
+                    assertThat(item.getScheduledStart()).isEqualTo(expectedStart);
+                    assertThat(item.getScheduledEnd()).isEqualTo(expectedEnd);
+                    assertThat(item.getLocationLabel()).isEqualTo("Studio storico");
+                });
+        authenticateAs(professional);
+        assertThat(bookingService.getProfessionalBookingRequests())
+                .singleElement()
+                .satisfies(summary -> {
+                    assertThat(summary.getId()).isEqualTo(cancellable.getId());
+                    assertThat(summary.getStatus()).isEqualTo("PENDING");
+                    assertThat(summary.getScheduledStart()).isEqualTo(expectedStart);
+                    assertThat(summary.getScheduledEnd()).isEqualTo(expectedEnd);
+                });
+        assertThat(bookingService.confirmBookingRequest(cancellable.getId()).getStatus()).isEqualTo("CONFIRMED");
+        authenticateAs(client);
+        assertThat(bookingService.cancelBookingRequest(cancellable.getId()).getStatus()).isEqualTo("CANCELLED");
+
+        AvailabilitySlot secondLegacy = availabilitySlotRepository.saveAndFlush(new AvailabilitySlot(
+                professional,
+                asBusinessInstant(start.plusHours(2)),
+                asBusinessInstant(start.plusHours(3))
+        ));
+        BookingRequest rejectable = historicalBooking(client, professional, secondLegacy, "Storico rifiutabile");
+        authenticateAs(professional);
+        assertThat(bookingService.rejectBookingRequest(rejectable.getId()).getStatus()).isEqualTo("REJECTED");
+        authenticateAs(client);
+        assertThat(bookingService.getBookingRequestDetail(rejectable.getId()).getItems())
+                .singleElement()
+                .satisfies(item -> assertThat(item.getAvailabilitySlotId()).isEqualTo(secondLegacy.getId()));
+    }
+
+    private BookingRequest historicalBooking(
+            ClientProfile client,
+            ProfessionalProfile professional,
+            AvailabilitySlot slot,
+            String note
+    ) {
+        BookingRequest request = bookingRequestRepository.save(new BookingRequest(
+                client,
+                professional,
+                note,
+                client.getFirstName() + " " + client.getLastName(),
+                professional.getFirstName() + " " + professional.getLastName()
+        ));
+        BookingRequestItem item = bookingRequestItemRepository.save(new BookingRequestItem(
+                request,
+                slot,
+                slot.getStartDateTime(),
+                slot.getEndDateTime(),
+                slot.getLocationLabel()
+        ));
+        request.getItems().add(item);
+        return request;
+    }
+
+    private CreateBookingRequest bookingRequestFor(AvailabilitySlot slot, String note) {
+        if (slot.getWeeklyRule() == null) {
+            var start = slot.getStartDateTime().atZone(ZoneId.of("Europe/Rome"));
+            var end = slot.getEndDateTime().atZone(ZoneId.of("Europe/Rome"));
+            int duration = Math.toIntExact(java.time.Duration.between(
+                    slot.getStartDateTime(),
+                    slot.getEndDateTime()
+            ).toMinutes());
+            WeeklyAvailabilityRule rule = weeklyAvailabilityRuleRepository.saveAndFlush(
+                    new WeeklyAvailabilityRule(
+                            slot.getProfessional(),
+                            start.getDayOfWeek(),
+                            start.toLocalTime(),
+                            end.toLocalTime(),
+                            java.util.Set.of(duration),
+                            slot.getLocationLabel(),
+                            slot.getCapacity(),
+                            start.toLocalDate()
+                    )
+            );
+            slot.setWeeklyRule(rule);
+            availabilitySlotRepository.saveAndFlush(slot);
+        }
+        int duration = Math.toIntExact(java.time.Duration.between(
+                slot.getStartDateTime(),
+                slot.getEndDateTime()
+        ).toMinutes());
+        return new CreateBookingRequest(
+                slot.getId(),
+                slot.getStartDateTime().atZone(ZoneId.of("Europe/Rome")).toOffsetDateTime(),
+                duration,
+                note
+        );
+    }
+
+    private AvailabilitySlot createWeeklyWindow(
+            ProfessionalProfile professional,
+            LocalDate date,
+            int capacity
+    ) {
+        WeeklyAvailabilityRule rule = weeklyAvailabilityRuleRepository.saveAndFlush(
+                new WeeklyAvailabilityRule(
+                        professional,
+                        date.getDayOfWeek(),
+                        LocalTime.of(9, 0),
+                        LocalTime.of(11, 0),
+                        java.util.Set.of(45, 60, 120),
+                        "Studio",
+                        capacity,
+                        date
+                )
+        );
+        return availabilitySlotRepository.saveAndFlush(new AvailabilitySlot(
+                professional,
+                rule,
+                asBusinessInstant(date.atTime(9, 0)),
+                asBusinessInstant(date.atTime(11, 0)),
+                "Studio",
+                capacity
+        ));
+    }
+
     private static Instant asBusinessInstant(LocalDateTime localDateTime) {
         return localDateTime.atZone(ZoneId.of("Europe/Rome")).toInstant();
+    }
+
+    private static LocalDateTime futureStart(int days) {
+        return LocalDate.now(ZoneId.of("Europe/Rome")).plusDays(days).atTime(9, 0);
     }
 }

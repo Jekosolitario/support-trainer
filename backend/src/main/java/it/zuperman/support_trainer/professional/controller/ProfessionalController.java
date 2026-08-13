@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import it.zuperman.support_trainer.availability.dto.response.AvailabilitySlotResponse;
+import it.zuperman.support_trainer.availability.dto.response.ClientAvailabilitySlotResponse;
 import it.zuperman.support_trainer.availability.service.AvailabilityService;
 import it.zuperman.support_trainer.professional.dto.response.ProfessionalDetailResponse;
 import it.zuperman.support_trainer.professional.dto.response.ProfessionalSummaryResponse;
@@ -44,11 +44,11 @@ public class ProfessionalController {
     }
 
     @GetMapping("/{professionalId}/availability")
-    public ResponseEntity<List<AvailabilitySlotResponse>> getProfessionalAvailability(
+    public ResponseEntity<List<ClientAvailabilitySlotResponse>> getProfessionalAvailability(
             @PathVariable Long professionalId
     ) {
-        List<AvailabilitySlotResponse> response
-                = availabilityService.getAvailableSlotsByProfessional(professionalId);
+        List<ClientAvailabilitySlotResponse> response
+                = availabilityService.getClientAvailableSlotsByProfessional(professionalId);
 
         return ResponseEntity.ok(response);
     }

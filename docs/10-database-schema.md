@@ -235,6 +235,24 @@ Codici invito generati dai professionisti.
 
 ---
 
+## 3.6.1 `weekly_availability_rules` e durate
+
+`weekly_availability_rules` conserva la finestra ricorrente del Personal Trainer: `professional_id`, giorno, `start_time`, `end_time`, luogo, capacità, stato attivo, prima data valida e audit. Le durate non sono compresse in una singola colonna: `weekly_availability_rule_durations(weekly_rule_id, duration_minutes)` è la tabella figlia normalizzata, con primary key composta.
+
+Vincoli strutturali e applicativi:
+
+- ogni durata è compresa fra 15 e 180 minuti ed è multipla di 15;
+- la primary key composta impedisce duplicati per regola;
+- il service verifica che gli estremi siano allineati a 15 minuti e che ogni durata rientri nella finestra;
+- le regole attive dello stesso giorno non si sovrappongono;
+- la foreign key delle durate usa `ON DELETE CASCADE`, mentre la regola riferisce il Professional con `ON DELETE RESTRICT`.
+
+## 3.6.2 Audit Availability
+
+`availability_rule_changes` registra update/deactivate immediati con regola, data business corrente, tipo, motivazione, numero di Booking occupanti coinvolti e audit. `availability_slot_changes` registra block/unblock della singola occorrenza con gli stessi dati di motivazione e impatto. Il service rende la motivazione obbligatoria quando `impacted_booking_count > 0`.
+
+---
+
 ## 3.7 `availability_slots`
 
 Slot di disponibilità dei professionisti.
@@ -243,8 +261,12 @@ Slot di disponibilità dei professionisti.
 
 - `id`
 - `professional_id`
+- `weekly_rule_id` nullable per gli slot manuali legacy
 - `start_date_time`
 - `end_date_time`
+- `location_label`
+- `capacity`
+- `blocked`
 - `status`
 - `active`
 - `created_at`
@@ -253,12 +275,15 @@ Slot di disponibilità dei professionisti.
 ### Foreign key
 
 - `professional_id` → `professional_profiles(id)`
+- `weekly_rule_id` → `weekly_availability_rules(id)`
 
 ### Vincoli principali
 
 - `professional_id` `NOT NULL`
 - `start_date_time` `NOT NULL`
 - `end_date_time` `NOT NULL`
+- `capacity >= 1`
+- (`weekly_rule_id`, `start_date_time`) `UNIQUE` per l'idempotenza della materializzazione
 - `status` `NOT NULL`
 - `active` `NOT NULL DEFAULT TRUE`
 
@@ -273,11 +298,13 @@ Slot di disponibilità dei professionisti.
 Regole applicative attualmente implementate:
 
 - gestione riservata ai professionisti `PERSONAL_TRAINER`;
-- intervallo valido e data iniziale futura in creazione o aggiornamento;
+- una regola genera una sola occorrenza-finestra per data nella rolling horizon, non una riga per combinazione inizio/durata;
+- intervallo valido e data iniziale futura in creazione o aggiornamento manuale;
 - assenza di sovrapposizioni tra slot attivi dello stesso professionista;
 - protezione da overlap concorrenti tramite lock pessimista sul `ProfessionalProfile`;
-- esclusione dalla lettura cliente degli slot scaduti o con richiesta booking `PENDING` attiva;
-- divieto di modifica o blocco manuale dello slot con richiesta booking `PENDING` attiva;
+- esclusione dalla lettura cliente degli slot scaduti, bloccati o privi di combinazioni con capacità temporale;
+- divieto di ripianificazione manuale delle occorrenze generate;
+- blocco di una occorrenza futura senza cancellare i Booking e con motivazione/audit quando ha impatto;
 - immutabilità di data e ora dopo il primo coinvolgimento dello slot in una richiesta booking;
 - creazione di un nuovo slot per proporre un intervallo temporale diverso dopo uno storico booking.
 
@@ -327,7 +354,7 @@ Richieste di prenotazione create dai clienti.
 
 ### Note
 
-Nel codice attuale la richiesta booking viene creata a partire da un singolo `availabilitySlotId`.
+Nel codice attuale la richiesta booking viene creata a partire da un singolo `availabilitySlotId`, un `startDateTime` e una `durationMinutes`; il server deriva la fine. Per le nuove richieste lo slot deve riferire una `WeeklyAvailabilityRule`. Gli slot manuali legacy con `weekly_rule_id` nullo restano nello schema per compatibilità e Booking storici, ma non sono selezionabili dalla create.
 
 La presenza della tabella `booking_request_items` mantiene il modello estendibile a più slot in futuro, ma l’API attuale lavora su una richiesta single-slot.
 
@@ -335,11 +362,12 @@ Regole applicative attualmente implementate:
 
 - booking consentito solo tra cliente e professionista collegati;
 - professionista proprietario dello slot necessariamente `PERSONAL_TRAINER`;
-- slot attivo, `AVAILABLE` e non scaduto;
-- assenza di una seconda richiesta `PENDING` attiva sullo stesso slot;
+- intervallo futuro, contenuto nell'occorrenza e non bloccato, con capacità temporale sufficiente;
+- occupancy calcolata sugli intervalli sovrapposti delle richieste `PENDING` e `CONFIRMED`;
+- assenza di overlap con altri Booking occupanti dello stesso Client;
 - `note` facoltativa, normalizzata e limitata a `1000` caratteri;
-- booking `PENDING` che riserva logicamente lo slot rispetto a esposizione cliente, modifica e blocco manuale;
-- conferma consentita solo se lo slot è ancora disponibile, futuro e coerente con la specializzazione prevista;
+- booking `PENDING` che riserva un posto sulla capacità dello slot;
+- conferma a occupancy invariata, poiché `PENDING` e `CONFIRMED` occupano entrambi un posto;
 - protezione delle transizioni tramite lock pessimista;
 - conservazione dell’intervallo temporale originario dello slot anche dopo `REJECTED` o `CANCELLED`.
 - V6 esegue il backfill dei display name dai profili correnti dopo preflight: per il legacy non sono una prova del nome originario;
@@ -358,6 +386,7 @@ Dettaglio degli slot collegati a una richiesta booking.
 - `availability_slot_id`
 - `scheduled_start`
 - `scheduled_end`
+- `location_label_snapshot`
 - `created_at`
 - `updated_at`
 
@@ -373,23 +402,24 @@ Dettaglio degli slot collegati a una richiesta booking.
 - coppia (`booking_request_id`, `availability_slot_id`) `UNIQUE`
 - `scheduled_start DATETIME(6) NOT NULL`
 - `scheduled_end DATETIME(6) NOT NULL`
+- `location_label_snapshot VARCHAR(255) NULL`
 - `updated_at DATETIME(6) NOT NULL` dopo il backfill conservativo della V2
 
 ### Note
 
 Nel backend attuale ogni booking creato tramite API contiene un solo item.
 
-`scheduled_start` e `scheduled_end` sono snapshot UTC dell'intervallo al momento della prenotazione e non vengono aggiornati se lo slot cambia. V6 ricostruisce i valori legacy dallo slot referenziato solo dopo averne verificato esistenza, ordine e precisione microsecondi; il migration fallisce se il backfill non è deterministico.
+`scheduled_start`, `scheduled_end` e `location_label_snapshot` sono gli snapshot dell'intervallo e del luogo al momento della prenotazione e non vengono aggiornati se l'occorrenza o la regola cambiano. V6 ricostruisce gli orari legacy dallo slot referenziato solo dopo averne verificato esistenza, ordine e precisione microsecondi; il migration fallisce se il backfill non è deterministico. La colonna luogo viene introdotta dalla V8 ed è nullable per preservare lo storico legacy.
 
 `DATETIME(6)` è il contratto canonico finale di `updated_at`. La V2 valorizza soltanto gli eventuali null e preserva i valori legacy non nulli; le migrazioni successive uniformano la precisione, convertono la semantica in UTC e trasferiscono l'auditing all'applicazione.
 
 La tabella collega la richiesta allo slot availability selezionato e consente al service layer di:
 
-- verificare l’assenza di richieste `PENDING` attive sullo stesso slot;
-- escludere dalla lettura cliente gli slot con richiesta `PENDING` attiva;
-- impedire modifica o blocco manuale dello slot mentre una richiesta è in attesa;
+- calcolare l'occupancy concorrente delle richieste `PENDING` e `CONFIRMED` sugli intervalli richiesti;
+- escludere dalla lettura cliente le finestre bloccate, scadute o senza combinazioni prenotabili;
+- preservare gli intervalli esistenti anche quando una occorrenza viene bloccata;
 - impedire la ripianificazione temporale di uno slot già coinvolto in una richiesta booking;
-- aggiornare coerentemente lo stato dello slot durante conferma o cancellazione booking.
+- conservare sul booking la transizione di stato relativa alla prenotazione per quello specifico cliente, senza mutare globalmente lo stato dello slot.
 
 ---
 
@@ -874,34 +904,37 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 
 ### Area availability
 
-- gestione slot riservata ai professionisti `PERSONAL_TRAINER`;
-- intervallo temporale valido e data iniziale futura in creazione o aggiornamento;
-- nessuna sovrapposizione tra slot attivi dello stesso professionista;
-- esclusione dalla lettura cliente degli slot scaduti o con booking `PENDING` attivo;
-- impossibilità di modificare o bloccare manualmente uno slot con booking `PENDING` attivo;
-- immutabilità dell’intervallo temporale di uno slot già coinvolto in una richiesta booking;
-- obbligo di creare un nuovo slot per proporre un intervallo diverso dopo uno storico booking.
+- gestione delle regole settimanali riservata ai professionisti `PERSONAL_TRAINER`;
+- giorno, finestra, durate multiple normalizzate, luogo e capacità concorrente come dati della regola ricorrente;
+- estremi, inizi selezionabili e durate allineati a 15 minuti; durate da 15 a 180 minuti che devono rientrare nella finestra;
+- materializzazione di una occorrenza-finestra per data per un intervallo di 6 mesi, esteso automaticamente;
+- assenza di sovrapposizioni tra regole e slot attivi dello stesso professionista, con adiacenza consentita;
+- blocco della singola occorrenza futura senza modificare la regola o cancellare Booking, con audit e motivazione in caso di impatto;
+- update/deactivate immediati che preservano passato e Booking, con anteprima impatto e motivazione obbligatoria quando necessario;
+- capacità che non può scendere sotto la massima occupancy concorrente `PENDING` più `CONFIRMED`.
 
 ### Area booking
 
 - booking consentito solo tra cliente e professionista collegati;
 - booking consentito solo su slot appartenenti a un `PERSONAL_TRAINER`;
-- booking consentito solo su slot attivi, disponibili e futuri;
-- una sola richiesta `PENDING` attiva per slot;
+- booking consentito solo su combinazioni future, contenute nella finestra, non bloccate e con capacità temporale residua;
+- inizio e durata scelti dal Client, fine derivata e validata dal server;
+- richieste `PENDING` e `CONFIRMED` conteggiate come occupancy negli intervalli temporali sovrapposti;
+- divieto race-safe di Booking occupanti sovrapposti per lo stesso Client;
 - nota facoltativa, normalizzata e limitata a `1000` caratteri;
 - transizioni booking consentite:
   - `PENDING -> CONFIRMED`;
   - `PENDING -> REJECTED`;
   - `PENDING -> CANCELLED`;
   - `CONFIRMED -> CANCELLED`;
-- conferma booking consentita solo se lo slot è ancora valido e prenotabile;
-- sincronizzazione coerente tra stato booking e stato slot;
-- preservazione dell’intervallo temporale originario dello slot nello storico del booking.
+- conferma booking a occupancy invariata e senza transizione globale dello slot a `BOOKED`;
+- rifiuto e cancellazione che liberano il posto occupato;
+- preservazione dell'intervallo temporale e del luogo originari nello storico del booking.
 
 ### Protezione da concorrenza
 
-- lock pessimista sul professionista durante creazione e aggiornamento availability;
-- lock pessimista sullo slot durante creazione booking;
+- lock condiviso sul professionista e lock della regola per coordinare materializzazione, update e deactivate;
+- lock pessimista sul Client e sull'occorrenza, con nuovo calcolo di overlap e occupancy durante creazione booking;
 - lock pessimista sulla richiesta durante conferma, rifiuto e cancellazione;
 - lock pessimista sullo slot durante conferma booking;
 - lock pessimista sullo slot durante modifica o blocco manuale in presenza potenziale di richieste booking.
@@ -1000,7 +1033,8 @@ Le risorse versionate sono applicate in questo ordine:
 20. `V5_8__transfer_booking_request_audit_ownership_to_application.sql`;
 21. `V5_9__transfer_booking_item_audit_ownership_to_application.sql`;
 22. `V6__add_booking_historical_snapshots`;
-23. `V7__create_spring_session_jdbc_schema.sql`.
+23. `V7__create_spring_session_jdbc_schema.sql`;
+24. `V8__add_weekly_availability_and_capacity.sql`.
 
 Questo è l’elenco delle migrazioni Flyway correnti. Lo schema runtime versionato **non termina più a V6**.
 
@@ -1017,12 +1051,16 @@ Le nove V3 contengono esclusivamente un `ALTER TABLE` ciascuna. Portano a `DATET
 
 Il passaggio strutturale delle sole V3 da `DATETIME(0)` a `DATETIME(6)` mantiene invariati anno, mese, giorno, ora, minuto e secondo e aggiunge una frazione zero. Le V3 non usano `CONVERT_TZ` e non convertono i valori da `Europe/Rome` a UTC: questa responsabilità appartiene alla successiva V4, mentre le V5 trasferiscono l'ownership degli audit all'applicazione.
 
-La V4 Java verifica schema, precisione, gap/overlap e dati prima di convertire i datetime legacy `Europe/Rome` verso UTC. Le V5 rimuovono default e `ON UPDATE` dagli audit, trasferendone l'ownership a Spring Data JPA; i timestamp ombra dei profili diventano nullable e congelati. La V6 Java aggiunge gli snapshot storici Booking e ne esegue il backfill dopo preflight, senza inventare dati o orari. La V7 crea `SPRING_SESSION` e `SPRING_SESSION_ATTRIBUTES` per lo store JDBC delle sessioni server-side (infrastruttura, non domain); dettagli in sezione 3.10.
+La V4 Java verifica schema, precisione, gap/overlap e dati prima di convertire i datetime legacy `Europe/Rome` verso UTC. Le V5 rimuovono default e `ON UPDATE` dagli audit, trasferendone l'ownership a Spring Data JPA; i timestamp ombra dei profili diventano nullable e congelati. La V6 Java aggiunge gli snapshot storici Booking e ne esegue il backfill dopo preflight, senza inventare dati o orari. La V7 crea `SPRING_SESSION` e `SPRING_SESSION_ATTRIBUTES` per lo store JDBC delle sessioni server-side. La V8 aggiunge `weekly_availability_rules`, la tabella normalizzata delle durate, gli audit di regola e occorrenza, i campi `weekly_rule_id`, `location_label`, `capacity`, `blocked` sugli slot e `location_label_snapshot` sugli item Booking, con backfill conservativo degli slot legacy.
 
 ### 12.2 Indici di convergenza
 
 - `invite_codes(professional_id, created_at)` supporta la lista inviti del professionista ordinata per creazione.
 - `availability_slots(professional_id, active, status, start_date_time)` supporta gli slot visibili al cliente filtrati per stato e ordinati temporalmente.
+- `availability_slots(professional_id, active, blocked, start_date_time)` supporta il filtro di prenotabilità e capacità;
+- `weekly_availability_rules(professional_id, active, day_of_week, valid_from)` supporta la settimana tipo;
+- `availability_slots(weekly_rule_id, start_date_time)` è univocamente vincolato per rendere idempotente la materializzazione.
+- `booking_request_items(availability_slot_id, scheduled_start, scheduled_end)` supporta i calcoli temporali di occupancy e overlap.
 - `booking_requests(client_id, active, created_at)` supporta le liste booking del cliente.
 - `booking_requests(professional_id, active, created_at)` supporta le liste booking del professionista.
 

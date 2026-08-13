@@ -43,15 +43,36 @@ public class BookingRequestItem extends BaseEntity {
     @Column(name = "scheduled_end", nullable = false, columnDefinition = "DATETIME(6)")
     private Instant scheduledEnd;
 
+    @Setter(AccessLevel.NONE)
+    @Column(name = "location_label_snapshot", length = 255)
+    private String locationLabelSnapshot;
+
     public BookingRequestItem(
             BookingRequest bookingRequest,
             AvailabilitySlot availabilitySlot,
             Instant scheduledStart,
             Instant scheduledEnd
     ) {
+        this(
+                bookingRequest,
+                availabilitySlot,
+                scheduledStart,
+                scheduledEnd,
+                availabilitySlot.getLocationLabel()
+        );
+    }
+
+    public BookingRequestItem(
+            BookingRequest bookingRequest,
+            AvailabilitySlot availabilitySlot,
+            Instant scheduledStart,
+            Instant scheduledEnd,
+            String locationLabelSnapshot
+    ) {
         this.bookingRequest = bookingRequest;
         this.availabilitySlot = availabilitySlot;
         this.scheduledStart = scheduledStart;
         this.scheduledEnd = scheduledEnd;
+        this.locationLabelSnapshot = locationLabelSnapshot;
     }
 }

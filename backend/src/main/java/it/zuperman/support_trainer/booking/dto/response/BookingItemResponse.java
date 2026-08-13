@@ -9,6 +9,7 @@ public class BookingItemResponse {
     private final OffsetDateTime scheduledStart;
     private final OffsetDateTime scheduledEnd;
     private final long durationMinutes;
+    private final String locationLabel;
 
     public BookingItemResponse(
             Long id,
@@ -17,11 +18,23 @@ public class BookingItemResponse {
             OffsetDateTime scheduledEnd,
             long durationMinutes
     ) {
+        this(id, availabilitySlotId, scheduledStart, scheduledEnd, durationMinutes, null);
+    }
+
+    public BookingItemResponse(
+            Long id,
+            Long availabilitySlotId,
+            OffsetDateTime scheduledStart,
+            OffsetDateTime scheduledEnd,
+            long durationMinutes,
+            String locationLabel
+    ) {
         this.id = id;
         this.availabilitySlotId = availabilitySlotId;
         this.scheduledStart = scheduledStart;
         this.scheduledEnd = scheduledEnd;
         this.durationMinutes = durationMinutes;
+        this.locationLabel = locationLabel;
     }
 
     public Long getId() {
@@ -42,5 +55,9 @@ public class BookingItemResponse {
 
     public long getDurationMinutes() {
         return durationMinutes;
+    }
+
+    public String getLocationLabel() {
+        return locationLabel;
     }
 }

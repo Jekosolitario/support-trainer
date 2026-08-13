@@ -254,30 +254,49 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 
 ---
 
+## 3.6.1 WeeklyAvailabilityRule
+
+| Campo | Tipo | Obbligatorio | Nullable | Descrizione |
+| --- | --- | ---: | ---: | --- |
+| `professional` | `ProfessionalProfile` | Sì | No | Owner della regola |
+| `dayOfWeek` | `Enum` | Sì | No | Giorno della settimana |
+| `startTime` | `LocalTime` | Sì | No | Inizio fascia |
+| `endTime` | `LocalTime` | Sì | No | Fine fascia |
+| `allowedDurations` | `Set<Integer>` | Sì | No | Durate selezionabili, normalizzate nella tabella figlia |
+| `locationLabel` | `String` | No | Sì | Luogo libero, max 255 |
+| `capacityPerSlot` | `Integer` | Sì | No | Capacità copiata negli slot concreti |
+| `active` | `Boolean` | Sì | No | Regola attiva |
+| `validFrom` | `LocalDate` | Sì | No | Prima data della ricorrenza |
+
+Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e non superiori alla finestra. `startTime` ed `endTime` sono allineati a 15 minuti. Update e deactivate non accettano date programmate: agiscono sul futuro dalla data/ora corrente.
+
+---
+
 ## 3.7 AvailabilitySlot
 
 | Campo           | Tipo                  | Obbligatorio | Nullable | Default     | Note                                   |
 | --------------- | --------------------- | -----------: | -------: | ----------- | -------------------------------------- |
 | `id`            | `Long`                |           Sì |       No | auto        | Identificativo univoco                 |
 | `professional`  | `ProfessionalProfile` |           Sì |       No | —           | Professionista proprietario dello slot |
+| `weeklyRule`    | `WeeklyAvailabilityRule` |          No |       Sì |           — | Regola ricorrente generatrice          |
 | `startDateTime` | `Instant`             |           Sì |       No | —           | Inizio slot persistito UTC             |
 | `endDateTime`   | `Instant`             |           Sì |       No | —           | Fine slot persistita UTC               |
-| `status`        | `Enum`                |           Sì |       No | `AVAILABLE` | Stato slot                             |
+| `locationLabel` | `String`              |           No |       Sì | `null`      | Luogo dell'occorrenza                   |
+| `capacity`      | `Integer`             |           Sì |       No | `1`         | Posti massimi                  |
+| `blocked`       | `Boolean`             |           Sì |       No | `false`     | Eccezione di blocco della singola occorrenza |
+| `status`        | `Enum`                |           Sì |       No | `AVAILABLE` | Compatibilità legacy                   |
 | `active`        | `Boolean`             |           Sì |       No | `true`      | Flag logico di attivazione             |
 | `createdAt`     | `Instant`             |           Sì |       No | audit app   | Istante UTC creazione                  |
 | `updatedAt`     | `Instant`             |           Sì |       No | audit app   | Istante UTC ultimo aggiornamento       |
 
 ### Note
 
-- `status` valori implementati:
-  - `AVAILABLE`
-  - `BOOKED`
-  - `BLOCKED`
 - `endDateTime` deve essere successivo a `startDateTime`;
-- in creazione o aggiornamento, `startDateTime` deve essere nel futuro;
-- gli slot attivi dello stesso professionista non possono sovrapporsi;
 - la gestione degli slot è prevista per professionisti `PERSONAL_TRAINER`;
-- lo stato `BOOKED` viene utilizzato dal modulo Bookings.
+- l'occupancy è derivata da Booking `PENDING` e `CONFIRMED`;
+- `capacity` limita la massima occupancy concorrente in ogni istante della finestra, non il numero totale di Booking associati;
+- `weeklyRule` identifica una finestra con più combinazioni inizio/durata; non viene materializzata una riga per combinazione;
+- l'intero legacy `status` non è più l'authority esclusiva sulla prenotabilità.
 
 ---
 
@@ -327,15 +346,22 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 | `availabilitySlot` | `AvailabilitySlot` |           Sì |       No | —       | Slot richiesto                 |
 | `scheduledStart`   | `Instant`          |           Sì |       No | —       | Snapshot UTC dell'inizio       |
 | `scheduledEnd`     | `Instant`          |           Sì |       No | —       | Snapshot UTC della fine        |
+| `locationLabelSnapshot` | `String`       |           No |       Sì | `null`  | Snapshot del luogo scelto      |
 | `createdAt`        | `Instant`          |           Sì |       No | audit app | Istante UTC creazione          |
 | `updatedAt`        | `Instant`          |           Sì |       No | audit app | Istante UTC aggiornamento      |
 
 ### Note
 
 - ogni item punta a uno slot specifico;
-- gli orari snapshot sono `DATETIME(6)` in UTC e restano la fonte autorevole per lo storico Booking;
+- gli orari snapshot sono `DATETIME(6)` in UTC e, insieme al luogo snapshot, restano la fonte autorevole per lo storico Booking;
 - nel contratto API attuale ogni booking creato contiene un solo item;
 - il modello resta predisposto per un’eventuale evoluzione multi-slot futura.
+
+---
+
+## 3.9.1 AvailabilityRuleChange e AvailabilitySlotChange
+
+`AvailabilityRuleChange` registra `weeklyRule`, data business corrente in `effectiveFrom`, tipo `UPDATE`/`DEACTIVATE`, motivazione opzionale e numero di Booking occupanti coinvolti. `AvailabilitySlotChange` registra analogamente `availabilitySlot`, tipo `BLOCK`/`UNBLOCK`, motivazione e impatto. La motivazione è obbligatoria a livello service quando l'operazione coinvolge almeno un Booking `PENDING` o `CONFIRMED`.
 
 ---
 
@@ -531,6 +557,8 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 - `AVAILABLE`
 - `BOOKED`
 - `BLOCKED`
+
+L'enum resta presente per compatibilità con gli slot legacy. Per gli slot materializzati dalle regole settimanali, l'authority corrente è composta da `blocked`, `capacity` e dal conteggio dei membri `PENDING`/`CONFIRMED`; `BOOKED` non rappresenta più l'esauramento globale dello slot.
 
 ## 4.7 BookingRequestStatus
 - `PENDING`

@@ -7,11 +7,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import it.zuperman.support_trainer.availability.dto.request.ChangeAvailabilitySlotBlockRequest;
 import it.zuperman.support_trainer.availability.dto.request.CreateAvailabilitySlotRequest;
 import it.zuperman.support_trainer.availability.dto.request.UpdateAvailabilitySlotRequest;
 import it.zuperman.support_trainer.availability.dto.response.AvailabilitySlotResponse;
+import it.zuperman.support_trainer.availability.dto.response.ClientBookableOptionResponse;
+import it.zuperman.support_trainer.availability.dto.response.ClientAvailabilitySlotResponse;
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
+import it.zuperman.support_trainer.availability.entity.AvailabilitySlotChange;
+import it.zuperman.support_trainer.availability.repository.AvailabilitySlotChangeRepository;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
+import it.zuperman.support_trainer.availability.repository.WeeklyAvailabilityRuleRepository;
 import it.zuperman.support_trainer.booking.repository.BookingRequestItemRepository;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.common.entity.User;
@@ -32,6 +38,7 @@ import it.zuperman.support_trainer.security.session.AuthenticatedUserLoader;
 public class AvailabilityService {
 
     private final AvailabilitySlotRepository availabilitySlotRepository;
+    private final AvailabilitySlotChangeRepository slotChangeRepository;
     private final AuthenticatedUserLoader authenticatedUserLoader;
     private final ProfessionalProfileRepository professionalProfileRepository;
     private final ProfessionalClientLinkRepository professionalClientLinkRepository;
@@ -39,18 +46,26 @@ public class AvailabilityService {
     private final ApplicationTimeProvider timeProvider;
     private final BusinessDateTimeMapper businessDateTimeMapper;
     private final UserReadinessValidator userReadinessValidator;
+    private final WeeklyAvailabilityRuleRepository weeklyRuleRepository;
+    private final AvailabilityMaterializationService materializationService;
+    private final AvailabilityCapacityService capacityService;
 
     public AvailabilityService(
             AvailabilitySlotRepository availabilitySlotRepository,
+            AvailabilitySlotChangeRepository slotChangeRepository,
             AuthenticatedUserLoader authenticatedUserLoader,
             ProfessionalProfileRepository professionalProfileRepository,
             ProfessionalClientLinkRepository professionalClientLinkRepository,
             BookingRequestItemRepository bookingRequestItemRepository,
             ApplicationTimeProvider timeProvider,
             BusinessDateTimeMapper businessDateTimeMapper,
-            UserReadinessValidator userReadinessValidator
+            UserReadinessValidator userReadinessValidator,
+            WeeklyAvailabilityRuleRepository weeklyRuleRepository,
+            AvailabilityMaterializationService materializationService,
+            AvailabilityCapacityService capacityService
     ) {
         this.availabilitySlotRepository = availabilitySlotRepository;
+        this.slotChangeRepository = slotChangeRepository;
         this.authenticatedUserLoader = authenticatedUserLoader;
         this.professionalProfileRepository = professionalProfileRepository;
         this.professionalClientLinkRepository = professionalClientLinkRepository;
@@ -58,46 +73,46 @@ public class AvailabilityService {
         this.timeProvider = timeProvider;
         this.businessDateTimeMapper = businessDateTimeMapper;
         this.userReadinessValidator = userReadinessValidator;
+        this.weeklyRuleRepository = weeklyRuleRepository;
+        this.materializationService = materializationService;
+        this.capacityService = capacityService;
     }
 
     @Transactional
     public AvailabilitySlotResponse createAvailabilitySlot(CreateAvailabilitySlotRequest request) {
         ProfessionalProfile professional = getAuthenticatedProfessional();
         validateAvailabilitySpecialization(professional);
-
         professional = lockProfessionalForAvailabilityChange(professional.getId());
 
         Instant startDateTime = businessDateTimeMapper.toInstant(request.getStartDateTime());
         Instant endDateTime = businessDateTimeMapper.toInstant(request.getEndDateTime());
-
         validateTimeInterval(startDateTime, endDateTime);
         validateSlotIsInFuture(startDateTime);
+        validateNoOverlappingSlots(professional.getId(), startDateTime, endDateTime);
 
-        validateNoOverlappingSlots(
-                professional.getId(),
-                startDateTime,
-                endDateTime
-        );
-
-        AvailabilitySlot slot = new AvailabilitySlot(
+        AvailabilitySlot savedSlot = availabilitySlotRepository.save(new AvailabilitySlot(
                 professional,
                 startDateTime,
                 endDateTime
-        );
-
-        AvailabilitySlot savedSlot = availabilitySlotRepository.save(slot);
-        return AvailabilitySlotResponse.fromEntity(savedSlot, businessDateTimeMapper);
+        ));
+        return toProfessionalSlotResponse(savedSlot);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<AvailabilitySlotResponse> getMyAvailabilitySlots() {
         ProfessionalProfile professional = getAuthenticatedProfessional();
         validateAvailabilitySpecialization(professional);
 
-        return availabilitySlotRepository
-                .findAllByProfessional_IdAndActiveTrueOrderByStartDateTimeAsc(professional.getId())
-                .stream()
-                .map(slot -> AvailabilitySlotResponse.fromEntity(slot, businessDateTimeMapper))
+        materializationService.synchronizeProfessional(professional.getId());
+
+        List<AvailabilitySlot> slots = availabilitySlotRepository
+                .findAllByProfessional_IdAndActiveTrueAndStartDateTimeAfterOrderByStartDateTimeAsc(
+                        professional.getId(),
+                        timeProvider.nowInstant()
+                );
+        AvailabilityCapacityService.OccupancySnapshot occupancy = capacityService.loadOccupancy(slots);
+        return slots.stream()
+                .map(slot -> toProfessionalSlotResponse(slot, occupancy))
                 .toList();
     }
 
@@ -105,12 +120,11 @@ public class AvailabilityService {
     public AvailabilitySlotResponse updateAvailabilitySlot(Long slotId, UpdateAvailabilitySlotRequest request) {
         ProfessionalProfile professional = getAuthenticatedProfessional();
         validateAvailabilitySpecialization(professional);
-
         professional = lockProfessionalForAvailabilityChange(professional.getId());
 
         AvailabilitySlot slot = getOwnedActiveSlotForUpdate(slotId, professional.getId());
-
         validateSlotCanBeUpdated(slot);
+        validateSlotIsInFuture(slot.getStartDateTime());
         validateNoPendingBookingOnSlot(slot.getId());
         validateSlotHasNoBookingHistoryForReschedule(slot.getId());
         validateUpdateRequestNotEmpty(request);
@@ -118,14 +132,12 @@ public class AvailabilityService {
         Instant newStartDateTime = request.getStartDateTime() != null
                 ? businessDateTimeMapper.toInstant(request.getStartDateTime())
                 : slot.getStartDateTime();
-
         Instant newEndDateTime = request.getEndDateTime() != null
                 ? businessDateTimeMapper.toInstant(request.getEndDateTime())
                 : slot.getEndDateTime();
 
         validateTimeInterval(newStartDateTime, newEndDateTime);
         validateSlotIsInFuture(newStartDateTime);
-
         validateNoOverlappingSlotsExcludingCurrent(
                 professional.getId(),
                 slot.getId(),
@@ -135,85 +147,116 @@ public class AvailabilityService {
 
         slot.setStartDateTime(newStartDateTime);
         slot.setEndDateTime(newEndDateTime);
-
-        AvailabilitySlot savedSlot = availabilitySlotRepository.save(slot);
-        return AvailabilitySlotResponse.fromEntity(savedSlot, businessDateTimeMapper);
+        return toProfessionalSlotResponse(availabilitySlotRepository.save(slot));
     }
 
     @Transactional
     public AvailabilitySlotResponse blockAvailabilitySlot(Long slotId) {
+        return blockAvailabilitySlot(slotId, null);
+    }
+
+    @Transactional
+    public AvailabilitySlotResponse blockAvailabilitySlot(
+            Long slotId,
+            ChangeAvailabilitySlotBlockRequest request
+    ) {
         ProfessionalProfile professional = getAuthenticatedProfessional();
         validateAvailabilitySpecialization(professional);
-
         AvailabilitySlot slot = getOwnedActiveSlotForUpdate(slotId, professional.getId());
+        validateSlotIsInFuture(slot.getStartDateTime());
 
-        if (slot.getStatus() != AvailabilitySlotStatus.AVAILABLE) {
+        if (Boolean.TRUE.equals(slot.getBlocked())) {
             throw new AppException(
                     HttpStatus.CONFLICT,
                     "AVAILABILITY_SLOT_NOT_AVAILABLE",
-                    "Solo uno slot disponibile può essere bloccato"
+                    "Solo una finestra disponibile può essere bloccata"
             );
         }
 
-        validateNoPendingBookingOnSlot(slot.getId());
-
+        long impacted = capacityService.occupyingBookingCount(slot);
+        String reason = validateAndNormalizeReason(
+                request == null ? null : request.changeReason(),
+                impacted
+        );
+        slot.setBlocked(true);
         slot.setStatus(AvailabilitySlotStatus.BLOCKED);
-
         AvailabilitySlot savedSlot = availabilitySlotRepository.save(slot);
-        return AvailabilitySlotResponse.fromEntity(savedSlot, businessDateTimeMapper);
+        slotChangeRepository.save(new AvailabilitySlotChange(
+                savedSlot,
+                AvailabilitySlotChange.ChangeType.BLOCK,
+                reason,
+                impacted
+        ));
+        return toProfessionalSlotResponse(savedSlot);
     }
 
     @Transactional
     public AvailabilitySlotResponse unblockAvailabilitySlot(Long slotId) {
         ProfessionalProfile professional = getAuthenticatedProfessional();
         validateAvailabilitySpecialization(professional);
-
         AvailabilitySlot slot = getOwnedActiveSlotForUpdate(slotId, professional.getId());
+        validateSlotIsInFuture(slot.getStartDateTime());
 
-        if (slot.getStatus() != AvailabilitySlotStatus.BLOCKED) {
+        if (!Boolean.TRUE.equals(slot.getBlocked())) {
             throw new AppException(
                     HttpStatus.CONFLICT,
                     "AVAILABILITY_SLOT_NOT_BLOCKED",
-                    "Solo uno slot bloccato può essere sbloccato"
+                    "Solo una finestra bloccata può essere sbloccata"
             );
         }
 
+        slot.setBlocked(false);
         slot.setStatus(AvailabilitySlotStatus.AVAILABLE);
-
         AvailabilitySlot savedSlot = availabilitySlotRepository.save(slot);
-        return AvailabilitySlotResponse.fromEntity(savedSlot, businessDateTimeMapper);
+        slotChangeRepository.save(new AvailabilitySlotChange(
+                savedSlot,
+                AvailabilitySlotChange.ChangeType.UNBLOCK,
+                null,
+                0
+        ));
+        return toProfessionalSlotResponse(savedSlot);
     }
 
-    @Transactional(readOnly = true)
-    public List<AvailabilitySlotResponse> getAvailableSlotsByProfessional(Long professionalId) {
+    @Transactional
+    public List<ClientAvailabilitySlotResponse> getClientAvailableSlotsByProfessional(Long professionalId) {
         ClientProfile authenticatedClient = getAuthenticatedClient();
-
         ProfessionalProfile professional = getAccessibleProfessionalForClient(
                 authenticatedClient.getId(),
                 professionalId
         );
-
         validateAvailabilitySpecialization(professional);
 
-        return availabilitySlotRepository
-                .findAvailableSlotsVisibleToClient(
-                        professionalId,
-                        AvailabilitySlotStatus.AVAILABLE,
-                        timeProvider.nowInstant(),
-                        BookingRequestStatus.PENDING
-                )
-                .stream()
-                .map(slot -> AvailabilitySlotResponse.fromEntity(slot, businessDateTimeMapper))
+        materializationService.synchronizeProfessional(professionalId);
+
+        List<AvailabilitySlot> slots = availabilitySlotRepository
+                .findFutureUnblockedSlotsVisibleToClient(professionalId, timeProvider.nowInstant());
+        AvailabilityCapacityService.OccupancySnapshot occupancy = capacityService.loadOccupancy(slots);
+        return slots.stream()
+                .map(slot -> toClientSlotResponse(
+                        slot,
+                        capacityService.bookableOptionsForClient(
+                                slot,
+                                occupancy,
+                                authenticatedClient.getId()
+                        )
+                ))
+                .filter(java.util.Objects::nonNull)
                 .toList();
     }
 
     private ProfessionalProfile lockProfessionalForAvailabilityChange(Long professionalId) {
-        return professionalProfileRepository.findByIdForUpdate(professionalId)
+        weeklyRuleRepository.lockProfessionalAvailability(professionalId)
                 .orElseThrow(() -> new AppException(
-                HttpStatus.NOT_FOUND,
-                "PROFESSIONAL_NOT_FOUND",
-                "Professionista non trovato"
-        ));
+                        HttpStatus.NOT_FOUND,
+                        "PROFESSIONAL_NOT_FOUND",
+                        "Professionista non trovato"
+                ));
+        return professionalProfileRepository.findById(professionalId)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.NOT_FOUND,
+                        "PROFESSIONAL_NOT_FOUND",
+                        "Professionista non trovato"
+                ));
     }
 
     private void validateAvailabilitySpecialization(ProfessionalProfile professional) {
@@ -241,72 +284,57 @@ public class AvailabilityService {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
                     "AVAILABILITY_SLOT_IN_PAST",
-                    "Lo slot disponibilità deve iniziare nel futuro"
+                    "La finestra di disponibilità deve iniziare nel futuro"
             );
         }
     }
 
-    private void validateNoOverlappingSlots(
-            Long professionalId,
-            Instant startDateTime,
-            Instant endDateTime
-    ) {
-        boolean overlapping = availabilitySlotRepository
+    private void validateNoOverlappingSlots(Long professionalId, Instant start, Instant end) {
+        if (availabilitySlotRepository
                 .existsByProfessional_IdAndActiveTrueAndStartDateTimeLessThanAndEndDateTimeGreaterThan(
-                        professionalId,
-                        endDateTime,
-                        startDateTime
-                );
-
-        if (overlapping) {
-            throw new AppException(
-                    HttpStatus.CONFLICT,
-                    "AVAILABILITY_SLOT_OVERLAP",
-                    "Esiste già uno slot sovrapposto per questo professionista"
-            );
+                        professionalId, end, start
+                )) {
+            throw slotOverlap();
         }
     }
 
     private void validateNoOverlappingSlotsExcludingCurrent(
             Long professionalId,
             Long slotId,
-            Instant startDateTime,
-            Instant endDateTime
+            Instant start,
+            Instant end
     ) {
-        boolean overlapping = availabilitySlotRepository
+        if (availabilitySlotRepository
                 .existsByProfessional_IdAndActiveTrueAndIdNotAndStartDateTimeLessThanAndEndDateTimeGreaterThan(
-                        professionalId,
-                        slotId,
-                        endDateTime,
-                        startDateTime
-                );
-
-        if (overlapping) {
-            throw new AppException(
-                    HttpStatus.CONFLICT,
-                    "AVAILABILITY_SLOT_OVERLAP",
-                    "Esiste già uno slot sovrapposto per questo professionista"
-            );
+                        professionalId, slotId, end, start
+                )) {
+            throw slotOverlap();
         }
+    }
+
+    private AppException slotOverlap() {
+        return new AppException(
+                HttpStatus.CONFLICT,
+                "AVAILABILITY_SLOT_OVERLAP",
+                "Esiste già uno slot sovrapposto per questo professionista"
+        );
     }
 
     private AvailabilitySlot getOwnedActiveSlotForUpdate(Long slotId, Long professionalId) {
         return availabilitySlotRepository.findActiveByIdAndProfessionalIdForUpdate(slotId, professionalId)
                 .orElseThrow(() -> new AppException(
-                HttpStatus.NOT_FOUND,
-                "AVAILABILITY_SLOT_NOT_FOUND",
-                "Slot disponibilità non trovato"
-        ));
+                        HttpStatus.NOT_FOUND,
+                        "AVAILABILITY_SLOT_NOT_FOUND",
+                        "Finestra di disponibilità non trovata"
+                ));
     }
 
     private void validateNoPendingBookingOnSlot(Long slotId) {
-        boolean hasPendingBooking = bookingRequestItemRepository
+        if (bookingRequestItemRepository
                 .existsByAvailabilitySlot_IdAndBookingRequest_StatusAndBookingRequest_ActiveTrue(
                         slotId,
                         BookingRequestStatus.PENDING
-                );
-
-        if (hasPendingBooking) {
+                )) {
             throw new AppException(
                     HttpStatus.CONFLICT,
                     "AVAILABILITY_SLOT_HAS_PENDING_BOOKING",
@@ -316,10 +344,7 @@ public class AvailabilityService {
     }
 
     private void validateSlotHasNoBookingHistoryForReschedule(Long slotId) {
-        boolean hasBookingHistory = bookingRequestItemRepository
-                .existsByAvailabilitySlot_Id(slotId);
-
-        if (hasBookingHistory) {
+        if (bookingRequestItemRepository.existsByAvailabilitySlot_Id(slotId)) {
             throw new AppException(
                     HttpStatus.CONFLICT,
                     "AVAILABILITY_SLOT_HAS_BOOKING_HISTORY",
@@ -329,11 +354,18 @@ public class AvailabilityService {
     }
 
     private void validateSlotCanBeUpdated(AvailabilitySlot slot) {
-        if (slot.getStatus() != AvailabilitySlotStatus.AVAILABLE) {
+        if (slot.getWeeklyRule() != null) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "WEEKLY_AVAILABILITY_OCCURRENCE_NOT_PATCHABLE",
+                    "Le occorrenze generate devono essere modificate dalla fascia settimanale"
+            );
+        }
+        if (Boolean.TRUE.equals(slot.getBlocked())) {
             throw new AppException(
                     HttpStatus.CONFLICT,
                     "AVAILABILITY_SLOT_NOT_UPDATABLE",
-                    "Solo uno slot disponibile può essere aggiornato"
+                    "Solo una disponibilità non bloccata può essere aggiornata"
             );
         }
     }
@@ -349,9 +381,27 @@ public class AvailabilityService {
         }
     }
 
+    private String validateAndNormalizeReason(String value, long impactedBookings) {
+        String normalized = value == null || value.trim().isEmpty() ? null : value.trim();
+        if (normalized != null && normalized.length() > 1000) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "VALIDATION_ERROR",
+                    "La motivazione non può superare 1000 caratteri"
+            );
+        }
+        if (impactedBookings > 0 && normalized == null) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "AVAILABILITY_CHANGE_REASON_REQUIRED",
+                    "Indica una motivazione perché il blocco coinvolge prenotazioni esistenti"
+            );
+        }
+        return normalized;
+    }
+
     private ClientProfile getAuthenticatedClient() {
         User user = getAuthenticatedUser();
-
         if (!(user instanceof ClientProfile clientProfile)) {
             throw new AppException(
                     HttpStatus.FORBIDDEN,
@@ -359,7 +409,6 @@ public class AvailabilityService {
                     "Solo il cliente può accedere a questa risorsa"
             );
         }
-
         return clientProfile;
     }
 
@@ -377,7 +426,6 @@ public class AvailabilityService {
 
     private ProfessionalProfile getAuthenticatedProfessional() {
         User user = getAuthenticatedUser();
-
         if (!(user instanceof ProfessionalProfile professionalProfile)) {
             throw new AppException(
                     HttpStatus.FORBIDDEN,
@@ -385,7 +433,6 @@ public class AvailabilityService {
                     "Solo il professionista può accedere a questa risorsa"
             );
         }
-
         return professionalProfile;
     }
 
@@ -395,4 +442,44 @@ public class AvailabilityService {
         return user;
     }
 
+    private AvailabilitySlotResponse toProfessionalSlotResponse(AvailabilitySlot slot) {
+        return toProfessionalSlotResponse(slot, capacityService.loadOccupancy(List.of(slot)));
+    }
+
+    private AvailabilitySlotResponse toProfessionalSlotResponse(
+            AvailabilitySlot slot,
+            AvailabilityCapacityService.OccupancySnapshot occupancy
+    ) {
+        long maximumOccupancy = capacityService.maximumOccupancy(slot, occupancy);
+        return AvailabilitySlotResponse.fromEntity(
+                slot,
+                maximumOccupancy,
+                capacityService.hasAnyBookableCombination(slot, occupancy),
+                businessDateTimeMapper
+        );
+    }
+
+    private ClientAvailabilitySlotResponse toClientSlotResponse(
+            AvailabilitySlot slot,
+            List<AvailabilityCapacityService.BookableOption> options
+    ) {
+        if (options.isEmpty()) {
+            return null;
+        }
+        return new ClientAvailabilitySlotResponse(
+                slot.getId(),
+                businessDateTimeMapper.toBusinessOffsetDateTime(slot.getStartDateTime()),
+                businessDateTimeMapper.toBusinessOffsetDateTime(slot.getEndDateTime()),
+                AvailabilityWindowPolicy.allowedDurations(slot),
+                AvailabilityWindowPolicy.START_INTERVAL_MINUTES,
+                slot.getLocationLabel(),
+                slot.getCapacity(),
+                options.stream()
+                        .map(option -> new ClientBookableOptionResponse(
+                        option.startDateTime(),
+                        option.allowedDurations()
+                ))
+                        .toList()
+        );
+    }
 }

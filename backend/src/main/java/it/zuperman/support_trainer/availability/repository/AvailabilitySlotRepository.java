@@ -5,13 +5,12 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
-import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
-import it.zuperman.support_trainer.common.enums.BookingRequestStatus;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
 import jakarta.persistence.LockModeType;
 
@@ -32,24 +31,37 @@ public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySl
 
     List<AvailabilitySlot> findAllByProfessional_IdAndActiveTrueOrderByStartDateTimeAsc(Long professionalId);
 
+    @EntityGraph(attributePaths = {"weeklyRule", "weeklyRule.allowedDurations"})
+    List<AvailabilitySlot> findAllByProfessional_IdAndActiveTrueAndStartDateTimeAfterOrderByStartDateTimeAsc(
+            Long professionalId,
+            Instant now
+    );
+
+    Optional<AvailabilitySlot> findByWeeklyRule_IdAndStartDateTime(Long weeklyRuleId, Instant startDateTime);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT slot FROM AvailabilitySlot slot "
-        + "WHERE slot.professional.id = :professionalId "
-        + "AND slot.active = true "
-        + "AND slot.status = :status "
-        + "AND slot.startDateTime > :startDateTime "
-        + "AND NOT EXISTS ("
-        + "    SELECT item.id FROM BookingRequestItem item "
-        + "    WHERE item.availabilitySlot.id = slot.id "
-        + "    AND item.bookingRequest.active = true "
-        + "    AND item.bookingRequest.status = :pendingStatus"
-        + ") "
-        + "ORDER BY slot.startDateTime ASC")
-List<AvailabilitySlot> findAvailableSlotsVisibleToClient(
-        @Param("professionalId") Long professionalId,
-        @Param("status") AvailabilitySlotStatus status,
-        @Param("startDateTime") Instant startDateTime,
-        @Param("pendingStatus") BookingRequestStatus pendingStatus
-);
+            + "WHERE slot.weeklyRule.id = :weeklyRuleId "
+            + "AND slot.startDateTime >= :effectiveFrom "
+            + "ORDER BY slot.startDateTime ASC")
+    List<AvailabilitySlot> findRuleSlotsFromForUpdate(
+            @Param("weeklyRuleId") Long weeklyRuleId,
+            @Param("effectiveFrom") Instant effectiveFrom
+    );
+
+    @Query("SELECT DISTINCT slot FROM AvailabilitySlot slot "
+            + "JOIN FETCH slot.weeklyRule rule "
+            + "JOIN FETCH rule.allowedDurations "
+            + "WHERE slot.professional.id = :professionalId "
+            + "AND slot.active = true "
+            + "AND slot.blocked = false "
+            + "AND slot.weeklyRule IS NOT NULL "
+            + "AND slot.startDateTime > :startDateTime "
+            + "ORDER BY slot.startDateTime ASC")
+    List<AvailabilitySlot> findFutureUnblockedSlotsVisibleToClient(
+            @Param("professionalId") Long professionalId,
+            @Param("startDateTime") Instant startDateTime
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT slot FROM AvailabilitySlot slot "
@@ -65,6 +77,7 @@ List<AvailabilitySlot> findAvailableSlotsVisibleToClient(
     @Query("SELECT slot FROM AvailabilitySlot slot "
             + "WHERE slot.id = :slotId "
             + "AND slot.active = true "
+            + "AND slot.weeklyRule IS NOT NULL "
             + "AND slot.professional.active = true "
             + "AND slot.professional.accountStatus = :accountStatus "
             + "AND slot.professional.emailVerified = true "
@@ -83,4 +96,8 @@ List<AvailabilitySlot> findAvailableSlotsVisibleToClient(
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT slot FROM AvailabilitySlot slot WHERE slot.id = :slotId AND slot.active = true")
     Optional<AvailabilitySlot> findActiveByIdForUpdate(@Param("slotId") Long slotId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT slot FROM AvailabilitySlot slot WHERE slot.id = :slotId")
+    Optional<AvailabilitySlot> findByIdForUpdate(@Param("slotId") Long slotId);
 }

@@ -1,0 +1,333 @@
+.toolbar,
+.formActions,
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton,
+.textDangerButton {
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+  border-radius: 0.75rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, #2dd4bf, #6366f1);
+  color: #0b1220;
+}
+
+.secondaryButton {
+  border: 1px solid var(--color-border, #334155);
+  background: transparent;
+  color: var(--color-text-primary, #e2e8f0);
+}
+
+.dangerButton {
+  border: 1px solid transparent;
+  background: var(--color-danger, #f87171);
+  color: #111827;
+}
+
+.textDangerButton {
+  border: 1px solid
+    color-mix(in srgb, var(--color-danger, #f87171) 55%, transparent);
+  background: transparent;
+  color: var(--color-danger, #f87171);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled,
+.textDangerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible,
+.dangerButton:focus-visible,
+.textDangerButton:focus-visible,
+.formCard input:focus-visible,
+.formCard select:focus-visible,
+.formCard textarea:focus-visible {
+  outline: 2px solid var(--color-primary, #2dd4bf);
+  outline-offset: 2px;
+}
+
+.feedback {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+}
+
+.success {
+  border: 1px solid #2dd4bf;
+  background: color-mix(in srgb, #2dd4bf 14%, transparent);
+}
+.failure {
+  border: 1px solid var(--color-danger, #f87171);
+  background: color-mix(in srgb, var(--color-danger, #f87171) 14%, transparent);
+}
+.warning {
+  border: 1px solid var(--color-warning, #fbbf24);
+  background: color-mix(
+    in srgb,
+    var(--color-warning, #fbbf24) 14%,
+    transparent
+  );
+}
+.failure p {
+  margin-top: 0;
+}
+
+.formCard,
+.emptyState,
+.ruleCard {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border, #334155);
+  border-radius: 0.9rem;
+  background: var(--color-background-elevated, #111827);
+}
+
+.formCard h2,
+.emptyState h2,
+.ruleCard h2,
+.emptyState p {
+  margin: 0;
+}
+
+.formGrid {
+  display: grid;
+  gap: 0.9rem;
+}
+.formGrid label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 650;
+}
+
+.formCard input,
+.formCard select,
+.formCard textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-border, #334155);
+  border-radius: 0.65rem;
+  background: var(--color-background, #0b1220);
+  color: var(--color-text-primary, #e2e8f0);
+  font: inherit;
+}
+
+.formCard textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.durationFieldset {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--color-border, #334155);
+  border-radius: 0.75rem;
+}
+
+.durationFieldset legend {
+  padding: 0 0.35rem;
+  font-weight: 700;
+}
+
+.durationOptions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 0.8rem;
+}
+
+.durationOptions label {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  font-weight: 600;
+}
+
+.durationOptions input {
+  width: auto;
+  min-height: auto;
+  margin: 0;
+}
+.warningText,
+.slotPreview,
+.muted {
+  margin: 0;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.ruleList {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ruleHeading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.day {
+  margin: 0 0 0.25rem;
+  color: var(--color-primary, #2dd4bf);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.capacityBadge {
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #6366f1 24%, transparent);
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.ruleMeta {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+}
+.ruleMeta div {
+  display: grid;
+  gap: 0.15rem;
+}
+.ruleMeta dt {
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ruleMeta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.occurrences {
+  display: grid;
+  gap: 1rem;
+}
+
+.occurrences h2,
+.occurrences p {
+  margin: 0;
+}
+
+.occurrences header {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.occurrences header p,
+.slotLocation {
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.slotList {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slotCard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-border, #334155);
+  border-radius: 0.8rem;
+  background: var(--color-background-elevated, #111827);
+}
+
+.slotDate,
+.slotTime,
+.slotLocation,
+.slotStatus span {
+  margin: 0;
+}
+
+.slotDate {
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-transform: capitalize;
+}
+
+.slotTime {
+  margin-top: 0.15rem;
+  font-size: 1.15rem;
+  font-weight: 750;
+}
+
+.slotLocation {
+  margin-top: 0.15rem;
+  font-size: 0.9rem;
+}
+
+.slotStatus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.slotStatus span {
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+@media (min-width: 48rem) {
+  .formCard,
+  .emptyState,
+  .ruleCard {
+    padding: 1.25rem;
+  }
+  .formGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wideField {
+    grid-column: 1 / -1;
+  }
+  .durationFieldset {
+    grid-column: 1 / -1;
+  }
+  .durationOptions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .ruleList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .slotList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

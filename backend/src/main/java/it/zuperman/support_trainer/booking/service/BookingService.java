@@ -1,7 +1,9 @@
 package it.zuperman.support_trainer.booking.service;
 
-import java.util.ArrayList;
+import java.time.Instant;
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -9,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
+import it.zuperman.support_trainer.availability.service.AvailabilityCapacityService;
+import it.zuperman.support_trainer.availability.service.AvailabilityWindowPolicy;
 import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
 import it.zuperman.support_trainer.booking.dto.response.BookingDetailResponse;
 import it.zuperman.support_trainer.booking.dto.response.BookingSummaryResponse;
@@ -18,13 +22,14 @@ import it.zuperman.support_trainer.booking.mapper.BookingResponseMapper;
 import it.zuperman.support_trainer.booking.repository.BookingRequestItemRepository;
 import it.zuperman.support_trainer.booking.repository.BookingRequestRepository;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
+import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
-import it.zuperman.support_trainer.common.enums.AvailabilitySlotStatus;
 import it.zuperman.support_trainer.common.enums.BookingRequestStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
+import it.zuperman.support_trainer.common.time.BusinessDateTimeMapper;
 import it.zuperman.support_trainer.common.security.UserReadinessValidator;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.security.session.AuthenticatedUserLoader;
@@ -32,35 +37,55 @@ import it.zuperman.support_trainer.security.session.AuthenticatedUserLoader;
 @Service
 public class BookingService {
 
+    private static final Set<BookingRequestStatus> OCCUPYING_STATUSES = Set.of(
+            BookingRequestStatus.PENDING,
+            BookingRequestStatus.CONFIRMED
+    );
+
     private final BookingRequestRepository bookingRequestRepository;
     private final BookingRequestItemRepository bookingRequestItemRepository;
     private final AvailabilitySlotRepository availabilitySlotRepository;
+    private final ClientProfileRepository clientProfileRepository;
     private final AuthenticatedUserLoader authenticatedUserLoader;
     private final ApplicationTimeProvider timeProvider;
     private final BookingResponseMapper bookingResponseMapper;
     private final UserReadinessValidator userReadinessValidator;
+    private final BusinessDateTimeMapper businessDateTimeMapper;
+    private final AvailabilityCapacityService capacityService;
 
     public BookingService(
             BookingRequestRepository bookingRequestRepository,
             BookingRequestItemRepository bookingRequestItemRepository,
             AvailabilitySlotRepository availabilitySlotRepository,
+            ClientProfileRepository clientProfileRepository,
             AuthenticatedUserLoader authenticatedUserLoader,
             ApplicationTimeProvider timeProvider,
             BookingResponseMapper bookingResponseMapper,
-            UserReadinessValidator userReadinessValidator
+            UserReadinessValidator userReadinessValidator,
+            BusinessDateTimeMapper businessDateTimeMapper,
+            AvailabilityCapacityService capacityService
     ) {
         this.bookingRequestRepository = bookingRequestRepository;
         this.bookingRequestItemRepository = bookingRequestItemRepository;
         this.availabilitySlotRepository = availabilitySlotRepository;
+        this.clientProfileRepository = clientProfileRepository;
         this.authenticatedUserLoader = authenticatedUserLoader;
         this.timeProvider = timeProvider;
         this.bookingResponseMapper = bookingResponseMapper;
         this.userReadinessValidator = userReadinessValidator;
+        this.businessDateTimeMapper = businessDateTimeMapper;
+        this.capacityService = capacityService;
     }
 
     @Transactional
     public BookingDetailResponse createBookingRequest(CreateBookingRequest request) {
-        ClientProfile client = getAuthenticatedClient();
+        ClientProfile authenticatedClient = getAuthenticatedClient();
+        ClientProfile client = clientProfileRepository.findByIdForUpdate(authenticatedClient.getId())
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.NOT_FOUND,
+                        "CLIENT_NOT_FOUND",
+                        "Cliente non trovato"
+                ));
 
         AvailabilitySlot slot = availabilitySlotRepository.findActiveAccessibleByIdAndClientIdForUpdate(
                         request.getAvailabilitySlotId(),
@@ -76,8 +101,10 @@ public class BookingService {
         ProfessionalProfile professional = slot.getProfessional();
 
         validateBookableProfessionalSpecialization(professional);
-        validateBookableSlot(slot);
-        validateNoPendingBookingOnSlot(slot.getId());
+        validateBookableWindow(slot);
+        BookingInterval interval = resolveBookingInterval(request, slot);
+        validateClientHasNoOverlappingBooking(client, professional, interval);
+        validateCapacity(slot, interval);
 
         BookingRequest bookingRequest = new BookingRequest(
                 client,
@@ -92,8 +119,9 @@ public class BookingService {
         BookingRequestItem bookingRequestItem = new BookingRequestItem(
                 savedBookingRequest,
                 slot,
-                slot.getStartDateTime(),
-                slot.getEndDateTime()
+                interval.start(),
+                interval.end(),
+                slot.getLocationLabel()
         );
 
         BookingRequestItem savedItem = bookingRequestItemRepository.save(bookingRequestItem);
@@ -152,11 +180,9 @@ public class BookingService {
 
         validateBookingRequestIsPending(bookingRequest);
 
-        List<AvailabilitySlot> slotsToBook
-                = lockAndValidateSlotsCanBeConfirmed(bookingRequest);
+        lockAndValidateSlotsCanBeConfirmed(bookingRequest);
 
         bookingRequest.confirm(timeProvider.nowInstant());
-        markSlotsAsBooked(slotsToBook);
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
         return bookingResponseMapper.toDetail(savedBookingRequest);
@@ -174,7 +200,6 @@ public class BookingService {
         validateBookingRequestIsPending(bookingRequest);
 
         bookingRequest.reject(timeProvider.nowInstant());
-        releaseSlotsAfterNegativeOutcome(bookingRequest);
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
         return bookingResponseMapper.toDetail(savedBookingRequest);
@@ -197,7 +222,6 @@ public class BookingService {
         validateCancellationAllowed(user, bookingRequest);
 
         bookingRequest.cancel(timeProvider.nowInstant());
-        releaseSlotsAfterNegativeOutcome(bookingRequest);
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
         return bookingResponseMapper.toDetail(savedBookingRequest);
@@ -256,12 +280,10 @@ public class BookingService {
         }
     }
 
-    private List<AvailabilitySlot> lockAndValidateSlotsCanBeConfirmed(BookingRequest bookingRequest) {
-        List<AvailabilitySlot> slotsToBook = new ArrayList<>();
-
+    private void lockAndValidateSlotsCanBeConfirmed(BookingRequest bookingRequest) {
         for (BookingRequestItem item : bookingRequest.getItems()) {
             AvailabilitySlot slot = availabilitySlotRepository
-                    .findActiveByIdForUpdate(item.getAvailabilitySlot().getId())
+                    .findByIdForUpdate(item.getAvailabilitySlot().getId())
                     .orElseThrow(() -> new AppException(
                     HttpStatus.CONFLICT,
                     "AVAILABILITY_SLOT_NOT_CONFIRMABLE",
@@ -276,14 +298,6 @@ public class BookingService {
                 );
             }
 
-            if (slot.getStatus() != AvailabilitySlotStatus.AVAILABLE) {
-                throw new AppException(
-                        HttpStatus.CONFLICT,
-                        "AVAILABILITY_SLOT_NOT_CONFIRMABLE",
-                        "Lo slot collegato non è più confermabile"
-                );
-            }
-
             if (!slot.getStartDateTime().isAfter(timeProvider.nowInstant())) {
                 throw new AppException(
                         HttpStatus.CONFLICT,
@@ -292,27 +306,6 @@ public class BookingService {
                 );
             }
 
-            slotsToBook.add(slot);
-        }
-
-        return slotsToBook;
-    }
-
-    private void markSlotsAsBooked(List<AvailabilitySlot> slotsToBook) {
-        for (AvailabilitySlot slot : slotsToBook) {
-            slot.setStatus(AvailabilitySlotStatus.BOOKED);
-            availabilitySlotRepository.save(slot);
-        }
-    }
-
-    private void releaseSlotsAfterNegativeOutcome(BookingRequest bookingRequest) {
-        for (BookingRequestItem item : bookingRequest.getItems()) {
-            AvailabilitySlot slot = item.getAvailabilitySlot();
-
-            if (slot.getStatus() == AvailabilitySlotStatus.BOOKED) {
-                slot.setStatus(AvailabilitySlotStatus.AVAILABLE);
-                availabilitySlotRepository.save(slot);
-            }
         }
     }
 
@@ -362,12 +355,12 @@ public class BookingService {
         );
     }
 
-    private void validateBookableSlot(AvailabilitySlot slot) {
-        if (slot.getStatus() != AvailabilitySlotStatus.AVAILABLE) {
+    private void validateBookableWindow(AvailabilitySlot slot) {
+        if (!Boolean.TRUE.equals(slot.getActive()) || Boolean.TRUE.equals(slot.getBlocked())) {
             throw new AppException(
                     HttpStatus.CONFLICT,
                     "AVAILABILITY_SLOT_NOT_BOOKABLE",
-                    "Lo slot selezionato non è prenotabile"
+                    "La disponibilità selezionata non è prenotabile"
             );
         }
 
@@ -375,25 +368,79 @@ public class BookingService {
             throw new AppException(
                     HttpStatus.CONFLICT,
                     "AVAILABILITY_SLOT_NOT_BOOKABLE",
-                    "Lo slot selezionato è scaduto e non è prenotabile"
+                    "La disponibilità selezionata è scaduta e non è prenotabile"
             );
         }
     }
 
-    private void validateNoPendingBookingOnSlot(Long availabilitySlotId) {
-        boolean alreadyRequested = bookingRequestItemRepository
-                .existsByAvailabilitySlot_IdAndBookingRequest_StatusAndBookingRequest_ActiveTrue(
-                        availabilitySlotId,
-                        BookingRequestStatus.PENDING
-                );
+    private BookingInterval resolveBookingInterval(
+            CreateBookingRequest request,
+            AvailabilitySlot slot
+    ) {
+        if (request.getStartDateTime() == null || request.getDurationMinutes() == null) {
+            throw invalidBookingInterval("Orario di inizio e durata sono obbligatori");
+        }
 
-        if (alreadyRequested) {
+        businessDateTimeMapper.validateRequestDateTime(request.getStartDateTime());
+        LocalTime localStart = request.getStartDateTime().toLocalTime();
+        if (!AvailabilityWindowPolicy.isAligned(localStart)) {
+            throw invalidBookingInterval("L'orario di inizio deve essere allineato a 15 minuti");
+        }
+        int duration = request.getDurationMinutes();
+        if (!AvailabilityWindowPolicy.isAllowedDuration(duration)) {
+            throw invalidBookingInterval("La durata deve essere tra 15 e 180 minuti e multipla di 15");
+        }
+        List<Integer> allowedDurations = AvailabilityWindowPolicy.allowedDurations(slot);
+        if (!allowedDurations.contains(duration)) {
+            throw invalidBookingInterval("La durata selezionata non è disponibile per questa fascia");
+        }
+
+        AvailabilityWindowPolicy.ConcreteWindow resolved = AvailabilityWindowPolicy.resolveBookingInterval(
+                slot,
+                request.getStartDateTime(),
+                duration,
+                timeProvider.businessZone()
+        ).orElseThrow(() -> invalidBookingInterval(
+                "La combinazione temporale non è valida o non rientra nella fascia"
+        ));
+        if (!resolved.start().isAfter(timeProvider.nowInstant())) {
+            throw invalidBookingInterval("La prenotazione deve iniziare nel futuro");
+        }
+        return new BookingInterval(resolved.start(), resolved.end());
+    }
+
+    private void validateClientHasNoOverlappingBooking(
+            ClientProfile client,
+            ProfessionalProfile professional,
+            BookingInterval interval
+    ) {
+        if (bookingRequestItemRepository.existsOccupyingBookingForClientOverlappingProfessional(
+                client.getId(),
+                professional.getId(),
+                interval.start(),
+                interval.end(),
+                OCCUPYING_STATUSES
+        )) {
             throw new AppException(
                     HttpStatus.CONFLICT,
-                    "BOOKING_REQUEST_ALREADY_PENDING",
-                    "Esiste già una richiesta di prenotazione in attesa per questo slot"
+                    "CLIENT_BOOKING_TIME_OVERLAP",
+                    "Hai già una prenotazione sovrapposta con questo professionista"
             );
         }
+    }
+
+    private void validateCapacity(AvailabilitySlot slot, BookingInterval interval) {
+        if (!capacityService.hasCapacity(slot, interval.start(), interval.end())) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "AVAILABILITY_SLOT_CAPACITY_EXHAUSTED",
+                    "La fascia non ha capacità disponibile per tutto l'intervallo richiesto"
+            );
+        }
+    }
+
+    private AppException invalidBookingInterval(String message) {
+        return new AppException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message);
     }
 
     private void validateBookableProfessionalSpecialization(ProfessionalProfile professional) {
@@ -438,6 +485,9 @@ public class BookingService {
         User user = authenticatedUserLoader.requireAuthenticatedUser();
         userReadinessValidator.validateOperationalUser(user);
         return user;
+    }
+
+    private record BookingInterval(Instant start, Instant end) {
     }
 
 }

@@ -4,7 +4,7 @@
 
 Support Trainer è un progetto full stack per la gestione del rapporto tra professionisti del benessere e clienti. Il backend MVP copre autenticazione, profili, inviti, collegamenti professionista-cliente, disponibilità e richieste di prenotazione. Il frontend dispone di una fondazione React, home pubblica (direzione visuale dark-tech), autenticazione session-based (login/logout/CSRF/guards) e foundation API client, oltre alle pagine Profilo autenticata, gestione inviti PROFESSIONAL e liste/dettagli delle relazioni CLIENT ↔ PROFESSIONAL.
 
-Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Login, logout, routing protetto, foundation auth, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status, **gestione inviti PROFESSIONAL** e navigazione delle relazioni collegate nelle due direzioni sono implementati. Restano placeholder dashboard con dati, Availability e Booking.
+Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Login, logout, routing protetto, foundation auth, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status, **gestione inviti PROFESSIONAL**, navigazione delle relazioni collegate e gestione Availability settimanale del Personal Trainer sono implementati. Restano placeholder dashboard con dati e Booking frontend.
 
 ## 2. Stato attuale del progetto
 
@@ -14,7 +14,7 @@ Stato sintetico:
 
 - backend Spring Boot presente;
 - API per i flussi principali implementate;
-- 31 endpoint applicativi documentati; `/error` resta un fallback tecnico separato;
+- 36 endpoint applicativi documentati; `/error` resta un fallback tecnico separato;
 - autenticazione session-based, CSRF e autorizzazione per ruolo presenti;
 - test di integrazione per auth, sessione, inviti, access control, profili, availability, booking e Security / Common presenti;
 - database applicativo MySQL con migrazioni Flyway (schema di dominio e infrastruttura Spring Session JDBC);
@@ -26,7 +26,7 @@ Stato sintetico:
 - validazione invito e registrazione pubblica CLIENT implementate con handoff memory-only, outcome conservativi e cleanup dei dati sensibili;
 - gestione inviti PROFESSIONAL implementata (`/app/professional/invites`: lista, genera, copia codice valido);
 - liste e dettagli dei Client collegati per PT/NUT e dei Professional collegati per CLIENT implementati;
-- dashboard con dati, Availability e Booking frontend ancora placeholder;
+- dashboard con dati e Booking frontend ancora placeholder; Availability PT è integrata;
 - pipeline CI GitHub Actions per il backend presente; i gate frontend (lint/test/build) restano locali; deploy non configurato;
 - progetto non ancora considerato production-ready.
 
@@ -116,24 +116,29 @@ Lo stato operativo è un’informazione di profilo: nell’MVP non implica autom
 
 ### Availability
 
-- creazione e aggiornamento degli slot;
-- blocco e sblocco degli slot;
-- controllo di date e sovrapposizioni;
-- gestione degli stati degli slot;
-- consultazione degli slot disponibili da parte dei clienti collegati.
+- definizione di finestre settimanali ricorrenti con `dayOfWeek`, orari allineati a 15 minuti, durate multiple da 15 a 180 minuti, luogo e capacità concorrente;
+- materializzazione idempotente di una sola occorrenza per finestra nella rolling horizon oggi → sei mesi;
+- scelta Client di inizio e durata, con fine derivata e validata dal server;
+- blocco e sblocco auditati delle occorrenze individuali, preservando i Booking;
+- modifica o disattivazione immediata con rilevamento dell'impatto e motivazione obbligatoria;
+- occupancy temporale derivata da `PENDING + CONFIRMED`, con protezione race-safe dell'ultimo posto e degli overlap dello stesso Client;
+- consultazione minimizzata delle finestre che hanno almeno una combinazione prenotabile.
 
 Il modulo Availability è attualmente riservato ai professionisti con specializzazione `PERSONAL_TRAINER`.
 
-Gli orari business degli slot usano un contratto ISO-8601 con offset obbligatorio e zona server `Europe/Rome`: per esempio `2026-07-13T17:30:00+02:00` in estate e `2026-01-13T17:30:00+01:00` in inverno. Il backend rifiuta valori senza offset, `Z` o offset incoerenti, orari nel gap primaverile, orari ambigui nell'overlap autunnale e frazioni di secondo non nulle. Le response Booking espongono gli stessi orari con offset, ma li leggono dallo snapshot storico e non dallo slot live.
+Contratto corrente: [Availability Domain Contract v1](docs/18-availability-domain-contract-v1.md).
+
+Le regole settimanali usano data/ora civile e zona business `Europe/Rome`; gap e overlap DST sono rifiutati e le occorrenze concrete sono persistite come istanti UTC. Le occurrence settimanali sono l'unica sorgente per nuove prenotazioni. I vecchi endpoint di creazione e ripianificazione manuale restano temporaneamente disponibili per compatibilità, ma gli slot manuali non sono discoverable o prenotabili dai Client e il `PATCH` legacy non può modificare un'occorrenza generata.
 
 ### Bookings
 
-- creazione di una richiesta di prenotazione;
+- creazione di una richiesta di prenotazione con occorrenza, inizio e durata;
 - consultazione delle richieste lato cliente e professionista;
 - dettaglio della prenotazione con controllo di accesso;
 - conferma e rifiuto da parte del professionista;
 - cancellazione secondo le transizioni consentite;
-- aggiornamento coerente dello stato dello slot.
+- riserva atomica della capacità temporale già al primo stato `PENDING`;
+- snapshot immutabili di inizio, fine e luogo scelti.
 
 Le liste usano un riepilogo autosufficiente e create, dettaglio e transizioni restituiscono il dettaglio completo. Nome delle parti e orari sono snapshot storici persistiti; immagini profilo e specializzazione del professionista sono invece valori correnti e opzionali. Le response non espongono `primaryGoal`, dati sanitari o `slotStatus` live. Uno storico già creato resta leggibile dai partecipanti originari anche dopo la disattivazione del collegamento, mentre un collegamento attivo resta necessario per creare una nuova prenotazione. Per risorse identificabili, un booking inesistente o non appartenente al principal e uno slot non accessibile al Client restituiscono lo stesso `404`; ruoli e stati account/profilo non idonei restano invece `403`. Le query mutate sono scoperte al principal prima di acquisire il lock pessimista. Le liste sono ordinate per creazione decrescente e id decrescente; paginazione, filtri e motivazioni di rifiuto/annullamento sono rinviati.
 
@@ -148,7 +153,7 @@ Le liste usano un riepilogo autosufficiente e create, dettaglio e transizioni re
 - editing account (email, password, cancellazione) e gestione dispositivi/sessioni;
 - limite di sessioni concorrenti;
 - API dedicate alla gestione manuale dei collegamenti;
-- pagine frontend business ancora placeholder (dashboard con dati, Availability e Booking);
+- pagine frontend business ancora placeholder (dashboard con dati e Booking);
 - configurazione completa per il deploy.
 
 Follow-up non bloccanti aperti (dettaglio in [Functional Scope](docs/01-functional-scope.md)):
@@ -245,11 +250,11 @@ Anche `app.email` è tipizzata e fail-fast. `verification-page-url` punta alla p
 
 La configurazione locale validata usa `app.email.verification-page-url=http://localhost:5173/verify-email`. La pagina frontend `/verify-email` è implementata: legge e rimuove il token dal fragment, conferma via API e offre il resend neutro. Lo startup controllato è stato eseguito con email `DISABLED`, senza invii SMTP reali.
 
-Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazione usa un unico `Clock` tecnico UTC; `ApplicationTimeProvider.nowInstant()` tronca, senza arrotondare, alla precisione canonica di sei cifre. Gli istanti persistiti e gli audit applicativi sono `Instant` su colonne `DATETIME(6)`, con `spring.jpa.properties.hibernate.jdbc.time_zone=UTC`; `Europe/Rome` resta soltanto la zona business. Spring Data JPA valorizza `createdAt` e `updatedAt`. Le scadenze email e invito sono rispettivamente 24 e 168 ore reali e sono esposte con `Z`. Sul confine HTTP gli orari degli slot restano `OffsetDateTime` al secondo, validati contro gap, overlap e offset di `Europe/Rome`. Anche il timestamp di `ErrorResponse` è un `Instant` UTC serializzato con `Z`.
+Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazione usa un unico `Clock` tecnico UTC; `ApplicationTimeProvider.nowInstant()` tronca, senza arrotondare, alla precisione canonica di sei cifre. Gli istanti persistiti e gli audit applicativi sono `Instant` su colonne `DATETIME(6)`, con `spring.jpa.properties.hibernate.jdbc.time_zone=UTC`; `Europe/Rome` resta la zona business per la generazione degli slot. Spring Data JPA valorizza `createdAt` e `updatedAt`. Le scadenze email e invito sono rispettivamente 24 e 168 ore reali e sono esposte con `Z`. Sul confine HTTP gli orari degli slot restano `OffsetDateTime` con offset valido per `Europe/Rome`.
 
-La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle nove tabelle runtime e dello schema Spring Session tramite `classpath:db/migration`.
+La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle undici tabelle runtime e dello schema Spring Session tramite `classpath:db/migration`.
 
-Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true` e governa lo schema di dominio insieme all'infrastruttura Spring Session. V4 prepara e verifica atomicamente la conversione delle 23 colonne temporali legacy da `Europe/Rome` a UTC; V5 trasferisce l'auditing all'applicazione; V6 aggiunge e verifica il backfill degli snapshot storici Booking; V7 ha introdotto lo schema Spring Session JDBC (`SPRING_SESSION`, `SPRING_SESSION_ATTRIBUTES`) senza auto-init di Boot. L'elenco aggiornato delle migrazioni e i dettagli di schema restano in [docs/10-database-schema.md](docs/10-database-schema.md). Tutti gli istanti runtime usano `DATETIME(6)` e Hibernate valida il contratto con `ddl-auto=validate`.
+Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true` e governa lo schema di dominio insieme all'infrastruttura Spring Session. V4 converte i dati temporali legacy, V5 trasferisce l'auditing all'applicazione, V6 aggiunge gli snapshot Booking, V7 introduce Spring Session JDBC e V8 aggiunge regole settimanali, audit delle modifiche, capacità e luogo dello slot. L'elenco aggiornato delle migrazioni e i dettagli di schema restano in [docs/10-database-schema.md](docs/10-database-schema.md).
 
 La validazione conclusiva del 16 luglio 2026 su MySQL 8.0.44 ha prodotto il verdetto **MYSQL VALIDATION PASSED WITH WARNINGS**. Gli schemi isolati `support_trainer_audit_empty_20260716_101232` e `support_trainer_audit_legacy_20260716_101232` hanno certificato i percorsi da schema vuoto e legacy simulato. Sono rimasti presenti e non devono essere eliminati senza autorizzazione.
 
@@ -340,7 +345,7 @@ Creare la build frontend di produzione, comprensiva del controllo TypeScript:
 npm run build
 ```
 
-L'output della build viene generato in `frontend/dist`. I comandi verificano foundation, home, auth session-based, onboarding pubblico PROFESSIONAL e CLIENT, verifica email, Profilo/Account/Operational Status, gestione inviti PROFESSIONAL e liste/dettagli delle relazioni CLIENT ↔ PROFESSIONAL; non implicano che dashboard, Availability o Booking siano già integrate nel frontend.
+L'output della build viene generato in `frontend/dist`. I comandi verificano foundation, home, auth session-based, onboarding, Profilo/Account, inviti, relazioni e Availability settimanale PT; dashboard con dati e Booking restano da integrare nel frontend.
 
 ### Sviluppo locale frontend + backend
 
@@ -470,7 +475,7 @@ Il profilo tracciato `mailpit` è un aiuto manuale locale, non un profilo di pro
 
 ## 14. Roadmap sintetica
 
-1. pagine frontend business ancora placeholder (Availability, Booking e dashboard con dati);
+1. pagine frontend business ancora placeholder (Booking e dashboard con dati);
 2. completare il lifecycle account (recupero/reset password, editing account, upload immagine profilo);
 3. implementare le schede di allenamento;
 4. implementare i piani alimentari;
@@ -491,6 +496,6 @@ La cartella `frontend` contiene un'applicazione React/TypeScript/Vite con:
 - proxy Vite `/api` → `http://localhost:8080` in sviluppo;
 - test con Vitest / React Testing Library; gate locali lint/format/build.
 
-Auth foundation, login/logout, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status, gestione inviti PROFESSIONAL e liste/dettagli delle relazioni CLIENT ↔ PROFESSIONAL sono implementati. Restano placeholder dashboard con dati, Availability e Booking. Nessun JWT/Bearer né storage di token o codici invito nel client.
+Auth foundation, login/logout, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status, inviti, relazioni CLIENT ↔ PROFESSIONAL e Availability settimanale PT sono implementati. Restano placeholder dashboard con dati e Booking. Nessun JWT/Bearer né storage di token o codici invito nel client.
 
 Riferimenti: [Authentication Session Flow](docs/frontend/03-authentication-session-flow.md), [Professional Onboarding Implementation](docs/frontend/04-professional-onboarding-implementation.md), [Professional Invites Implementation](docs/frontend/05-professional-invites-implementation.md), [Client Onboarding Implementation](docs/frontend/06-client-onboarding-implementation.md), [Client-Professional Relationships Implementation](docs/frontend/07-client-professional-relationships-implementation.md), [Frontend Functional Map](docs/frontend/01-frontend-functional-map-mvp.md), [Public Home](docs/frontend/02-public-home-implementation.md), [Security Flow](docs/09-security-flow.md), [Functional Scope](docs/01-functional-scope.md).

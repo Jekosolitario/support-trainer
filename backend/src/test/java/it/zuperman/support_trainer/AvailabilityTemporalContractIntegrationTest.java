@@ -2,10 +2,13 @@ package it.zuperman.support_trainer;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +32,9 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 
 import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
+import it.zuperman.support_trainer.availability.entity.WeeklyAvailabilityRule;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
+import it.zuperman.support_trainer.availability.repository.WeeklyAvailabilityRuleRepository;
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
@@ -59,6 +64,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AvailabilityTemporalContractIntegrationTest {
 
     private static final Instant FIXED_NOW = Instant.parse("2026-01-15T10:00:00Z");
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Europe/Rome");
     private static final String PASSWORD = "Password123!";
 
     @Autowired
@@ -72,6 +78,9 @@ class AvailabilityTemporalContractIntegrationTest {
 
     @Autowired
     private AvailabilitySlotRepository availabilitySlotRepository;
+
+    @Autowired
+    private WeeklyAvailabilityRuleRepository weeklyAvailabilityRuleRepository;
 
     @Autowired
     private ProfessionalClientLinkRepository professionalClientLinkRepository;
@@ -186,16 +195,15 @@ class AvailabilityTemporalContractIntegrationTest {
         ClientProfile client = createClient();
         CsrfSession clientAuth = authenticateClient(client);
         professionalClientLinkRepository.saveAndFlush(new ProfessionalClientLink(professional, client));
-        AvailabilitySlot slot = availabilitySlotRepository.saveAndFlush(new AvailabilitySlot(
-                professional,
-                Instant.parse("2026-07-20T15:30:00Z"),
-                Instant.parse("2026-07-20T16:30:00Z")
-        ));
+        AvailabilitySlot slot = saveWeeklyOccurrence(
+                "2026-07-20T15:30:00Z",
+                "2026-07-20T16:30:00Z"
+        );
 
         mockMvc.perform(post("/api/v1/bookings")
                         .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"availabilitySlotId\":" + slot.getId() + "}"))
+                        .content(bookingPayload(slot)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.items[0].scheduledStart")
                         .value("2026-07-20T17:30:00+02:00"))
@@ -203,6 +211,45 @@ class AvailabilityTemporalContractIntegrationTest {
                         .value("2026-07-20T18:30:00+02:00"))
                 .andExpect(jsonPath("$.createdAt").isNotEmpty())
                 .andExpect(jsonPath("$.updatedAt").isNotEmpty());
+    }
+
+    @Test
+    void shouldPreserveWinterBusinessOffsetWhenCreatingBookingOverHttp() throws Exception {
+        ClientProfile client = createClient();
+        CsrfSession clientAuth = authenticateClient(client);
+        professionalClientLinkRepository.saveAndFlush(new ProfessionalClientLink(professional, client));
+        AvailabilitySlot slot = saveWeeklyOccurrence(
+                "2026-02-16T16:30:00Z",
+                "2026-02-16T17:30:00Z"
+        );
+
+        mockMvc.perform(post("/api/v1/bookings")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingPayload(slot)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.scheduledStart").value("2026-02-16T17:30:00+01:00"))
+                .andExpect(jsonPath("$.scheduledEnd").value("2026-02-16T18:30:00+01:00"))
+                .andExpect(jsonPath("$.items[0].scheduledStart").value("2026-02-16T17:30:00+01:00"));
+    }
+
+    @Test
+    void shouldRejectIncorrectSummerOffsetWhenCreatingBookingOverHttp() throws Exception {
+        ClientProfile client = createClient();
+        CsrfSession clientAuth = authenticateClient(client);
+        professionalClientLinkRepository.saveAndFlush(new ProfessionalClientLink(professional, client));
+        AvailabilitySlot slot = saveWeeklyOccurrence(
+                "2026-07-20T15:30:00Z",
+                "2026-07-20T16:30:00Z"
+        );
+
+        mockMvc.perform(post("/api/v1/bookings")
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingPayload(slot, "2026-07-20T17:30:00+01:00")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("L'offset indicato non è coerente con la zona business"));
     }
 
     @Test
@@ -319,6 +366,49 @@ class AvailabilityTemporalContractIntegrationTest {
     private static String slotPayload(String startDateTime, String endDateTime) {
         return "{\"startDateTime\":\"" + startDateTime
                 + "\",\"endDateTime\":\"" + endDateTime + "\"}";
+    }
+
+    private AvailabilitySlot saveWeeklyOccurrence(String start, String end) {
+        Instant startInstant = Instant.parse(start);
+        Instant endInstant = Instant.parse(end);
+        var businessStart = startInstant.atZone(BUSINESS_ZONE);
+        var businessEnd = endInstant.atZone(BUSINESS_ZONE);
+        int durationMinutes = Math.toIntExact(Duration.between(startInstant, endInstant).toMinutes());
+        WeeklyAvailabilityRule rule = weeklyAvailabilityRuleRepository.saveAndFlush(
+                new WeeklyAvailabilityRule(
+                        professional,
+                        businessStart.getDayOfWeek(),
+                        businessStart.toLocalTime(),
+                        businessEnd.toLocalTime(),
+                        Set.of(durationMinutes),
+                        "Studio",
+                        1,
+                        businessStart.toLocalDate()
+                )
+        );
+        return availabilitySlotRepository.saveAndFlush(new AvailabilitySlot(
+                professional,
+                rule,
+                startInstant,
+                endInstant,
+                "Studio",
+                1
+        ));
+    }
+
+    private static String bookingPayload(AvailabilitySlot slot) {
+        String startDateTime = slot.getStartDateTime()
+                .atZone(BUSINESS_ZONE)
+                .toOffsetDateTime()
+                .toString();
+        return bookingPayload(slot, startDateTime);
+    }
+
+    private static String bookingPayload(AvailabilitySlot slot, String startDateTime) {
+        long durationMinutes = Duration.between(slot.getStartDateTime(), slot.getEndDateTime()).toMinutes();
+        return "{\"availabilitySlotId\":" + slot.getId()
+                + ",\"startDateTime\":\"" + startDateTime
+                + "\",\"durationMinutes\":" + durationMinutes + "}";
     }
 
     @TestConfiguration
