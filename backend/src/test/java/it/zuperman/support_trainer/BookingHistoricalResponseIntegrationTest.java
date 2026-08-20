@@ -144,6 +144,9 @@ class BookingHistoricalResponseIntegrationTest {
                 .andExpect(jsonPath("$.scheduledStart").value("2026-07-20T17:30:00+02:00"))
                 .andExpect(jsonPath("$.scheduledEnd").value("2026-07-20T18:30:00+02:00"))
                 .andExpect(jsonPath("$.durationMinutes").value(60))
+                .andExpect(jsonPath("$.rejectionReason").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.cancellationReason").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.cancelledBy").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.items[0].availabilitySlotId").value(slot.getId()))
                 .andExpect(jsonPath("$.items[0].scheduledStart").value("2026-07-20T17:30:00+02:00"))
                 .andExpect(jsonPath("$.items[0].locationLabel").value("Studio"))
@@ -233,16 +236,23 @@ class BookingHistoricalResponseIntegrationTest {
                 .andExpect(jsonPath("$.rejectedAt").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.cancelledAt").value(org.hamcrest.Matchers.nullValue()));
         mockMvc.perform(patch("/api/v1/bookings/{id}/cancel", firstBookingId)
-                        .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth)))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(clientAuth))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\" Cambio programma \"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.confirmedAt").value("2026-01-15T10:00:00Z"))
-                .andExpect(jsonPath("$.cancelledAt").value("2026-01-15T10:00:00Z"));
+                .andExpect(jsonPath("$.cancelledAt").value("2026-01-15T10:00:00Z"))
+                .andExpect(jsonPath("$.cancellationReason").value("Cambio programma"))
+                .andExpect(jsonPath("$.cancelledBy").value("CLIENT"));
         mockMvc.perform(patch("/api/v1/bookings/{id}/reject", secondBookingId)
-                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth)))
+                        .with(SessionAuthTestSupport.withSessionAndCsrf(professionalAuth))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\" Agenda completa \"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rejectedAt").value("2026-01-15T10:00:00Z"))
                 .andExpect(jsonPath("$.confirmedAt").value(org.hamcrest.Matchers.nullValue()))
-                .andExpect(jsonPath("$.cancelledAt").value(org.hamcrest.Matchers.nullValue()));
+                .andExpect(jsonPath("$.cancelledAt").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.rejectionReason").value("Agenda completa"));
         mockMvc.perform(get("/api/v1/bookings/client").with(SessionAuthTestSupport.withSession(clientAuth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(thirdBookingId))

@@ -1,9 +1,13 @@
 # Domain Model — Support Trainer
 
+> Booking V1 corrente: `BookingRequest` include `rejectionReason`, `cancellationReason` e `cancelledBy` (`BookingCancellationActor.CLIENT|PROFESSIONAL`), oltre ai timestamp di transizione. I metadata sono atomici con la transizione, privi di setter pubblici e nullable per lo storico legacy. Il limite mutation deriva da `MAX(BookingRequestItem.scheduledEnd)`, non dallo slot live. Vedi [19-booking-domain-contract-v1.md](19-booking-domain-contract-v1.md).
+
 ## 1. Obiettivo del documento
+
 Questo documento definisce le principali entità del dominio, le loro responsabilità e le relazioni logiche tra di esse.
 
 Lo scopo è creare una base chiara per:
+
 - progettazione database
 - definizione delle entity JPA
 - costruzione della business logic
@@ -14,21 +18,26 @@ Lo scopo è creare una base chiara per:
 ## 2. Scelte di modellazione principali
 
 ### 2.1 Gerarchia utenti
+
 Il sistema prevede una gerarchia con una entità base astratta:
 
-- **User** *(astratta)*
+- **User** _(astratta)_
 - **ProfessionalProfile**
 - **ClientProfile**
 
 ### 2.2 Motivazione della scelta
+
 Questa soluzione permette di:
+
 - centralizzare i campi comuni degli utenti
 - distinguere chiaramente professionisti e clienti
 - aggiungere campi specifici per ogni tipo di utente
 - mantenere il modello più ordinato e leggibile
 
 ### 2.3 Specializzazione del professionista
+
 Un professionista può avere una specializzazione tra:
+
 - **PERSONAL_TRAINER**
 - **NUTRITIONIST**
 
@@ -37,9 +46,11 @@ Un professionista può avere una specializzazione tra:
 ## 3. Entità principali
 
 ## 3.1 User (astratta)
+
 Rappresenta la base comune di tutti gli utenti del sistema.
 
 ### Campi comuni iniziali
+
 - `id`
 - `firstName`
 - `lastName`
@@ -53,7 +64,9 @@ Rappresenta la base comune di tutti gli utenti del sistema.
 - `updatedAt`
 
 ### Note
+
 Campi come `role`, `accountStatus` ed `emailVerified` servono a distinguere:
+
 - permessi di accesso
 - stato dell’account
 - verifica email completata o meno
@@ -63,12 +76,15 @@ Campi come `role`, `accountStatus` ed `emailVerified` servono a distinguere:
 ---
 
 ## 3.2 ProfessionalProfile
+
 Rappresenta un professionista registrato alla piattaforma.
 
 ### Eredita da
+
 - `User`
 
 ### Campi specifici iniziali
+
 - `specialization`
 - `operationalStatus`
 - `phoneNumber`
@@ -78,11 +94,14 @@ Rappresenta un professionista registrato alla piattaforma.
 - `active`
 
 ### Esempi valori
+
 - `specialization`: `PERSONAL_TRAINER`, `NUTRITIONIST`
 - `operationalStatus`: `DISPONIBILE`, `ASSENTE`, `FERIE`, `MALATTIA`
 
 ### Responsabilità
+
 Il professionista può:
+
 - invitare clienti
 - gestire contenuti professionali
 - nel caso del PT, gestire disponibilità e prenotazioni
@@ -90,12 +109,15 @@ Il professionista può:
 ---
 
 ## 3.3 ClientProfile
+
 Rappresenta un cliente registrato alla piattaforma.
 
 ### Eredita da
+
 - `User`
 
 ### Campi specifici iniziali
+
 - `operationalStatus`
 - `birthDate`
 - `heightCm`
@@ -107,15 +129,19 @@ Rappresenta un cliente registrato alla piattaforma.
 - `active`
 
 ### Esempi valori
+
 - `operationalStatus`: `ATTIVO`, `INFORTUNATO`, `PAUSA`
 
 ### Note
+
 `ClientProfile` contiene i dati principali e relativamente stabili del cliente.
 
 I dati fisici che cambiano nel tempo, utili per monitoraggio, storico e grafici, non devono stare qui in modo diretto ma in una entità separata dedicata alle misurazioni.
 
 ### Responsabilità
+
 Il cliente può:
+
 - collegarsi a professionisti
 - visualizzare contenuti assegnati
 - inviare richieste di prenotazione al PT
@@ -124,9 +150,11 @@ Il cliente può:
 ---
 
 ## 3.4 ClientMeasurement
+
 Rappresenta una rilevazione fisica del cliente registrata nel tempo.
 
 ### Campi iniziali
+
 - `id`
 - `client`
 - `recordedAt`
@@ -138,22 +166,28 @@ Rappresenta una rilevazione fisica del cliente registrata nel tempo.
 - `notes`
 
 ### Note
+
 Questa entità serve a:
+
 - mantenere uno storico delle misurazioni
 - supportare il monitoraggio da parte dei professionisti
 - rendere possibili grafici futuri e analisi andamento
 
 ### Nota progettuale
+
 Indicatori derivati come BMI o peso ideale stimato possono essere:
+
 - calcolati dal backend
 - eventualmente salvati in futuro se servirà uno snapshot storico esplicito
 
 ---
 
 ## 3.5 ProfessionalClientLink
+
 Entità intermedia che rappresenta il collegamento tra un professionista e un cliente.
 
 ### Campi iniziali
+
 - `id`
 - `professional`
 - `client`
@@ -161,19 +195,23 @@ Entità intermedia che rappresenta il collegamento tra un professionista e un cl
 - `active`
 
 ### Relazione
+
 - molti collegamenti possono riferirsi a un professionista
 - molti collegamenti possono riferirsi a un cliente
 
 ### Note di business
+
 - un cliente può avere al massimo **3 professionisti**
 - il sistema non deve permettere il collegamento di un professionista a sé stesso come cliente
 
 ---
 
 ## 3.6 InviteCode
+
 Rappresenta il codice invito generato da un professionista per permettere la registrazione di un cliente.
 
 ### Campi iniziali
+
 - `id`
 - `code`
 - `professional`
@@ -183,6 +221,7 @@ Rappresenta il codice invito generato da un professionista per permettere la reg
 - `createdAt`
 
 ### Regole di business
+
 - può essere generato solo da un professionista con account verificato e attivo
 - ha una scadenza
 - è usabile una sola volta
@@ -191,6 +230,7 @@ Rappresenta il codice invito generato da un professionista per permettere la reg
 ---
 
 ## 3.6.1 WeeklyAvailabilityRule
+
 Definisce una fascia ricorrente della settimana lavorativa del Personal Trainer.
 
 I campi correnti sono `id`, `professional`, `dayOfWeek`, `startTime`, `endTime`, `allowedDurations`, `locationLabel`, `capacityPerSlot`, `active`, `validFrom` e audit. `allowedDurations` è una collezione normalizzata di durate da 15 a 180 minuti, multiple di 15 e interamente contenute nella finestra. Anche gli estremi della finestra sono allineati a 15 minuti. Le regole attive dello stesso giorno non possono sovrapporsi, mentre possono essere adiacenti.
@@ -200,9 +240,11 @@ Update e deactivate modificano immediatamente il futuro dalla data/ora corrente.
 ---
 
 ## 3.7 AvailabilitySlot
+
 Rappresenta un'occorrenza-finestra limitata nel tempo e materializzata da una regola settimanale. Non rappresenta una singola combinazione inizio/durata: una sola occorrenza espone più inizi a intervalli di 15 minuti e più durate consentite.
 
 ### Campi attualmente implementati
+
 - `id`
 - `professional`
 - `weeklyRule` opzionale per gli slot legacy
@@ -217,10 +259,13 @@ Rappresenta un'occorrenza-finestra limitata nel tempo e materializzata da una re
 - `updatedAt`
 
 ### Note
+
 Questa entità è utilizzata solo per i professionisti con specializzazione:
+
 - `PERSONAL_TRAINER`
 
 ### Regole principali implementate
+
 - lo slot appartiene a un solo professionista;
 - l'occupancy è derivata da Booking `PENDING` e `CONFIRMED`;
 - la capacità misura il massimo numero di Client contemporaneamente presenti, calcolato sugli intervalli Booking sovrapposti;
@@ -232,26 +277,39 @@ Questa entità è utilizzata solo per i professionisti con specializzazione:
 ---
 
 ## 3.8 BookingRequest
+
 Rappresenta una richiesta di prenotazione inviata da un cliente verso un personal trainer.
 
 ### Campi attualmente implementati
+
 - `id`
 - `client`
 - `professional`
 - `status`
 - `note`
+- `clientDisplayName`
+- `professionalDisplayName`
+- `confirmedAt`
+- `rejectedAt`
+- `cancelledAt`
+- `rejectionReason`
+- `cancellationReason`
+- `cancelledBy`
 - `active`
 - `createdAt`
 - `updatedAt`
 
 ### Stati richiesta implementati
+
 - `PENDING`
 - `CONFIRMED`
 - `REJECTED`
 - `CANCELLED`
 
 ### Note
+
 Una richiesta di prenotazione appartiene a:
+
 - un solo cliente;
 - un solo personal trainer.
 
@@ -261,12 +319,16 @@ Il lock del Client rende race-safe il vincolo che vieta allo stesso Client due B
 
 La richiesta viene mantenuta nello storico tramite stato e flag `active`, senza eliminazione fisica nel normale ciclo operativo.
 
+Le nuove transizioni valorizzano atomicamente timestamp e metadata: reject richiede una reason valida; cancel richiede sempre l'actor server-side e, sullo stato `CONFIRMED`, una reason. I metadata restano nullable nello schema esclusivamente per idratare record legacy.
+
 ---
 
 ## 3.9 BookingRequestItem
+
 Rappresenta il dettaglio dello slot collegato a una richiesta di prenotazione.
 
 ### Campi attualmente implementati
+
 - `id`
 - `bookingRequest`
 - `availabilitySlot`
@@ -277,17 +339,21 @@ Rappresenta il dettaglio dello slot collegato a una richiesta di prenotazione.
 - `updatedAt`
 
 ### Stato attuale dell’implementazione
+
 Nel backend attuale ogni richiesta creata tramite API contiene un solo `BookingRequestItem`, collegato all'occorrenza indicata da `availabilitySlotId`. Inizio, fine e luogo sono snapshot immutabili della scelta concordata e non seguono successive modifiche alla regola o all'occorrenza.
 
 ### Evoluzione possibile
+
 La presenza di questa entità mantiene il modello estendibile a una futura gestione multi-slot, ma tale comportamento non è attualmente implementato nel contratto API.
 
 ---
 
 ## 3.10 WorkoutPlan
+
 Rappresenta una scheda di allenamento mensile assegnata da un personal trainer a un cliente.
 
 ### Campi iniziali
+
 - `id`
 - `professional`
 - `client`
@@ -298,22 +364,28 @@ Rappresenta una scheda di allenamento mensile assegnata da un personal trainer a
 - `active`
 
 ### Note
+
 Una scheda appartiene a:
+
 - un personal trainer
 - un cliente
 
 ---
 
 ## 3.11 WorkoutWeek
+
 Rappresenta una settimana interna a una scheda di allenamento.
 
 ### Campi iniziali
+
 - `id`
 - `workoutPlan`
 - `weekNumber`
 
 ### Note
+
 Serve a organizzare la scheda in:
+
 - settimana 1
 - settimana 2
 - settimana 3
@@ -322,9 +394,11 @@ Serve a organizzare la scheda in:
 ---
 
 ## 3.12 WorkoutDay
+
 Rappresenta un singolo giorno della scheda di allenamento.
 
 ### Campi iniziali
+
 - `id`
 - `workoutWeek`
 - `date`
@@ -333,18 +407,22 @@ Rappresenta un singolo giorno della scheda di allenamento.
 - `notes`
 
 ### Esempi dayType
+
 - `REST`
 - `WORKOUT`
 
 ### Note
+
 Se il giorno è di tipo `WORKOUT`, il cliente può aprire il dettaglio dell’allenamento.
 
 ---
 
 ## 3.13 WorkoutExercise
+
 Rappresenta una riga di esercizio associata a un giorno di allenamento.
 
 ### Campi iniziali
+
 - `id`
 - `workoutDay`
 - `exerciseName`
@@ -361,9 +439,11 @@ Rappresenta una riga di esercizio associata a un giorno di allenamento.
 ---
 
 ## 3.14 NutritionPlan
+
 Rappresenta un piano alimentare mensile assegnato da un nutrizionista a un cliente.
 
 ### Campi iniziali
+
 - `id`
 - `professional`
 - `client`
@@ -376,9 +456,11 @@ Rappresenta un piano alimentare mensile assegnato da un nutrizionista a un clien
 ---
 
 ## 3.15 NutritionWeek
+
 Rappresenta una settimana interna a un piano alimentare.
 
 ### Campi iniziali
+
 - `id`
 - `nutritionPlan`
 - `weekNumber`
@@ -386,9 +468,11 @@ Rappresenta una settimana interna a un piano alimentare.
 ---
 
 ## 3.16 NutritionDay
+
 Rappresenta un singolo giorno del piano alimentare.
 
 ### Campi iniziali
+
 - `id`
 - `nutritionWeek`
 - `date`
@@ -397,15 +481,18 @@ Rappresenta un singolo giorno del piano alimentare.
 - `notes`
 
 ### Esempi dayType
+
 - `FREE`
 - `PLANNED`
 
 ---
 
 ## 3.17 NutritionEntry
+
 Rappresenta una riga di contenuto giornaliero del piano alimentare.
 
 ### Campi iniziali
+
 - `id`
 - `nutritionDay`
 - `mealType`
@@ -414,14 +501,17 @@ Rappresenta una riga di contenuto giornaliero del piano alimentare.
 - `notes`
 
 ### Note
+
 La struttura esatta dei campi nutrizionali verrà raffinata in un documento successivo.
 
 ---
 
 ## 3.18 ClientFeedback
+
 Rappresenta una segnalazione inviata dal cliente su un contenuto assegnato.
 
 ### Campi iniziali
+
 - `id`
 - `client`
 - `professional`
@@ -429,12 +519,15 @@ Rappresenta una segnalazione inviata dal cliente su un contenuto assegnato.
 - `createdAt`
 
 ### Collegamenti possibili
+
 La segnalazione deve riferirsi a uno specifico giorno di contenuto.
 
 ### Nota progettuale
+
 Poiché workout e piano alimentare sono separati, sarà necessario decidere in fase tecnica se:
+
 - usare una struttura generica di feedback
-oppure
+  oppure
 - separare i feedback tra area allenamento e area nutrizione
 
 Questa decisione verrà definita meglio in una fase successiva.
@@ -475,25 +568,31 @@ Le entità pianificate restano valide come ipotesi di dominio futuro, ma non rap
 ## 4. Relazioni principali
 
 ### 4.1 Gerarchia utenti
+
 - `ProfessionalProfile` estende `User`
 - `ClientProfile` estende `User`
 
 ### 4.2 Monitoraggio fisico cliente
+
 - un `ClientProfile` può avere molte `ClientMeasurement`
 - ogni `ClientMeasurement` appartiene a un solo cliente
 
 ### 4.3 Collegamento professionista-cliente
+
 - `ProfessionalProfile` ↔ `ClientProfile`
 - relazione molti-a-molti gestita tramite `ProfessionalClientLink`
 
 ### 4.4 Codice invito
+
 - un `ProfessionalProfile` può generare molti `InviteCode`
 - un `InviteCode` appartiene a un solo professionista
 
 ### 4.5 Disponibilità
+
 - un `ProfessionalProfile` di tipo `PERSONAL_TRAINER` può avere molti `AvailabilitySlot`
 
 ### 4.6 Prenotazioni
+
 - un `ClientProfile` può creare molte `BookingRequest`;
 - un `ProfessionalProfile` di tipo `PERSONAL_TRAINER` può ricevere molte `BookingRequest`;
 - una `BookingRequest` contiene attualmente un singolo `BookingRequestItem` nel flusso esposto dalle API;
@@ -501,6 +600,7 @@ Le entità pianificate restano valide come ipotesi di dominio futuro, ma non rap
 - il modello dati resta predisposto per una futura evoluzione multi-slot.
 
 ### 4.7 Schede di allenamento
+
 - un `ProfessionalProfile` di tipo `PERSONAL_TRAINER` può creare molte `WorkoutPlan`
 - un `ClientProfile` può ricevere molte `WorkoutPlan`
 - una `WorkoutPlan` contiene molte `WorkoutWeek`
@@ -508,6 +608,7 @@ Le entità pianificate restano valide come ipotesi di dominio futuro, ma non rap
 - un `WorkoutDay` contiene molti `WorkoutExercise`
 
 ### 4.8 Piani alimentari
+
 - un `ProfessionalProfile` di tipo `NUTRITIONIST` può creare molti `NutritionPlan`
 - un `ClientProfile` può ricevere molti `NutritionPlan`
 - un `NutritionPlan` contiene molte `NutritionWeek`
@@ -515,6 +616,7 @@ Le entità pianificate restano valide come ipotesi di dominio futuro, ma non rap
 - un `NutritionDay` contiene molte `NutritionEntry`
 
 ### 4.9 Segnalazioni
+
 - un `ClientProfile` può inviare molte segnalazioni
 - un `ProfessionalProfile` può ricevere molte segnalazioni
 

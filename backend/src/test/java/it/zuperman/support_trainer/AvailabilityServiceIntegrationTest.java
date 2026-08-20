@@ -39,7 +39,9 @@ import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepos
 import it.zuperman.support_trainer.availability.repository.WeeklyAvailabilityRuleRepository;
 import it.zuperman.support_trainer.availability.service.AvailabilityService;
 import it.zuperman.support_trainer.availability.service.WeeklyAvailabilityRuleService;
+import it.zuperman.support_trainer.booking.dto.request.CancelBookingRequest;
 import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
+import it.zuperman.support_trainer.booking.dto.request.RejectBookingRequest;
 import it.zuperman.support_trainer.booking.entity.BookingRequest;
 import it.zuperman.support_trainer.booking.entity.BookingRequestItem;
 import it.zuperman.support_trainer.booking.repository.BookingRequestItemRepository;
@@ -661,7 +663,10 @@ class AvailabilityServiceIntegrationTest {
 
         authenticateAs(professional);
 
-        bookingService.rejectBookingRequest(pendingBooking.getId());
+        bookingService.rejectBookingRequest(
+                pendingBooking.getId(),
+                new RejectBookingRequest("Disponibilità cambiata")
+        );
 
         UpdateAvailabilitySlotRequest updateRequest = new UpdateAvailabilitySlotRequest(
                 asBusinessOffset(startDateTime.plusDays(1)),
@@ -1261,7 +1266,10 @@ class AvailabilityServiceIntegrationTest {
                 .satisfies(option -> assertThat(option.allowedDurations()).containsExactly(60));
 
         authenticateAs(bookingClient);
-        bookingService.cancelBookingRequest(shortBooking.getId());
+        bookingService.cancelBookingRequest(
+                shortBooking.getId(),
+                new CancelBookingRequest("Cambio programma")
+        );
         authenticateAs(viewingClient);
         assertThat(clientWindow(professional.getId(), slot.getId()).bookableOptions())
                 .filteredOn(option -> option.startDateTime().toLocalTime().equals(LocalTime.of(9, 0)))
@@ -1281,7 +1289,10 @@ class AvailabilityServiceIntegrationTest {
                 .doesNotContain(slot.getId());
 
         authenticateAs(professional);
-        bookingService.rejectBookingRequest(fullBooking.getId());
+        bookingService.rejectBookingRequest(
+                fullBooking.getId(),
+                new RejectBookingRequest("Fascia non disponibile")
+        );
         authenticateAs(viewingClient);
         assertThat(clientWindow(professional.getId(), slot.getId()).bookableOptions()).isNotEmpty();
     }
@@ -1327,7 +1338,10 @@ class AvailabilityServiceIntegrationTest {
         assertNotBookableAt(confirmedResponse, LocalTime.of(9, 30));
         assertBookableAt(confirmedResponse, LocalTime.of(10, 0), 60);
 
-        bookingService.cancelBookingRequest(pendingBooking.getId());
+        bookingService.cancelBookingRequest(
+                pendingBooking.getId(),
+                new CancelBookingRequest("Cambio programma")
+        );
         assertBookableAt(
                 clientWindow(professional.getId(), slot.getId()),
                 LocalTime.of(9, 0),
@@ -1341,7 +1355,10 @@ class AvailabilityServiceIntegrationTest {
                 null
         ));
         authenticateAs(professional);
-        bookingService.rejectBookingRequest(bookingToReject.getId());
+        bookingService.rejectBookingRequest(
+                bookingToReject.getId(),
+                new RejectBookingRequest("Fascia non disponibile")
+        );
         authenticateAs(client);
         assertBookableAt(
                 clientWindow(professional.getId(), slot.getId()),

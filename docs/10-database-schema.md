@@ -1,6 +1,9 @@
 # Database Schema — Support Trainer
 
+> V9 additiva: `booking_requests` include `rejection_reason VARCHAR(1000) NULL`, `cancellation_reason VARCHAR(1000) NULL`, `cancelled_by VARCHAR(32) NULL`. Nessun backfill, indice o vincolo aggiuntivo: i metadata legacy null restano validi. `cancelled_by` mappa l'enum dedicato `BookingCancellationActor`, non `UserRole`.
+
 ## 1. Obiettivo del documento
+
 Questo documento definisce lo schema del database di Support Trainer distinguendo chiaramente tra:
 
 - schema **attualmente integrato nel backend**
@@ -8,6 +11,7 @@ Questo documento definisce lo schema del database di Support Trainer distinguend
 - schema **pianificato per moduli futuri**
 
 Lo scopo è:
+
 - tradurre il domain model in tabelle SQL
 - definire chiavi primarie e foreign key
 - chiarire i vincoli principali
@@ -18,14 +22,18 @@ Lo scopo è:
 ## 2. Convenzioni adottate
 
 ### 2.1 Naming
+
 - nomi tabelle in **snake_case plurale**
 - nomi colonne in **snake_case**
 
 ### 2.2 Chiavi primarie
+
 Tutte le tabelle principali usano:
+
 - `id BIGINT PRIMARY KEY AUTO_INCREMENT`
 
 ### 2.3 Timestamps
+
 - tabelle principali: `created_at`, `updated_at`
 - tabelle evento/token: almeno `created_at`
 - dove serve, si aggiungono campi specifici come:
@@ -36,7 +44,9 @@ Tutte le tabelle principali usano:
 Lo schema finale contiene 28 campi runtime che rappresentano istanti, tutti `DATETIME(6)` con semantica UTC. Ventitré appartenevano già al modello legacy e sono stati sottoposti alla conversione V4; gli altri cinque timestamp di transizione o snapshot sono stati aggiunti da V6. L'applicazione li mappa come `Instant`, imposta Hibernate/JDBC in UTC e normalizza a microsecondi. `Europe/Rome` non è una timezone di persistenza: resta la zona business per l'input/output civile degli slot.
 
 ### 2.4 Soft delete
+
 Per alcune tabelle principali si usa:
+
 - `active BOOLEAN NOT NULL DEFAULT TRUE`
 
 ### 2.5 Engine, charset e versionamento
@@ -55,9 +65,11 @@ Flyway governa le nove tabelle di dominio runtime della sezione 3 e, con la V7, 
 ## 3. Schema attualmente integrato nel backend
 
 ## 3.1 `users`
+
 Tabella base della gerarchia utenti.
 
 ### Colonne principali
+
 - `id`
 - `first_name`
 - `last_name`
@@ -71,6 +83,7 @@ Tabella base della gerarchia utenti.
 - `updated_at`
 
 ### Vincoli principali
+
 - `email` **UNIQUE**
 - `first_name` `NOT NULL`
 - `last_name` `NOT NULL`
@@ -83,14 +96,17 @@ Tabella base della gerarchia utenti.
 - `role` e `account_status` `VARCHAR(50)`
 
 ### Note
+
 Questa tabella contiene i campi comuni a tutti gli utenti.
 
 ---
 
 ## 3.2 `professional_profiles`
+
 Tabella figlia di `users` per i professionisti.
 
 ### Colonne principali
+
 - `id`
 - `specialization`
 - `operational_status`
@@ -105,9 +121,11 @@ Tabella figlia di `users` per i professionisti.
 - `updated_at`
 
 ### Chiavi
+
 - `id` → PK e FK verso `users(id)`
 
 ### Vincoli principali
+
 - `specialization` `NOT NULL`
 - `operational_status` `NOT NULL`
 - `active` `NOT NULL DEFAULT TRUE`
@@ -115,14 +133,17 @@ Tabella figlia di `users` per i professionisti.
 - `instagram_url` e `website_url` `VARCHAR(500)`
 
 ### Note
+
 Rappresenta i dati specifici del professionista.
 
 ---
 
 ## 3.3 `client_profiles`
+
 Tabella figlia di `users` per i clienti.
 
 ### Colonne principali
+
 - `id`
 - `operational_status`
 - `birth_date`
@@ -137,9 +158,11 @@ Tabella figlia di `users` per i clienti.
 - `updated_at`
 
 ### Chiavi
+
 - `id` → PK e FK verso `users(id)`
 
 ### Vincoli principali
+
 - `operational_status` `NOT NULL`
 - `birth_date` `NOT NULL`
 - `height_cm` `NOT NULL`
@@ -152,9 +175,11 @@ Tabella figlia di `users` per i clienti.
 ---
 
 ## 3.4 `professional_client_links`
+
 Tabella intermedia per la relazione molti-a-molti tra professionisti e clienti.
 
 ### Colonne principali
+
 - `id`
 - `professional_id`
 - `client_id`
@@ -163,17 +188,21 @@ Tabella intermedia per la relazione molti-a-molti tra professionisti e clienti.
 - `updated_at`
 
 ### Foreign key
+
 - `professional_id` → `professional_profiles(id)`
 - `client_id` → `client_profiles(id)`
 
 ### Vincoli principali
+
 - `professional_id` `NOT NULL`
 - `client_id` `NOT NULL`
 - `active` `NOT NULL DEFAULT TRUE`
 
 ### Note
+
 Non si impone qui un vincolo SQL rigido su `(professional_id, client_id, active)`.  
 La regola di unicità del collegamento attivo viene gestita da:
+
 - business logic
 - query dedicate
 - validazioni service layer
@@ -181,9 +210,11 @@ La regola di unicità del collegamento attivo viene gestita da:
 ---
 
 ## 3.5 `invite_codes`
+
 Codici invito generati dai professionisti.
 
 ### Colonne principali
+
 - `id`
 - `code`
 - `professional_id`
@@ -195,9 +226,11 @@ Codici invito generati dai professionisti.
 - `updated_at`
 
 ### Foreign key
+
 - `professional_id` → `professional_profiles(id)`
 
 ### Vincoli principali
+
 - `code` `NOT NULL UNIQUE`
 - `professional_id` `NOT NULL`
 - `expires_at` `NOT NULL`
@@ -205,6 +238,7 @@ Codici invito generati dai professionisti.
 - `active` `NOT NULL DEFAULT TRUE`
 
 ### Note
+
 `active` è utile per eventuale disattivazione logica di codici non ancora usati.
 
 ---
@@ -212,6 +246,7 @@ Codici invito generati dai professionisti.
 ## 3.6 `email_verification_tokens`
 
 ### Colonne principali
+
 - `id`
 - `user_id`
 - `token`
@@ -221,9 +256,11 @@ Codici invito generati dai professionisti.
 - `created_at`
 
 ### Foreign key
+
 - `user_id` → `users(id)`
 
 ### Vincoli principali
+
 - `user_id` `NOT NULL`
 - `token` `NOT NULL UNIQUE`
 - `token` `VARCHAR(500)`
@@ -231,6 +268,7 @@ Codici invito generati dai professionisti.
 - `used` `NOT NULL DEFAULT FALSE`
 
 ### Note
+
 È il token di sicurezza attualmente realmente integrato nel backend per il flusso di verifica email del professionista.
 
 ---
@@ -329,6 +367,9 @@ Richieste di prenotazione create dai clienti.
 - `confirmed_at`
 - `rejected_at`
 - `cancelled_at`
+- `rejection_reason`
+- `cancellation_reason`
+- `cancelled_by`
 
 ### Foreign key
 
@@ -344,6 +385,9 @@ Richieste di prenotazione create dai clienti.
 - `status` `NOT NULL`
 - `active` `NOT NULL DEFAULT TRUE`
 - i timestamp di transizione sono `DATETIME(6)` nullable e persistiti UTC
+- `rejection_reason VARCHAR(1000) NULL`
+- `cancellation_reason VARCHAR(1000) NULL`
+- `cancelled_by VARCHAR(32) NULL`, enum applicativo `CLIENT|PROFESSIONAL`
 
 ### Stati gestiti
 
@@ -372,6 +416,7 @@ Regole applicative attualmente implementate:
 - conservazione dell’intervallo temporale originario dello slot anche dopo `REJECTED` o `CANCELLED`.
 - V6 esegue il backfill dei display name dai profili correnti dopo preflight: per il legacy non sono una prova del nome originario;
 - V6 usa `updated_at` solo per il timestamp dello stato finale legacy e non inferisce stati intermedi non ricostruibili.
+- V9 aggiunge reason e actor nullable senza backfill; le nuove transizioni richiedono reject reason e cancel actor, mentre la nullability preserva soltanto lo storico.
 
 ---
 
@@ -432,6 +477,7 @@ Sono create da Flyway `V7__create_spring_session_jdbc_schema.sql` (schema uffici
 ### `SPRING_SESSION`
 
 #### Colonne
+
 - `PRIMARY_ID` `CHAR(36) NOT NULL`
 - `SESSION_ID` `CHAR(36) NOT NULL`
 - `CREATION_TIME` `BIGINT NOT NULL`
@@ -441,6 +487,7 @@ Sono create da Flyway `V7__create_spring_session_jdbc_schema.sql` (schema uffici
 - `PRINCIPAL_NAME` `VARCHAR(100)` nullable
 
 #### Vincoli e indici
+
 - PK `SPRING_SESSION_PK` su `PRIMARY_ID`
 - unique index `SPRING_SESSION_IX1` su `SESSION_ID`
 - index `SPRING_SESSION_IX2` su `EXPIRY_TIME`
@@ -450,16 +497,19 @@ Sono create da Flyway `V7__create_spring_session_jdbc_schema.sql` (schema uffici
 ### `SPRING_SESSION_ATTRIBUTES`
 
 #### Colonne
+
 - `SESSION_PRIMARY_ID` `CHAR(36) NOT NULL`
 - `ATTRIBUTE_NAME` `VARCHAR(200) NOT NULL`
 - `ATTRIBUTE_BYTES` `BLOB NOT NULL`
 
 #### Vincoli
+
 - PK `SPRING_SESSION_ATTRIBUTES_PK` su (`SESSION_PRIMARY_ID`, `ATTRIBUTE_NAME`)
 - FK `SPRING_SESSION_ATTRIBUTES_FK`: `SESSION_PRIMARY_ID` → `SPRING_SESSION(PRIMARY_ID)` `ON DELETE CASCADE`
 - `ENGINE=InnoDB` `ROW_FORMAT=DYNAMIC`
 
 ### Relazione con l’autenticazione
+
 Lo store JDBC persiste le sessioni autenticate (cookie HttpOnly + attributi di sessione, incluso `authenticatedAt`). Non sostituisce né estende le tabelle di dominio della sezione 3.1–3.9.
 
 ---
@@ -473,6 +523,7 @@ Il perimetro legacy non governato comprende tredici tabelle: `refresh_tokens`, `
 ## 4.1 `refresh_tokens`
 
 ### Colonne principali
+
 - `id`
 - `user_id`
 - `token`
@@ -481,18 +532,22 @@ Il perimetro legacy non governato comprende tredici tabelle: `refresh_tokens`, `
 - `created_at`
 
 ### Foreign key
+
 - `user_id` → `users(id)`
 
 ### Vincoli principali
+
 - `user_id` `NOT NULL`
 - `token` `NOT NULL UNIQUE`
 - `expires_at` `NOT NULL`
 - `revoked` `NOT NULL DEFAULT FALSE`
 
 ### Nota importante
+
 `refresh_tokens` è una **struttura legacy** eventualmente presente in database locali storici. **Non governa** l’autenticazione session-based corrente.
 
 Nel backend attuale:
+
 - il login **non** genera né restituisce un refresh token;
 - non esistono entity, repository o service runtime collegati a questa tabella;
 - l’autenticazione usa Spring Session JDBC e cookie HttpOnly (`docs/09-security-flow.md`).
@@ -504,6 +559,7 @@ La tabella resta documentata qui solo come reperto legacy / non utilizzato dal f
 ## 4.2 `password_reset_tokens`
 
 ### Colonne principali
+
 - `id`
 - `user_id`
 - `token`
@@ -513,15 +569,18 @@ La tabella resta documentata qui solo come reperto legacy / non utilizzato dal f
 - `created_at`
 
 ### Foreign key
+
 - `user_id` → `users(id)`
 
 ### Vincoli principali
+
 - `user_id` `NOT NULL`
 - `token` `NOT NULL UNIQUE`
 - `expires_at` `NOT NULL`
 - `used` `NOT NULL DEFAULT FALSE`
 
 ### Nota importante
+
 Questa tabella può già essere presente nel database, ma il flusso di forgot/reset password **non è ancora implementato nel backend attuale**.
 
 ---
@@ -533,9 +592,11 @@ Le tabelle seguenti appartengono alla roadmap progettuale, ma **non sono ancora 
 ---
 
 ## 5.1 `workout_plans`
+
 Schede di allenamento create dai professionisti.
 
 ### Colonne principali
+
 - `id`
 - `professional_id`
 - `client_id`
@@ -546,10 +607,12 @@ Schede di allenamento create dai professionisti.
 - `updated_at`
 
 ### Foreign key
+
 - `professional_id` → `professional_profiles(id)`
 - `client_id` → `client_profiles(id)`
 
 ### Vincoli principali
+
 - `professional_id` `NOT NULL`
 - `client_id` `NOT NULL`
 - `title` `NOT NULL`
@@ -557,6 +620,7 @@ Schede di allenamento create dai professionisti.
 - `active` `NOT NULL DEFAULT TRUE`
 
 ### Note
+
 La regola della singola scheda attiva per coppia professionista-cliente andrà gestita a livello business/service.
 
 ---
@@ -564,6 +628,7 @@ La regola della singola scheda attiva per coppia professionista-cliente andrà g
 ## 5.2 `workout_weeks`
 
 ### Colonne principali
+
 - `id`
 - `workout_plan_id`
 - `week_number`
@@ -571,9 +636,11 @@ La regola della singola scheda attiva per coppia professionista-cliente andrà g
 - `updated_at`
 
 ### Foreign key
+
 - `workout_plan_id` → `workout_plans(id)`
 
 ### Vincoli principali
+
 - `workout_plan_id` `NOT NULL`
 - `week_number` `NOT NULL`
 
@@ -582,6 +649,7 @@ La regola della singola scheda attiva per coppia professionista-cliente andrà g
 ## 5.3 `workout_days`
 
 ### Colonne principali
+
 - `id`
 - `workout_week_id`
 - `date`
@@ -592,9 +660,11 @@ La regola della singola scheda attiva per coppia professionista-cliente andrà g
 - `updated_at`
 
 ### Foreign key
+
 - `workout_week_id` → `workout_weeks(id)`
 
 ### Vincoli principali
+
 - `workout_week_id` `NOT NULL`
 - `date` `NOT NULL`
 - `day_label` `NOT NULL`
@@ -605,6 +675,7 @@ La regola della singola scheda attiva per coppia professionista-cliente andrà g
 ## 5.4 `workout_exercises`
 
 ### Colonne principali
+
 - `id`
 - `workout_day_id`
 - `exercise_name`
@@ -621,9 +692,11 @@ La regola della singola scheda attiva per coppia professionista-cliente andrà g
 - `updated_at`
 
 ### Foreign key
+
 - `workout_day_id` → `workout_days(id)`
 
 ### Vincoli principali
+
 - `workout_day_id` `NOT NULL`
 - `exercise_name` `NOT NULL`
 - `sets` `NOT NULL`
@@ -632,9 +705,11 @@ La regola della singola scheda attiva per coppia professionista-cliente andrà g
 ---
 
 ## 5.5 `nutrition_plans`
+
 Piani alimentari creati dai professionisti.
 
 ### Colonne principali
+
 - `id`
 - `professional_id`
 - `client_id`
@@ -645,10 +720,12 @@ Piani alimentari creati dai professionisti.
 - `updated_at`
 
 ### Foreign key
+
 - `professional_id` → `professional_profiles(id)`
 - `client_id` → `client_profiles(id)`
 
 ### Vincoli principali
+
 - `professional_id` `NOT NULL`
 - `client_id` `NOT NULL`
 - `title` `NOT NULL`
@@ -656,6 +733,7 @@ Piani alimentari creati dai professionisti.
 - `active` `NOT NULL DEFAULT TRUE`
 
 ### Note
+
 La regola del singolo piano attivo per coppia professionista-cliente andrà gestita a livello business/service.
 
 ---
@@ -663,6 +741,7 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 ## 5.6 `nutrition_weeks`
 
 ### Colonne principali
+
 - `id`
 - `nutrition_plan_id`
 - `week_number`
@@ -670,9 +749,11 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 - `updated_at`
 
 ### Foreign key
+
 - `nutrition_plan_id` → `nutrition_plans(id)`
 
 ### Vincoli principali
+
 - `nutrition_plan_id` `NOT NULL`
 - `week_number` `NOT NULL`
 
@@ -681,6 +762,7 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 ## 5.7 `nutrition_days`
 
 ### Colonne principali
+
 - `id`
 - `nutrition_week_id`
 - `date`
@@ -691,9 +773,11 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 - `updated_at`
 
 ### Foreign key
+
 - `nutrition_week_id` → `nutrition_weeks(id)`
 
 ### Vincoli principali
+
 - `nutrition_week_id` `NOT NULL`
 - `date` `NOT NULL`
 - `day_label` `NOT NULL`
@@ -704,6 +788,7 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 ## 5.8 `nutrition_entries`
 
 ### Colonne principali
+
 - `id`
 - `nutrition_day_id`
 - `meal_type`
@@ -714,9 +799,11 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 - `updated_at`
 
 ### Foreign key
+
 - `nutrition_day_id` → `nutrition_days(id)`
 
 ### Vincoli principali
+
 - `nutrition_day_id` `NOT NULL`
 - `meal_type` `NOT NULL`
 - `content` `NOT NULL`
@@ -726,6 +813,7 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 ## 5.9 `workout_feedbacks`
 
 ### Colonne principali
+
 - `id`
 - `client_id`
 - `professional_id`
@@ -734,11 +822,13 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 - `created_at`
 
 ### Foreign key
+
 - `client_id` → `client_profiles(id)`
 - `professional_id` → `professional_profiles(id)`
 - `workout_day_id` → `workout_days(id)`
 
 ### Vincoli principali
+
 - `client_id` `NOT NULL`
 - `professional_id` `NOT NULL`
 - `workout_day_id` `NOT NULL`
@@ -749,6 +839,7 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 ## 5.10 `nutrition_feedbacks`
 
 ### Colonne principali
+
 - `id`
 - `client_id`
 - `professional_id`
@@ -757,11 +848,13 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 - `created_at`
 
 ### Foreign key
+
 - `client_id` → `client_profiles(id)`
 - `professional_id` → `professional_profiles(id)`
 - `nutrition_day_id` → `nutrition_days(id)`
 
 ### Vincoli principali
+
 - `client_id` `NOT NULL`
 - `professional_id` `NOT NULL`
 - `nutrition_day_id` `NOT NULL`
@@ -772,6 +865,7 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 ## 5.11 `client_measurements`
 
 ### Colonne principali
+
 - `id`
 - `client_id`
 - `recorded_at`
@@ -788,14 +882,17 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 - `created_at`
 
 ### Foreign key
+
 - `client_id` → `client_profiles(id)`
 
 ### Vincoli principali
+
 - `client_id` `NOT NULL`
 - `recorded_at` `NOT NULL`
 - `weight_kg` `NOT NULL`
 
 ### Note
+
 È una tabella storica, non va pensata come “profilo aggiornabile”.
 
 ---
@@ -803,6 +900,7 @@ La regola del singolo piano attivo per coppia professionista-cliente andrà gest
 ## 6. Enum da salvare come stringa
 
 ## 6.1 Enum attualmente integrati nel backend
+
 I seguenti campi enum devono essere salvati come stringhe leggibili:
 
 - `users.role`
@@ -815,6 +913,7 @@ I seguenti campi enum devono essere salvati come stringhe leggibili:
 - `booking_requests.status`
 
 ## 6.2 Enum previsti per moduli futuri
+
 Quando verranno implementati i moduli futuri, andranno salvati come stringhe leggibili anche:
 
 - `workout_days.day_type`
@@ -825,23 +924,29 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 ## 7. Foreign key attualmente integrate
 
 ### Area utenti
+
 - `professional_profiles.id` → `users.id`
 - `client_profiles.id` → `users.id`
 
 ### Area collegamenti
+
 - `professional_client_links.professional_id` → `professional_profiles.id`
 - `professional_client_links.client_id` → `client_profiles.id`
 
 ### Area inviti
+
 - `invite_codes.professional_id` → `professional_profiles.id`
 
 ### Area sicurezza
+
 - `email_verification_tokens.user_id` → `users.id`
 
 ### Area availability
+
 - `availability_slots.professional_id` → `professional_profiles(id)`
 
 ### Area booking
+
 - `booking_requests.client_id` → `client_profiles(id)`
 - `booking_requests.professional_id` → `professional_profiles(id)`
 - `booking_request_items.booking_request_id` → `booking_requests(id)`
@@ -852,10 +957,12 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 ## 8. Foreign key future o non ancora integrate
 
 ### Tabelle già presenti nel DB ma non ancora integrate
+
 - `refresh_tokens.user_id` → `users.id`
 - `password_reset_tokens.user_id` → `users.id`
 
 ### Area workout
+
 - `workout_plans.professional_id` → `professional_profiles.id`
 - `workout_plans.client_id` → `client_profiles.id`
 - `workout_weeks.workout_plan_id` → `workout_plans.id`
@@ -863,6 +970,7 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 - `workout_exercises.workout_day_id` → `workout_days.id`
 
 ### Area nutrition
+
 - `nutrition_plans.professional_id` → `professional_profiles.id`
 - `nutrition_plans.client_id` → `client_profiles.id`
 - `nutrition_weeks.nutrition_plan_id` → `nutrition_plans.id`
@@ -870,6 +978,7 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 - `nutrition_entries.nutrition_day_id` → `nutrition_days.id`
 
 ### Area feedback
+
 - `workout_feedbacks.client_id` → `client_profiles.id`
 - `workout_feedbacks.professional_id` → `professional_profiles.id`
 - `workout_feedbacks.workout_day_id` → `workout_days.id`
@@ -878,6 +987,7 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 - `nutrition_feedbacks.nutrition_day_id` → `nutrition_days.id`
 
 ### Area misurazioni
+
 - `client_measurements.client_id` → `client_profiles.id`
 
 ---
@@ -885,12 +995,14 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 ## 9. Unique constraints principali
 
 ## 9.1 Vincoli SQL confermati nello schema attualmente integrato
+
 - `users.email` tramite `uk_users_email`
 - `invite_codes.code` tramite `uk_invite_codes_code`
 - `email_verification_tokens.token` tramite `uk_email_verification_tokens_token`
 - coppia `booking_request_items(booking_request_id, availability_slot_id)` tramite `uk_booking_request_items_request_slot`
 
 ## 9.2 Tabelle già presenti nel DB ma non ancora integrate
+
 - `refresh_tokens.token`
 - `password_reset_tokens.token`
 
@@ -953,18 +1065,23 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 ## 10. Note progettuali importanti
 
 ### 10.1 JOINED inheritance
+
 La scelta `JOINED` tra:
+
 - `users`
 - `professional_profiles`
 - `client_profiles`
 
 è coerente con:
+
 - domain model
 - strategia JPA definita
 - separazione pulita tra campi comuni e specifici
 
 ### 10.2 Immagine profilo
+
 Nel database viene salvato solo:
+
 - `profile_image_url`
 
 Non si salvano file binari nel DB.
@@ -981,7 +1098,9 @@ Restano storicizzati:
 - dati futuri storici quando i relativi moduli verranno implementati.
 
 ### 10.4 Regola di lettura del documento
+
 Questo documento va sempre letto distinguendo tra:
+
 - tabelle già supportate dal backend attuale
 - tabelle già presenti nel DB ma non ancora usate dal codice
 - tabelle solo pianificate per i moduli futuri
@@ -1034,9 +1153,10 @@ Le risorse versionate sono applicate in questo ordine:
 21. `V5_9__transfer_booking_item_audit_ownership_to_application.sql`;
 22. `V6__add_booking_historical_snapshots`;
 23. `V7__create_spring_session_jdbc_schema.sql`;
-24. `V8__add_weekly_availability_and_capacity.sql`.
+24. `V8__add_weekly_availability_and_capacity.sql`;
+25. `V9__add_booking_transition_metadata.sql`.
 
-Questo è l’elenco delle migrazioni Flyway correnti. Lo schema runtime versionato **non termina più a V6**.
+Questo è l’elenco delle migrazioni Flyway correnti. Lo schema runtime versionato termina a V9.
 
 La V1 crea esclusivamente le nove tabelle di dominio runtime, con PK, FK restrittive, unique, nullability, default, precisioni, engine, charset, collation e indici dello schema legacy. Non contiene dati applicativi.
 
@@ -1051,7 +1171,7 @@ Le nove V3 contengono esclusivamente un `ALTER TABLE` ciascuna. Portano a `DATET
 
 Il passaggio strutturale delle sole V3 da `DATETIME(0)` a `DATETIME(6)` mantiene invariati anno, mese, giorno, ora, minuto e secondo e aggiunge una frazione zero. Le V3 non usano `CONVERT_TZ` e non convertono i valori da `Europe/Rome` a UTC: questa responsabilità appartiene alla successiva V4, mentre le V5 trasferiscono l'ownership degli audit all'applicazione.
 
-La V4 Java verifica schema, precisione, gap/overlap e dati prima di convertire i datetime legacy `Europe/Rome` verso UTC. Le V5 rimuovono default e `ON UPDATE` dagli audit, trasferendone l'ownership a Spring Data JPA; i timestamp ombra dei profili diventano nullable e congelati. La V6 Java aggiunge gli snapshot storici Booking e ne esegue il backfill dopo preflight, senza inventare dati o orari. La V7 crea `SPRING_SESSION` e `SPRING_SESSION_ATTRIBUTES` per lo store JDBC delle sessioni server-side. La V8 aggiunge `weekly_availability_rules`, la tabella normalizzata delle durate, gli audit di regola e occorrenza, i campi `weekly_rule_id`, `location_label`, `capacity`, `blocked` sugli slot e `location_label_snapshot` sugli item Booking, con backfill conservativo degli slot legacy.
+La V4 Java verifica schema, precisione, gap/overlap e dati prima di convertire i datetime legacy `Europe/Rome` verso UTC. Le V5 rimuovono default e `ON UPDATE` dagli audit, trasferendone l'ownership a Spring Data JPA; i timestamp ombra dei profili diventano nullable e congelati. La V6 Java aggiunge gli snapshot storici Booking e ne esegue il backfill dopo preflight, senza inventare dati o orari. La V7 crea `SPRING_SESSION` e `SPRING_SESSION_ATTRIBUTES` per lo store JDBC delle sessioni server-side. La V8 aggiunge `weekly_availability_rules`, la tabella normalizzata delle durate, gli audit di regola e occorrenza, i campi `weekly_rule_id`, `location_label`, `capacity`, `blocked` sugli slot e `location_label_snapshot` sugli item Booking, con backfill conservativo degli slot legacy. La V9 aggiunge `rejection_reason`, `cancellation_reason` e `cancelled_by` nullable a `booking_requests`, senza backfill né nuovi indici.
 
 ### 12.2 Indici di convergenza
 
@@ -1069,6 +1189,8 @@ Gli indici legacy con prefissi parzialmente sovrapposti vengono preservati nella
 Non viene introdotta una unique su `professional_client_links(professional_id, client_id, active)`: impedirebbe di conservare più record storici inattivi della stessa coppia.
 
 ### 12.3 Validazione conclusiva MySQL 8
+
+> Sezione storica: i conteggi e la versione finale riportati nei §§12.3–12.12 fotografano la certificazione del 16 luglio 2026 fino a V6; non descrivono l'elenco runtime corrente, oggi esteso forward-only fino a V9 nel §12.1.
 
 Il 16 luglio 2026 la validazione conclusiva su MySQL 8.0.44 ha prodotto il verdetto **MYSQL VALIDATION PASSED WITH WARNINGS**. Sono stati creati nuovi i due schemi isolati:
 
@@ -1198,13 +1320,13 @@ V1 non è stata rieseguita: lo schema V1 era già presente nel backup e la basel
 
 Sono state applicate 21 migrazioni effettive: V2, V3.1–V3.9, V4, V5.1–V5.9 e V6. La durata osservata è stata 3.321 ms:
 
-| Blocco | Durata osservata |
-|---|---:|
-| V2 | 403 ms |
-| V3.1–V3.9 | 1.370 ms |
-| V4 | 79 ms |
-| V5.1–V5.9 | 478 ms |
-| V6 | 991 ms |
+| Blocco    | Durata osservata |
+| --------- | ---------------: |
+| V2        |           403 ms |
+| V3.1–V3.9 |         1.370 ms |
+| V4        |            79 ms |
+| V5.1–V5.9 |           478 ms |
+| V6        |           991 ms |
 
 Questi tempi descrivono soltanto il rehearsal locale e non costituiscono una garanzia per altri computer o quantità di dati.
 

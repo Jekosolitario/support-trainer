@@ -4,7 +4,7 @@
 
 Support Trainer è un progetto full stack per la gestione del rapporto tra professionisti del benessere e clienti. Il backend MVP copre autenticazione, profili, inviti, collegamenti professionista-cliente, disponibilità e richieste di prenotazione. Il frontend dispone di una fondazione React, home pubblica (direzione visuale dark-tech), autenticazione session-based (login/logout/CSRF/guards) e foundation API client, oltre alle pagine Profilo autenticata, gestione inviti PROFESSIONAL e liste/dettagli delle relazioni CLIENT ↔ PROFESSIONAL.
 
-Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Login, logout, routing protetto, foundation auth, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status, **gestione inviti PROFESSIONAL**, navigazione delle relazioni collegate e gestione Availability settimanale del Personal Trainer sono implementati. Restano placeholder dashboard con dati e Booking frontend.
+Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Login, logout, routing protetto, foundation auth, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status, **gestione inviti PROFESSIONAL**, navigazione delle relazioni collegate, Availability settimanale del Personal Trainer e Booking end-to-end Client ↔ Personal Trainer sono implementati. Resta placeholder la dashboard con dati.
 
 ## 2. Stato attuale del progetto
 
@@ -26,7 +26,7 @@ Stato sintetico:
 - validazione invito e registrazione pubblica CLIENT implementate con handoff memory-only, outcome conservativi e cleanup dei dati sensibili;
 - gestione inviti PROFESSIONAL implementata (`/app/professional/invites`: lista, genera, copia codice valido);
 - liste e dettagli dei Client collegati per PT/NUT e dei Professional collegati per CLIENT implementati;
-- dashboard con dati e Booking frontend ancora placeholder; Availability PT è integrata;
+- dashboard con dati ancora placeholder; Availability PT e Booking Client ↔ PT sono integrati end-to-end;
 - pipeline CI GitHub Actions per il backend presente; i gate frontend (lint/test/build) restano locali; deploy non configurato;
 - progetto non ancora considerato production-ready.
 
@@ -140,7 +140,7 @@ Le regole settimanali usano data/ora civile e zona business `Europe/Rome`; gap e
 - riserva atomica della capacità temporale già al primo stato `PENDING`;
 - snapshot immutabili di inizio, fine e luogo scelti.
 
-Le liste usano un riepilogo autosufficiente e create, dettaglio e transizioni restituiscono il dettaglio completo. Nome delle parti e orari sono snapshot storici persistiti; immagini profilo e specializzazione del professionista sono invece valori correnti e opzionali. Le response non espongono `primaryGoal`, dati sanitari o `slotStatus` live. Uno storico già creato resta leggibile dai partecipanti originari anche dopo la disattivazione del collegamento, mentre un collegamento attivo resta necessario per creare una nuova prenotazione. Per risorse identificabili, un booking inesistente o non appartenente al principal e uno slot non accessibile al Client restituiscono lo stesso `404`; ruoli e stati account/profilo non idonei restano invece `403`. Le query mutate sono scoperte al principal prima di acquisire il lock pessimista. Le liste sono ordinate per creazione decrescente e id decrescente; paginazione, filtri e motivazioni di rifiuto/annullamento sono rinviati.
+Le liste usano un riepilogo autosufficiente e create, dettaglio e transizioni restituiscono il dettaglio completo. Nome delle parti e orari sono snapshot storici persistiti; immagini profilo e specializzazione del professionista sono invece valori correnti e opzionali. Le response non espongono `primaryGoal`, dati sanitari o `slotStatus` live. Uno storico già creato resta leggibile dai partecipanti originari anche dopo la disattivazione del collegamento, mentre un collegamento attivo resta necessario per creare una nuova prenotazione. Per risorse identificabili, un booking inesistente o non appartenente al principal e uno slot non accessibile al Client restituiscono lo stesso `404`; ruoli e stati account/profilo non idonei restano invece `403`. Le query mutate sono scoperte al principal prima di acquisire il lock pessimista. Rifiuto e annullamento conservano motivazione e attore secondo il contratto V1; i record legacy possono mantenere metadata null. Le mutazioni sono consentite fino alla fine snapshot del Booking e rifiutate da `now >= MAX(scheduledEnd)` con `409 BOOKING_REQUEST_ENDED`. Le liste sono ordinate per creazione decrescente e id decrescente; paginazione e filtri restano futuri.
 
 ## 5. Funzionalità pianificate / non ancora implementate
 
@@ -153,7 +153,7 @@ Le liste usano un riepilogo autosufficiente e create, dettaglio e transizioni re
 - editing account (email, password, cancellazione) e gestione dispositivi/sessioni;
 - limite di sessioni concorrenti;
 - API dedicate alla gestione manuale dei collegamenti;
-- pagine frontend business ancora placeholder (dashboard con dati e Booking);
+- dashboard frontend con dati ancora placeholder;
 - configurazione completa per il deploy.
 
 Follow-up non bloccanti aperti (dettaglio in [Functional Scope](docs/01-functional-scope.md)):
@@ -254,7 +254,7 @@ Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazi
 
 La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle undici tabelle runtime e dello schema Spring Session tramite `classpath:db/migration`.
 
-Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true` e governa lo schema di dominio insieme all'infrastruttura Spring Session. V4 converte i dati temporali legacy, V5 trasferisce l'auditing all'applicazione, V6 aggiunge gli snapshot Booking, V7 introduce Spring Session JDBC e V8 aggiunge regole settimanali, audit delle modifiche, capacità e luogo dello slot. L'elenco aggiornato delle migrazioni e i dettagli di schema restano in [docs/10-database-schema.md](docs/10-database-schema.md).
+Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true` e governa lo schema di dominio insieme all'infrastruttura Spring Session. V4 converte i dati temporali legacy, V5 trasferisce l'auditing all'applicazione, V6 aggiunge gli snapshot Booking, V7 introduce Spring Session JDBC, V8 aggiunge regole settimanali, audit delle modifiche, capacità e luogo dello slot e V9 aggiunge i metadata nullable di rifiuto/cancellazione Booking. L'elenco aggiornato delle migrazioni e i dettagli di schema restano in [docs/10-database-schema.md](docs/10-database-schema.md).
 
 La validazione conclusiva del 16 luglio 2026 su MySQL 8.0.44 ha prodotto il verdetto **MYSQL VALIDATION PASSED WITH WARNINGS**. Gli schemi isolati `support_trainer_audit_empty_20260716_101232` e `support_trainer_audit_legacy_20260716_101232` hanno certificato i percorsi da schema vuoto e legacy simulato. Sono rimasti presenti e non devono essere eliminati senza autorizzazione.
 
@@ -345,7 +345,7 @@ Creare la build frontend di produzione, comprensiva del controllo TypeScript:
 npm run build
 ```
 
-L'output della build viene generato in `frontend/dist`. I comandi verificano foundation, home, auth session-based, onboarding, Profilo/Account, inviti, relazioni e Availability settimanale PT; dashboard con dati e Booking restano da integrare nel frontend.
+L'output della build viene generato in `frontend/dist`. I comandi verificano foundation, home, auth session-based, onboarding, Profilo/Account, inviti, relazioni, Availability settimanale PT e Booking Client ↔ PT end-to-end; resta da integrare la dashboard con dati.
 
 ### Sviluppo locale frontend + backend
 
@@ -475,7 +475,7 @@ Il profilo tracciato `mailpit` è un aiuto manuale locale, non un profilo di pro
 
 ## 14. Roadmap sintetica
 
-1. pagine frontend business ancora placeholder (Booking e dashboard con dati);
+1. dashboard frontend con dati ancora placeholder;
 2. completare il lifecycle account (recupero/reset password, editing account, upload immagine profilo);
 3. implementare le schede di allenamento;
 4. implementare i piani alimentari;
@@ -496,6 +496,6 @@ La cartella `frontend` contiene un'applicazione React/TypeScript/Vite con:
 - proxy Vite `/api` → `http://localhost:8080` in sviluppo;
 - test con Vitest / React Testing Library; gate locali lint/format/build.
 
-Auth foundation, login/logout, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status, inviti, relazioni CLIENT ↔ PROFESSIONAL e Availability settimanale PT sono implementati. Restano placeholder dashboard con dati e Booking. Nessun JWT/Bearer né storage di token o codici invito nel client.
+Auth foundation, login/logout, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status, inviti, relazioni CLIENT ↔ PROFESSIONAL, Availability settimanale PT e Booking end-to-end sono implementati. Resta placeholder la dashboard con dati. Nessun JWT/Bearer né storage di token o codici invito nel client.
 
 Riferimenti: [Authentication Session Flow](docs/frontend/03-authentication-session-flow.md), [Professional Onboarding Implementation](docs/frontend/04-professional-onboarding-implementation.md), [Professional Invites Implementation](docs/frontend/05-professional-invites-implementation.md), [Client Onboarding Implementation](docs/frontend/06-client-onboarding-implementation.md), [Client-Professional Relationships Implementation](docs/frontend/07-client-professional-relationships-implementation.md), [Frontend Functional Map](docs/frontend/01-frontend-functional-map-mvp.md), [Public Home](docs/frontend/02-public-home-implementation.md), [Security Flow](docs/09-security-flow.md), [Functional Scope](docs/01-functional-scope.md).

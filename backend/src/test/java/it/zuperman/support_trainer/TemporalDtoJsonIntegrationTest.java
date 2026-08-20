@@ -77,6 +77,9 @@ class TemporalDtoJsonIntegrationTest {
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
                 List.of(item)
         );
 

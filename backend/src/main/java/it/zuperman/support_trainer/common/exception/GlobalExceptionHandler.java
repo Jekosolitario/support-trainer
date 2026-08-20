@@ -46,6 +46,22 @@ public class GlobalExceptionHandler {
         this.errorResponseWriter = errorResponseWriter;
     }
 
+    @ExceptionHandler(AppValidationException.class)
+    public ResponseEntity<ErrorResponse> handleAppValidationException(
+            AppValidationException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(errorResponseFactory.create(
+                        request,
+                        HttpStatus.BAD_REQUEST,
+                        ex.getErrorCode(),
+                        ex.getMessage(),
+                        ex.getFieldErrors()
+                ));
+    }
+
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ErrorResponse> handleAppException(AppException ex, HttpServletRequest request) {
         if (ex.getStatus().is5xxServerError()) {

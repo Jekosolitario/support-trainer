@@ -1,9 +1,13 @@
 # Entity Fields — Support Trainer
 
+> Estensione Booking V1 (V9): `BookingRequest.rejectionReason: String?` max 1000, `cancellationReason: String?` max 1000 e `cancelledBy: BookingCancellationActor?`. I null sono validi per record legacy; actor è assegnato server-side. Dettaglio normativo: [19-booking-domain-contract-v1.md](19-booking-domain-contract-v1.md).
+
 ## 1. Obiettivo del documento
+
 Questo documento definisce i campi principali delle entità del dominio con un livello di dettaglio intermedio tra analisi funzionale e modello tecnico.
 
 Per ogni campo vengono indicati:
+
 - nome
 - tipo logico suggerito
 - obbligatorietà
@@ -16,24 +20,32 @@ Per ogni campo vengono indicati:
 ## 2. Convenzioni generali
 
 ### 2.1 Identificativi
+
 Per la v1, tutti gli identificativi possono essere modellati come:
 
 - `id` → `Long`, obbligatorio, `nullable = false`
 
 ### 2.2 Timestamp
+
 Dove presenti:
+
 - `createdAt` → `Instant`
 - `updatedAt` → `Instant`
 
 ### 2.3 Campi decimali
+
 Per pesi, misure e valori numerici con decimali si consiglia:
+
 - `BigDecimal`
 
 ### 2.4 Enum
+
 Per campi con valori chiusi si consiglia:
+
 - `Enum`
 
 ### 2.5 Regola pratica
+
 - `nullable = false` per i campi davvero essenziali
 - `nullable = true` per campi facoltativi, descrittivi o compilabili in un secondo momento
 
@@ -73,21 +85,22 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 
 ## 3.1 User (astratta)
 
-| Campo             | Tipo            | Obbligatorio | Nullable | Default                | Note                                             |
-| ----------------- | --------------- | -----------: | -------: | ---------------------- | ------------------------------------------------ |
-| `id`              | `Long`          |           Sì |       No | —                      | Identificativo univoco                           |
-| `firstName`       | `String`        |           Sì |       No | —                      | Nome utente                                      |
-| `lastName`        | `String`        |           Sì |       No | —                      | Cognome utente                                   |
-| `email`           | `String`        |           Sì |       No | —                      | Univoca, da salvare preferibilmente normalizzata |
-| `password`        | `String`        |           Sì |       No | —                      | Password hashata, mai in chiaro                  |
-| `profileImageUrl` | `String`        |           No |       Sì | `null`                 | URL/path immagine profilo                        |
-| `role`            | `Enum`          |           Sì |       No | —                      | `CLIENT`, `PROFESSIONAL`                         |
-| `accountStatus`   | `Enum`          |           Sì |       No | `PENDING_VERIFICATION` | Stato account                                    |
-| `emailVerified`   | `Boolean`       |           Sì |       No | `false`                | Verifica email completata o no                   |
-| `createdAt`       | `Instant`       |           Sì |       No | audit app              | Istante UTC di creazione                         |
-| `updatedAt`       | `Instant`       |           Sì |       No | audit app              | Istante UTC ultimo aggiornamento                 |
+| Campo             | Tipo      | Obbligatorio | Nullable | Default                | Note                                             |
+| ----------------- | --------- | -----------: | -------: | ---------------------- | ------------------------------------------------ |
+| `id`              | `Long`    |           Sì |       No | —                      | Identificativo univoco                           |
+| `firstName`       | `String`  |           Sì |       No | —                      | Nome utente                                      |
+| `lastName`        | `String`  |           Sì |       No | —                      | Cognome utente                                   |
+| `email`           | `String`  |           Sì |       No | —                      | Univoca, da salvare preferibilmente normalizzata |
+| `password`        | `String`  |           Sì |       No | —                      | Password hashata, mai in chiaro                  |
+| `profileImageUrl` | `String`  |           No |       Sì | `null`                 | URL/path immagine profilo                        |
+| `role`            | `Enum`    |           Sì |       No | —                      | `CLIENT`, `PROFESSIONAL`                         |
+| `accountStatus`   | `Enum`    |           Sì |       No | `PENDING_VERIFICATION` | Stato account                                    |
+| `emailVerified`   | `Boolean` |           Sì |       No | `false`                | Verifica email completata o no                   |
+| `createdAt`       | `Instant` |           Sì |       No | audit app              | Istante UTC di creazione                         |
+| `updatedAt`       | `Instant` |           Sì |       No | audit app              | Istante UTC ultimo aggiornamento                 |
 
 ### Note
+
 - `email` deve essere **univoca**
 - `password` deve contenere il valore **criptato/hashato**
 - `accountStatus` è diverso da `operationalStatus`
@@ -111,6 +124,7 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 | `active`            | `Boolean`         |           Sì |       No | `true`        | Flag logico di attivazione         |
 
 ### Note
+
 - `active` serve come flag logico interno
 - `operationalStatus` valori iniziali:
   - `DISPONIBILE`
@@ -135,6 +149,7 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 | `active`            | `Boolean`         |           Sì |       No | `true`   | Flag logico di attivazione       |
 
 ### Note
+
 - `operationalStatus` valori iniziali:
   - `ATTIVO`
   - `INFORTUNATO`
@@ -181,6 +196,7 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 | `notes`             | `String` / `Text` |           No |       Sì | `null`  | Note rilevazione                       |
 
 ### Note
+
 - Questa entità va storicizzata, non sovrascritta
 - Eventuali indicatori derivati come BMI possono essere calcolati dal backend
 
@@ -188,16 +204,17 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 
 ## 3.5 ProfessionalClientLink
 
-| Campo          | Tipo                  | Obbligatorio | Nullable | Default | Note                                            |
-| -------------- | --------------------- | -----------: | -------: | ------- | ----------------------------------------------- |
-| `id`           | `Long`                |           Sì |       No | —       | Identificativo univoco                          |
-| `professional` | `ProfessionalProfile` |           Sì |       No | —       | Professionista collegato                        |
-| `client`       | `ClientProfile`       |           Sì |       No | —       | Cliente collegato                               |
-| `createdAt`    | `Instant`             |           Sì |       No | audit app | Data collegamento UTC                           |
-| `updatedAt`    | `Instant`             |           Sì |       No | audit app | Istante UTC ultimo aggiornamento                |
-| `active`       | `Boolean`             |           Sì |       No | `true`  | Collegamento attivo/disattivato                 |
+| Campo          | Tipo                  | Obbligatorio | Nullable | Default   | Note                             |
+| -------------- | --------------------- | -----------: | -------: | --------- | -------------------------------- |
+| `id`           | `Long`                |           Sì |       No | —         | Identificativo univoco           |
+| `professional` | `ProfessionalProfile` |           Sì |       No | —         | Professionista collegato         |
+| `client`       | `ClientProfile`       |           Sì |       No | —         | Cliente collegato                |
+| `createdAt`    | `Instant`             |           Sì |       No | audit app | Data collegamento UTC            |
+| `updatedAt`    | `Instant`             |           Sì |       No | audit app | Istante UTC ultimo aggiornamento |
+| `active`       | `Boolean`             |           Sì |       No | `true`    | Collegamento attivo/disattivato  |
 
 ### Note
+
 - Va previsto un vincolo logico per evitare duplicati dello stesso collegamento
 - Un cliente può avere massimo **3** professionisti attivi
 
@@ -205,19 +222,20 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 
 ## 3.6 InviteCode
 
-| Campo          | Tipo                  | Obbligatorio | Nullable | Default | Note                                             |
-| -------------- | --------------------- | -----------: | -------: | ------- | ------------------------------------------------ |
-| `id`           | `Long`                |           Sì |       No | —       | Identificativo univoco                           |
-| `code`         | `String`              |           Sì |       No | —       | Codice invito univoco                            |
-| `professional` | `ProfessionalProfile` |           Sì |       No | —       | Professionista che genera il codice              |
-| `expiresAt`    | `Instant`             |           Sì |       No | —       | Scadenza UTC dopo 168 ore reali                  |
-| `used`         | `Boolean`             |           Sì |       No | `false` | Codice già usato o no                            |
-| `active`       | `Boolean`             |           Sì |       No | `true`  | Flag logico di attivazione/disattivazione codice |
-| `updatedAt`    | `Instant`             |           Sì |       No | audit app | Istante UTC ultimo aggiornamento                |
-| `usedAt`       | `Instant`             |           No |       Sì | `null`  | Istante UTC di utilizzo                          |
-| `createdAt`    | `Instant`             |           Sì |       No | audit app | Istante UTC di creazione                        |
+| Campo          | Tipo                  | Obbligatorio | Nullable | Default   | Note                                             |
+| -------------- | --------------------- | -----------: | -------: | --------- | ------------------------------------------------ |
+| `id`           | `Long`                |           Sì |       No | —         | Identificativo univoco                           |
+| `code`         | `String`              |           Sì |       No | —         | Codice invito univoco                            |
+| `professional` | `ProfessionalProfile` |           Sì |       No | —         | Professionista che genera il codice              |
+| `expiresAt`    | `Instant`             |           Sì |       No | —         | Scadenza UTC dopo 168 ore reali                  |
+| `used`         | `Boolean`             |           Sì |       No | `false`   | Codice già usato o no                            |
+| `active`       | `Boolean`             |           Sì |       No | `true`    | Flag logico di attivazione/disattivazione codice |
+| `updatedAt`    | `Instant`             |           Sì |       No | audit app | Istante UTC ultimo aggiornamento                 |
+| `usedAt`       | `Instant`             |           No |       Sì | `null`    | Istante UTC di utilizzo                          |
+| `createdAt`    | `Instant`             |           Sì |       No | audit app | Istante UTC di creazione                         |
 
 ### Note
+
 - `code` deve essere **univoco**
 - Monouso fisso
 - Può essere generato solo da un professionista con:
@@ -229,15 +247,15 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 
 ## 3.6.1 EmailVerificationToken
 
-| Campo       | Tipo            | Obbligatorio | Nullable | Default | Note                               |
-| ----------- | --------------- | -----------: | -------: | ------- | ---------------------------------- |
-| `id`        | `Long`          |           Sì |       No | auto    | Identificativo univoco             |
-| `user`      | `User`          |           Sì |       No | —       | Utente destinatario della verifica |
-| `token`     | `String`        |           Sì |       No | —       | Token univoco di verifica email    |
-| `expiresAt` | `Instant`       |           Sì |       No | —       | Scadenza UTC dopo 24 ore reali     |
-| `used`      | `Boolean`       |           Sì |       No | `false` | Token consumato o invalidato       |
-| `usedAt`    | `Instant`       |           No |       Sì | `null`  | Istante UTC di uso o invalidazione |
-| `createdAt` | `Instant`       |           Sì |       No | audit app | Istante UTC di creazione         |
+| Campo       | Tipo      | Obbligatorio | Nullable | Default   | Note                               |
+| ----------- | --------- | -----------: | -------: | --------- | ---------------------------------- |
+| `id`        | `Long`    |           Sì |       No | auto      | Identificativo univoco             |
+| `user`      | `User`    |           Sì |       No | —         | Utente destinatario della verifica |
+| `token`     | `String`  |           Sì |       No | —         | Token univoco di verifica email    |
+| `expiresAt` | `Instant` |           Sì |       No | —         | Scadenza UTC dopo 24 ore reali     |
+| `used`      | `Boolean` |           Sì |       No | `false`   | Token consumato o invalidato       |
+| `usedAt`    | `Instant` |           No |       Sì | `null`    | Istante UTC di uso o invalidazione |
+| `createdAt` | `Instant` |           Sì |       No | audit app | Istante UTC di creazione           |
 
 ### Note
 
@@ -256,17 +274,17 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 
 ## 3.6.1 WeeklyAvailabilityRule
 
-| Campo | Tipo | Obbligatorio | Nullable | Descrizione |
-| --- | --- | ---: | ---: | --- |
-| `professional` | `ProfessionalProfile` | Sì | No | Owner della regola |
-| `dayOfWeek` | `Enum` | Sì | No | Giorno della settimana |
-| `startTime` | `LocalTime` | Sì | No | Inizio fascia |
-| `endTime` | `LocalTime` | Sì | No | Fine fascia |
-| `allowedDurations` | `Set<Integer>` | Sì | No | Durate selezionabili, normalizzate nella tabella figlia |
-| `locationLabel` | `String` | No | Sì | Luogo libero, max 255 |
-| `capacityPerSlot` | `Integer` | Sì | No | Capacità copiata negli slot concreti |
-| `active` | `Boolean` | Sì | No | Regola attiva |
-| `validFrom` | `LocalDate` | Sì | No | Prima data della ricorrenza |
+| Campo              | Tipo                  | Obbligatorio | Nullable | Descrizione                                             |
+| ------------------ | --------------------- | -----------: | -------: | ------------------------------------------------------- |
+| `professional`     | `ProfessionalProfile` |           Sì |       No | Owner della regola                                      |
+| `dayOfWeek`        | `Enum`                |           Sì |       No | Giorno della settimana                                  |
+| `startTime`        | `LocalTime`           |           Sì |       No | Inizio fascia                                           |
+| `endTime`          | `LocalTime`           |           Sì |       No | Fine fascia                                             |
+| `allowedDurations` | `Set<Integer>`        |           Sì |       No | Durate selezionabili, normalizzate nella tabella figlia |
+| `locationLabel`    | `String`              |           No |       Sì | Luogo libero, max 255                                   |
+| `capacityPerSlot`  | `Integer`             |           Sì |       No | Capacità copiata negli slot concreti                    |
+| `active`           | `Boolean`             |           Sì |       No | Regola attiva                                           |
+| `validFrom`        | `LocalDate`           |           Sì |       No | Prima data della ricorrenza                             |
 
 Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e non superiori alla finestra. `startTime` ed `endTime` sono allineati a 15 minuti. Update e deactivate non accettano date programmate: agiscono sul futuro dalla data/ora corrente.
 
@@ -274,20 +292,20 @@ Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e n
 
 ## 3.7 AvailabilitySlot
 
-| Campo           | Tipo                  | Obbligatorio | Nullable | Default     | Note                                   |
-| --------------- | --------------------- | -----------: | -------: | ----------- | -------------------------------------- |
-| `id`            | `Long`                |           Sì |       No | auto        | Identificativo univoco                 |
-| `professional`  | `ProfessionalProfile` |           Sì |       No | —           | Professionista proprietario dello slot |
-| `weeklyRule`    | `WeeklyAvailabilityRule` |          No |       Sì |           — | Regola ricorrente generatrice          |
-| `startDateTime` | `Instant`             |           Sì |       No | —           | Inizio slot persistito UTC             |
-| `endDateTime`   | `Instant`             |           Sì |       No | —           | Fine slot persistita UTC               |
-| `locationLabel` | `String`              |           No |       Sì | `null`      | Luogo dell'occorrenza                   |
-| `capacity`      | `Integer`             |           Sì |       No | `1`         | Posti massimi                  |
-| `blocked`       | `Boolean`             |           Sì |       No | `false`     | Eccezione di blocco della singola occorrenza |
-| `status`        | `Enum`                |           Sì |       No | `AVAILABLE` | Compatibilità legacy                   |
-| `active`        | `Boolean`             |           Sì |       No | `true`      | Flag logico di attivazione             |
-| `createdAt`     | `Instant`             |           Sì |       No | audit app   | Istante UTC creazione                  |
-| `updatedAt`     | `Instant`             |           Sì |       No | audit app   | Istante UTC ultimo aggiornamento       |
+| Campo           | Tipo                     | Obbligatorio | Nullable | Default     | Note                                         |
+| --------------- | ------------------------ | -----------: | -------: | ----------- | -------------------------------------------- |
+| `id`            | `Long`                   |           Sì |       No | auto        | Identificativo univoco                       |
+| `professional`  | `ProfessionalProfile`    |           Sì |       No | —           | Professionista proprietario dello slot       |
+| `weeklyRule`    | `WeeklyAvailabilityRule` |           No |       Sì | —           | Regola ricorrente generatrice                |
+| `startDateTime` | `Instant`                |           Sì |       No | —           | Inizio slot persistito UTC                   |
+| `endDateTime`   | `Instant`                |           Sì |       No | —           | Fine slot persistita UTC                     |
+| `locationLabel` | `String`                 |           No |       Sì | `null`      | Luogo dell'occorrenza                        |
+| `capacity`      | `Integer`                |           Sì |       No | `1`         | Posti massimi                                |
+| `blocked`       | `Boolean`                |           Sì |       No | `false`     | Eccezione di blocco della singola occorrenza |
+| `status`        | `Enum`                   |           Sì |       No | `AVAILABLE` | Compatibilità legacy                         |
+| `active`        | `Boolean`                |           Sì |       No | `true`      | Flag logico di attivazione                   |
+| `createdAt`     | `Instant`                |           Sì |       No | audit app   | Istante UTC creazione                        |
+| `updatedAt`     | `Instant`                |           Sì |       No | audit app   | Istante UTC ultimo aggiornamento             |
 
 ### Note
 
@@ -302,22 +320,25 @@ Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e n
 
 ## 3.8 BookingRequest
 
-| Campo          | Tipo                       | Obbligatorio | Nullable | Default     | Note                           |
-| -------------- | -------------------------- | -----------: | -------: | ----------- | ------------------------------ |
-| `id`           | `Long`                     |           Sì |       No | auto        | Identificativo univoco         |
-| `client`       | `ClientProfile`            |           Sì |       No | —           | Cliente richiedente            |
-| `professional` | `ProfessionalProfile`      |           Sì |       No | —           | Professionista destinatario    |
-| `clientDisplayName` | `String`               |           Sì |       No | —           | Snapshot storico, max 201 caratteri |
-| `professionalDisplayName` | `String`         |           Sì |       No | —           | Snapshot storico, max 201 caratteri |
-| `status`       | `Enum`                     |           Sì |       No | `PENDING`   | Stato richiesta                |
-| `note`         | `String` / `Text`          |           No |       Sì | `null`      | Nota facoltativa del cliente   |
-| `active`       | `Boolean`                  |           Sì |       No | `true`      | Flag logico di attivazione     |
-| `items`        | `List<BookingRequestItem>` |           Sì |       No | lista vuota | Slot collegati alla richiesta  |
-| `createdAt`    | `Instant`                  |           Sì |       No | audit app   | Istante UTC creazione          |
-| `updatedAt`    | `Instant`                  |           Sì |       No | audit app   | Istante UTC aggiornamento      |
-| `confirmedAt`  | `Instant`                  |           No |       Sì | `null`      | Istante UTC della conferma     |
-| `rejectedAt`   | `Instant`                  |           No |       Sì | `null`      | Istante UTC del rifiuto        |
-| `cancelledAt`  | `Instant`                  |           No |       Sì | `null`      | Istante UTC dell'annullamento  |
+| Campo                     | Tipo                       | Obbligatorio | Nullable | Default     | Note                                                    |
+| ------------------------- | -------------------------- | -----------: | -------: | ----------- | ------------------------------------------------------- |
+| `id`                      | `Long`                     |           Sì |       No | auto        | Identificativo univoco                                  |
+| `client`                  | `ClientProfile`            |           Sì |       No | —           | Cliente richiedente                                     |
+| `professional`            | `ProfessionalProfile`      |           Sì |       No | —           | Professionista destinatario                             |
+| `clientDisplayName`       | `String`                   |           Sì |       No | —           | Snapshot storico, max 201 caratteri                     |
+| `professionalDisplayName` | `String`                   |           Sì |       No | —           | Snapshot storico, max 201 caratteri                     |
+| `status`                  | `Enum`                     |           Sì |       No | `PENDING`   | Stato richiesta                                         |
+| `note`                    | `String` / `Text`          |           No |       Sì | `null`      | Nota facoltativa del cliente                            |
+| `active`                  | `Boolean`                  |           Sì |       No | `true`      | Flag logico di attivazione                              |
+| `items`                   | `List<BookingRequestItem>` |           Sì |       No | lista vuota | Slot collegati alla richiesta                           |
+| `createdAt`               | `Instant`                  |           Sì |       No | audit app   | Istante UTC creazione                                   |
+| `updatedAt`               | `Instant`                  |           Sì |       No | audit app   | Istante UTC aggiornamento                               |
+| `confirmedAt`             | `Instant`                  |           No |       Sì | `null`      | Istante UTC della conferma                              |
+| `rejectedAt`              | `Instant`                  |           No |       Sì | `null`      | Istante UTC del rifiuto                                 |
+| `cancelledAt`             | `Instant`                  |           No |       Sì | `null`      | Istante UTC dell'annullamento                           |
+| `rejectionReason`         | `String`                   |           No |       Sì | `null`      | Motivo rifiuto, max 1000; null solo legacy              |
+| `cancellationReason`      | `String`                   |           No |       Sì | `null`      | Motivo annullamento, max 1000; required per `CONFIRMED` |
+| `cancelledBy`             | `BookingCancellationActor` |           No |       Sì | `null`      | `CLIENT`/`PROFESSIONAL`; null solo legacy               |
 
 ### Note
 
@@ -334,21 +355,23 @@ Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e n
 - i display name sono costruiti al momento della creazione con nome e cognome normalizzati, trim e un solo spazio; non cambiano quando cambia il profilo;
 - per i record legacy i display name vengono ricostruiti dai profili correnti durante V6: non provano il nome originario;
 - i timestamp di transizione sono assegnati dal clock applicativo; il backfill legacy usa `updatedAt` solo per lo stato finale e non inventa stati intermedi.
+- `status` non espone setter pubblico: le modifiche passano dai metodi di transizione;
+- `reject` richiede una reason non null/non blank; `cancel` richiede sempre un actor non null. JPA può comunque idratare i metadata null dei record pre-V9.
 
 ---
 
 ## 3.9 BookingRequestItem
 
-| Campo              | Tipo               | Obbligatorio | Nullable | Default | Note                           |
-| ------------------ | ------------------ | -----------: | -------: | ------- | ------------------------------ |
-| `id`               | `Long`             |           Sì |       No | auto    | Identificativo univoco         |
-| `bookingRequest`   | `BookingRequest`   |           Sì |       No | —       | Richiesta principale           |
-| `availabilitySlot` | `AvailabilitySlot` |           Sì |       No | —       | Slot richiesto                 |
-| `scheduledStart`   | `Instant`          |           Sì |       No | —       | Snapshot UTC dell'inizio       |
-| `scheduledEnd`     | `Instant`          |           Sì |       No | —       | Snapshot UTC della fine        |
-| `locationLabelSnapshot` | `String`       |           No |       Sì | `null`  | Snapshot del luogo scelto      |
-| `createdAt`        | `Instant`          |           Sì |       No | audit app | Istante UTC creazione          |
-| `updatedAt`        | `Instant`          |           Sì |       No | audit app | Istante UTC aggiornamento      |
+| Campo                   | Tipo               | Obbligatorio | Nullable | Default   | Note                      |
+| ----------------------- | ------------------ | -----------: | -------: | --------- | ------------------------- |
+| `id`                    | `Long`             |           Sì |       No | auto      | Identificativo univoco    |
+| `bookingRequest`        | `BookingRequest`   |           Sì |       No | —         | Richiesta principale      |
+| `availabilitySlot`      | `AvailabilitySlot` |           Sì |       No | —         | Slot richiesto            |
+| `scheduledStart`        | `Instant`          |           Sì |       No | —         | Snapshot UTC dell'inizio  |
+| `scheduledEnd`          | `Instant`          |           Sì |       No | —         | Snapshot UTC della fine   |
+| `locationLabelSnapshot` | `String`           |           No |       Sì | `null`    | Snapshot del luogo scelto |
+| `createdAt`             | `Instant`          |           Sì |       No | audit app | Istante UTC creazione     |
+| `updatedAt`             | `Instant`          |           Sì |       No | audit app | Istante UTC aggiornamento |
 
 ### Note
 
@@ -379,6 +402,7 @@ Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e n
 | `active`         | `Boolean`             |           Sì |       No | `true`  | Scheda attiva o archiviata           |
 
 ### Note
+
 - `monthReference` può rappresentare il primo giorno del mese, es. `2026-03-01`
 
 ---
@@ -392,6 +416,7 @@ Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e n
 | `weekNumber`  | `Integer`     |           Sì |       No | —       | Da 1 a 4               |
 
 ### Note
+
 - Per la v1 si assume struttura mensile in 4 settimane
 
 ---
@@ -408,6 +433,7 @@ Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e n
 | `notes`       | `String` / `Text` |           No |       Sì | `null`  | Note del giorno        |
 
 ### Note
+
 - `dayType` valori iniziali:
   - `REST`
   - `WORKOUT`
@@ -416,22 +442,23 @@ Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e n
 
 ## 3.13 WorkoutExercise
 
-| Campo             | Tipo              | Obbligatorio | Nullable | Default | Note                                |
-| ----------------- | ----------------- | -----------: | -------: | ------- | ----------------------------------- |
-| `id`              | `Long`            |           Sì |       No | —       | Identificativo univoco              |
-| `workoutDay`      | `WorkoutDay`      |           Sì |       No | —       | Giorno di appartenenza              |
-| `exerciseName`    | `String`          |           Sì |       No | —       | Nome esercizio                      |
-| `sets`            | `String`          |           Sì |       No | —       | Es. `4` o `4x`                      |
-| `reps`            | `String`          |           Sì |       No | —       | Es. `10`, `8-10`, `max`             |
-| `intensity`       | `String`          |           No |       Sì | `null`  | Intensità o RPE                     |
-| `recoveryTime`    | `String`          |           No |       Sì | `null`  | Recupero tra le serie               |
-| `extraTechniques` | `String` / `Text` |           No |       Sì | `null`  | Superset, drop set, rest pause ecc. |
-| `description`     | `String` / `Text` |           No |       Sì | `null`  | Spiegazioni esercizio               |
+| Campo             | Tipo              | Obbligatorio | Nullable | Default | Note                                                         |
+| ----------------- | ----------------- | -----------: | -------: | ------- | ------------------------------------------------------------ |
+| `id`              | `Long`            |           Sì |       No | —       | Identificativo univoco                                       |
+| `workoutDay`      | `WorkoutDay`      |           Sì |       No | —       | Giorno di appartenenza                                       |
+| `exerciseName`    | `String`          |           Sì |       No | —       | Nome esercizio                                               |
+| `sets`            | `String`          |           Sì |       No | —       | Es. `4` o `4x`                                               |
+| `reps`            | `String`          |           Sì |       No | —       | Es. `10`, `8-10`, `max`                                      |
+| `intensity`       | `String`          |           No |       Sì | `null`  | Intensità o RPE                                              |
+| `recoveryTime`    | `String`          |           No |       Sì | `null`  | Recupero tra le serie                                        |
+| `extraTechniques` | `String` / `Text` |           No |       Sì | `null`  | Superset, drop set, rest pause ecc.                          |
+| `description`     | `String` / `Text` |           No |       Sì | `null`  | Spiegazioni esercizio                                        |
 | `loggedLoad`      | `BigDecimal`      |           No |       Sì | `null`  | Carico registrato, `DECIMAL(6,2)` nello schema legacy futuro |
-| `loggedReps`      | `Integer`         |           No |       Sì | `null`  | Ripetizioni registrate nello schema legacy futuro |
-| `notes`           | `String` / `Text` |           No |       Sì | `null`  | Note aggiuntive                     |
+| `loggedReps`      | `Integer`         |           No |       Sì | `null`  | Ripetizioni registrate nello schema legacy futuro            |
+| `notes`           | `String` / `Text` |           No |       Sì | `null`  | Note aggiuntive                                              |
 
 ### Note
+
 - `sets` e `reps` come `String` danno più flessibilità nella v1
 - `loggedLoad` e `loggedReps` descrivono valori consuntivi numerici; le relative tabelle non sono ancora governate da Flyway né integrate nel codice runtime
 
@@ -474,6 +501,7 @@ Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e n
 | `notes`         | `String` / `Text` |           No |       Sì | `null`    | Note del giorno        |
 
 ### Note
+
 - `dayType` valori iniziali:
   - `FREE`
   - `PLANNED`
@@ -492,6 +520,7 @@ Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e n
 | `notes`        | `String` / `Text` |           No |       Sì | `null`  | Note aggiuntive                     |
 
 ### Note
+
 - Per la v1 va bene una struttura flessibile e non troppo rigida
 
 ---
@@ -508,6 +537,7 @@ Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e n
 | `createdAt`    | `LocalDateTime`       |           Sì |       No | auto    | Data invio                    |
 
 ### Note
+
 - Riferito solo a contenuti workout
 
 ---
@@ -524,6 +554,7 @@ Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e n
 | `createdAt`    | `LocalDateTime`       |           Sì |       No | auto    | Data invio                 |
 
 ### Note
+
 - Riferito solo a contenuti nutrizione
 
 ---
@@ -531,29 +562,35 @@ Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e n
 # 4. Enum consigliati
 
 ## 4.1 Role
+
 - `CLIENT`
 - `PROFESSIONAL`
 
 ## 4.2 AccountStatus
+
 - `PENDING_VERIFICATION`
 - `ACTIVE`
 
 ## 4.3 ProfessionalSpecialization
+
 - `PERSONAL_TRAINER`
 - `NUTRITIONIST`
 
 ## 4.4 ProfessionalOperationalStatus
+
 - `DISPONIBILE`
 - `ASSENTE`
 - `FERIE`
 - `MALATTIA`
 
 ## 4.5 ClientOperationalStatus
+
 - `ATTIVO`
 - `INFORTUNATO`
 - `PAUSA`
 
 ## 4.6 AvailabilitySlotStatus
+
 - `AVAILABLE`
 - `BOOKED`
 - `BLOCKED`
@@ -561,20 +598,24 @@ Le durate devono essere uniche, comprese fra 15 e 180 minuti, multiple di 15 e n
 L'enum resta presente per compatibilità con gli slot legacy. Per gli slot materializzati dalle regole settimanali, l'authority corrente è composta da `blocked`, `capacity` e dal conteggio dei membri `PENDING`/`CONFIRMED`; `BOOKED` non rappresenta più l'esauramento globale dello slot.
 
 ## 4.7 BookingRequestStatus
+
 - `PENDING`
 - `CONFIRMED`
 - `REJECTED`
 - `CANCELLED`
 
 ## 4.8 WorkoutDayType
+
 - `REST`
 - `WORKOUT`
 
 ## 4.9 NutritionDayType
+
 - `FREE`
 - `PLANNED`
 
 ## 4.10 Gender
+
 - `MALE`
 - `FEMALE`
 - `OTHER`

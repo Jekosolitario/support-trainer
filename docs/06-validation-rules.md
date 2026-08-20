@@ -1,9 +1,13 @@
 # Validation Rules — Support Trainer
 
+> Regole Booking V1 correnti: reject PT richiede `reason`; cancel `CONFIRMED` richiede `reason` per Client e PT, mentre cancel Client `PENDING` la rende facoltativa. Reason è plain text trimmata, whitespace → `null`, massimo 1000; una requiredness condizionale fallita produce `400 VALIDATION_ERROR` con field error `reason`. Confirm/reject/cancel richiedono `now < MAX(items.scheduledEnd)` e sono consentiti durante `IN_PROGRESS`; a fine esatta o oltre rispondono `409 BOOKING_REQUEST_ENDED`. Tutte le capability Booking Professional richiedono `PERSONAL_TRAINER`.
+
 ## 1. Obiettivo del documento
+
 Questo documento definisce le principali regole di validazione del sistema.
 
 Lo scopo è chiarire:
+
 - quali controlli applicare ai dati in ingresso
 - quali regole di business devono bloccare le operazioni non valide
 - quali vincoli devono essere verificati prima di creare, aggiornare o collegare entità
@@ -13,30 +17,37 @@ Lo scopo è chiarire:
 ## 2. Principi generali
 
 ### 2.1 Due livelli di validazione
+
 Nel progetto si distinguono due livelli principali di validazione:
 
 - **validazioni strutturali**
 - **validazioni di business**
 
 ### 2.2 Validazioni strutturali
+
 Riguardano forma e presenza dei dati, ad esempio:
+
 - campi obbligatori
 - formato email
 - lunghezza password
 - valori null non consentiti
 
 Queste validazioni possono essere gestite con:
+
 - Bean Validation
 - controlli DTO request
 
 ### 2.3 Validazioni di business
+
 Riguardano le regole reali del dominio, ad esempio:
+
 - massimo 3 professionisti per cliente
 - divieto di self-link
 - slot non sovrapposti
 - impossibilità di usare un codice invito scaduto
 
 Queste validazioni devono essere gestite nel:
+
 - service layer
 
 ---
@@ -44,7 +55,9 @@ Queste validazioni devono essere gestite nel:
 ## 3. Validazioni registrazione professionista
 
 ### 3.1 Campi obbligatori
+
 In fase di registrazione professionista devono essere obbligatori:
+
 - `firstName`
 - `lastName`
 - `email`
@@ -52,14 +65,18 @@ In fase di registrazione professionista devono essere obbligatori:
 - `specialization`
 
 ### 3.2 Email
+
 L’email deve:
+
 - essere presente
 - avere formato valido
 - essere univoca nel sistema
 - essere salvata in forma normalizzata, se previsto
 
 ### 3.3 Password
+
 La password deve rispettare almeno queste regole:
+
 - minimo **8 unità UTF-16** (`@Size(min=8)` / lunghezza `String` Java)
 - massimo **72 byte in codifica UTF-8** con semantica Java (`String.getBytes(UTF_8)`, inclusi i replacement sui surrogate isolati)
 - almeno **una lettera maiuscola ASCII** (`[A-Z]`)
@@ -69,12 +86,16 @@ La password deve rispettare almeno queste regole:
 Il limite massimo è calcolato sui byte UTF-8, non sul solo numero di unità UTF-16. Il backend rifiuta il valore oltre soglia prima dell’hashing e non tronca, normalizza, fa trim o trasforma la password. Il frontend della registrazione PROFESSIONAL pre-valida in modo coerente; il server resta autoritativo. Dettaglio client: [`docs/frontend/04-professional-onboarding-implementation.md`](frontend/04-professional-onboarding-implementation.md).
 
 ### 3.4 Stato iniziale account
+
 Alla registrazione, sia l’account professionista sia il cliente devono nascere con:
+
 - `accountStatus = PENDING_VERIFICATION`
 - `emailVerified = false`
 
 ### 3.5 Blocco funzioni operative
+
 Finché l’email non è verificata, l’utente non può effettuare login. Il professionista non può inoltre:
+
 - generare codici invito
 - collegare clienti
 - utilizzare funzionalità operative riservate
@@ -84,10 +105,12 @@ Finché l’email non è verificata, l’utente non può effettuare login. Il pr
 ## 4. Validazioni registrazione cliente con codice invito
 
 ### 4.1 Regola generale
+
 Il cliente non può registrarsi liberamente.  
 La registrazione cliente richiede un codice invito valido.
 
 ### 4.2 Password cliente
+
 A livello di **contratto backend** la policy password del cliente è la stessa della registrazione professionista (§3.3): minimo 8 unità UTF-16, complessità ASCII reale, massimo 72 byte UTF-8 con semantica Java, senza trim/normalize/truncate lato server.
 
 Il frontend di registrazione CLIENT applica la stessa policy senza modificare il valore e invia la password invariata. Il server resta autoritativo. Dettaglio client: [`docs/frontend/06-client-onboarding-implementation.md`](frontend/06-client-onboarding-implementation.md).
@@ -109,7 +132,9 @@ Regole applicate prima della request:
 Il codice invito del payload proviene esclusivamente dal provider memory-only e non da un controllo editabile del form Register. Prima della mutation la pagina costruisce uno snapshot immutabile.
 
 ### 4.3 Validazioni sul codice invito
+
 Il codice deve:
+
 - esistere
 - avere `active = true`
 - essere associato a un professionista esistente
@@ -119,24 +144,31 @@ Il codice deve:
 Per la validazione pubblica, il professionista proprietario deve inoltre avere profilo `active = true`, email verificata e `accountStatus = ACTIVE`. La registrazione ripete autoritativamente i controlli pertinenti sotto lock; la validazione preventiva non prenota né consuma il codice.
 
 ### 4.4 Registrazione entro scadenza
+
 L’utente che utilizza il codice invito deve completare la registrazione entro la scadenza del codice.
 
 La scadenza è un `Instant` calcolato come 168 ore reali dal `Clock` applicativo, non come sette giorni civili; il passaggio DST non modifica la durata. Analogamente, il token di verifica email dura esattamente 24 ore reali e al confine `now == expiresAt` è già scaduto.
 
 Se la registrazione non viene completata entro tale termine:
+
 - il codice non è più valido
 - la registrazione associata non deve essere considerata valida/completata
 
 ### 4.5 Consumo del codice
+
 Il codice invito deve essere considerato usato quando:
+
 - la registrazione cliente viene completata con successo
 
 A quel punto:
+
 - `used = true`
 - `usedAt` valorizzato
 
 ### 4.6 Collegamento finale
+
 Il collegamento cliente-professionista deve essere creato solo dopo:
+
 - registrazione completata correttamente
 - validazione finale del codice invito
 
@@ -157,24 +189,32 @@ Il cooldown è attivo quando `now < latestToken.createdAt + 60 secondi`; al boun
 ## 5. Validazioni collegamento professionista-cliente
 
 ### 5.1 Cliente massimo 3 professionisti
+
 Un cliente non può avere più di:
+
 - **3 professionisti attivi**
 
 ### 5.2 No self-link
+
 Il sistema non deve permettere che:
+
 - un professionista si colleghi come cliente a sé stesso
 - venga creato un collegamento logicamente riferito allo stesso account
 
 ### 5.3 No duplicati attivi
+
 Tra lo stesso professionista e lo stesso cliente non può esistere:
+
 - più di un collegamento attivo
 
 ### 5.4 Stato professionista
+
 Solo un professionista con:
+
 - `accountStatus = ACTIVE`
 - email verificata
 - profilo `active = true`
-può collegare clienti tramite invito valido.
+  può collegare clienti tramite invito valido.
 
 ---
 
@@ -272,16 +312,9 @@ Per rendere disponibile un nuovo giorno o orario, il professionista deve creare 
 
 ### 6.7 Blocco e sblocco
 
-Sono consentite solo le transizioni:
+Il flag `blocked` è l'autorità corrente: può essere bloccata una finestra non già bloccata e può essere sbloccata soltanto una finestra bloccata. Il campo enum legacy viene mantenuto coerente come `BLOCKED`/`AVAILABLE`, ma il valore `BOOKED` non governa la capacità.
 
-- `AVAILABLE -> BLOCKED`;
-- `BLOCKED -> AVAILABLE`.
-
-Non è consentito bloccare o sbloccare uno slot `BOOKED`.
-
-Non è inoltre consentito bloccare manualmente uno slot `AVAILABLE` se esiste una richiesta booking `PENDING` attiva collegata.
-
-In questo caso il professionista deve prima gestire la richiesta pendente tramite il flusso Booking previsto, ad esempio rifiutandola.
+Il blocco di una finestra con Booking occupanti è consentito solo con `changeReason` valida; gli snapshot Booking restano invariati. Non esiste un divieto globale basato sulla sola presenza di un `PENDING`.
 
 ### 6.8 Lettura disponibilità lato cliente
 
@@ -292,37 +325,20 @@ Un cliente può leggere gli slot disponibili di un professionista solo se:
 - il professionista esiste ed è attivo;
 - esiste un collegamento attivo cliente-professionista.
 
-La lettura lato cliente restituisce solo slot:
+La lettura lato cliente restituisce occurrence materializzate:
 
-- attivi;
-- in stato `AVAILABLE`;
+- attive;
+- non bloccate;
 - con `startDateTime` nel futuro;
-- senza una richiesta booking `PENDING` attiva collegata.
+- con almeno una combinazione autoritativa in `bookableOptions`.
 
-Gli slot rimasti `AVAILABLE` ma ormai scaduti non vengono esposti al cliente.
+Le occurrence scadute o prive di capacità residua non vengono esposte. Una occurrence con Booking `PENDING` può restare visibile quando conserva altre combinazioni prenotabili.
 
-Gli slot formalmente `AVAILABLE` ma già interessati da una richiesta booking `PENDING` non vengono più mostrati come disponibilità prenotabili.
+### 6.9 Coordinamento con occupancy Booking
 
-### 6.9 Coordinamento con booking pending
+`PENDING` e `CONFIRMED` occupano capacità sull'intervallo snapshot; `REJECTED` e `CANCELLED` la liberano. Capacity e overlap sono verificati sotto i lock previsti e sostituiscono il precedente vincolo globale di un solo `PENDING` per slot.
 
-Uno slot può rimanere in stato `AVAILABLE` anche quando esiste una richiesta booking in stato `PENDING`, perché la prenotazione non è ancora stata confermata.
-
-Tuttavia, in presenza di una richiesta `PENDING` attiva, lo slot è considerato logicamente impegnato rispetto alle operazioni manuali del professionista.
-
-Di conseguenza, non sono consentiti:
-
-- aggiornamento della data o dell’orario dello slot;
-- blocco manuale dello slot.
-
-Le operazioni di aggiornamento e blocco caricano lo slot con lock pessimista in scrittura e verificano l’assenza di richieste pendenti prima di applicare modifiche.
-
-La presenza di una richiesta `PENDING` attiva incide anche sulla lettura lato cliente.
-
-Uno slot interessato da una richiesta pendente:
-
-- non può essere modificato;
-- non può essere bloccato manualmente;
-- non viene restituito tra le disponibilità prenotabili agli altri clienti.
+La ripianificazione temporale di uno slot già presente nello storico Booking resta vietata. Il blocco, invece, preserva gli snapshot esistenti e richiede una motivazione quando impatta Booking occupanti. La lettura cliente espone le sole `bookableOptions` con capacità residua.
 
 ### 6.10 Integrità storica dello slot
 
@@ -337,9 +353,10 @@ La regola vale quando la richiesta collegata è:
 
 In particolare:
 
-- con booking `PENDING`, lo slot non può essere modificato né bloccato manualmente;
-- dopo un booking rifiutato o cancellato, lo slot può eventualmente ricevere nuove richieste sullo stesso intervallo;
-- dopo qualsiasi richiesta booking, lo slot non può essere ripianificato modificandone data o ora.
+- con booking `PENDING` o `CONFIRMED`, l'intervallo snapshot occupa capacità e resta immutabile;
+- dopo un booking rifiutato o cancellato, la relativa capacità viene liberata;
+- dopo qualsiasi richiesta booking, lo slot non può essere ripianificato modificandone data o ora;
+- il blocco con Booking impattati richiede reason e non riscrive gli snapshot.
 
 La finalità è evitare che lo storico di una richiesta mostri un intervallo differente da quello selezionato dal cliente al momento della prenotazione.
 
@@ -365,9 +382,7 @@ Il cliente può inviare una richiesta solo verso uno slot appartenente a un prof
 
 ### 7.3 Contratto attuale della richiesta
 
-Nel backend attuale una richiesta booking viene creata a partire da:
-
-- un singolo `availabilitySlotId`.
+Nel backend attuale una richiesta booking viene creata a partire da un singolo `availabilitySlotId`/`occurrenceId`, con `startDateTime` e `durationMinutes` scelti fra le combinazioni restituite dal server.
 
 Di conseguenza, ogni booking creato tramite API contiene attualmente:
 
@@ -382,24 +397,16 @@ Per creare una richiesta, lo slot selezionato deve:
 - esistere;
 - essere attivo;
 - appartenere al professionista collegato;
-- essere in stato `AVAILABLE`;
-- avere `startDateTime` nel futuro;
-- non avere già una richiesta `PENDING` attiva associata.
+- essere un'occurrence generata da regola settimanale;
+- non essere bloccato e avere `startDateTime` nel futuro;
+- contenere l'intervallo richiesto e avere capacità residua per tutta la durata;
+- non sovrapporsi a un Booking occupante dello stesso Client con quel professionista.
 
-Uno slot `AVAILABLE` ma ormai scaduto non è prenotabile.
+Il valore legacy `AVAILABLE`/`BOOKED` non è l'authority della capacità. Un'occurrence scaduta o priva di una `bookableOption` coerente non è prenotabile.
 
-### 7.4.1 Riserva logica dello slot
+### 7.4.1 Occupancy e capacità
 
-La creazione di una richiesta booking `PENDING` non modifica immediatamente lo stato dello slot in `BOOKED`.
-
-Lo slot resta `AVAILABLE` fino alla conferma del professionista, ma viene protetto rispetto alle operazioni manuali incompatibili.
-
-Finché esiste una richiesta `PENDING` attiva sullo slot:
-
-- non può essere creata una seconda richiesta `PENDING` sullo stesso slot;
-- il professionista non può modificare lo slot;
-- il professionista non può bloccare manualmente lo slot;
-- lo slot non viene esposto al cliente come disponibilità prenotabile.
+La creazione di una richiesta `PENDING` non muta lo slot in `BOOKED`: occupa un posto soltanto sull'intervallo snapshot. `PENDING` e `CONFIRMED` concorrono entrambi all'occupancy; `REJECTED` e `CANCELLED` la liberano. La response cliente può continuare a esporre altre combinazioni della stessa occurrence quando conservano capacità residua.
 
 ### 7.4.2 Integrità temporale dello storico booking
 
@@ -437,40 +444,37 @@ Una richiesta può essere confermata solo:
 
 - dal professionista coinvolto;
 - se si trova in stato `PENDING`;
-- se lo slot collegato è ancora `AVAILABLE`;
-- se lo slot collegato non è scaduto.
+- se il professionista dello slot è ancora un `PERSONAL_TRAINER`;
+- se `now < MAX(items.scheduledEnd)`.
 
 Alla conferma:
 
 - booking `PENDING -> CONFIRMED`;
-- slot `AVAILABLE -> BOOKED`.
+- occupancy invariata, perché entrambi gli stati occupano capacità.
 
-Un booking pending con slot ormai scaduto non può essere confermato.
+La fine snapshot del Booking, non lo stato o la fine dello slot live, è il limite temporale. La conferma è consentita durante `IN_PROGRESS` e rifiutata a fine esatta o oltre con `409 BOOKING_REQUEST_ENDED`.
 
 ### 7.8 Rifiuto richiesta
 
 Una richiesta può essere rifiutata solo:
 
 - dal professionista coinvolto;
-- se si trova in stato `PENDING`.
+- se si trova in stato `PENDING`;
+- se `now < MAX(items.scheduledEnd)`;
+- con reason non null/non blank, trimmata e lunga al massimo 1000 caratteri.
 
 Al rifiuto:
 
 - booking `PENDING -> REJECTED`;
-- lo slot resta `AVAILABLE`.
+- viene liberata la capacità dell'intervallo.
 
 ### 7.9 Cancellazione richiesta
 
-Il cliente coinvolto può cancellare:
-
-- booking `PENDING`, lasciando lo slot `AVAILABLE`;
-- booking `CONFIRMED`, riportando lo slot a `AVAILABLE`.
-
-Il professionista coinvolto può cancellare:
-
-- solo booking `CONFIRMED`, riportando lo slot a `AVAILABLE`.
+Il cliente coinvolto può cancellare `PENDING` con reason facoltativa oppure `CONFIRMED` con reason obbligatoria. Il professionista coinvolto può cancellare soltanto `CONFIRMED`, sempre con reason obbligatoria. Ogni cancellazione richiede `now < MAX(items.scheduledEnd)`, libera la capacità dell'intervallo e assegna server-side `cancelledBy = CLIENT|PROFESSIONAL`.
 
 Il professionista non può cancellare una richiesta `PENDING`: deve rifiutarla.
+
+Reason e actor possono essere null soltanto nei record legacy pre-V9; una nuova transizione produttiva non può creare reject senza reason né cancel senza actor.
 
 ### 7.10 Ownership e dettaglio
 
@@ -485,32 +489,44 @@ Un utente estraneo alla richiesta non può visualizzarla né modificarne lo stat
 ## 8. Validazioni WorkoutPlan — Pianificate, non implementate
 
 ### 8.1 Soggetto autorizzato
+
 Una scheda workout può essere creata solo da un professionista con specializzazione:
+
 - `PERSONAL_TRAINER`
 
 ### 8.2 Relazione valida
+
 Il PT può creare una scheda workout solo per:
+
 - un cliente collegato attivamente a lui
 
 ### 8.3 Unicità scheda attiva per coppia PT-cliente
+
 Per una coppia:
+
 - `personal trainer`
 - `cliente`
 
 può esistere una sola scheda workout attiva alla volta.
 
 ### 8.4 Eccezione multi-PT
+
 Un cliente può comunque avere più schede workout attive contemporaneamente se appartengono a:
+
 - personal trainer diversi
 - tutti collegati validamente al cliente
 
 ### 8.5 Sostituzione scheda
+
 Quando viene creata una nuova scheda workout per la stessa coppia PT-cliente:
+
 - la precedente deve passare a `active = false`
 - la nuova diventa l’unica attiva per quella coppia
 
 ### 8.6 Struttura minima coerente
+
 Una scheda workout valida deve avere almeno:
+
 - struttura coerente
 - settimane/giorni correttamente associati
 - almeno un contenuto utile se prevista come scheda completa
@@ -520,27 +536,37 @@ Una scheda workout valida deve avere almeno:
 ## 9. Validazioni NutritionPlan — Pianificate, non implementate
 
 ### 9.1 Soggetto autorizzato
+
 Un piano alimentare può essere creato solo da un professionista con specializzazione:
+
 - `NUTRITIONIST`
 
 ### 9.2 Relazione valida
+
 Il nutrizionista può creare un piano solo per:
+
 - un cliente collegato attivamente a lui
 
 ### 9.3 Unicità piano attivo
+
 Per una coppia:
+
 - `nutrizionista`
 - `cliente`
 
 può esistere un solo piano alimentare attivo alla volta.
 
 ### 9.4 Sostituzione piano
+
 Quando viene creato un nuovo piano per la stessa coppia:
+
 - il piano precedente passa a `active = false`
 - il nuovo diventa l’unico attivo
 
 ### 9.5 Struttura minima coerente
+
 Il piano alimentare deve avere una struttura coerente e collegamenti validi tra:
+
 - piano
 - settimane
 - giorni
@@ -551,22 +577,30 @@ Il piano alimentare deve avere una struttura coerente e collegamenti validi tra:
 ## 10. Validazioni WorkoutFeedback — Pianificate, non implementate
 
 ### 10.1 Utente autorizzato
+
 Il feedback workout può essere inviato solo da:
+
 - un cliente autenticato
 
 ### 10.2 Relazione valida
+
 Il cliente può inviare feedback workout solo verso:
+
 - un PT a cui è collegato attivamente
 
 ### 10.3 Giorno valido
+
 Il `WorkoutDay` indicato nel feedback deve:
+
 - esistere
 - appartenere a una scheda reale
 - appartenere a una scheda del PT destinatario
 - appartenere al cliente che invia il messaggio
 
 ### 10.4 Messaggio obbligatorio
+
 Il campo `message` deve essere:
+
 - obbligatorio
 - non vuoto
 - non composto solo da spazi
@@ -576,22 +610,30 @@ Il campo `message` deve essere:
 ## 11. Validazioni NutritionFeedback — Pianificate, non implementate
 
 ### 11.1 Utente autorizzato
+
 Il feedback nutrizione può essere inviato solo da:
+
 - un cliente autenticato
 
 ### 11.2 Relazione valida
+
 Il cliente può inviare feedback nutrizione solo verso:
+
 - un nutrizionista a cui è collegato attivamente
 
 ### 11.3 Giorno valido
+
 Il `NutritionDay` indicato nel feedback deve:
+
 - esistere
 - appartenere a un piano reale
 - appartenere al nutrizionista destinatario
 - appartenere al cliente che invia il messaggio
 
 ### 11.4 Messaggio obbligatorio
+
 Il campo `message` deve essere:
+
 - obbligatorio
 - non vuoto
 - non composto solo da spazi
@@ -601,29 +643,39 @@ Il campo `message` deve essere:
 ## 12. Validazioni ClientMeasurement — Pianificate, non implementate
 
 ### 12.1 Cliente valido
+
 Ogni misurazione deve riferirsi a:
+
 - un cliente esistente
 
 ### 12.2 Campi obbligatori minimi
+
 Per una `ClientMeasurement` devono essere obbligatori almeno:
+
 - `client`
 - `recordedAt`
 - `weightKg`
 
 ### 12.3 Inserimento autorizzato
+
 Una misurazione può essere inserita solo:
+
 - dal cliente stesso
 - da un professionista collegato attivamente a quel cliente
 
 ### 12.4 Coerenza logica
+
 Il sistema non deve permettere a un professionista non collegato di:
+
 - creare
 - alterare
 - registrare misurazioni per quel cliente
 
 ### 12.5 Storico
+
 Le misurazioni rappresentano dati storici.  
 Per questo:
+
 - normalmente si aggiunge una nuova rilevazione
 - non si sovrascrive una vecchia rilevazione come comportamento standard
 
@@ -632,13 +684,17 @@ Per questo:
 ## 13. Validazioni generali su campi testuali
 
 ### 13.1 Stringhe obbligatorie
+
 I campi testuali obbligatori devono:
+
 - essere presenti
 - non essere vuoti
 - non contenere solo spazi
 
 ### 13.2 Stringhe facoltative
+
 I campi facoltativi possono essere null, ma se valorizzati devono essere trattati con:
+
 - trim
 - controllo lunghezza massima, se definita
 
@@ -651,12 +707,12 @@ I campi URL attualmente gestiti nel profilo professionista sono:
 
 Nel `PATCH /api/v1/me/profile` seguono queste regole:
 
-| Valore ricevuto | Comportamento |
-|---|---|
-| campo omesso oppure `null` | il valore già salvato non viene modificato |
-| valore che inizia con `http://` oppure `https://` | l’URL viene accettato e salvato |
-| stringa vuota oppure composta solo da spazi | l’URL già salvato viene rimosso e memorizzato come `null` |
-| valore senza protocollo valido | la richiesta viene rifiutata per errore di validazione |
+| Valore ricevuto                                   | Comportamento                                             |
+| ------------------------------------------------- | --------------------------------------------------------- |
+| campo omesso oppure `null`                        | il valore già salvato non viene modificato                |
+| valore che inizia con `http://` oppure `https://` | l’URL viene accettato e salvato                           |
+| stringa vuota oppure composta solo da spazi       | l’URL già salvato viene rimosso e memorizzato come `null` |
+| valore senza protocollo valido                    | la richiesta viene rifiutata per errore di validazione    |
 
 La rimozione tramite stringa vuota permette al frontend di offrire un form profilo completo, nel quale il professionista può eliminare un link precedentemente inserito.
 
@@ -680,11 +736,15 @@ Le regole di registrazione e aggiornamento del profilo owner restano invariate. 
 ## 14. Validazioni generali su stati ed enum
 
 ### 14.1 Valori ammessi
+
 I campi enum devono accettare solo:
+
 - valori previsti dal sistema
 
 ### 14.2 Coerenza tra stato account e azioni
+
 Un utente non può eseguire azioni operative riservate se:
+
 - `accountStatus` non è `ACTIVE`
 - l’email richiesta non è verificata
 - il profilo applicativo è `active = false`
@@ -745,21 +805,20 @@ Il service layer gestisce le regole business reali, tra cui:
 - ownership sugli slot;
 - lettura cliente solo per professionisti collegati;
 - esclusione degli slot scaduti dalla lettura cliente;
-- booking solo su slot disponibili e futuri;
-- assenza di booking `PENDING` duplicati sullo stesso slot;
+- booking solo su occurrence/window future, non bloccate e presenti nelle `bookableOptions`;
+- capacità residua e assenza di overlap Client sull'intervallo richiesto;
+- occupancy prodotta da `PENDING` e `CONFIRMED`, con rilascio su `REJECTED` e `CANCELLED`;
 - normalizzazione della nota booking;
 - transizioni booking consentite;
-- blocco conferma booking con slot scaduto;
-- aggiornamento coerente dello stato slot.
+- blocco mutation Booking a fine snapshot esatta o oltre;
+- nessuna mutation globale dello stato slot durante confirm, reject o cancel;
 - protezione da overlap Availability concorrenti tramite lock sul professionista;
-- lock sullo slot durante modifica e blocco quando possono esistere booking pendenti;
-- blocco modifica slot con booking `PENDING` attivo;
-- blocco manuale slot con booking `PENDING` attivo;
-- coordinamento transazionale tra Availability e Bookings sullo stesso slot;
-- protezione da doppia creazione concorrente di booking `PENDING`;
+- lock e reason per operazioni Availability che impattano Booking esistenti;
+- coordinamento transazionale tra Availability e Bookings sulla stessa occurrence/window;
+- protezione da over-capacity e overlap durante creazioni concorrenti;
 - protezione da transizioni concorrenti della stessa richiesta booking;
-- protezione da conferme concorrenti sullo stesso slot.
-- esclusione dalla lettura availability lato cliente degli slot con booking `PENDING` attivo;
+- protezione delle occurrence collegate durante la conferma;
+- esposizione delle sole `bookableOptions` con capacità residua;
 - blocco della ripianificazione di slot già coinvolti in richieste booking;
 - tutela dell’integrità temporale dello storico delle prenotazioni;
 - normalizzazione dei valori vuoti di `instagramUrl` e `websiteUrl` in `null` durante l’aggiornamento profilo.
@@ -820,19 +879,18 @@ Le seguenti situazioni sono gestite o devono essere gestite tramite errori appli
 - blocco o sblocco in stato non consentito;
 - accesso cliente a professionista non collegato.
 - modifica di slot con richiesta booking `PENDING` attiva;
-- blocco manuale di slot con richiesta booking `PENDING` attiva.
+- blocco di slot con Booking impattati senza reason.
 - ripianificazione tramite modifica data/ora di uno slot già coinvolto in una richiesta booking.
 
 ### Area booking
 
 - cliente non autorizzato;
 - booking verso professionista non collegato;
-- slot non trovato;
-- slot non disponibile;
-- slot scaduto non prenotabile;
-- booking pending duplicato sullo stesso slot;
+- occurrence/window non trovata, bloccata o scaduta;
+- combinazione non presente nelle `bookableOptions`;
+- capacità esaurita o overlap Client incompatibile;
 - dettaglio richiesto da utente non coinvolto;
-- conferma booking con slot scaduto;
+- mutation Booking con `now >= MAX(items.scheduledEnd)`;
 - transizione di stato non consentita;
 - cancellazione professionista di booking ancora `PENDING`.
 
@@ -859,16 +917,14 @@ Per Support Trainer risultano attualmente confermate le seguenti regole:
 - slot scaduti esclusi dalle disponibilità consultabili;
 - booking creato attualmente su un singolo slot;
 - booking consentito solo tra cliente e professionista collegati;
-- booking non creabile né confermabile su slot scaduti;
+- booking non creabile su occurrence scadute; le mutation esistenti usano `now < MAX(items.scheduledEnd)` e non lo stato live dello slot;
 - stati booking gestiti: `PENDING`, `CONFIRMED`, `REJECTED`, `CANCELLED`;
 - ownership e transizioni booking controllate nel service layer.
 - il controllo di sovrapposizione availability è protetto da lock pessimista sul professionista;
-- uno slot con booking `PENDING` è logicamente riservato rispetto a modifica e blocco manuale;
+- `PENDING` e `CONFIRMED` occupano capacità sull'intervallo snapshot;
 - Availability e Bookings coordinano le operazioni concorrenti sullo stesso slot tramite lock pessimisti e validazioni nel service layer.
-- uno slot con booking `PENDING` attivo non viene esposto al cliente come disponibilità prenotabile;
-- uno slot già coinvolto in una richiesta booking non può essere ripianificato modificandone data o ora;
-- per proporre una nuova disponibilità temporale dopo uno storico booking, il professionista deve creare un nuovo slot;
-- la regola protegge la coerenza storica delle richieste già create.
+- la response cliente espone soltanto le `bookableOptions` con capacità residua, anche quando appartengono a un'occurrence già parzialmente occupata;
+- modifiche, disattivazioni e blocchi preservano gli snapshot Booking esistenti e richiedono reason quando hanno impatto;
 - gli URL `instagramUrl` e `websiteUrl` del professionista sono facoltativi, ma se valorizzati devono iniziare con `http://` o `https://`;
 - il professionista può rimuovere un URL già salvato inviando una stringa vuota nel form di aggiornamento profilo;
 - il frontend dovrà distinguere tra campo non modificato (`null`/omesso) e richiesta esplicita di rimozione (`""`).

@@ -47,7 +47,8 @@ class FlywayMigrationResourcesTest {
             "db/migration/V5_8__transfer_booking_request_audit_ownership_to_application.sql",
             "db/migration/V5_9__transfer_booking_item_audit_ownership_to_application.sql",
             "db/migration/V7__create_spring_session_jdbc_schema.sql",
-            "db/migration/V8__add_weekly_availability_and_capacity.sql"
+            "db/migration/V8__add_weekly_availability_and_capacity.sql",
+            "db/migration/V9__add_booking_transition_metadata.sql"
     );
 
     private static final List<V5MigrationContract> V5_MIGRATIONS = List.of(
@@ -191,7 +192,8 @@ class FlywayMigrationResourcesTest {
                         "V5_8__transfer_booking_request_audit_ownership_to_application.sql",
                         "V5_9__transfer_booking_item_audit_ownership_to_application.sql",
                         "V7__create_spring_session_jdbc_schema.sql",
-                        "V8__add_weekly_availability_and_capacity.sql"
+                        "V8__add_weekly_availability_and_capacity.sql",
+                        "V9__add_booking_transition_metadata.sql"
                 )
                 .allMatch(name -> VALID_MIGRATION_NAME.matcher(name).matches());
 
@@ -200,7 +202,7 @@ class FlywayMigrationResourcesTest {
     }
 
     @Test
-    void migrationDirectoryShouldContainOnlyApprovedSqlMigrationsThroughV8() throws IOException {
+    void migrationDirectoryShouldContainOnlyApprovedSqlMigrationsThroughV9() throws IOException {
         Resource[] resources = new PathMatchingResourcePatternResolver()
                 .getResources("classpath*:db/migration/V*__*.sql");
 
@@ -396,7 +398,7 @@ class FlywayMigrationResourcesTest {
 
     @Test
     void v7ShouldCreateOfficialSpringSessionJdbcSchemaWithoutLegacyReuse() throws IOException {
-        String sql = readResource(MIGRATIONS.get(MIGRATIONS.size() - 2));
+        String sql = readResource(MIGRATIONS.get(MIGRATIONS.size() - 3));
         Matcher matcher = CREATE_TABLE.matcher(sql);
         Set<String> createdTables = new LinkedHashSet<>();
         while (matcher.find()) {
@@ -436,7 +438,7 @@ class FlywayMigrationResourcesTest {
 
     @Test
     void v8ShouldAddWeeklyRulesCapacityAndChangeAuditWithoutDestroyingHistory() throws IOException {
-        String sql = readResource(MIGRATIONS.getLast());
+        String sql = readResource(MIGRATIONS.get(MIGRATIONS.size() - 2));
 
         assertThat(sql)
                 .contains("CREATE TABLE weekly_availability_rules")
@@ -456,6 +458,19 @@ class FlywayMigrationResourcesTest {
                 .contains("ADD COLUMN location_label_snapshot VARCHAR(255) NULL")
                 .contains("UPDATE availability_slots")
                 .doesNotContainIgnoringCase("DROP TABLE")
+                .doesNotContainIgnoringCase("DELETE FROM");
+    }
+
+    @Test
+    void v9ShouldAddNullableBookingTransitionMetadata() throws IOException {
+        String sql = readResource(MIGRATIONS.getLast());
+
+        assertThat(sql)
+                .contains("ADD COLUMN rejection_reason VARCHAR(1000) NULL")
+                .contains("ADD COLUMN cancellation_reason VARCHAR(1000) NULL")
+                .contains("ADD COLUMN cancelled_by VARCHAR(32) NULL")
+                .doesNotContainIgnoringCase("UPDATE booking_requests")
+                .doesNotContainIgnoringCase("DROP ")
                 .doesNotContainIgnoringCase("DELETE FROM");
     }
 

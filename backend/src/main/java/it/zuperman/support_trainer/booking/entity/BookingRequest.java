@@ -3,12 +3,14 @@ package it.zuperman.support_trainer.booking.entity;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.common.entity.BaseEntity;
+import it.zuperman.support_trainer.common.enums.BookingCancellationActor;
 import it.zuperman.support_trainer.common.enums.BookingRequestStatus;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import jakarta.persistence.CascadeType;
@@ -42,6 +44,7 @@ public class BookingRequest extends BaseEntity {
     private ProfessionalProfile professional;
 
     @Enumerated(EnumType.STRING)
+    @Setter(AccessLevel.NONE)
     @Column(name = "status", nullable = false, length = 50)
     private BookingRequestStatus status = BookingRequestStatus.PENDING;
 
@@ -71,6 +74,19 @@ public class BookingRequest extends BaseEntity {
     @Column(name = "cancelled_at", columnDefinition = "DATETIME(6)")
     private Instant cancelledAt;
 
+    @Setter(AccessLevel.NONE)
+    @Column(name = "rejection_reason", length = 1000)
+    private String rejectionReason;
+
+    @Setter(AccessLevel.NONE)
+    @Column(name = "cancellation_reason", length = 1000)
+    private String cancellationReason;
+
+    @Setter(AccessLevel.NONE)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancelled_by", length = 32)
+    private BookingCancellationActor cancelledBy;
+
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
@@ -98,22 +114,42 @@ public class BookingRequest extends BaseEntity {
     }
 
     public void confirm(Instant confirmedAt) {
+        Objects.requireNonNull(confirmedAt, "confirmedAt must not be null");
         if (this.confirmedAt == null) {
             this.confirmedAt = confirmedAt;
         }
         this.status = BookingRequestStatus.CONFIRMED;
     }
 
-    public void reject(Instant rejectedAt) {
+    public void reject(Instant rejectedAt, String rejectionReason) {
+        Objects.requireNonNull(rejectedAt, "rejectedAt must not be null");
+        if (rejectionReason == null || rejectionReason.isBlank()) {
+            throw new IllegalArgumentException("rejectionReason must not be blank");
+        }
+        if (rejectionReason.length() > 1000) {
+            throw new IllegalArgumentException("rejectionReason must not exceed 1000 characters");
+        }
         if (this.rejectedAt == null) {
             this.rejectedAt = rejectedAt;
+            this.rejectionReason = rejectionReason;
         }
         this.status = BookingRequestStatus.REJECTED;
     }
 
-    public void cancel(Instant cancelledAt) {
+    public void cancel(
+            Instant cancelledAt,
+            String cancellationReason,
+            BookingCancellationActor cancelledBy
+    ) {
+        Objects.requireNonNull(cancelledAt, "cancelledAt must not be null");
+        Objects.requireNonNull(cancelledBy, "cancelledBy must not be null");
+        if (cancellationReason != null && cancellationReason.length() > 1000) {
+            throw new IllegalArgumentException("cancellationReason must not exceed 1000 characters");
+        }
         if (this.cancelledAt == null) {
             this.cancelledAt = cancelledAt;
+            this.cancellationReason = cancellationReason;
+            this.cancelledBy = cancelledBy;
         }
         this.status = BookingRequestStatus.CANCELLED;
     }

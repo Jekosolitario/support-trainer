@@ -13,7 +13,9 @@ import it.zuperman.support_trainer.availability.entity.AvailabilitySlot;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
 import it.zuperman.support_trainer.availability.service.AvailabilityCapacityService;
 import it.zuperman.support_trainer.availability.service.AvailabilityWindowPolicy;
+import it.zuperman.support_trainer.booking.dto.request.CancelBookingRequest;
 import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
+import it.zuperman.support_trainer.booking.dto.request.RejectBookingRequest;
 import it.zuperman.support_trainer.booking.dto.response.BookingDetailResponse;
 import it.zuperman.support_trainer.booking.dto.response.BookingSummaryResponse;
 import it.zuperman.support_trainer.booking.entity.BookingRequest;
@@ -25,9 +27,11 @@ import it.zuperman.support_trainer.client.entity.ClientProfile;
 import it.zuperman.support_trainer.client.repository.ClientProfileRepository;
 import it.zuperman.support_trainer.common.entity.User;
 import it.zuperman.support_trainer.common.enums.AccountStatus;
+import it.zuperman.support_trainer.common.enums.BookingCancellationActor;
 import it.zuperman.support_trainer.common.enums.BookingRequestStatus;
 import it.zuperman.support_trainer.common.enums.ProfessionalSpecialization;
 import it.zuperman.support_trainer.common.exception.AppException;
+import it.zuperman.support_trainer.common.exception.AppValidationException;
 import it.zuperman.support_trainer.common.time.ApplicationTimeProvider;
 import it.zuperman.support_trainer.common.time.BusinessDateTimeMapper;
 import it.zuperman.support_trainer.common.security.UserReadinessValidator;
@@ -143,7 +147,7 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public List<BookingSummaryResponse> getProfessionalBookingRequests() {
-        ProfessionalProfile professional = getAuthenticatedProfessional();
+        ProfessionalProfile professional = getAuthenticatedPersonalTrainer();
 
         return bookingRequestRepository
                 .findAllByProfessional_IdAndActiveTrueOrderByCreatedAtDescIdDesc(professional.getId())
@@ -155,6 +159,7 @@ public class BookingService {
     @Transactional(readOnly = true)
     public BookingDetailResponse getBookingRequestDetail(Long bookingRequestId) {
         User user = getAuthenticatedUser();
+        validateProfessionalBookingCapability(user);
 
         BookingRequest bookingRequest = bookingRequestRepository.findActiveByIdAndParticipantId(
                         bookingRequestId,
@@ -171,7 +176,7 @@ public class BookingService {
 
     @Transactional
     public BookingDetailResponse confirmBookingRequest(Long bookingRequestId) {
-        ProfessionalProfile professional = getAuthenticatedProfessional();
+        ProfessionalProfile professional = getAuthenticatedPersonalTrainer();
 
         BookingRequest bookingRequest = getActiveBookingRequestForProfessional(
                 bookingRequestId,
@@ -179,18 +184,24 @@ public class BookingService {
         );
 
         validateBookingRequestIsPending(bookingRequest);
+
+        Instant now = timeProvider.nowInstant();
+        validateBookingRequestHasNotEnded(bookingRequest, now);
 
         lockAndValidateSlotsCanBeConfirmed(bookingRequest);
 
-        bookingRequest.confirm(timeProvider.nowInstant());
+        bookingRequest.confirm(now);
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
         return bookingResponseMapper.toDetail(savedBookingRequest);
     }
 
     @Transactional
-    public BookingDetailResponse rejectBookingRequest(Long bookingRequestId) {
-        ProfessionalProfile professional = getAuthenticatedProfessional();
+    public BookingDetailResponse rejectBookingRequest(
+            Long bookingRequestId,
+            RejectBookingRequest request
+    ) {
+        ProfessionalProfile professional = getAuthenticatedPersonalTrainer();
 
         BookingRequest bookingRequest = getActiveBookingRequestForProfessional(
                 bookingRequestId,
@@ -199,15 +210,23 @@ public class BookingService {
 
         validateBookingRequestIsPending(bookingRequest);
 
-        bookingRequest.reject(timeProvider.nowInstant());
+        Instant now = timeProvider.nowInstant();
+        validateBookingRequestHasNotEnded(bookingRequest, now);
+        String reason = normalizeRequiredReason(request == null ? null : request.getReason());
+
+        bookingRequest.reject(now, reason);
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
         return bookingResponseMapper.toDetail(savedBookingRequest);
     }
 
     @Transactional
-    public BookingDetailResponse cancelBookingRequest(Long bookingRequestId) {
+    public BookingDetailResponse cancelBookingRequest(
+            Long bookingRequestId,
+            CancelBookingRequest request
+    ) {
         User user = getAuthenticatedUser();
+        validateProfessionalBookingCapability(user);
 
         BookingRequest bookingRequest = bookingRequestRepository.findActiveByIdAndParticipantIdForUpdate(
                         bookingRequestId,
@@ -221,7 +240,14 @@ public class BookingService {
 
         validateCancellationAllowed(user, bookingRequest);
 
-        bookingRequest.cancel(timeProvider.nowInstant());
+        Instant now = timeProvider.nowInstant();
+        validateBookingRequestHasNotEnded(bookingRequest, now);
+        String reason = normalizeReason(request == null ? null : request.getReason());
+        if (bookingRequest.getStatus() == BookingRequestStatus.CONFIRMED && reason == null) {
+            throw reasonRequired();
+        }
+
+        bookingRequest.cancel(now, reason, cancellationActor(user));
 
         BookingRequest savedBookingRequest = bookingRequestRepository.save(bookingRequest);
         return bookingResponseMapper.toDetail(savedBookingRequest);
@@ -239,6 +265,53 @@ public class BookingService {
         }
 
         return normalizedNote;
+    }
+
+    private String normalizeRequiredReason(String reason) {
+        String normalizedReason = normalizeReason(reason);
+        if (normalizedReason == null) {
+            throw reasonRequired();
+        }
+        return normalizedReason;
+    }
+
+    private String normalizeReason(String reason) {
+        if (reason == null) {
+            return null;
+        }
+
+        if (reason.length() > 1000) {
+            throw AppValidationException.field(
+                    "reason",
+                    "Size",
+                    "La motivazione non può superare 1000 caratteri"
+            );
+        }
+
+        String normalizedReason = reason.trim();
+        return normalizedReason.isBlank() ? null : normalizedReason;
+    }
+
+    private AppValidationException reasonRequired() {
+        return AppValidationException.field(
+                "reason",
+                "NotBlank",
+                "La motivazione è obbligatoria"
+        );
+    }
+
+    private BookingCancellationActor cancellationActor(User user) {
+        if (user instanceof ClientProfile) {
+            return BookingCancellationActor.CLIENT;
+        }
+        if (user instanceof ProfessionalProfile) {
+            return BookingCancellationActor.PROFESSIONAL;
+        }
+        throw new AppException(
+                HttpStatus.FORBIDDEN,
+                "ROLE_NOT_ALLOWED",
+                "Il ruolo autenticato non può cancellare la prenotazione"
+        );
     }
 
     private String displayName(String firstName, String lastName) {
@@ -298,14 +371,26 @@ public class BookingService {
                 );
             }
 
-            if (!slot.getStartDateTime().isAfter(timeProvider.nowInstant())) {
-                throw new AppException(
-                        HttpStatus.CONFLICT,
-                        "AVAILABILITY_SLOT_NOT_CONFIRMABLE",
-                        "Lo slot collegato è scaduto e non è più confermabile"
-                );
-            }
+        }
+    }
 
+    private void validateBookingRequestHasNotEnded(BookingRequest bookingRequest, Instant now) {
+        Instant bookingEnd = bookingRequest.getItems().stream()
+                .filter(item -> item != null && item.getScheduledEnd() != null)
+                .map(BookingRequestItem::getScheduledEnd)
+                .max(Instant::compareTo)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "BOOKING_HISTORY_INCONSISTENT",
+                        "La prenotazione non è disponibile"
+                ));
+
+        if (!now.isBefore(bookingEnd)) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "BOOKING_REQUEST_ENDED",
+                    "La prenotazione è terminata e non può più essere modificata"
+            );
         }
     }
 
@@ -479,6 +564,28 @@ public class BookingService {
         }
 
         return professionalProfile;
+    }
+
+    private ProfessionalProfile getAuthenticatedPersonalTrainer() {
+        ProfessionalProfile professional = getAuthenticatedProfessional();
+        validateProfessionalBookingSpecialization(professional);
+        return professional;
+    }
+
+    private void validateProfessionalBookingCapability(User user) {
+        if (user instanceof ProfessionalProfile professional) {
+            validateProfessionalBookingSpecialization(professional);
+        }
+    }
+
+    private void validateProfessionalBookingSpecialization(ProfessionalProfile professional) {
+        if (professional.getSpecialization() != ProfessionalSpecialization.PERSONAL_TRAINER) {
+            throw new AppException(
+                    HttpStatus.FORBIDDEN,
+                    "BOOKING_SPECIALIZATION_NOT_ALLOWED",
+                    "Il modulo prenotazioni è disponibile solo per i personal trainer"
+            );
+        }
     }
 
     private User getAuthenticatedUser() {

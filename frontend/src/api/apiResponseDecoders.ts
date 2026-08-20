@@ -135,6 +135,66 @@ export function requireIsoLocalDate(record: JsonObject, key: string): string {
   return value;
 }
 
+export function requireIsoInstant(record: JsonObject, key: string): string {
+  const value = requireString(record, key);
+  if (
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value) ||
+    Number.isNaN(Date.parse(value))
+  ) {
+    throw new Error(`${key} must be an ISO instant`);
+  }
+  return value;
+}
+
+export function requireNullableIsoInstant(
+  record: JsonObject,
+  key: string,
+): string | null {
+  if (record[key] === null) return null;
+  return requireIsoInstant(record, key);
+}
+
+export function requireBusinessOffsetDateTime(
+  record: JsonObject,
+  key: string,
+): string {
+  const value = requireString(record, key);
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?([+-]\d{2}:\d{2})$/.exec(
+      value,
+    );
+  const instant = new Date(value);
+  if (match === null || Number.isNaN(instant.getTime())) {
+    throw new Error(`${key} must be an ISO offset date-time`);
+  }
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Rome',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  })
+    .formatToParts(instant)
+    .reduce<Record<string, string>>((result, part) => {
+      result[part.type] = part.value;
+      return result;
+    }, {});
+  if (
+    parts.year !== match[1] ||
+    parts.month !== match[2] ||
+    parts.day !== match[3] ||
+    parts.hour !== match[4] ||
+    parts.minute !== match[5] ||
+    parts.second !== match[6]
+  ) {
+    throw new Error(`${key} must use the Europe/Rome business offset`);
+  }
+  return value;
+}
+
 export function requireArray(value: unknown, label: string): unknown[] {
   if (!Array.isArray(value)) {
     throw new Error(`${label} must be an array`);

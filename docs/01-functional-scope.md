@@ -1,5 +1,7 @@
 # Functional Scope — Support Trainer
 
+> Aggiornamento corrente: il Booking Workflow V1 Client ↔ Personal Trainer è implementato end-to-end. Il contratto normativo completo è in [19-booking-domain-contract-v1.md](19-booking-domain-contract-v1.md); eventuali indicazioni successive che descrivono Booking frontend o motivazioni come futuri sono superate.
+
 ## 1. Obiettivo del documento
 
 Questo documento definisce:
@@ -75,7 +77,7 @@ Non risultano ancora implementate:
 - recupero e reset password;
 - upload immagine profilo;
 - editing account (email, password, cancellazione) e gestione dispositivi/sessioni;
-- altre pagine frontend business ancora placeholder (oltre auth, onboarding PROFESSIONAL/verifica email, Profilo/Account/Operational Status e gestione inviti PROFESSIONAL già presenti);
+- dashboard frontend con dati ancora placeholder; Availability e Booking Client ↔ Personal Trainer sono flussi operativi;
 - preparazione completa al deploy.
 
 ---
@@ -245,7 +247,7 @@ Il cliente può:
 - aggiornare il proprio stato operativo;
 - visualizzare i professionisti collegati;
 - visualizzare il dettaglio di un professionista collegato;
-- visualizzare gli slot disponibili, futuri e privi di richieste booking `PENDING` attive di un personal trainer collegato;
+- visualizzare le sole combinazioni future restituite in `bookableOptions` per un personal trainer collegato;
 - creare una richiesta booking su uno slot disponibile;
 - visualizzare le proprie richieste booking;
 - visualizzare il dettaglio delle proprie richieste;
@@ -276,10 +278,10 @@ Il personal trainer può gestire solo i propri slot.
 
 Può:
 
-- creare slot;
-- leggere i propri slot;
-- aggiornare slot `AVAILABLE`;
-- bloccare slot `AVAILABLE`;
+- creare e gestire regole settimanali e relative occurrence;
+- leggere i propri slot materializzati;
+- ripianificare soltanto slot manuali legacy non bloccati e mai coinvolti in Booking;
+- bloccare occurrence future non già bloccate, con reason quando esistono Booking impattati;
 - sbloccare slot `BLOCKED`.
 
 ### 9.3 Regole temporali
@@ -296,11 +298,10 @@ Il cliente può visualizzare soltanto slot:
 
 - appartenenti a un personal trainer collegato;
 - attivi;
-- in stato `AVAILABLE`;
-- non scaduti;
-- senza una richiesta booking `PENDING` attiva collegata.
+- non bloccati e non scaduti;
+- con capacità residua per almeno una combinazione di inizio e durata.
 
-Uno slot con richiesta booking `PENDING` resta formalmente `AVAILABLE` fino alla decisione del professionista, ma non viene più mostrato ad altri clienti come disponibilità prenotabile.
+Lo stato `AVAILABLE`/`BOOKED` è legacy e non rappresenta l'occupancy corrente. `PENDING` e `CONFIRMED` occupano capacità; la response cliente espone soltanto le combinazioni ancora prenotabili.
 
 ### 9.5 Stati slot implementati
 
@@ -318,9 +319,7 @@ Le prenotazioni tramite app riguardano solo slot availability del personal train
 
 ### 10.2 Contratto attuale
 
-Nel backend attuale una richiesta booking viene creata a partire da:
-
-- un singolo `availabilitySlotId`.
+Nel backend attuale una richiesta booking viene creata a partire da un singolo `availabilitySlotId`/`occurrenceId`, `startDateTime` e `durationMinutes` scelti fra le `bookableOptions` server-side.
 
 Il modello dati mantiene la possibilità di una futura evoluzione multi-slot, ma questa non è parte delle API attuali.
 
@@ -332,7 +331,7 @@ Il flusso operativo è:
 2. il cliente collegato visualizza lo slot disponibile;
 3. il cliente invia una richiesta booking;
 4. la richiesta nasce in stato `PENDING`;
-5. durante lo stato `PENDING`, lo slot non viene più esposto come prenotabile e non può essere modificato o bloccato manualmente;
+5. `PENDING` occupa capacità per il proprio intervallo, come `CONFIRMED`;
 6. il personal trainer può confermare o rifiutare;
 7. cliente o professionista possono cancellare secondo le regole previste.
 
@@ -343,11 +342,11 @@ Il cliente può creare una richiesta solo se:
 - è collegato al professionista proprietario dello slot;
 - lo slot esiste;
 - lo slot è attivo;
-- lo slot è `AVAILABLE`;
-- lo slot non è scaduto;
-- non esiste già una richiesta `PENDING` attiva sullo stesso slot.
+- lo slot è un'occurrence generata da regola settimanale, non bloccata e non scaduta;
+- inizio e durata appartengono a `bookableOptions` e la capacità residua copre l'intero intervallo;
+- il Client non ha un altro Booking `PENDING` o `CONFIRMED` sovrapposto con lo stesso professionista.
 
-Quando una richiesta `PENDING` viene creata correttamente, lo slot interessato viene considerato logicamente riservato e non viene più mostrato nelle disponibilità consultabili dagli altri clienti.
+Quando una richiesta `PENDING` viene creata correttamente, occupa un posto nell'intervallo selezionato. La stessa occurrence può continuare a esporre altre combinazioni se hanno capacità residua.
 
 ### 10.5 Nota del booking
 
@@ -368,20 +367,24 @@ La nota:
 
 ### 10.7 Transizioni implementate
 
-| Azione        | Attore autorizzato       | Stato iniziale | Stato finale | Effetto slot          |
-| ------------- | ------------------------ | -------------- | ------------ | --------------------- |
-| Conferma      | professionista coinvolto | `PENDING`      | `CONFIRMED`  | `AVAILABLE -> BOOKED` |
-| Rifiuto       | professionista coinvolto | `PENDING`      | `REJECTED`   | resta `AVAILABLE`     |
-| Cancellazione | cliente coinvolto        | `PENDING`      | `CANCELLED`  | resta `AVAILABLE`     |
-| Cancellazione | cliente coinvolto        | `CONFIRMED`    | `CANCELLED`  | `BOOKED -> AVAILABLE` |
-| Cancellazione | professionista coinvolto | `CONFIRMED`    | `CANCELLED`  | `BOOKED -> AVAILABLE` |
+| Azione        | Attore autorizzato       | Stato iniziale | Stato finale | Effetto capacità                                      |
+| ------------- | ------------------------ | -------------- | ------------ | ----------------------------------------------------- |
+| Conferma      | professionista coinvolto | `PENDING`      | `CONFIRMED`  | invariata: entrambi gli stati occupano                |
+| Rifiuto       | professionista coinvolto | `PENDING`      | `REJECTED`   | libera la capacità dell'intervallo                    |
+| Cancellazione | cliente coinvolto        | `PENDING`      | `CANCELLED`  | libera la capacità; reason facoltativa                |
+| Cancellazione | cliente coinvolto        | `CONFIRMED`    | `CANCELLED`  | libera la capacità; reason obbligatoria, actor Client |
+| Cancellazione | professionista coinvolto | `CONFIRMED`    | `CANCELLED`  | libera la capacità; reason obbligatoria, actor PT     |
+
+Il rifiuto PT richiede sempre una reason. `cancelledBy` è assegnato server-side come `CLIENT` o `PROFESSIONAL`; reason e actor restano nullable soltanto per lo storico legacy.
 
 ### 10.8 Protezioni temporali
 
 Non è consentito:
 
 - creare booking su uno slot ormai scaduto;
-- confermare una richiesta pending se lo slot collegato è ormai scaduto.
+- confermare, rifiutare o cancellare quando `now >= MAX(BookingRequestItem.scheduledEnd)`.
+
+Le mutation sono ammesse durante `IN_PROGRESS` quando il lifecycle lo consente. La fine snapshot del Booking è autorevole; lo stato o la fine dello slot live non definiscono questo limite.
 
 ---
 
@@ -566,7 +569,7 @@ Risultano già implementati:
 
 Restano fuori da questo vertical slice:
 
-- altre pagine frontend business (dashboard con dati, clients, professionals, availability, bookings) ancora placeholder.
+- dashboard frontend con dati ancora placeholder; relazioni, Availability e Booking sono operativi nel perimetro documentato.
 
 ### 14.2 Parte della v1 ancora da implementare
 
@@ -576,7 +579,7 @@ Per completare il perimetro funzionale originariamente previsto restano da svilu
 - piani alimentari;
 - feedback o segnalazioni cliente;
 - eventuale gestione misurazioni/progressi;
-- altre pagine frontend business (dashboard con dati, clients, professionals, availability, bookings) ancora placeholder.
+- dashboard frontend con dati ancora placeholder; relazioni, Availability e Booking sono operativi nel perimetro documentato.
 
 ### 14.3 Funzionalità escluse dal perimetro attuale
 

@@ -1,5 +1,7 @@
 # Planned Endpoints Roadmap — Support Trainer
 
+> Booking Workflow V1 non è roadmap: è implementato end-to-end nel backend e nel frontend, inclusi `bookableOptions`, create, liste, detail, confirm/reject/cancel, reason, actor e riconciliazione `409`. Restano futuri soltanto ampliamenti fuori contratto quali reschedule, notifiche, paginazione, filtri, `COMPLETED` e no-show.
+
 ## 1. Obiettivo del documento
 
 Questo documento raccoglie gli endpoint futuri, pianificati o ipotizzati per le prossime fasi di Support Trainer.
@@ -51,7 +53,7 @@ Alla data attuale risultano già implementati:
 
 Availability e Bookings non devono più essere considerati endpoint pianificati.
 
-Secondo `08-endpoint-map.md`, il backend espone **31 endpoint applicativi** già implementati (Auth 8 incluso login/logout/CSRF, Me 4, Client 2, Professional 3, Invite 2, Availability 5, Booking 7). L’autenticazione runtime è session-based (cookie HttpOnly + CSRF); login, logout e CSRF **non** sono lavoro futuro.
+Secondo `08-endpoint-map.md`, il backend espone **36 endpoint applicativi** già implementati (Auth 8 incluso login/logout/CSRF, Me 4, Client 2, Professional 3, Invite 2, Availability 10, Booking 7). L’autenticazione runtime è session-based (cookie HttpOnly + CSRF); login, logout e CSRF **non** sono lavoro futuro.
 
 Le evoluzioni future dello schema devono usare esclusivamente nuove migrazioni forward-only.
 

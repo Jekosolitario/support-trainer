@@ -13,7 +13,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import it.zuperman.support_trainer.booking.dto.request.CancelBookingRequest;
 import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
+import it.zuperman.support_trainer.booking.dto.request.RejectBookingRequest;
 import it.zuperman.support_trainer.booking.dto.response.BookingDetailResponse;
 import it.zuperman.support_trainer.booking.dto.response.BookingSummaryResponse;
 import it.zuperman.support_trainer.booking.service.BookingService;
@@ -68,17 +70,19 @@ public class BookingController {
 
     @PatchMapping("/{bookingRequestId}/reject")
     public ResponseEntity<BookingDetailResponse> rejectBookingRequest(
-            @PathVariable Long bookingRequestId
+            @PathVariable Long bookingRequestId,
+            @Valid @RequestBody RejectBookingRequest request
     ) {
-        BookingDetailResponse response = bookingService.rejectBookingRequest(bookingRequestId);
+        BookingDetailResponse response = bookingService.rejectBookingRequest(bookingRequestId, request);
         return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{bookingRequestId}/cancel")
     public ResponseEntity<BookingDetailResponse> cancelBookingRequest(
-            @PathVariable Long bookingRequestId
+            @PathVariable Long bookingRequestId,
+            @Valid @RequestBody(required = false) CancelBookingRequest request
     ) {
-        BookingDetailResponse response = bookingService.cancelBookingRequest(bookingRequestId);
+        BookingDetailResponse response = bookingService.cancelBookingRequest(bookingRequestId, request);
         return ResponseEntity.ok(response);
     }
 }

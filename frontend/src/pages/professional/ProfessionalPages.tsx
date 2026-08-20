@@ -1,25 +1,5 @@
-import { PageTemplate } from '../../components/page/PageTemplate';
-
 export { ProfessionalClientDetailPage } from './ProfessionalClientDetailPage';
 export { ProfessionalClientsPage } from './ProfessionalClientsPage';
 export { ProfessionalAvailabilityPage } from './ProfessionalAvailabilityPage';
-
-export function ProfessionalBookingsPage() {
-  return (
-    <PageTemplate
-      eyebrow="Area personal trainer"
-      title="Prenotazioni"
-      description="Questa pagina ospiterà le richieste di prenotazione ricevute dal personal trainer."
-    />
-  );
-}
-
-export function ProfessionalBookingDetailPage() {
-  return (
-    <PageTemplate
-      eyebrow="Area personal trainer"
-      title="Dettaglio prenotazione"
-      description="Struttura destinata al dettaglio e alle future transizioni della prenotazione identificata dalla rotta."
-    />
-  );
-}
+export { ProfessionalBookingsPage } from './ProfessionalBookingsPage';
+export { ProfessionalBookingDetailPage } from './ProfessionalBookingDetailPage';

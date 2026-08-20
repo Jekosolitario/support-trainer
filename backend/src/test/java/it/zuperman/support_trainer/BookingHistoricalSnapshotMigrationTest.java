@@ -64,7 +64,7 @@ class BookingHistoricalSnapshotMigrationTest {
                 .baselineVersion("5.9")
                 .load();
 
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(3);
+        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(4);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
 
         try (Connection connection = DriverManager.getConnection(JDBC_URL, "sa", "");
@@ -96,6 +96,15 @@ class BookingHistoricalSnapshotMigrationTest {
                 assertThat(resultSet.getObject("rejected_at", LocalDateTime.class)).isNull();
                 assertThat(resultSet.getObject("cancelled_at", LocalDateTime.class))
                         .isEqualTo(LocalDateTime.parse("2026-07-16T15:30:45.123456"));
+            }
+            try (ResultSet resultSet = statement.executeQuery(
+                    "SELECT rejection_reason, cancellation_reason, cancelled_by "
+                            + "FROM booking_requests WHERE id = 13"
+            )) {
+                assertThat(resultSet.next()).isTrue();
+                assertThat(resultSet.getString("rejection_reason")).isNull();
+                assertThat(resultSet.getString("cancellation_reason")).isNull();
+                assertThat(resultSet.getString("cancelled_by")).isNull();
             }
             try (ResultSet resultSet = statement.executeQuery(
                     "SELECT confirmed_at, rejected_at, cancelled_at FROM booking_requests WHERE id = 11"

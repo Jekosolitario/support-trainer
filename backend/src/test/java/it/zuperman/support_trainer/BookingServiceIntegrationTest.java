@@ -18,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -29,7 +30,9 @@ import it.zuperman.support_trainer.availability.entity.WeeklyAvailabilityRule;
 import it.zuperman.support_trainer.availability.repository.AvailabilitySlotRepository;
 import it.zuperman.support_trainer.availability.repository.WeeklyAvailabilityRuleRepository;
 import it.zuperman.support_trainer.availability.service.AvailabilityService;
+import it.zuperman.support_trainer.booking.dto.request.CancelBookingRequest;
 import it.zuperman.support_trainer.booking.dto.request.CreateBookingRequest;
+import it.zuperman.support_trainer.booking.dto.request.RejectBookingRequest;
 import it.zuperman.support_trainer.booking.dto.response.BookingDetailResponse;
 import it.zuperman.support_trainer.booking.entity.BookingRequest;
 import it.zuperman.support_trainer.booking.entity.BookingRequestItem;
@@ -198,18 +201,21 @@ class BookingServiceIntegrationTest {
                 .isInstanceOfSatisfying(AppException.class, exception ->
                 assertThat(exception.getErrorCode()).isEqualTo("BOOKING_REQUEST_NOT_FOUND"));
 
-        assertThatThrownBy(() -> bookingService.rejectBookingRequest(booking.getId()))
+        assertThatThrownBy(() -> bookingService.rejectBookingRequest(
+                booking.getId(),
+                new RejectBookingRequest("Richiesta non valida")
+        ))
                 .isInstanceOfSatisfying(AppException.class, exception ->
                 assertThat(exception.getErrorCode()).isEqualTo("BOOKING_REQUEST_NOT_FOUND"));
 
         authenticateAs(clientB);
 
         AppException foreignBookingCancellation = catchThrowableOfType(
-                () -> bookingService.cancelBookingRequest(booking.getId()),
+                () -> bookingService.cancelBookingRequest(booking.getId(), null),
                 AppException.class
         );
         AppException missingBookingCancellation = catchThrowableOfType(
-                () -> bookingService.cancelBookingRequest(Long.MAX_VALUE),
+                () -> bookingService.cancelBookingRequest(Long.MAX_VALUE, null),
                 AppException.class
         );
         assertThat(foreignBookingCancellation).isNotNull();
@@ -457,7 +463,10 @@ class BookingServiceIntegrationTest {
         authenticateAs(professional);
 
         BookingDetailResponse rejectedResponse
-                = bookingService.rejectBookingRequest(pendingResponse.getId());
+                = bookingService.rejectBookingRequest(
+                        pendingResponse.getId(),
+                        new RejectBookingRequest("Impossibile accogliere la richiesta")
+                );
 
         assertThat(rejectedResponse.getStatus()).isEqualTo("REJECTED");
         assertThat(rejectedResponse.getItems()).hasSize(1);
@@ -492,7 +501,7 @@ class BookingServiceIntegrationTest {
         BookingDetailResponse pendingResponse = bookingService.createBookingRequest(request);
 
         BookingDetailResponse cancelledResponse
-                = bookingService.cancelBookingRequest(pendingResponse.getId());
+                = bookingService.cancelBookingRequest(pendingResponse.getId(), null);
 
         assertThat(cancelledResponse.getStatus()).isEqualTo("CANCELLED");
         assertThat(cancelledResponse.getItems()).hasSize(1);
@@ -536,7 +545,10 @@ class BookingServiceIntegrationTest {
         authenticateAs(client);
 
         BookingDetailResponse cancelledResponse
-                = bookingService.cancelBookingRequest(confirmedResponse.getId());
+                = bookingService.cancelBookingRequest(
+                        confirmedResponse.getId(),
+                        new CancelBookingRequest("Impegno sopraggiunto")
+                );
 
         assertThat(cancelledResponse.getStatus()).isEqualTo("CANCELLED");
         assertThat(cancelledResponse.getItems()).hasSize(1);
@@ -572,7 +584,10 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(professional);
 
-        assertThatThrownBy(() -> bookingService.cancelBookingRequest(pendingResponse.getId()))
+        assertThatThrownBy(() -> bookingService.cancelBookingRequest(
+                pendingResponse.getId(),
+                new CancelBookingRequest("Non disponibile")
+        ))
                 .isInstanceOf(AppException.class)
                 .hasMessage("Una richiesta in attesa deve essere rifiutata dal professionista");
 
@@ -710,8 +725,8 @@ class BookingServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("Professionista non deve confermare un booking pending con slot ormai scaduto")
-    void shouldNotConfirmPendingBookingRequestWhenSlotIsExpired() {
+    @DisplayName("Professionista conferma usando lo snapshot Booking anche se lo slot live è stato spostato nel passato")
+    void shouldConfirmPendingBookingRequestUsingSnapshotEndInsteadOfLiveSlotTime() {
         ProfessionalProfile professional = createActivePersonalTrainer();
         ClientProfile client = createActiveClient();
 
@@ -739,11 +754,9 @@ class BookingServiceIntegrationTest {
 
         authenticateAs(professional);
 
-        assertThatThrownBy(() -> bookingService.confirmBookingRequest(pendingResponse.getId()))
-                .isInstanceOf(AppException.class)
-                .hasMessage("Lo slot collegato è scaduto e non è più confermabile");
+        BookingDetailResponse confirmed = bookingService.confirmBookingRequest(pendingResponse.getId());
 
-        assertThat(slot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
+        assertThat(confirmed.getStatus()).isEqualTo("CONFIRMED");
     }
 
     @Test
@@ -799,7 +812,11 @@ class BookingServiceIntegrationTest {
 
         assertThatThrownBy(() -> bookingService.confirmBookingRequest(bookingRequest.getId()))
                 .isInstanceOf(AppException.class)
-                .hasMessage("Lo slot collegato non è confermabile per questo professionista");
+                .satisfies(throwable -> {
+                    AppException exception = (AppException) throwable;
+                    assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+                    assertThat(exception.getErrorCode()).isEqualTo("BOOKING_SPECIALIZATION_NOT_ALLOWED");
+                });
 
         assertThat(invalidSlot.getStatus()).isEqualTo(AvailabilitySlotStatus.AVAILABLE);
     }
@@ -868,7 +885,7 @@ class BookingServiceIntegrationTest {
                 assertThat(exception.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_CAPACITY_EXHAUSTED"));
 
         authenticateAs(professional);
-        bookingService.rejectBookingRequest(first.getId());
+        bookingService.rejectBookingRequest(first.getId(), new RejectBookingRequest("Posto non disponibile"));
 
         authenticateAs(thirdClient);
         BookingDetailResponse replacement = bookingService.createBookingRequest(
@@ -909,7 +926,7 @@ class BookingServiceIntegrationTest {
                 assertThat(exception.getErrorCode()).isEqualTo("AVAILABILITY_SLOT_CAPACITY_EXHAUSTED"));
 
         authenticateAs(firstClient);
-        bookingService.cancelBookingRequest(pending.getId());
+        bookingService.cancelBookingRequest(pending.getId(), new CancelBookingRequest("Cambio programma"));
 
         authenticateAs(secondClient);
         BookingDetailResponse replacement = bookingService.createBookingRequest(
@@ -1156,7 +1173,10 @@ class BookingServiceIntegrationTest {
                 });
         assertThat(bookingService.confirmBookingRequest(cancellable.getId()).getStatus()).isEqualTo("CONFIRMED");
         authenticateAs(client);
-        assertThat(bookingService.cancelBookingRequest(cancellable.getId()).getStatus()).isEqualTo("CANCELLED");
+        assertThat(bookingService.cancelBookingRequest(
+                cancellable.getId(),
+                new CancelBookingRequest("Storico annullato")
+        ).getStatus()).isEqualTo("CANCELLED");
 
         AvailabilitySlot secondLegacy = availabilitySlotRepository.saveAndFlush(new AvailabilitySlot(
                 professional,
@@ -1165,7 +1185,10 @@ class BookingServiceIntegrationTest {
         ));
         BookingRequest rejectable = historicalBooking(client, professional, secondLegacy, "Storico rifiutabile");
         authenticateAs(professional);
-        assertThat(bookingService.rejectBookingRequest(rejectable.getId()).getStatus()).isEqualTo("REJECTED");
+        assertThat(bookingService.rejectBookingRequest(
+                rejectable.getId(),
+                new RejectBookingRequest("Storico rifiutato")
+        ).getStatus()).isEqualTo("REJECTED");
         authenticateAs(client);
         assertThat(bookingService.getBookingRequestDetail(rejectable.getId()).getItems())
                 .singleElement()

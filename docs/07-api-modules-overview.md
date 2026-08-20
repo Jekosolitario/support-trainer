@@ -1,5 +1,7 @@
 # API Modules Overview — Support Trainer
 
+> Modulo Booking V1 corrente: reject usa body obbligatorio `{ "reason": "..." }`; cancel usa body opzionale con requiredness di dominio. `BookingDetailResponse` espone i nullable `rejectionReason`, `cancellationReason`, `cancelledBy`. Le mutation usano la fine snapshot e le capability Professional sono riservate al Personal Trainer. Vedi [19-booking-domain-contract-v1.md](19-booking-domain-contract-v1.md).
+
 ## 1. Obiettivo del documento
 
 Questo documento descrive l’organizzazione funzionale delle API backend di Support Trainer, distinguendo chiaramente tra:
@@ -279,9 +281,9 @@ La lettura lato cliente è esposta tramite:
 - non sono consentiti slot sovrapposti;
 - gli slot possono essere bloccati e sbloccati secondo stato;
 - il cliente può leggere availability solo di professionisti collegati;
-- gli slot disponibili ma scaduti non vengono mostrati al cliente;
-- gli slot con una richiesta booking `PENDING` attiva non vengono mostrati al cliente come disponibilità prenotabili;
-- uno slot con booking `PENDING` attivo non può essere modificato o bloccato manualmente dal professionista.
+- le occurrence scadute, bloccate o prive di `bookableOptions` non vengono mostrate al cliente;
+- `PENDING` e `CONFIRMED` occupano capacità sull'intervallo, senza nascondere necessariamente l'intera occurrence;
+- una finestra già nello storico Booking non può essere ripianificata; il blocco preserva gli snapshot e richiede reason quando impatta Booking occupanti.
 
 ### Contratto temporale degli slot
 
@@ -331,14 +333,13 @@ Nomi delle parti e orari sono snapshot persistiti: gli orari non vengono letti d
 
 - il cliente può prenotare solo slot di professionisti collegati;
 - lo slot deve essere attivo, disponibile e non scaduto;
-- non può esistere una richiesta `PENDING` duplicata sullo stesso slot;
+- `PENDING` e `CONFIRMED` occupano la capacità del rispettivo intervallo e il Client non può avere Booking occupanti sovrapposti con lo stesso professionista;
 - la nota è facoltativa, normalizzata e limitata a `1000` caratteri;
 - il dettaglio booking è visibile solo agli utenti coinvolti;
 - il collegamento attivo è richiesto per creare una nuova richiesta, ma non filtra lo storico: i partecipanti originari attivi possono continuare a consultarlo dopo la disattivazione del link;
-- un booking pending con slot ormai scaduto non può essere confermato.
-- una richiesta `PENDING` riserva logicamente lo slot;
-- finché una richiesta è `PENDING`, lo slot non viene più esposto come disponibilità prenotabile agli altri clienti;
-- finché una richiesta è `PENDING`, lo slot non può essere modificato o bloccato manualmente dal professionista;
+- tutte le mutation richiedono `now < MAX(items.scheduledEnd)` e restano consentite durante `IN_PROGRESS` quando il lifecycle lo consente;
+- reject PT e cancel `CONFIRMED` richiedono reason; cancel Client `PENDING` la rende facoltativa;
+- l'actor della cancellazione è assegnato server-side;
 - i flussi critici di creazione e transizione booking sono protetti da lock pessimisti per evitare inconsistenze concorrenti.
 
 ### Stati booking gestiti
@@ -350,17 +351,17 @@ Nomi delle parti e orari sono snapshot persistiti: gli orari non vengono letti d
 
 ### Transizioni principali
 
-| Azione | Attore | Stato booking | Effetto sullo slot |
-|---|---|---|---|
-| confirm | professionista coinvolto | `PENDING -> CONFIRMED` | `AVAILABLE -> BOOKED` |
-| reject | professionista coinvolto | `PENDING -> REJECTED` | resta `AVAILABLE` |
-| cancel | cliente coinvolto | `PENDING -> CANCELLED` | resta `AVAILABLE` |
-| cancel | cliente coinvolto | `CONFIRMED -> CANCELLED` | `BOOKED -> AVAILABLE` |
-| cancel | professionista coinvolto | `CONFIRMED -> CANCELLED` | `BOOKED -> AVAILABLE` |
+| Azione  | Attore                   | Stato booking            | Effetto capacità / metadata                                |
+| ------- | ------------------------ | ------------------------ | ---------------------------------------------------------- |
+| confirm | professionista coinvolto | `PENDING -> CONFIRMED`   | occupancy invariata                                        |
+| reject  | professionista coinvolto | `PENDING -> REJECTED`    | libera capacità; reason obbligatoria                       |
+| cancel  | cliente coinvolto        | `PENDING -> CANCELLED`   | libera capacità; reason facoltativa; actor `CLIENT`        |
+| cancel  | cliente coinvolto        | `CONFIRMED -> CANCELLED` | libera capacità; reason obbligatoria; actor `CLIENT`       |
+| cancel  | professionista coinvolto | `CONFIRMED -> CANCELLED` | libera capacità; reason obbligatoria; actor `PROFESSIONAL` |
 
-Le transizioni assegnano una sola volta il rispettivo timestamp applicativo e restituiscono il dettaglio completo aggiornato. Per i record legacy, V6 usa `updatedAt` solo come timestamp dello stato finale noto; per esempio un record `CANCELLED` non riceve un `confirmedAt` inferito.
+Le transizioni assegnano una sola volta il rispettivo timestamp applicativo e, per reject/cancel, i metadata decisionali; restituiscono il dettaglio completo aggiornato. Per i record legacy, V6 usa `updatedAt` solo come timestamp dello stato finale noto e V9 non esegue backfill di reason/actor: i null storici restano validi.
 
-Le liste sono ordinate per `createdAt DESC, id DESC`. Paginazione, filtri temporali e motivazioni di rifiuto o annullamento non fanno parte di questo contratto.
+Le liste sono ordinate per `createdAt DESC, id DESC`. Paginazione e filtri temporali non fanno parte di questo contratto; motivazioni di rifiuto/annullamento e actor di cancellazione appartengono al detail V1.
 
 ---
 

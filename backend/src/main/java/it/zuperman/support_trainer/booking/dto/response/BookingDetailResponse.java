@@ -19,6 +19,9 @@ public class BookingDetailResponse {
     private final Instant confirmedAt;
     private final Instant rejectedAt;
     private final Instant cancelledAt;
+    private final String rejectionReason;
+    private final String cancellationReason;
+    private final String cancelledBy;
     private final List<BookingItemResponse> items;
 
     public BookingDetailResponse(
@@ -35,6 +38,9 @@ public class BookingDetailResponse {
             Instant confirmedAt,
             Instant rejectedAt,
             Instant cancelledAt,
+            String rejectionReason,
+            String cancellationReason,
+            String cancelledBy,
             List<BookingItemResponse> items
     ) {
         this.id = id;
@@ -50,6 +56,9 @@ public class BookingDetailResponse {
         this.confirmedAt = confirmedAt;
         this.rejectedAt = rejectedAt;
         this.cancelledAt = cancelledAt;
+        this.rejectionReason = rejectionReason;
+        this.cancellationReason = cancellationReason;
+        this.cancelledBy = cancelledBy;
         this.items = items;
     }
 
@@ -103,6 +112,18 @@ public class BookingDetailResponse {
 
     public Instant getCancelledAt() {
         return cancelledAt;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public String getCancellationReason() {
+        return cancellationReason;
+    }
+
+    public String getCancelledBy() {
+        return cancelledBy;
     }
 
     public List<BookingItemResponse> getItems() {

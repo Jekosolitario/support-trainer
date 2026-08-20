@@ -19,7 +19,7 @@ Lo scopo è chiarire:
 - ereditarietà tra `User`, `ProfessionalProfile` e `ClientProfile`;
 - relazione professionista-cliente tramite `ProfessionalClientLink`;
 - relazione professionista-codici invito tramite `InviteCode`;
-- relazione personal trainer-disponibilità tramite `AvailabilitySlot`;
+- relazione personal trainer-disponibilità tramite `WeeklyAvailabilityRule` e occurrence materializzate in `AvailabilitySlot`;
 - relazione cliente-professionista-prenotazione tramite `BookingRequest`;
 - relazione richiesta-slot tramite `BookingRequestItem`.
 
@@ -152,7 +152,7 @@ può generare codici invito.
 
 ### 6.1 Stato di implementazione
 
-La relazione tra personal trainer e disponibilità è implementata nel backend tramite l’entità `AvailabilitySlot`.
+La relazione tra personal trainer e disponibilità è implementata tramite `WeeklyAvailabilityRule` e occurrence/window materializzate in `AvailabilitySlot`.
 
 ### 6.2 Ambito della relazione
 
@@ -162,9 +162,9 @@ Le disponibilità sono gestite solo per professionisti con specializzazione:
 
 ### 6.3 Cardinalità logica
 
-Un personal trainer può avere molti `AvailabilitySlot`.
+Un personal trainer può avere molte `WeeklyAvailabilityRule`; ciascuna regola può generare molte occurrence `AvailabilitySlot`.
 
-Ogni `AvailabilitySlot` appartiene a un solo personal trainer.
+Ogni occurrence appartiene a un solo personal trainer e conserva, quando presente, il riferimento alla regola settimanale che l'ha generata.
 
 ### 6.4 Regole temporali implementate
 
@@ -179,23 +179,19 @@ Per lo stesso personal trainer non devono esistere slot attivi sovrapposti nello
 
 La creazione e l’aggiornamento degli slot sono protetti da lock pessimista sul professionista, così il controllo resta coerente anche in presenza di richieste concorrenti.
 
-### 6.6 Stati dello slot
+### 6.6 Stato legacy e prenotabilità corrente
 
-Uno slot può trovarsi in uno dei seguenti stati:
+Il campo legacy dello slot può contenere `AVAILABLE`, `BOOKED` o `BLOCKED`, ma il lifecycle binario `AVAILABLE ↔ BOOKED` è storico/superseded e non determina la capacità corrente.
 
-- `AVAILABLE`;
-- `BOOKED`;
-- `BLOCKED`.
+La prenotabilità deriva invece da occurrence/window attiva e futura, blocco, capacità configurata, occupancy dell'intervallo e combinazioni autoritative esposte in `bookableOptions`. Il workflow Booking non muta uno stato globale dello slot a `BOOKED`.
 
 ### 6.7 Ownership e gestione
 
 Il personal trainer autenticato può:
 
-- creare i propri slot;
-- leggere i propri slot;
-- aggiornare solo i propri slot `AVAILABLE`, se non già coinvolti in richieste booking;
-- bloccare solo i propri slot `AVAILABLE`, se non esiste una richiesta booking `PENDING`;
-- sbloccare solo i propri slot `BLOCKED`.
+- creare e gestire le proprie regole settimanali;
+- leggere le occurrence materializzate;
+- modificare, disattivare o bloccare le proprie disponibilità nel rispetto di snapshot Booking, capacity e validazioni di impatto.
 
 ### 6.8 Lettura lato cliente
 
@@ -205,25 +201,15 @@ Un cliente può leggere gli slot disponibili di un professionista solo se:
 - il professionista è attivo;
 - esiste un collegamento attivo tra cliente e professionista.
 
-La lettura lato cliente espone solo slot:
+La lettura lato cliente espone occurrence materializzate attive, future e non bloccate. Le sole combinazioni prenotabili sono quelle presenti in `bookableOptions`, calcolate server-side in base a finestre, durate consentite, overlap e capacità residua.
 
-- attivi;
-- in stato `AVAILABLE`;
-- con data iniziale futura;
-- privi di richieste booking `PENDING` attive collegate.
+Una richiesta `PENDING` non nasconde necessariamente l'intera occurrence: occupa capacità soltanto sul proprio intervallo snapshot e le altre combinazioni restano esposte quando conservano capacità residua.
 
-Uno slot formalmente `AVAILABLE` ma già interessato da una richiesta `PENDING` non viene mostrato agli altri clienti come disponibilità prenotabile.
+### 6.9 Occupancy delle occurrence
 
-### 6.9 Slot con richiesta booking pendente
+`PENDING` e `CONFIRMED` occupano capacità sull'intervallo snapshot; `REJECTED` e `CANCELLED` la liberano. Non esiste una riserva globale basata sulla presenza di un solo `PENDING` e nessuna transizione Booking muta l'intera occurrence a `BOOKED`.
 
-Uno slot può rimanere in stato `AVAILABLE` mentre esiste una richiesta booking in stato `PENDING`, perché la prenotazione non è ancora stata confermata.
-
-Durante questa fase lo slot è considerato logicamente riservato. Finché esiste una richiesta `PENDING` attiva collegata allo slot, il personal trainer non può:
-
-- modificare data o orario dello slot;
-- bloccare manualmente lo slot.
-
-Il professionista deve prima gestire la richiesta pendente tramite il flusso Booking previsto, ad esempio rifiutandola.
+Le operazioni Availability che incidono su Booking esistenti preservano gli snapshot e applicano le validazioni di impatto e capacità previste dal service layer.
 
 ### 6.10 Integrità storica dello slot dopo una richiesta booking
 
@@ -231,7 +217,7 @@ Quando uno slot viene collegato ad almeno una richiesta booking, il relativo int
 
 Anche se la richiesta viene successivamente rifiutata o cancellata, lo slot non può più essere ripianificato modificandone data o ora.
 
-Lo slot può eventualmente ricevere nuove richieste sullo stesso intervallo temporale, se resta coerente con tutte le altre regole applicative.
+L'occurrence può ricevere nuove richieste sullo stesso intervallo temporale se conserva capacità residua o se una precedente richiesta `REJECTED`/`CANCELLED` l'ha liberata, nel rispetto delle altre regole applicative.
 
 Per proporre una nuova disponibilità in un giorno o orario differente, il personal trainer deve creare un nuovo `AvailabilitySlot`.
 
@@ -266,9 +252,11 @@ Ogni `BookingRequest` appartiene a:
 
 ### 7.3 Relazione con lo slot
 
-Nel contratto API attuale una `BookingRequest` viene creata a partire da:
+Nel contratto API attuale una `BookingRequest` viene creata a partire da una combinazione presente in `bookableOptions`:
 
-- un singolo `availabilitySlotId`.
+- `availabilitySlotId` dell'occurrence materializzata;
+- `startDateTime`;
+- `durationMinutes`.
 
 Ogni richiesta creata tramite API contiene quindi:
 
@@ -295,8 +283,10 @@ Una nuova richiesta può essere creata solo se lo slot:
 - esiste;
 - è attivo;
 - appartiene al professionista collegato;
-- si trova in stato `AVAILABLE`;
-- non ha già una richiesta `PENDING` attiva associata.
+- rappresenta un'occurrence/window materializzata, futura e non bloccata;
+- contiene la combinazione richiesta fra le `bookableOptions` autoritative;
+- conserva capacità residua per l'intero intervallo;
+- non si sovrappone a un Booking occupante dello stesso cliente con quel professionista.
 
 ### 7.7 Stati booking implementati
 
@@ -309,13 +299,13 @@ Una `BookingRequest` può trovarsi in uno dei seguenti stati:
 
 ### 7.8 Transizioni implementate
 
-| Azione | Attore autorizzato | Stato iniziale | Stato finale | Effetto sullo slot |
+| Azione | Attore autorizzato | Stato iniziale | Stato finale | Effetto sulla capacità snapshot |
 |---|---|---|---|---|
-| confirm | professionista coinvolto | `PENDING` | `CONFIRMED` | `AVAILABLE -> BOOKED` |
-| reject | professionista coinvolto | `PENDING` | `REJECTED` | resta `AVAILABLE` |
-| cancel | cliente coinvolto | `PENDING` | `CANCELLED` | resta `AVAILABLE` |
-| cancel | cliente coinvolto | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
-| cancel | professionista coinvolto | `CONFIRMED` | `CANCELLED` | `BOOKED -> AVAILABLE` |
+| confirm | professionista coinvolto | `PENDING` | `CONFIRMED` | occupancy invariata |
+| reject | professionista coinvolto | `PENDING` | `REJECTED` | capacità liberata |
+| cancel | cliente coinvolto | `PENDING` | `CANCELLED` | capacità liberata |
+| cancel | cliente coinvolto | `CONFIRMED` | `CANCELLED` | capacità liberata |
+| cancel | professionista coinvolto | `CONFIRMED` | `CANCELLED` | capacità liberata |
 
 ### 7.9 Ownership e visibilità
 
@@ -332,24 +322,15 @@ Il professionista può:
 - confermare o rifiutare solo richieste riferite ai propri slot;
 - cancellare solo richieste confermate in cui è coinvolto.
 
-### 7.10 Integrità dello slot
+### 7.10 Integrità di capacity e overlap
 
-Uno slot già `BOOKED` non può essere confermato nuovamente tramite un’altra richiesta.
+Il backend impedisce la creazione oltre la capacità configurata e l'overlap con un Booking occupante dello stesso cliente presso quel professionista. La conferma non consuma un posto ulteriore, perché sia `PENDING` sia `CONFIRMED` sono stati occupanti.
 
-### 7.11 Riserva logica dello slot durante `PENDING`
+### 7.11 Occupancy durante `PENDING`
 
-La creazione di una `BookingRequest` in stato `PENDING` non modifica immediatamente lo stato dello slot in `BOOKED`.
+La creazione di una `BookingRequest` in stato `PENDING` occupa un posto sul solo intervallo snapshot e non modifica lo stato globale dell'occurrence a `BOOKED`.
 
-Lo slot resta formalmente `AVAILABLE` fino alla conferma del professionista, ma non è più liberamente modificabile dal professionista mentre il cliente attende risposta.
-
-Durante lo stato `PENDING`:
-
-- non può essere creata una seconda richiesta `PENDING` attiva sullo stesso slot;
-- lo slot non può essere modificato;
-- lo slot non può essere bloccato manualmente.
-
-Questa regola garantisce coerenza tra la disponibilità selezionata dal cliente e la successiva decisione del professionista.
-- lo slot non viene esposto al cliente come disponibilità prenotabile.
+Ulteriori richieste sono ammesse soltanto per combinazioni ancora presenti in `bookableOptions` e con capacità residua. Le modifiche Availability applicano le proprie guardie di impatto senza alterare lo snapshot storico già salvato nel `BookingRequestItem`.
 
 ### 7.12 Immutabilità temporale dello slot nello storico booking
 
@@ -553,7 +534,7 @@ Il `NutritionDay` associato al feedback deve appartenere a:
 - il dettaglio booking è accessibile solo agli utenti coinvolti;
 - conferma e rifiuto competono al professionista coinvolto;
 - cancellazione compete al cliente coinvolto o, se già confermata, anche al professionista coinvolto;
-- una richiesta `PENDING` riserva logicamente lo slot rispetto a nuova prenotazione, modifica e blocco manuale;
+- una richiesta `PENDING` occupa capacità sul proprio intervallo snapshot senza riservare globalmente l'intera occurrence;
 - una richiesta booking preserva il riferimento temporale originario dello slot anche dopo rifiuto o cancellazione.
 
 ### 13.2 Ownership pianificata per moduli futuri
@@ -618,16 +599,15 @@ Il backend attuale garantisce o controlla tramite persistence/service layer:
 - massimo 3 professionisti attivi per cliente;
 - impossibilità di auto-collegamento professionista-cliente;
 - availability gestita solo da professionisti `PERSONAL_TRAINER`;
-- slot availability con intervallo temporale valido e futuro in creazione/aggiornamento;
-- assenza di sovrapposizioni tra slot attivi dello stesso professionista;
-- esclusione dalla lettura cliente degli slot scaduti o con richiesta booking `PENDING` attiva;
-- impossibilità di modificare o bloccare manualmente uno slot con richiesta booking `PENDING` attiva;
-- impossibilità di ripianificare uno slot già coinvolto in una richiesta booking;
+- regole settimanali con occurrence/window materializzate, capacity configurabile e controllo overlap;
+- esclusione delle occurrence scadute o bloccate dalla prenotabilità cliente;
+- esposizione autoritativa delle sole combinazioni con capacità residua tramite `bookableOptions`;
+- conservazione degli snapshot Booking quando una disponibilità viene modificata, disattivata o bloccata;
 - booking creabile solo tra cliente e professionista collegati, su slot di un `PERSONAL_TRAINER`;
-- booking creabile solo su slot attivo, disponibile e futuro;
-- assenza di richiesta `PENDING` duplicata sullo stesso slot;
+- booking creabile solo su occurrence/window attiva, futura, non bloccata e con capacità residua;
+- `PENDING` e `CONFIRMED` occupano capacità, mentre `REJECTED` e `CANCELLED` la liberano;
 - rispetto delle transizioni consentite della prenotazione;
-- impossibilità di confermare nuovamente uno slot già `BOOKED`;
+- assenza di mutation globale dello slot a `BOOKED` durante le transizioni Booking;
 - protezione tramite lock pessimisti delle operazioni concorrenti critiche su availability e booking.
 
 ### 15.2 Regole pianificate per moduli futuri

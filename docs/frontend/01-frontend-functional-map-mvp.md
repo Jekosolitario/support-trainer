@@ -1,5 +1,7 @@
 # Frontend Functional Map MVP - Support Trainer
 
+> Stato corrente: Availability PT e Booking Client ↔ PT sono UI operative end-to-end; resta placeholder la dashboard dati. Booking usa decoder fail-closed, `bookableOptions` come unica fonte di selezione, stati temporali derivati, lock mutation senza optimistic state e riconciliazione GET dopo `409`. Reason/actor nullable legacy sono mostrati nel detail. Vedi [Booking Domain Contract V1](../19-booking-domain-contract-v1.md).
+
 ## 1. Obiettivo del documento
 
 Questo documento traduce il backend MVP reale di Support Trainer in una mappa funzionale per UX/UI, prototipazione Figma e implementazione web con React. Non definisce nuove API e non amplia il perimetro del prodotto.
@@ -23,7 +25,7 @@ La mappa distingue sempre tre stati:
 | **Futuro / non attivo** | La UX può prevederne la posizione, ma non deve presentarlo come funzionante. |
 | **Non presente**        | Non deve comparire come azione attiva né generare chiamate API.              |
 
-La presenza di una pagina frontend non implica necessariamente un endpoint dedicato: una landing statica non ne richiede uno, mentre una dashboard MVP deve comporre dati restituiti da endpoint già esistenti. Nel backend risultano implementati **31 endpoint applicativi**: Auth 8, Me 4, Client 2, Professional 3, Invite 2, Availability 5 e Booking 7. `/error` è un fallback tecnico separato e non va trattato come endpoint funzionale.
+La presenza di una pagina frontend non implica necessariamente un endpoint dedicato: una landing statica non ne richiede uno, mentre una dashboard MVP deve comporre dati restituiti da endpoint già esistenti. Nel backend risultano implementati **36 endpoint applicativi**: Auth 8, Me 4, Client 2, Professional 3, Invite 2, Availability 10 e Booking 7. `/error` è un fallback tecnico separato e non va trattato come endpoint funzionale.
 
 La baseline certificata richiede inoltre che il client usi la risposta neutra `202` per entrambe le registrazioni, non cerchi `EMAIL_ALREADY_REGISTERED`, gestisca `ErrorResponse` tramite `code` e tratti gli orari Availability e gli snapshot Booking come `OffsetDateTime` con offset autorevole. Le sezioni successive dettagliano questi contratti.
 
@@ -38,7 +40,7 @@ La baseline certificata richiede inoltre che il client usi la risposta neutra `2
 - La **registrazione pubblica PROFESSIONAL** e la **verifica email** (confirm + resend pertinente) sono **implementate**. Dettaglio tecnico: [Professional Onboarding Implementation](./04-professional-onboarding-implementation.md).
 - La **gestione inviti PROFESSIONAL** (`/app/professional/invites`: lista, genera, copia codice valido) è **implementata**. Dettaglio tecnico: [Professional Invites Implementation](./05-professional-invites-implementation.md).
 - La **validazione invito e registrazione pubblica CLIENT** sono **implementate** con provider memory-only, auth gate locale, outcome conservativi e cleanup del draft. Dettaglio tecnico: [Client Onboarding Implementation](./06-client-onboarding-implementation.md).
-- Le altre pagine business private (dashboard dati, clients, professionals, availability, bookings) restano **placeholder**: le route esistono, ma non sono flussi applicativi completi.
+- La dashboard dati resta **placeholder**; relazioni, Availability PT e Booking Client ↔ PT sono flussi applicativi completi.
 - Il client usa path relativi `/api/v1/...` con `credentials: 'same-origin'`. In sviluppo Vite proxya `/api` → `http://localhost:8080`. In produzione la topologia è same-origin dietro reverse proxy.
 - Un'app mobile con React Native + Expo è una possibile evoluzione futura, fuori dall'MVP.
 - L'implementazione corrente del frontend non modifica il contratto backend descritto in questa mappa.
@@ -166,41 +168,41 @@ Il follow-up auth **E2E-1** (safe redirect cross-role → `/forbidden`) è docum
 
 ### 5.2 Cliente
 
-| Area/pagina                  | Endpoint                                                                       | Stato MVP                                              | Note UX                                                                                                                                                                                                          |
-| ---------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dashboard cliente            | Composizione di `GET /api/v1/professionals/my` e `GET /api/v1/bookings/client` | Implementabile ora come composizione                   | Non esiste un endpoint dashboard. Mostrare riepiloghi derivati senza promettere statistiche avanzate.                                                                                                            |
-| Profilo/account              | Endpoint `/api/v1/me/**`                                                       | **UI implementata**                                    | Vedi §5.1; form anagrafica e note cliente.                                                                                                                                                                       |
-| Professionisti collegati     | `GET /api/v1/professionals/my`                                                 | **UI implementata**                                    | Route `/app/client/professionals`; lista responsive con loading, empty state, error e retry.                                                                                                                       |
-| Dettaglio professionista     | `GET /api/v1/professionals/{professionalId}`                                   | **UI implementata**                                    | Route `/app/client/professionals/:professionalId`; solo collegamento attivo, 404 neutro, contatti e link esterni sicuri. Il flag tecnico `active` non è presentato.                                                |
-| Disponibilità professionista | `GET /api/v1/professionals/{professionalId}/availability`                      | Implementabile ora solo per personal trainer collegato | Mostrare solo slot restituiti dal server. Per un nutrizionista l'area non va offerta. Empty state distinto da errore.                                                                                            |
-| Crea booking                 | `POST /api/v1/bookings`                                                        | Implementabile ora                                     | Body: un solo `availabilitySlotId` e nota facoltativa fino a 1000 caratteri. Confermare data/ora e professionista prima dell'invio.                                                                              |
-| Lista booking                | `GET /api/v1/bookings/client`                                                  | Implementabile ora                                     | Usa `BookingSummaryResponse`: controparte, stato, intervallo e durata sono già disponibili senza chiamate aggiuntive. Ordine iniziale: creazione decrescente e id decrescente; paginazione e filtri sono futuri. |
-| Dettaglio booking            | `GET /api/v1/bookings/{bookingRequestId}`                                      | Implementabile ora                                     | Usa `BookingDetailResponse`. Solo utenti coinvolti, anche dopo chiusura del collegamento: mostra nome storico, intervallo snapshot, stato, nota e item senza dipendere da `slotStatus`.                          |
-| Cancella booking             | `PATCH /api/v1/bookings/{bookingRequestId}/cancel`                             | Implementabile ora                                     | Il cliente può cancellare `PENDING` o `CONFIRMED`; usare conferma esplicita e aggiornare lo stato dalla risposta.                                                                                                |
+| Area/pagina                  | Endpoint                                                                       | Stato MVP                            | Note UX                                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard cliente            | Composizione di `GET /api/v1/professionals/my` e `GET /api/v1/bookings/client` | Implementabile ora come composizione | Non esiste un endpoint dashboard. Mostrare riepiloghi derivati senza promettere statistiche avanzate.                                                               |
+| Profilo/account              | Endpoint `/api/v1/me/**`                                                       | **UI implementata**                  | Vedi §5.1; form anagrafica e note cliente.                                                                                                                          |
+| Professionisti collegati     | `GET /api/v1/professionals/my`                                                 | **UI implementata**                  | Route `/app/client/professionals`; lista responsive con loading, empty state, error e retry.                                                                        |
+| Dettaglio professionista     | `GET /api/v1/professionals/{professionalId}`                                   | **UI implementata**                  | Route `/app/client/professionals/:professionalId`; solo collegamento attivo, 404 neutro, contatti e link esterni sicuri. Il flag tecnico `active` non è presentato. |
+| Disponibilità professionista | `GET /api/v1/professionals/{professionalId}/availability`                      | **UI implementata**                  | Route `/app/client/professionals/:professionalId/availability`; usa solo `bookableOptions`, resetta/fence la selezione sul cambio PT e distingue empty/error.       |
+| Crea booking                 | `POST /api/v1/bookings`                                                        | **UI implementata**                  | Invia `availabilitySlotId`, `startDateTime`, `durationMinutes` e nota nullable. Su `404` stale/`409` invalida la selezione e ricarica senza secondo POST.           |
+| Lista booking                | `GET /api/v1/bookings/client`                                                  | **UI implementata**                  | Usa `BookingSummaryResponse`, raggruppa prossime/storico e mantiene ordine server; paginazione e filtri sono futuri.                                                |
+| Dettaglio booking            | `GET /api/v1/bookings/{bookingRequestId}`                                      | **UI implementata**                  | Solo partecipanti; mostra snapshot e metadata legacy nullable. GET/mutation sono fenced per route e mount.                                                          |
+| Cancella booking             | `PATCH /api/v1/bookings/{bookingRequestId}/cancel`                             | **UI implementata**                  | `PENDING` reason facoltativa; `CONFIRMED` reason obbligatoria. Stato autorevole dalla response, `409` riconciliato con GET.                                         |
 
 ### 5.3 Professionista: funzionalità comuni
 
-| Area/pagina              | Endpoint                                                                           | Stato MVP                            | Note UX                                                                                                                                                                                                              |
-| ------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dashboard professionista | Composizione di clienti, inviti e, solo per personal trainer, availability/booking | Implementabile ora come composizione | Nessun endpoint aggregato. I widget devono dipendere dalla specializzazione.                                                                                                                                         |
-| Profilo/account          | Endpoint `/api/v1/me/**`                                                           | **UI implementata**                  | Vedi §5.1; contatti, bio, luogo, città e link.                                                                                                                                                                       |
-| Clienti collegati        | `GET /api/v1/clients/my`                                                           | **UI implementata**                  | Route `/app/professional/clients`; disponibile sia a PT sia a nutrizionisti, con lista responsive, loading, empty state, error e retry.                                                                               |
-| Dettaglio cliente        | `GET /api/v1/clients/{clientId}`                                                   | **UI implementata**                  | Route `/app/professional/clients/:clientId`; profilo condiviso approvato, collegamento attivo e 404 neutro. Le note sensibili e i dati account restano esclusi.                                                       |
-| Crea invito              | `POST /api/v1/invites`                                                             | **UI implementata**                  | Nessun body. Dopo `201`, mostra codice/scadenza; Copia solo se Valido. Fail-closed su `expiresAt` invalido (`Non disponibile`). Dettaglio: [FE05](./05-professional-invites-implementation.md).                      |
-| Lista inviti             | `GET /api/v1/invites`                                                              | **UI implementata**                  | Stati Non attivo / Usato / Scaduto / Non disponibile / Valido. Nessun dettaglio o disattivazione manuale.                                                                                                            |
+| Area/pagina              | Endpoint                                                                           | Stato MVP                            | Note UX                                                                                                                                                                                         |
+| ------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard professionista | Composizione di clienti, inviti e, solo per personal trainer, availability/booking | Implementabile ora come composizione | Nessun endpoint aggregato. I widget devono dipendere dalla specializzazione.                                                                                                                    |
+| Profilo/account          | Endpoint `/api/v1/me/**`                                                           | **UI implementata**                  | Vedi §5.1; contatti, bio, luogo, città e link.                                                                                                                                                  |
+| Clienti collegati        | `GET /api/v1/clients/my`                                                           | **UI implementata**                  | Route `/app/professional/clients`; disponibile sia a PT sia a nutrizionisti, con lista responsive, loading, empty state, error e retry.                                                         |
+| Dettaglio cliente        | `GET /api/v1/clients/{clientId}`                                                   | **UI implementata**                  | Route `/app/professional/clients/:clientId`; profilo condiviso approvato, collegamento attivo e 404 neutro. Le note sensibili e i dati account restano esclusi.                                 |
+| Crea invito              | `POST /api/v1/invites`                                                             | **UI implementata**                  | Nessun body. Dopo `201`, mostra codice/scadenza; Copia solo se Valido. Fail-closed su `expiresAt` invalido (`Non disponibile`). Dettaglio: [FE05](./05-professional-invites-implementation.md). |
+| Lista inviti             | `GET /api/v1/invites`                                                              | **UI implementata**                  | Stati Non attivo / Usato / Scaduto / Non disponibile / Valido. Nessun dettaglio o disattivazione manuale.                                                                                       |
 
 ### 5.4 Personal trainer
 
-| Area/pagina            | Endpoint                                                 | Stato MVP                      | Note UX                                                                                                                      |
-| ---------------------- | -------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| Lista slot             | `GET /api/v1/availability/my`                            | Implementabile ora             | Stati `AVAILABLE`, `BLOCKED`, `BOOKED`; lista ordinata per inizio. Nessun calendario avanzato necessario.                    |
-| Crea slot              | `POST /api/v1/availability`                              | Implementabile ora             | Inizio e fine futuri, fine successiva all'inizio, nessuna sovrapposizione.                                                   |
-| Modifica slot          | `PATCH /api/v1/availability/{slotId}`                    | Implementabile ora con vincoli | Solo slot `AVAILABLE`, mai coinvolti in booking e senza booking `PENDING`. Il `PATCH` è parziale.                            |
-| Blocca/sblocca slot    | `PATCH .../{slotId}/block`, `PATCH .../{slotId}/unblock` | Implementabile ora             | Azioni visibili solo negli stati coerenti. Uno slot con booking pending non è bloccabile.                                    |
-| Lista booking ricevuti | `GET /api/v1/bookings/professional`                      | Implementabile ora             | Usa `BookingSummaryResponse`: mostra richieste in ordine recente, stato, cliente e intervallo; nessuna chiamata aggiuntiva.  |
-| Dettaglio booking      | `GET /api/v1/bookings/{bookingRequestId}`                | Implementabile ora             | Usa `BookingDetailResponse`: mostra cliente, nota, stato, intervallo snapshot e timestamp della transizione quando presente. |
-| Conferma/rifiuta       | `PATCH .../{id}/confirm`, `PATCH .../{id}/reject`        | Implementabile ora             | Solo da `PENDING`. Il rifiuto non accetta un motivo: non mostrare un campo motivo attivo.                                    |
-| Cancella               | `PATCH .../{id}/cancel`                                  | Implementabile ora             | Il professionista può cancellare soltanto un booking `CONFIRMED`.                                                            |
+| Area/pagina               | Endpoint                                                                  | Stato MVP           | Note UX                                                                                                |
+| ------------------------- | ------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------ |
+| Regole e occurrence       | `GET /api/v1/availability/weekly-rules/my`, `GET /api/v1/availability/my` | **UI implementata** | Route `/app/professional/availability`; mostra regole settimanali e occurrence materializzate.         |
+| Crea/modifica regola      | `POST /weekly-rules`, `PUT /weekly-rules/{id}`                            | **UI implementata** | Form per giorno, finestra, durate, intervallo, luogo, capacità e validità; usa preview impatto.        |
+| Disattiva regola          | `PATCH /weekly-rules/{id}/deactivate`                                     | **UI implementata** | Reason richiesta dalla UI quando l'impatto Booking è positivo.                                         |
+| Blocca/sblocca occurrence | `PATCH .../{slotId}/block`, `PATCH .../{slotId}/unblock`                  | **UI implementata** | Mantiene i Booking esistenti e richiede reason quando coinvolge Booking occupanti.                     |
+| Lista booking ricevuti    | `GET /api/v1/bookings/professional`                                       | **UI implementata** | Usa `BookingSummaryResponse`: richieste da gestire, confermate e storico, senza chiamate aggiuntive.   |
+| Dettaglio booking         | `GET /api/v1/bookings/{bookingRequestId}`                                 | **UI implementata** | Mostra cliente, snapshot, metadata decisionali e azioni compatibili; lifecycle fenced per route/mount. |
+| Conferma/rifiuta          | `PATCH .../{id}/confirm`, `PATCH .../{id}/reject`                         | **UI implementata** | Solo da `PENDING`. Il rifiuto richiede motivo plain text, massimo 1000 caratteri.                      |
+| Cancella                  | `PATCH .../{id}/cancel`                                                   | **UI implementata** | Solo `CONFIRMED`, reason obbligatoria; actor assegnato server-side.                                    |
 
 ### 5.5 Contratto Booking per il frontend
 
@@ -238,7 +240,7 @@ Il nutrizionista usa le funzionalità comuni del professionista, ma non dispone 
 | Upload immagine profilo | Profilo                                                | Mostrare immagine esistente o avatar fallback; nessun controllo upload attivo.                  |
 | App mobile              | Fuori dalla web app                                    | Nessun elemento nell'MVP web. React Native + Expo resta un'evoluzione separata.                 |
 
-Sono inoltre non presenti e da non esporre come attivi: cambio password autenticato, gestione manuale dei collegamenti, disattivazione inviti, motivo di rifiuto booking, notifiche, pagamenti, chat, amministrazione e statistiche avanzate.
+Sono inoltre non presenti e da non esporre come attivi: cambio password autenticato, gestione manuale dei collegamenti, disattivazione inviti, notifiche, pagamenti, chat, amministrazione e statistiche avanzate.
 
 ## 7. Sitemap MVP
 
@@ -301,7 +303,7 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 | `/app/*/dashboard`                                      | CLIENT / PROFESSIONAL     | **Placeholder** (shell; senza dati business aggregati)       |
 | `/app/professional/clients` e dettaglio                 | PROFESSIONAL (PT + NUT)   | **Implementate**                                             |
 | `/app/client/professionals` e dettaglio                 | CLIENT                    | **Implementate**                                             |
-| Availability / bookings                                 | CLIENT; PROFESSIONAL + PT | **Placeholder**                                              |
+| Availability / bookings                                 | CLIENT; PROFESSIONAL + PT | **UI operativa end-to-end**                                  |
 | `/dev/role-preview`                                     | Dev-only                  | **Implementata** (solo `import.meta.env.DEV`)                |
 
 ## 8. Protezione rotte frontend
@@ -316,7 +318,7 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 
 Le guard frontend migliorano navigazione e chiarezza, ma non sostituiscono l'autorizzazione backend.
 
-Nella fondazione corrente le guard `RequireAuth`, `RequireRole` e `RequireSpecialization` sono **implementate** e collegate allo stato auth. Profilo, inviti PROFESSIONAL e le quattro pagine di lista/dettaglio CLIENT ↔ PROFESSIONAL sono pagine business reali; dashboard, Availability e Booking restano placeholder di contenuto.
+Nella fondazione corrente le guard `RequireAuth`, `RequireRole` e `RequireSpecialization` sono **implementate** e collegate allo stato auth. Profilo, inviti, relazioni, Availability PT e Booking Client ↔ PT sono pagine business reali; resta placeholder la dashboard con dati.
 
 Il subtree CLIENT pubblico usa inoltre `ClientOnboardingAuthGate`: non monta le pagine durante `initializing`, resta fail-closed su `unavailable`, consente l'outlet soltanto a `unauthenticated` e redirige un utente `authenticated` alla dashboard coerente col ruolo dopo aver pulito l'invito.
 
@@ -419,15 +421,14 @@ Ogni pagina privata deve prevedere anche gli stati trasversali `unauthorized` e 
 
 ## 11. Priorità implementazione React
 
-Completati: setup React/Vite/TypeScript, routing, layout, home pubblica, foundation API/auth session-based (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap), **Profilo/Account/Operational Status** collegati a `/me`, onboarding pubblico PROFESSIONAL e CLIENT/verifica email, **gestione inviti PROFESSIONAL** e liste/dettagli delle relazioni CLIENT ↔ PROFESSIONAL. Dettagli auth: [FE03](./03-authentication-session-flow.md); inviti: [FE05](./05-professional-invites-implementation.md); onboarding CLIENT: [FE06](./06-client-onboarding-implementation.md); relazioni: [FE07](./07-client-professional-relationships-implementation.md).
+Completati: setup React/Vite/TypeScript, routing, layout, home pubblica, foundation API/auth session-based, **Profilo/Account/Operational Status**, onboarding/verifica email, inviti, relazioni CLIENT ↔ PROFESSIONAL, Availability settimanale PT e Booking Client ↔ PT end-to-end. Dettagli auth: [FE03](./03-authentication-session-flow.md); inviti: [FE05](./05-professional-invites-implementation.md); onboarding CLIENT: [FE06](./06-client-onboarding-implementation.md); relazioni: [FE07](./07-client-professional-relationships-implementation.md).
 
 Ordine pragmatico **residuo**:
 
 1. dashboard base composte, senza analytics;
-2. Availability e Booking del personal trainer, poi Booking cliente;
-3. hardening di errori, accessibilità, responsive e test dei flussi applicativi business residui.
+2. hardening trasversale di errori, accessibilità, responsive e test dei flussi applicativi residui.
 
-La scelta del prossimo vertical slice business resta una decisione di prodotto. Availability e Booking vanno progettati insieme sul piano UX perché le transizioni booking modificano gli slot.
+La scelta del prossimo vertical slice business resta una decisione di prodotto. Availability e Booking V1 sono già operative e condividono bookability/occupancy server-side senza mutare uno stato binario dello slot.
 
 ## 12. Cosa NON implementare nella prima fase frontend
 
@@ -441,7 +442,7 @@ La scelta del prossimo vertical slice business resta una decisione di prodotto. 
 - grafici, statistiche e dashboard analitiche;
 - calendario drag-and-drop, ricorrenze o viste complesse;
 - filtri, paginazione o query param server non implementati;
-- motivo di rifiuto booking, notifiche, chat, pagamenti o funzioni admin;
+- notifiche, chat, pagamenti o funzioni admin;
 - nuove API o workaround che simulino feature mancanti nel solo client.
 
 Per Availability è sufficiente iniziare con una lista cronologica e form data/ora. Un calendario semplice può essere valutato dopo aver validato il flusso, senza introdurre semantiche non presenti nel backend.

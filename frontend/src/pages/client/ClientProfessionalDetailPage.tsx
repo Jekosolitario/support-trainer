@@ -156,6 +156,15 @@ function ProfessionalProfile({
         </section>
       ) : null}
 
+      {professional.specialization === 'PERSONAL_TRAINER' ? (
+        <Link
+          className={styles.backLink}
+          to={`/app/client/professionals/${String(professional.id)}/availability`}
+        >
+          Visualizza disponibilità
+        </Link>
+      ) : null}
+
       <Link className={styles.backLink} to="/app/client/professionals">
         Torna ai professionisti
       </Link>

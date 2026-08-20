@@ -32,7 +32,7 @@ class BookingHistoricalSnapshotMySqlIntegrationTest {
         migrateToV59(legacySchema, password);
         seedLegacyBooking(legacySchema, password);
         Flyway latest = flyway(legacySchema, password, null);
-        assertThat(latest.migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(latest.migrate().migrationsExecuted).isEqualTo(3);
         assertThat(latest.migrate().migrationsExecuted).isZero();
         assertLegacySnapshot(legacySchema, password);
         assertSnapshotColumns(legacySchema, password);
@@ -86,7 +86,8 @@ class BookingHistoricalSnapshotMySqlIntegrationTest {
         try (Connection connection = DriverManager.getConnection(jdbcUrl(schema), "root", password);
                 Statement statement = connection.createStatement();
                 ResultSet resultSet = statement.executeQuery(
-                        "SELECT client_display_name, professional_display_name, confirmed_at, rejected_at, cancelled_at "
+                        "SELECT client_display_name, professional_display_name, confirmed_at, rejected_at, cancelled_at, "
+                                + "rejection_reason, cancellation_reason, cancelled_by "
                                 + "FROM booking_requests WHERE id = 20"
                 )) {
             assertThat(resultSet.next()).isTrue();
@@ -96,6 +97,9 @@ class BookingHistoricalSnapshotMySqlIntegrationTest {
             assertThat(resultSet.getObject("rejected_at", LocalDateTime.class)).isNull();
             assertThat(resultSet.getObject("cancelled_at", LocalDateTime.class))
                     .isEqualTo(LocalDateTime.parse("2026-07-03T08:00:00.123456"));
+            assertThat(resultSet.getString("rejection_reason")).isNull();
+            assertThat(resultSet.getString("cancellation_reason")).isNull();
+            assertThat(resultSet.getString("cancelled_by")).isNull();
         }
     }
 
@@ -106,7 +110,8 @@ class BookingHistoricalSnapshotMySqlIntegrationTest {
                         "SELECT table_name, column_name, data_type, datetime_precision, is_nullable "
                                 + "FROM information_schema.columns WHERE table_schema = '" + schema + "' "
                                 + "AND column_name IN ('client_display_name', 'professional_display_name', 'scheduled_start', "
-                                + "'scheduled_end', 'confirmed_at', 'rejected_at', 'cancelled_at')"
+                                + "'scheduled_end', 'confirmed_at', 'rejected_at', 'cancelled_at', "
+                                + "'rejection_reason', 'cancellation_reason', 'cancelled_by')"
                 )) {
             Map<String, String> definitions = new java.util.HashMap<>();
             while (resultSet.next()) {
@@ -123,7 +128,10 @@ class BookingHistoricalSnapshotMySqlIntegrationTest {
                     .containsEntry("booking_request_items.scheduled_end", "datetime:6:NO")
                     .containsEntry("booking_requests.confirmed_at", "datetime:6:YES")
                     .containsEntry("booking_requests.rejected_at", "datetime:6:YES")
-                    .containsEntry("booking_requests.cancelled_at", "datetime:6:YES");
+                    .containsEntry("booking_requests.cancelled_at", "datetime:6:YES")
+                    .containsEntry("booking_requests.rejection_reason", "varchar:null:YES")
+                    .containsEntry("booking_requests.cancellation_reason", "varchar:null:YES")
+                    .containsEntry("booking_requests.cancelled_by", "varchar:null:YES");
         }
     }
 

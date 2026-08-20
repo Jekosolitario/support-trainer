@@ -350,6 +350,9 @@ describe('ClientProfessionalDetailPage', () => {
     expect(within(profile).getByText('Roma')).toBeVisible();
     expect(within(profile).getByText('+39 06 1234567')).toBeVisible();
     expect(within(profile).queryByText('true')).not.toBeInTheDocument();
+    expect(
+      within(profile).queryByRole('link', { name: 'Visualizza disponibilità' }),
+    ).not.toBeInTheDocument();
 
     const instagram = within(profile).getByRole('link', {
       name: 'Instagram di Grace Hopper',
@@ -367,6 +370,18 @@ describe('ClientProfessionalDetailPage', () => {
     expect(website).toHaveAttribute('href', 'http://grace.example/profile');
     expect(website).toHaveAttribute('target', '_blank');
     expect(website).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('mostra la CTA Availability solo per un Personal Trainer', async () => {
+    vi.spyOn(professionalsApi, 'getProfessionalById').mockResolvedValueOnce(
+      professionalDetail({ specialization: 'PERSONAL_TRAINER' }),
+    );
+
+    renderDetail('/app/client/professionals/10');
+
+    expect(
+      await screen.findByRole('link', { name: 'Visualizza disponibilità' }),
+    ).toHaveAttribute('href', '/app/client/professionals/10/availability');
   });
 
   it('omette nullabili assenti senza sezioni o placeholder vuoti', async () => {

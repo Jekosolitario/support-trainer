@@ -76,6 +76,9 @@ public class BookingResponseMapper {
                 bookingRequest.getConfirmedAt(),
                 bookingRequest.getRejectedAt(),
                 bookingRequest.getCancelledAt(),
+                bookingRequest.getRejectionReason(),
+                bookingRequest.getCancellationReason(),
+                bookingRequest.getCancelledBy() == null ? null : bookingRequest.getCancelledBy().name(),
                 temporalData.items()
         );
     }

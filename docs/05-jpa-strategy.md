@@ -435,7 +435,9 @@ Le entity coinvolte sono:
 
 Contiene inoltre:
 
-- stato salvato come enum stringa;
+- stato legacy salvato come enum stringa, non autoritativo per la capacità Booking;
+- capacità configurata e flag di blocco;
+- riferimento opzionale alla `WeeklyAvailabilityRule` che ha generato l'occurrence;
 - flag `active`;
 - timestamp ereditati da `BaseEntity`.
 
@@ -457,9 +459,11 @@ Ogni `BookingRequestItem` punta a:
 
 ## 14.4 Contratto API attuale
 
-Nel backend attuale una richiesta booking viene creata a partire da:
+Nel backend attuale una richiesta booking viene creata a partire da una combinazione restituita in `bookableOptions`:
 
-- un singolo `availabilitySlotId`.
+- `availabilitySlotId` dell'occurrence materializzata;
+- `startDateTime`;
+- `durationMinutes`.
 
 Di conseguenza, il flusso API attuale crea:
 
@@ -472,13 +476,13 @@ La struttura dati resta estendibile per un eventuale scenario multi-slot futuro,
 
 JPA modella le relazioni, mentre il service layer controlla:
 
-- slot nel futuro;
-- assenza di sovrapposizioni availability;
+- occurrence/window materializzata, attiva, futura e non bloccata;
+- combinazione richiesta coerente con le `bookableOptions` autoritative;
+- capacità residua e overlap sull'intervallo;
 - relazione attiva cliente-professionista;
-- slot disponibile prima della richiesta;
-- assenza di booking `PENDING` duplicato sullo stesso slot;
 - transizioni consentite del booking;
-- aggiornamento coerente dello stato slot dopo conferma o cancellazione.
+- guard temporale basata su `MAX(items.scheduledEnd)`;
+- occupancy derivata dagli stati Booking senza mutare uno stato globale dello slot.
 
 ## 14.6 Gestione concorrenza implementata
 
@@ -510,15 +514,15 @@ Durante la creazione di una richiesta booking, lo slot selezionato viene caricat
 
 - `@Lock(LockModeType.PESSIMISTIC_WRITE)`
 
-Il lock sullo slot resta attivo per la durata della transazione `@Transactional` del service.
+Il client e l'occurrence selezionata vengono caricati con lock pessimista; i lock restano attivi per la durata della transazione `@Transactional` del service.
 
 Questo consente di verificare in modo coerente:
 
-- disponibilità dello slot;
-- validità dello slot;
-- assenza di richieste `PENDING` già presenti sullo stesso slot.
+- validità della occurrence/window e della combinazione richiesta;
+- overlap del Client presso il professionista;
+- capacità residua sull'intero intervallo.
 
-L’obiettivo è impedire che due richieste concorrenti possano essere entrambe create come `PENDING` sullo stesso slot.
+L’obiettivo è impedire che richieste concorrenti superino la capacità configurata o introducano overlap incompatibili; più richieste possono coesistere sulla stessa occurrence quando la capacità lo consente.
 
 ### Transizioni booking
 
@@ -539,41 +543,28 @@ Durante la conferma, oltre alla richiesta booking vengono bloccati anche gli slo
 Il flusso è:
 
 1. lock della `BookingRequest`;
-2. lock degli `AvailabilitySlot` collegati;
-3. verifica che gli slot siano ancora validi, disponibili, futuri e appartenenti a un `PERSONAL_TRAINER`;
-4. aggiornamento booking a `CONFIRMED`;
-5. aggiornamento slot a `BOOKED`.
+2. guardia `now < MAX(items.scheduledEnd)` sullo snapshot Booking;
+3. lock delle occurrence `AvailabilitySlot` collegate;
+4. verifica della specializzazione `PERSONAL_TRAINER`;
+5. aggiornamento booking a `CONFIRMED`, senza mutare uno stato globale dello slot.
 
-Questa protezione impedisce conferme concorrenti incoerenti sullo stesso slot.
+Questa protezione impedisce transizioni concorrenti incoerenti sulla stessa richiesta. L'occupancy resta invariata perché `PENDING` e `CONFIRMED` occupano entrambi capacità.
 
-### Coordinamento Availability / Booking su richiesta pending
+### Coordinamento Availability / Booking su occupancy e snapshot
 
-Uno slot può restare in stato `AVAILABLE` mentre esiste una richiesta booking in stato `PENDING`.
+Le modifiche a regole settimanali e occurrence materializzate coordinano lock, capacity e Booking impattati. Gli intervalli già copiati nei `BookingRequestItem` restano snapshot storici e non vengono riscritti insieme alla disponibilità live.
 
-In questa situazione lo slot è considerato logicamente impegnato rispetto alle operazioni manuali del professionista.
-
-Durante:
-
-- aggiornamento dello slot;
-- blocco manuale dello slot;
-
-il backend:
-
-1. carica lo slot con lock pessimista in scrittura;
-2. verifica l’assenza di booking `PENDING` attivi collegati;
-3. consente l’operazione solo se non esistono richieste in attesa.
-
-Questa strategia impedisce che data, ora o disponibilità dello slot vengano alterate mentre un cliente attende una risposta alla propria richiesta.
+`PENDING` e `CONFIRMED` concorrono entrambi all'occupancy; `REJECTED` e `CANCELLED` liberano capacità. Il coordinamento non usa un vincolo globale “un solo `PENDING`” né il lifecycle binario `AVAILABLE ↔ BOOKED`.
 
 ### Repository coinvolti
 
 I repository interessati dalla strategia di lock sono:
 
 - `ProfessionalProfileRepository`, per serializzare creazione e aggiornamento availability dello stesso professionista;
-- `AvailabilitySlotRepository`, per proteggere creazione booking, conferma booking e operazioni sul singolo slot;
+- `AvailabilitySlotRepository`, per proteggere creazione booking, conferma booking e operazioni sulle occurrence materializzate;
 - `BookingRequestRepository`, per proteggere le transizioni di stato della richiesta booking.
 
-Il controllo dell’esistenza di booking `PENDING` collegati allo slot utilizza inoltre:
+I controlli di occupancy, overlap e impatto sui Booking utilizzano inoltre:
 
 - `BookingRequestItemRepository`.
 
@@ -727,19 +718,19 @@ Le regole business già implementate comprendono:
 - slot availability nel futuro;
 - assenza di sovrapposizioni slot;
 - booking coerente con professionista collegato;
-- booking solo su slot disponibile;
-- assenza di richiesta `PENDING` duplicata sullo stesso slot;
+- booking solo su occurrence/window presente in `bookableOptions` e con capacità residua;
+- occupancy calcolata su `PENDING` e `CONFIRMED`, con rilascio su `REJECTED` e `CANCELLED`;
 - transizioni booking consentite;
-- aggiornamento stato slot dopo conferma o cancellazione booking.
-- protezione dello slot tramite lock pessimista durante la creazione booking;
+- guard temporale delle mutation su `MAX(items.scheduledEnd)`;
+- nessuna mutation globale dello slot a `BOOKED` dopo conferma o ad `AVAILABLE` dopo rifiuto/cancellazione;
+- protezione del Client e dell'occurrence tramite lock pessimista durante la creazione booking;
 - protezione della richiesta booking tramite lock pessimista durante conferma, rifiuto e cancellazione;
-- protezione dello slot tramite lock pessimista durante la conferma booking;
-- prevenzione di richieste o conferme concorrenti incoerenti sullo stesso slot.
+- protezione delle occurrence collegate tramite lock pessimista durante la conferma booking;
+- prevenzione di over-capacity, overlap e transizioni concorrenti incoerenti.
 - protezione del professionista tramite lock pessimista durante creazione e aggiornamento availability;
 - prevenzione di slot sovrapposti creati o aggiornati tramite richieste concorrenti;
-- blocco modifica di uno slot con booking `PENDING` attivo;
-- blocco del blocco manuale di uno slot con booking `PENDING` attivo;
-- coordinamento transazionale tra Availability e Bookings sulle operazioni concorrenti relative allo stesso slot.
+- conservazione degli snapshot Booking durante modifiche, disattivazioni o blocchi Availability;
+- coordinamento transazionale tra Availability e Bookings sulle operazioni concorrenti relative alla stessa occurrence.
 
 ## 20.3 Regole future
 
@@ -776,9 +767,9 @@ La strategia è stata introdotta perché un semplice controllo applicativo seque
 
 Senza lock, potrebbero verificarsi scenari come:
 
-- due booking `PENDING` creati quasi simultaneamente sullo stesso slot;
+- due booking creati quasi simultaneamente oltre la capacità della stessa occurrence/window;
 - due transizioni concorrenti sulla stessa richiesta;
-- due conferme concorrenti che leggono lo stesso slot come ancora `AVAILABLE`.
+- una creazione concorrente che elude il controllo overlap del Client.
 
 ### Ambito di utilizzo
 
@@ -793,18 +784,13 @@ Il lock pessimistico è utilizzato soltanto nei flussi che modificano dati criti
 
 ### Bookings
 
-- lock dello slot durante creazione booking;
+- lock del Client e dell'occurrence durante creazione booking;
 - lock della richiesta durante conferma, rifiuto e cancellazione;
-- lock dello slot durante conferma booking.
+- lock delle occurrence collegate durante conferma booking.
 
 ### Coordinamento tra moduli
 
-Quando uno slot possiede una richiesta booking `PENDING`, le operazioni Availability che potrebbero alterare la proposta fatta al cliente vengono bloccate.
-
-Non sono quindi consentiti:
-
-- aggiornamento dello slot;
-- blocco manuale dello slot.
+Le operazioni Availability che incidono su Booking esistenti sono coordinate con lock e validazioni di impatto/capacity; gli snapshot temporali già persistiti nei `BookingRequestItem` restano immutati.
 
 Le normali operazioni di sola lettura continuano a utilizzare metodi repository senza lock.
 
@@ -864,14 +850,13 @@ Per Support Trainer risultano implementate e confermate le seguenti scelte:
 - DTO separati dalle entity JPA;
 - regole business complesse gestite nel service layer;
 - moduli Availability e Bookings integrati nel modello persistente reale.
-- lock pessimisti `PESSIMISTIC_WRITE` per proteggere la creazione booking sullo stesso slot;
+- lock pessimisti `PESSIMISTIC_WRITE` per proteggere capacità e overlap durante la creazione booking;
 - lock pessimisti sulla richiesta booking durante conferma, rifiuto e cancellazione;
-- lock pessimisti sugli slot durante la conferma booking;
+- lock pessimisti sulle occurrence collegate durante la conferma booking;
 - confine transazionale nel service layer per mantenere validi i lock fino al completamento dell’operazione.
 - lock pessimista sul `ProfessionalProfile` per serializzare creazione e aggiornamento availability;
-- lock sul singolo slot durante update e block quando può esistere un booking pendente;
-- impossibilità di modificare o bloccare availability slot con richiesta booking `PENDING`;
-- coordinamento transazionale tra moduli Availability e Bookings sullo stesso slot.
+- coordinamento di update, disattivazione e blocco con i Booking impattati, preservandone gli snapshot;
+- coordinamento transazionale tra moduli Availability e Bookings sulla stessa occurrence/window.
 
 ---
 
