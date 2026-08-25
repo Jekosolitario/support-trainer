@@ -9,9 +9,11 @@ describe('RolePreviewPage', () => {
     renderApp('/dev/role-preview', true);
 
     await user.click(screen.getByRole('radio', { name: 'Nutrizionista' }));
+    await user.click(screen.getByRole('button', { name: 'Menu' }));
 
-    expect(screen.getByText('Area nutrizionista')).toBeVisible();
-    const navigation = screen.getByRole('navigation', {
+    const dialog = screen.getByRole('dialog', { name: 'Navigazione' });
+    expect(within(dialog).getByText(/Area nutrizionista$/)).toBeVisible();
+    const navigation = within(dialog).getByRole('navigation', {
       name: 'Navigazione principale',
     });
     expect(

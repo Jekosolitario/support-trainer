@@ -5,7 +5,14 @@ import {
   StrictMode,
   useState,
 } from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -123,6 +130,14 @@ function renderPrivateHarness(props: StatefulHarnessProps = {}) {
     <MemoryRouter initialEntries={['/private']}>
       <StatefulHarness {...props}>{privateRoutes()}</StatefulHarness>
     </MemoryRouter>,
+  );
+}
+
+function openMobileLogoutButton(): HTMLElement {
+  fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+  return within(screen.getByRole('dialog', { name: 'Navigazione' })).getByRole(
+    'button',
+    { name: 'Esci' },
   );
 }
 
@@ -276,7 +291,7 @@ describe('LogoutButton', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: 'Esci' }));
+    await user.click(openMobileLogoutButton());
 
     expect(screen.getByRole('status')).toHaveTextContent(
       'Disconnessione in corso.',
@@ -335,7 +350,7 @@ describe('LogoutButton lifecycle con layout', () => {
     );
 
     expect(screen.getByText('Pagina privata')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Esci' }));
+    await user.click(openMobileLogoutButton());
 
     expect(screen.getByRole('status')).toHaveTextContent(
       'Disconnessione in corso.',
@@ -377,7 +392,7 @@ describe('LogoutButton lifecycle con layout', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: 'Esci' }));
+    await user.click(openMobileLogoutButton());
     expect(screen.getByRole('status')).toHaveTextContent(
       'Disconnessione in corso.',
     );
@@ -393,7 +408,7 @@ describe('LogoutButton lifecycle con layout', () => {
       expect(screen.getByText('Pagina privata')).toBeVisible();
     });
 
-    const buttonB = screen.getByRole('button', { name: 'Esci' });
+    const buttonB = openMobileLogoutButton();
     expect(buttonB).toBeEnabled();
     expect(
       screen.queryByRole('heading', { name: 'Login' }),
@@ -425,7 +440,7 @@ describe('LogoutButton lifecycle con layout', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: 'Esci' }));
+    await user.click(openMobileLogoutButton());
 
     await act(async () => {
       pending.reject(new Error('network failure'));
@@ -469,7 +484,7 @@ describe('LogoutButton lifecycle con layout', () => {
     await waitFor(() => {
       expect(screen.getByText('Pagina privata')).toBeVisible();
     });
-    expect(screen.getByRole('button', { name: 'Esci' })).toBeEnabled();
+    expect(openMobileLogoutButton()).toBeEnabled();
   });
 
   it('redirige a /login dopo reconciliation unauthenticated', async () => {

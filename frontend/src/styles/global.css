@@ -22,6 +22,20 @@
   --tracking-display: 0.012em;
   --tracking-micro-label: 0.08em;
 
+  /* Token meccanici condivisi: non definiscono un tema */
+  --control-min-size: 2.75rem;
+  --control-radius: 0.6rem;
+  --card-radius: 1rem;
+  --motion-duration-short: 160ms;
+  --focus-ring-width: 3px;
+  --panel-shadow: 0 1.25rem 3rem
+    color-mix(in srgb, var(--palette-canvas-deep) 58%, transparent);
+  --energy-line-gradient: linear-gradient(
+    90deg,
+    var(--palette-teal-medium),
+    var(--palette-violet-medium)
+  );
+
   /* Palette del brand */
   --palette-indigo-deep: #122155;
   --palette-indigo-medium: #7a84d7;
@@ -204,7 +218,8 @@ textarea {
 }
 
 :focus-visible {
-  outline: 3px solid var(--color-focus);
+  outline: var(--focus-ring-width) solid
+    var(--focus-ring-color, var(--color-focus));
 }
 
 img,

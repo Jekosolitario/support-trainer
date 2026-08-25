@@ -5,31 +5,34 @@
   margin-inline: auto;
 }
 
-.header {
-  display: grid;
-  gap: 0.5rem;
-}
+.authenticated {
+  --st-auth-heading: var(--color-heading-primary);
+  --st-auth-text: var(--color-text-primary);
+  --st-auth-text-muted: var(--color-text-secondary);
+  --st-auth-accent-violet: var(--color-accent-violet);
+  --st-auth-surface: var(--color-panel-glass);
+  --st-auth-surface-highlighted: var(--color-surface-violet);
+  --st-auth-border: var(--color-border-subtle);
+  --st-auth-border-emphasis: var(--color-border-emphasis);
+  --st-auth-border-informative: var(--color-border-informative);
+  --st-auth-glow: var(--color-glow-teal);
+  --st-auth-focus: var(--color-focus-on-dark);
+  --st-auth-primary-background: var(--color-cta-primary-background);
+  --st-auth-primary-text: var(--color-cta-primary-text);
+  --st-auth-primary-hover: var(--color-cta-primary-hover);
+  --st-auth-secondary-background: var(--color-cta-secondary-background);
+  --st-auth-secondary-text: var(--color-cta-secondary-text);
+  --st-auth-secondary-border: var(--color-cta-secondary-border);
+  --st-auth-secondary-hover: var(--color-cta-secondary-hover);
+  --st-auth-ghost-text: var(--color-link);
+  --st-auth-ghost-hover-text: var(--color-link-hover);
+  --st-auth-ghost-hover: var(--color-hover-surface);
+  --st-auth-danger-background: var(--color-error);
+  --st-auth-danger-text: var(--color-heading-primary);
+  --st-auth-danger-hover: color-mix(in srgb, var(--color-error) 84%, white);
 
-.eyebrow {
-  margin: 0;
-  color: var(--color-accent);
-  font-size: 0.78rem;
-  font-weight: 750;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.title {
-  margin: 0;
-  color: var(--color-primary);
-  font-size: clamp(1.65rem, 5vw, 2.35rem);
-  line-height: 1.15;
-}
-
-.description {
-  max-width: 68ch;
-  margin: 0;
-  color: var(--color-text-muted);
+  color: var(--st-auth-text);
+  font-family: var(--font-body);
 }
 
 .content {

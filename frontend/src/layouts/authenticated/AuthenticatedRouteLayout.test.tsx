@@ -1,4 +1,5 @@
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { expect, it } from 'vitest';
 
@@ -54,7 +55,8 @@ it.each([
   },
 ] satisfies LayoutCase[])(
   'usa il profilo runtime $label dal Context per layout, navigation e Logout',
-  ({ accessProfile, path, area, visibleLink, hiddenLink }) => {
+  async ({ accessProfile, path, area, visibleLink, hiddenLink }) => {
+    const user = userEvent.setup();
     const state = createAuthenticatedAuthState(accessProfile);
 
     renderWithAuthContext(
@@ -69,9 +71,12 @@ it.each([
       { initialEntries: [path] },
     );
 
-    expect(screen.getByText(area)).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Esci' })).toBeEnabled();
-    const navigation = screen.getByRole('navigation', {
+    await user.click(screen.getByRole('button', { name: 'Menu' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Navigazione' });
+    expect(within(dialog).getByText(new RegExp(`${area}$`))).toBeVisible();
+    expect(within(dialog).getByRole('button', { name: 'Esci' })).toBeEnabled();
+    const navigation = within(dialog).getByRole('navigation', {
       name: 'Navigazione principale',
     });
     expect(
@@ -84,7 +89,8 @@ it.each([
   },
 );
 
-it('mostra Logout anche con profile.active=false', () => {
+it('mostra Logout anche con profile.active=false', async () => {
+  const user = userEvent.setup();
   const state = createAuthenticatedAuthState(
     { role: 'CLIENT', specialization: null },
     { active: false },
@@ -102,7 +108,14 @@ it('mostra Logout anche con profile.active=false', () => {
     { initialEntries: ['/app/client/dashboard'] },
   );
 
-  expect(screen.getByRole('button', { name: 'Esci' })).toBeEnabled();
+  await user.click(screen.getByRole('button', { name: 'Menu' }));
+
+  expect(
+    within(screen.getByRole('dialog', { name: 'Navigazione' })).getByRole(
+      'button',
+      { name: 'Esci' },
+    ),
+  ).toBeEnabled();
   expect(screen.getByText('Pagina privata')).toBeVisible();
 });
 

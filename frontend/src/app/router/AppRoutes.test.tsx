@@ -117,6 +117,18 @@ function expectForbidden(): void {
   expectPageHeading('Non puoi accedere a questa pagina');
 }
 
+async function openMobileNavigation(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Menu' }));
+
+  const dialog = screen.getByRole('dialog', { name: 'Navigazione' });
+  return {
+    dialog,
+    navigation: within(dialog).getByRole('navigation', {
+      name: 'Navigazione principale',
+    }),
+  };
+}
+
 describe('AppRoutes', () => {
   beforeEach(() => {
     vi.spyOn(invitesApi, 'listMyInvites').mockResolvedValue([]);
@@ -319,16 +331,15 @@ describe('AppRoutes', () => {
     },
   );
 
-  it('usa il profilo NUT runtime anche per layout, nav e dashboard', () => {
+  it('usa il profilo NUT runtime anche per layout, nav e dashboard', async () => {
+    const user = userEvent.setup();
     renderAuthenticatedApp('/app/professional/dashboard', {
       role: 'PROFESSIONAL',
       specialization: 'NUTRITIONIST',
     });
 
-    expect(screen.getByText('Area nutrizionista')).toBeVisible();
-    const navigation = screen.getByRole('navigation', {
-      name: 'Navigazione principale',
-    });
+    const { dialog, navigation } = await openMobileNavigation(user);
+    expect(within(dialog).getByText(/Area nutrizionista$/)).toBeVisible();
     expect(
       within(navigation).getByRole('link', { name: 'Inviti' }),
     ).toBeVisible();
@@ -340,15 +351,14 @@ describe('AppRoutes', () => {
     ).toBeVisible();
   });
 
-  it('include Inviti nella primary navigation del personal trainer', () => {
+  it('include Inviti nella primary navigation del personal trainer', async () => {
+    const user = userEvent.setup();
     renderAuthenticatedApp('/app/professional/dashboard', {
       role: 'PROFESSIONAL',
       specialization: 'PERSONAL_TRAINER',
     });
 
-    const navigation = screen.getByRole('navigation', {
-      name: 'Navigazione principale',
-    });
+    const { navigation } = await openMobileNavigation(user);
     expect(within(navigation).getAllByRole('link')).toHaveLength(6);
     expect(
       within(navigation).getByRole('link', { name: 'Inviti' }),
@@ -384,10 +394,8 @@ describe('AppRoutes', () => {
 
     await user.click(screen.getByRole('radio', { name: 'Nutrizionista' }));
 
-    expect(screen.getByText('Area nutrizionista')).toBeVisible();
-    const navigation = screen.getByRole('navigation', {
-      name: 'Navigazione principale',
-    });
+    const { dialog, navigation } = await openMobileNavigation(user);
+    expect(within(dialog).getByText(/Area nutrizionista$/)).toBeVisible();
     expect(
       within(navigation).getByRole('link', { name: 'Inviti' }),
     ).toBeVisible();

@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react';
 import { NavLink } from 'react-router-dom';
 
 import type { UserAccessProfile } from '../../app/config/access';
@@ -6,20 +5,19 @@ import styles from './AuthenticatedNavigation.module.css';
 import { getNavigationItems } from './navigationConfig';
 
 interface AuthenticatedNavigationProps {
-  profile: UserAccessProfile;
+  readonly profile: UserAccessProfile;
+  readonly onNavigate?: () => void;
 }
 
 export function AuthenticatedNavigation({
   profile,
+  onNavigate,
 }: AuthenticatedNavigationProps) {
   const items = getNavigationItems(profile);
-  const navigationStyle = {
-    '--navigation-count': items.length,
-  } as CSSProperties;
 
   return (
     <nav className={styles.navigation} aria-label="Navigazione principale">
-      <ul className={styles.list} style={navigationStyle}>
+      <ul className={styles.list}>
         {items.map((item) => (
           <li key={item.id}>
             <NavLink
@@ -27,6 +25,7 @@ export function AuthenticatedNavigation({
                 `${styles.link} ${isActive ? styles.linkActive : ''}`
               }
               to={item.path}
+              onClick={onNavigate}
             >
               {item.label}
             </NavLink>

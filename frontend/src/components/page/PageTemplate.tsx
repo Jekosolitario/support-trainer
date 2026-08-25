@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react';
 
+import { PageHeader, type PageHeaderAppearance } from './PageHeader';
 import styles from './PageTemplate.module.css';
 
-interface PageTemplateProps {
-  title: string;
-  description: string;
-  eyebrow?: string;
-  children?: ReactNode;
+export interface PageTemplateProps {
+  readonly title: string;
+  readonly description: string;
+  readonly eyebrow?: string;
+  readonly children?: ReactNode;
+  readonly appearance?: PageHeaderAppearance;
 }
 
 export function PageTemplate({
@@ -14,14 +16,21 @@ export function PageTemplate({
   description,
   eyebrow,
   children,
+  appearance = 'legacy',
 }: PageTemplateProps) {
+  const pageClassName =
+    appearance === 'authenticated'
+      ? `${styles.page} ${styles.authenticated}`
+      : styles.page;
+
   return (
-    <article className={styles.page}>
-      <header className={styles.header}>
-        {eyebrow ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
-        <h1 className={styles.title}>{title}</h1>
-        <p className={styles.description}>{description}</p>
-      </header>
+    <article className={pageClassName}>
+      <PageHeader
+        appearance={appearance}
+        description={description}
+        eyebrow={eyebrow}
+        title={title}
+      />
       {children ? <div className={styles.content}>{children}</div> : null}
     </article>
   );

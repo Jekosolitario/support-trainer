@@ -1,0 +1,84 @@
+.link {
+  display: inline-flex;
+  min-width: var(--control-min-size);
+  min-height: var(--control-min-size);
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 0.95rem;
+  border: 1px solid transparent;
+  border-radius: var(--control-radius);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: var(--font-weight-interface);
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    color var(--motion-duration-short) ease,
+    border-color var(--motion-duration-short) ease,
+    background var(--motion-duration-short) ease,
+    box-shadow var(--motion-duration-short) ease,
+    transform var(--motion-duration-short) ease;
+}
+
+.link:hover {
+  transform: translateY(-1px);
+}
+
+.link:active {
+  transform: translateY(1px);
+}
+
+.link:focus-visible {
+  outline: var(--focus-ring-width) solid
+    var(--st-auth-focus, var(--focus-ring-color, var(--color-focus)));
+  outline-offset: 2px;
+}
+
+.primary {
+  border-color: var(
+    --st-auth-primary-background,
+    var(--color-cta-primary-background)
+  );
+  color: var(--st-auth-primary-text, var(--color-cta-primary-text));
+  background: var(
+    --st-auth-primary-background,
+    var(--color-cta-primary-background)
+  );
+  box-shadow: 0 0 1.25rem var(--color-glow-teal);
+}
+
+.primary:hover {
+  border-color: var(--st-auth-primary-hover, var(--color-cta-primary-hover));
+  background: var(--st-auth-primary-hover, var(--color-cta-primary-hover));
+  box-shadow: 0 0 1.75rem var(--color-glow-teal);
+}
+
+.secondary {
+  border-color: var(
+    --st-auth-secondary-border,
+    var(--color-cta-secondary-border)
+  );
+  color: var(--st-auth-secondary-text, var(--color-cta-secondary-text));
+  background: var(
+    --st-auth-secondary-background,
+    var(--color-cta-secondary-background)
+  );
+}
+
+.secondary:hover {
+  background: var(--st-auth-secondary-hover, var(--color-cta-secondary-hover));
+  box-shadow: 0 0 1.25rem var(--color-glow-indigo);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .link {
+    transition: none;
+  }
+
+  .link:hover,
+  .link:active {
+    transform: none;
+  }
+}

@@ -7,6 +7,7 @@ import {
 } from '../../app/config/access';
 import { Branding } from '../../components/branding/Branding';
 import { AuthenticatedNavigation } from '../../components/navigation/AuthenticatedNavigation';
+import { MobileNavigationDrawer } from '../../components/navigation/MobileNavigationDrawer';
 import styles from './AuthenticatedLayout.module.css';
 
 interface AuthenticatedLayoutProps {
@@ -25,21 +26,28 @@ export function AuthenticatedLayout({
       <a className={styles.skipLink} href="#main-content">
         Vai al contenuto
       </a>
-      <header className={styles.header}>
-        <Branding />
-        <div className={styles.headerEnd}>
+
+      <aside className={styles.sidebar} aria-label="Area riservata">
+        <div className={styles.sidebarBrand}>
+          <Branding />
+        </div>
+        <div className={styles.sidebarNavigation}>
+          <AuthenticatedNavigation profile={profile} />
+        </div>
+        <div className={styles.sidebarFooter}>
           <p className={styles.area}>{getAccessProfileLabel(profile)}</p>
           {headerActions}
         </div>
+      </aside>
+
+      <header className={styles.mobileHeader}>
+        <Branding />
+        <MobileNavigationDrawer profile={profile} footer={headerActions} />
       </header>
-      <div className={styles.body}>
-        <div className={styles.navigationSlot}>
-          <AuthenticatedNavigation profile={profile} />
-        </div>
-        <main className={styles.main} id="main-content">
-          {children ?? <Outlet />}
-        </main>
-      </div>
+
+      <main className={styles.main} id="main-content">
+        {children ?? <Outlet />}
+      </main>
     </div>
   );
 }

@@ -1,0 +1,79 @@
+.header {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.eyebrow,
+.title,
+.description {
+  margin: 0;
+}
+
+.eyebrow {
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-emphasis);
+  letter-spacing: var(--tracking-micro-label);
+  text-transform: uppercase;
+}
+
+.title {
+  font-size: clamp(1.65rem, 5vw, 2.35rem);
+  line-height: 1.15;
+}
+
+.description {
+  max-width: 68ch;
+}
+
+.legacy .eyebrow {
+  color: var(--color-accent);
+  font-weight: 750;
+}
+
+.legacy .title {
+  color: var(--color-primary);
+}
+
+.legacy .description {
+  color: var(--color-text-muted);
+}
+
+.authenticated {
+  gap: 0.65rem;
+  color: var(--st-auth-text, var(--color-text-primary));
+  font-family: var(--font-body);
+}
+
+.authenticated .eyebrow {
+  color: var(--st-auth-accent-violet, var(--color-accent-violet));
+}
+
+.authenticated .title {
+  position: relative;
+  width: fit-content;
+  max-width: 22ch;
+  padding-bottom: 0.75rem;
+  color: var(--st-auth-heading, var(--color-heading-primary));
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-body);
+  letter-spacing: var(--tracking-display);
+  text-wrap: balance;
+}
+
+.authenticated .title::after {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: min(7rem, 42%);
+  height: 0.18rem;
+  border-radius: 999px;
+  background: var(--energy-line-gradient);
+  box-shadow: 0 0 0.75rem var(--st-auth-glow, var(--color-glow-teal));
+  content: '';
+}
+
+.authenticated .description {
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
+  font-size: 1.05rem;
+  line-height: 1.6;
+}

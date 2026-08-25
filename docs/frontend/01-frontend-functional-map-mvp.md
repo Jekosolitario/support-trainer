@@ -15,6 +15,7 @@ Documentazione attiva di supporto:
 - [`07-api-modules-overview.md`](../07-api-modules-overview.md);
 - [`09-security-flow.md`](../09-security-flow.md);
 - [`06-client-onboarding-implementation.md`](./06-client-onboarding-implementation.md);
+- [`08-authenticated-ui-foundation-v1.md`](./08-authenticated-ui-foundation-v1.md);
 - controller, DTO, configurazione Spring Security, servizi ed enum presenti nel backend.
 
 La mappa distingue sempre tre stati:
@@ -33,14 +34,14 @@ La baseline certificata richiede inoltre che il client usi la risposta neutra `2
 
 - La fondazione frontend è implementata con **React + TypeScript + Vite**.
 - React Router registra le route pubbliche, le aree cliente e professionista, le pagine di errore e una preview tecnica disponibile soltanto in sviluppo (`/dev/role-preview`).
-- Sono presenti layout pubblico, autenticato e di errore, navigazione differenziata per ruolo, componenti condivisi e test automatici.
+- Sono presenti layout pubblico, autenticato e di errore, navigazione differenziata per ruolo, componenti condivisi e test automatici. Lo **shell autenticato** non è più legacy: usa la [Authenticated UI Foundation V1](./08-authenticated-ui-foundation-v1.md) (sidebar/drawer, token `--st-auth-*`, primitive condivise).
 - La home pubblica sulla route `/` è **implementata**; dettagli in [Public Home Implementation](./02-public-home-implementation.md).
 - L’**auth session-based frontend è implementata**: httpClient, CSRF memory-only, AuthProvider, bootstrap/reconciliation `/me`, login, logout, guards e routing protetto. Dettagli in [Authentication Session Flow](./03-authentication-session-flow.md).
 - La **pagina Profilo autenticata** è **implementata** (CLIENT e PROFESSIONAL), con Account in sola lettura e Operational Status modificabile. Soft commit e race protection: [FE03](./03-authentication-session-flow.md).
 - La **registrazione pubblica PROFESSIONAL** e la **verifica email** (confirm + resend pertinente) sono **implementate**. Dettaglio tecnico: [Professional Onboarding Implementation](./04-professional-onboarding-implementation.md).
 - La **gestione inviti PROFESSIONAL** (`/app/professional/invites`: lista, genera, copia codice valido) è **implementata**. Dettaglio tecnico: [Professional Invites Implementation](./05-professional-invites-implementation.md).
 - La **validazione invito e registrazione pubblica CLIENT** sono **implementate** con provider memory-only, auth gate locale, outcome conservativi e cleanup del draft. Dettaglio tecnico: [Client Onboarding Implementation](./06-client-onboarding-implementation.md).
-- La dashboard dati resta **placeholder**; relazioni, Availability PT e Booking Client ↔ PT sono flussi applicativi completi.
+- La dashboard dati resta **placeholder**; la pagina Dashboard è la **reference UI** della foundation autenticata, senza dati aggregati. Relazioni, Availability PT e Booking Client ↔ PT sono flussi applicativi completi.
 - Il client usa path relativi `/api/v1/...` con `credentials: 'same-origin'`. In sviluppo Vite proxya `/api` → `http://localhost:8080`. In produzione la topologia è same-origin dietro reverse proxy.
 - Un'app mobile con React Native + Expo è una possibile evoluzione futura, fuori dall'MVP.
 - L'implementazione corrente del frontend non modifica il contratto backend descritto in questa mappa.
@@ -300,7 +301,7 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 | Guardie auth (`RequireAuth` / ruolo / specializzazione) | Privato                   | **Implementate**                                             |
 | `/app/client/profile`, `/app/professional/profile`      | CLIENT / PROFESSIONAL     | **Implementata** (Profilo + Account RO + Operational Status) |
 | `/app/professional/invites`                             | PROFESSIONAL              | **Implementata** (lista, genera, copia se Valido)            |
-| `/app/*/dashboard`                                      | CLIENT / PROFESSIONAL     | **Placeholder** (shell; senza dati business aggregati)       |
+| `/app/*/dashboard`                                      | CLIENT / PROFESSIONAL     | **Placeholder dati**; **UI foundation** (reference shell autenticato, senza aggregati business) |
 | `/app/professional/clients` e dettaglio                 | PROFESSIONAL (PT + NUT)   | **Implementate**                                             |
 | `/app/client/professionals` e dettaglio                 | CLIENT                    | **Implementate**                                             |
 | Availability / bookings                                 | CLIENT; PROFESSIONAL + PT | **UI operativa end-to-end**                                  |
@@ -472,7 +473,7 @@ Per Availability è sufficiente iniziare con una lista cronologica e form data/o
 
 ### 13.2 Componenti e layout ricorrenti
 
-- app shell con header, navigazione laterale/drawer e menu utente;
+- app shell autenticato (topbar mobile, sidebar desktop, drawer) secondo [Authenticated UI Foundation V1](./08-authenticated-ui-foundation-v1.md);
 - route guard con stato di bootstrap;
 - page header, breadcrumb e area azioni;
 - card profilo professionista/cliente;

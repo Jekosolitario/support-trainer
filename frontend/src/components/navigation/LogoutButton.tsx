@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { useAuth } from '../../auth/authState';
+import { Button } from '../ui/Button';
 import styles from './LogoutButton.module.css';
 
 export function LogoutButton() {
@@ -40,8 +41,8 @@ export function LogoutButton() {
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       className={styles.button}
       disabled={pending}
       aria-busy={pending || undefined}
@@ -50,6 +51,6 @@ export function LogoutButton() {
       }}
     >
       Esci
-    </button>
+    </Button>
   );
 }
