@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
-import { Link } from 'react-router-dom';
 
 import { listClientBookings } from '../../api/bookingApi';
 import { PageTemplate } from '../../components/page/PageTemplate';
+import { ActionLink } from '../../components/ui/ActionLink';
 import { groupClientBookings } from '../shared/booking/bookingPresentation';
 import {
   BookingListSection,
@@ -22,6 +22,7 @@ export function ClientBookingsPage() {
     state.status === 'success' ? groupClientBookings(state.data) : null;
   return (
     <PageTemplate
+      appearance="authenticated"
       eyebrow="Area cliente"
       title="Prenotazioni"
       description="Consulta richieste, appuntamenti confermati e storico."
@@ -38,7 +39,9 @@ export function ClientBookingsPage() {
       {state.status === 'success' && state.data.length === 0 ? (
         <div className={styles.empty}>
           <p>Non hai ancora prenotazioni.</p>
-          <Link to="/app/client/professionals">Vai ai miei professionisti</Link>
+          <ActionLink to="/app/client/professionals" variant="secondary">
+            Vai ai miei professionisti
+          </ActionLink>
         </div>
       ) : null}
       {groups !== null ? (

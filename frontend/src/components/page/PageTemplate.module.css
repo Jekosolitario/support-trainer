@@ -30,6 +30,17 @@
   --st-auth-danger-background: var(--color-error);
   --st-auth-danger-text: var(--color-heading-primary);
   --st-auth-danger-hover: color-mix(in srgb, var(--color-error) 84%, white);
+  --st-auth-warning: #f0c674;
+  --st-auth-warning-border: color-mix(
+    in srgb,
+    var(--st-auth-warning) 55%,
+    transparent
+  );
+  --st-auth-warning-background: color-mix(
+    in srgb,
+    var(--st-auth-warning) 18%,
+    transparent
+  );
 
   color: var(--st-auth-text);
   font-family: var(--font-body);

@@ -6,84 +6,119 @@
   gap: 0.75rem;
 }
 
-.primaryButton,
-.secondaryButton,
-.dangerButton,
 .textDangerButton {
-  min-height: 2.75rem;
-  padding: 0.65rem 1rem;
-  border-radius: 0.75rem;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.primaryButton {
-  border: 1px solid transparent;
-  background: linear-gradient(135deg, #2dd4bf, #6366f1);
-  color: #0b1220;
-}
-
-.secondaryButton {
-  border: 1px solid var(--color-border, #334155);
-  background: transparent;
-  color: var(--color-text-primary, #e2e8f0);
-}
-
-.dangerButton {
-  border: 1px solid transparent;
-  background: var(--color-danger, #f87171);
-  color: #111827;
-}
-
-.textDangerButton {
+  display: inline-flex;
+  min-width: var(--control-min-size);
+  min-height: var(--control-min-size);
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 0.95rem;
   border: 1px solid
-    color-mix(in srgb, var(--color-danger, #f87171) 55%, transparent);
-  background: transparent;
-  color: var(--color-danger, #f87171);
+    color-mix(
+      in srgb,
+      var(--st-auth-danger-background, var(--color-error)) 62%,
+      transparent
+    );
+  border-radius: var(--control-radius);
+  color: var(--st-auth-heading, var(--color-heading-primary));
+  background: color-mix(
+    in srgb,
+    var(--st-auth-danger-background, var(--color-error)) 22%,
+    transparent
+  );
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: var(--font-weight-interface);
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    color var(--motion-duration-short) ease,
+    border-color var(--motion-duration-short) ease,
+    background var(--motion-duration-short) ease,
+    box-shadow var(--motion-duration-short) ease,
+    opacity var(--motion-duration-short) ease;
 }
 
-.primaryButton:disabled,
-.secondaryButton:disabled,
-.dangerButton:disabled,
+.textDangerButton:hover:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--st-auth-danger-background, var(--color-error)) 34%,
+    transparent
+  );
+}
+
+.textDangerButton:focus-visible {
+  outline: var(--focus-ring-width) solid
+    var(--st-auth-focus, var(--focus-ring-color, var(--color-focus)));
+  outline-offset: 2px;
+}
+
 .textDangerButton:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.72;
 }
 
-.primaryButton:focus-visible,
-.secondaryButton:focus-visible,
-.dangerButton:focus-visible,
-.textDangerButton:focus-visible,
-.formCard input:focus-visible,
-.formCard select:focus-visible,
-.formCard textarea:focus-visible {
-  outline: 2px solid var(--color-primary, #2dd4bf);
-  outline-offset: 2px;
+button.dangerOutline {
+  border-color: color-mix(
+    in srgb,
+    var(--st-auth-danger-background, var(--color-error)) 62%,
+    transparent
+  );
+  color: var(--st-auth-heading, var(--color-heading-primary));
+  background: color-mix(
+    in srgb,
+    var(--st-auth-danger-background, var(--color-error)) 22%,
+    transparent
+  );
+  box-shadow: none;
+}
+
+button.dangerOutline:hover:not(:disabled) {
+  border-color: color-mix(
+    in srgb,
+    var(--st-auth-danger-background, var(--color-error)) 74%,
+    transparent
+  );
+  background: color-mix(
+    in srgb,
+    var(--st-auth-danger-background, var(--color-error)) 34%,
+    transparent
+  );
+  box-shadow: none;
 }
 
 .feedback {
   margin: 0;
   padding: 0.85rem 1rem;
-  border-radius: 0.75rem;
+  border-radius: var(--control-radius);
+  color: var(--st-auth-text, var(--color-text-primary));
 }
 
 .success {
-  border: 1px solid #2dd4bf;
-  background: color-mix(in srgb, #2dd4bf 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-glow-teal) 55%, transparent);
+  background: color-mix(in srgb, var(--color-surface-teal) 58%, transparent);
 }
+
 .failure {
-  border: 1px solid var(--color-danger, #f87171);
-  background: color-mix(in srgb, var(--color-danger, #f87171) 14%, transparent);
-}
-.warning {
-  border: 1px solid var(--color-warning, #fbbf24);
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--st-auth-danger-background, var(--color-error)) 58%,
+      transparent
+    );
   background: color-mix(
     in srgb,
-    var(--color-warning, #fbbf24) 14%,
+    var(--st-auth-danger-background, var(--color-error)) 28%,
     transparent
   );
 }
+
+.warning {
+  border: 1px solid var(--st-auth-warning-border, var(--st-auth-warning));
+  background: var(--st-auth-warning-background, var(--st-auth-warning));
+  color: var(--st-auth-warning);
+}
+
 .failure p {
   margin-top: 0;
 }
@@ -94,9 +129,11 @@
   display: grid;
   gap: 1rem;
   padding: 1rem;
-  border: 1px solid var(--color-border, #334155);
-  border-radius: 0.9rem;
-  background: var(--color-background-elevated, #111827);
+  border: 1px solid var(--st-auth-border, var(--color-border-subtle));
+  border-radius: var(--card-radius);
+  color: var(--st-auth-text, var(--color-text-primary));
+  background: var(--st-auth-surface, var(--color-panel-glass));
+  box-shadow: var(--panel-shadow);
 }
 
 .formCard h2,
@@ -106,14 +143,23 @@
   margin: 0;
 }
 
+.formCard h2,
+.emptyState h2,
+.ruleCard h2 {
+  color: var(--st-auth-heading, var(--color-heading-primary));
+}
+
 .formGrid {
   display: grid;
   gap: 0.9rem;
 }
-.formGrid label {
+
+.formGrid label,
+.wideField {
   display: grid;
   gap: 0.4rem;
-  font-weight: 650;
+  color: var(--st-auth-text, var(--color-text-primary));
+  font-weight: var(--font-weight-emphasis);
 }
 
 .formCard input,
@@ -121,13 +167,20 @@
 .formCard textarea {
   width: 100%;
   box-sizing: border-box;
-  min-height: 2.75rem;
+  min-height: var(--control-min-size);
   padding: 0.65rem 0.75rem;
-  border: 1px solid var(--color-border, #334155);
-  border-radius: 0.65rem;
-  background: var(--color-background, #0b1220);
-  color: var(--color-text-primary, #e2e8f0);
+  border: 1px solid var(--st-auth-border, var(--color-border-subtle));
+  border-radius: var(--control-radius);
+  color: var(--st-auth-text, var(--color-text-primary));
+  background: var(--color-canvas-deep);
   font: inherit;
+  color-scheme: dark;
+}
+
+.formCard input::placeholder,
+.formCard textarea::placeholder {
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
+  opacity: 1;
 }
 
 .formCard textarea {
@@ -135,18 +188,36 @@
   resize: vertical;
 }
 
+.formCard input:disabled,
+.formCard select:disabled,
+.formCard textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.formCard input:focus-visible,
+.formCard select:focus-visible,
+.formCard textarea:focus-visible {
+  outline: var(--focus-ring-width) solid
+    var(--st-auth-focus, var(--focus-ring-color, var(--color-focus)));
+  outline-offset: 2px;
+}
+
 .durationFieldset {
   display: grid;
   gap: 0.65rem;
   margin: 0;
   padding: 0.85rem;
-  border: 1px solid var(--color-border, #334155);
-  border-radius: 0.75rem;
+  border: 1px solid var(--st-auth-border, var(--color-border-subtle));
+  border-radius: var(--control-radius);
+  color: var(--st-auth-text, var(--color-text-primary));
+  background: color-mix(in srgb, var(--color-canvas-deep) 62%, transparent);
 }
 
 .durationFieldset legend {
   padding: 0 0.35rem;
-  font-weight: 700;
+  color: var(--st-auth-heading, var(--color-heading-primary));
+  font-weight: var(--font-weight-emphasis);
 }
 
 .durationOptions {
@@ -157,21 +228,44 @@
 
 .durationOptions label {
   display: flex;
-  gap: 0.45rem;
+  min-height: var(--control-min-size);
   align-items: center;
-  font-weight: 600;
+  gap: 0.45rem;
+  color: var(--st-auth-text, var(--color-text-primary));
+  font-weight: var(--font-weight-interface);
 }
 
+.formCard input[type='checkbox'],
 .durationOptions input {
-  width: auto;
-  min-height: auto;
+  width: 1.15rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  min-height: 1.15rem;
   margin: 0;
+  padding: 0;
+  color-scheme: dark;
+  accent-color: var(
+    --st-auth-primary-background,
+    var(--color-cta-primary-background)
+  );
 }
+
+.durationOptions input:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.durationOptions input:focus-visible {
+  outline: var(--focus-ring-width) solid
+    var(--st-auth-focus, var(--focus-ring-color, var(--color-focus)));
+  outline-offset: 2px;
+}
+
 .warningText,
 .slotPreview,
 .muted {
   margin: 0;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
 }
 
 .ruleList {
@@ -192,19 +286,24 @@
 
 .day {
   margin: 0 0 0.25rem;
-  color: var(--color-primary, #2dd4bf);
+  color: var(--st-auth-accent-violet, var(--color-accent-violet));
   font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  font-weight: var(--font-weight-emphasis);
+  letter-spacing: var(--tracking-micro-label);
   text-transform: uppercase;
 }
 
 .capacityBadge {
   padding: 0.35rem 0.65rem;
   border-radius: 999px;
-  background: color-mix(in srgb, #6366f1 24%, transparent);
+  color: var(--st-auth-text, var(--color-text-primary));
+  background: color-mix(
+    in srgb,
+    var(--st-auth-surface-highlighted, var(--color-surface-violet)) 72%,
+    transparent
+  );
   font-size: 0.9rem;
-  font-weight: 750;
+  font-weight: var(--font-weight-emphasis);
 }
 
 .ruleMeta {
@@ -212,30 +311,39 @@
   gap: 0.7rem;
   margin: 0;
 }
+
 .ruleMeta div {
   display: grid;
   gap: 0.15rem;
 }
+
 .ruleMeta dt {
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
   font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: var(--font-weight-emphasis);
+  letter-spacing: var(--tracking-micro-label);
   text-transform: uppercase;
 }
+
 .ruleMeta dd {
   margin: 0;
+  color: var(--st-auth-text, var(--color-text-primary));
   overflow-wrap: anywhere;
 }
 
 .occurrences {
   display: grid;
   gap: 1rem;
+  color: var(--st-auth-text, var(--color-text-primary));
 }
 
 .occurrences h2,
 .occurrences p {
   margin: 0;
+}
+
+.occurrences h2 {
+  color: var(--st-auth-heading, var(--color-heading-primary));
 }
 
 .occurrences header {
@@ -245,7 +353,7 @@
 
 .occurrences header p,
 .slotLocation {
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
 }
 
 .slotList {
@@ -263,9 +371,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.9rem 1rem;
-  border: 1px solid var(--color-border, #334155);
-  border-radius: 0.8rem;
-  background: var(--color-background-elevated, #111827);
+  border: 1px solid var(--st-auth-border, var(--color-border-subtle));
+  border-radius: var(--card-radius);
+  color: var(--st-auth-text, var(--color-text-primary));
+  background: var(--st-auth-surface, var(--color-panel-glass));
+  box-shadow: var(--panel-shadow);
 }
 
 .slotDate,
@@ -277,14 +387,15 @@
 
 .slotDate {
   font-size: 0.82rem;
-  font-weight: 750;
+  font-weight: var(--font-weight-emphasis);
   text-transform: capitalize;
 }
 
 .slotTime {
   margin-top: 0.15rem;
+  color: var(--st-auth-heading, var(--color-heading-primary));
   font-size: 1.15rem;
-  font-weight: 750;
+  font-weight: var(--font-weight-emphasis);
 }
 
 .slotLocation {
@@ -302,7 +413,7 @@
 
 .slotStatus span {
   font-size: 0.9rem;
-  font-weight: 650;
+  font-weight: var(--font-weight-interface);
 }
 
 @media (min-width: 48rem) {
@@ -311,23 +422,35 @@
   .ruleCard {
     padding: 1.25rem;
   }
+
   .formGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
   .wideField {
     grid-column: 1 / -1;
   }
+
   .durationFieldset {
     grid-column: 1 / -1;
   }
+
   .durationOptions {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+
   .ruleList {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .slotList {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .textDangerButton,
+  button.dangerOutline {
+    transition: none;
   }
 }

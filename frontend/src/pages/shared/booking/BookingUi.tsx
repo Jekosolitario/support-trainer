@@ -1,14 +1,36 @@
 import { Link } from 'react-router-dom';
 
-import type { BookingDetail, BookingSummary } from '../../../api/bookingTypes';
+import type {
+  BookingDetail,
+  BookingStatus,
+  BookingSummary,
+} from '../../../api/bookingTypes';
+import { Button } from '../../../components/ui/Button';
 import {
   bookingStatusLabel,
   bookingTemporalState,
   cancellationActorLabel,
   formatBookingDateTime,
+  type BookingTemporalState,
   type BookingViewer,
 } from './bookingPresentation';
 import styles from './BookingWorkflow.module.css';
+
+function bookingBadgeClass(
+  status: BookingStatus,
+  temporal: BookingTemporalState,
+): string {
+  if (status === 'PENDING' && temporal === 'PAST') {
+    return styles.badgeExpired;
+  }
+  if (status === 'CONFIRMED' && temporal === 'PAST') {
+    return styles.badgePast;
+  }
+  if (status === 'PENDING') return styles.badgePending;
+  if (status === 'CONFIRMED') return styles.badgeConfirmed;
+  if (status === 'REJECTED') return styles.badgeRejected;
+  return styles.badgeCancelled;
+}
 
 export function BookingListSection({
   sectionId,
@@ -40,11 +62,13 @@ export function BookingListSection({
                 <span className={styles.cardTitle}>
                   {booking.counterparty.displayName}
                 </span>
-                <span>
+                <span className={styles.cardMeta}>
                   {formatBookingDateTime(booking.scheduledStart)} ·{' '}
                   {String(booking.durationMinutes)} min
                 </span>
-                <span className={styles.badge}>
+                <span
+                  className={`${styles.badge} ${bookingBadgeClass(booking.status, temporal)}`}
+                >
                   {bookingStatusLabel(booking.status, temporal)}
                 </span>
               </Link>
@@ -73,7 +97,9 @@ export function BookingDetailView({
     <div className={temporal === 'PAST' ? styles.past : undefined}>
       <section className={styles.card} aria-labelledby="booking-summary-title">
         <h2 id="booking-summary-title">{counterparty.displayName}</h2>
-        <p className={styles.badge}>
+        <p
+          className={`${styles.badge} ${bookingBadgeClass(booking.status, temporal)}`}
+        >
           {bookingStatusLabel(booking.status, temporal)}
         </p>
         <dl className={styles.detailList}>
@@ -157,9 +183,9 @@ export function ErrorState({
   return (
     <div className={styles.error} role="alert">
       <p>{message}</p>
-      <button className={styles.secondaryButton} type="button" onClick={retry}>
+      <Button onClick={retry} type="button" variant="secondary">
         Riprova
-      </button>
+      </Button>
     </div>
   );
 }

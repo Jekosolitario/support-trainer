@@ -19,6 +19,21 @@
   margin: 0;
 }
 
+.section h2,
+.card h2,
+.decision h2 {
+  color: var(--st-auth-heading, var(--color-heading-primary));
+}
+
+.section p,
+.card p,
+.decision p,
+.status,
+.empty,
+.form {
+  color: var(--st-auth-text, var(--color-text-primary));
+}
+
 .bookingList,
 .itemList,
 .optionList {
@@ -34,9 +49,24 @@
 .error,
 .empty {
   padding: 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
-  background: var(--color-background-elevated);
+  border: 1px solid var(--st-auth-border, var(--color-border-subtle));
+  border-radius: var(--card-radius);
+  color: var(--st-auth-text, var(--color-text-primary));
+  background: var(--st-auth-surface, var(--color-panel-glass));
+  box-shadow: var(--panel-shadow);
+}
+
+.bookingList .card {
+  min-width: 0;
+  transition:
+    border-color var(--motion-duration-short) ease,
+    box-shadow var(--motion-duration-short) ease;
+}
+
+.bookingList .card:hover,
+.bookingList .card:focus-within {
+  border-color: var(--st-auth-border-emphasis, var(--color-border-emphasis));
+  box-shadow: 0 0 0.75rem var(--st-auth-glow, var(--color-glow-teal));
 }
 
 .card a {
@@ -44,35 +74,97 @@
   gap: 0.45rem;
   color: inherit;
   text-decoration: none;
+  border-radius: var(--control-radius);
 }
 
 .card a:focus-visible,
-.primaryButton:focus-visible,
-.secondaryButton:focus-visible,
 .optionButton:focus-visible,
 .field textarea:focus-visible {
-  outline: 3px solid var(--color-accent);
-  outline-offset: 3px;
+  outline: var(--focus-ring-width) solid
+    var(--st-auth-focus, var(--focus-ring-color, var(--color-focus)));
+  outline-offset: 2px;
 }
 
 .cardTitle {
-  color: var(--color-primary);
+  color: var(--st-auth-heading, var(--color-heading-primary));
   font-size: 1.15rem;
-  font-weight: 750;
+  font-weight: var(--font-weight-emphasis);
+  overflow-wrap: anywhere;
+}
+
+.cardMeta {
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
 }
 
 .badge {
   width: fit-content;
   padding: 0.25rem 0.55rem;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
-  color: var(--color-primary);
-  font-weight: 700;
+  color: var(--st-auth-text, var(--color-text-primary));
+  font-weight: var(--font-weight-emphasis);
+}
+
+.badgePending {
+  border-color: color-mix(
+    in srgb,
+    var(--st-auth-accent-violet, var(--color-accent-violet)) 48%,
+    transparent
+  );
+  background: color-mix(
+    in srgb,
+    var(--st-auth-surface-highlighted, var(--color-surface-violet)) 72%,
+    transparent
+  );
+}
+
+.badgeConfirmed {
+  border-color: color-mix(in srgb, var(--color-glow-teal) 48%, transparent);
+  background: color-mix(in srgb, var(--color-surface-teal) 58%, transparent);
+}
+
+.badgeRejected,
+.badgeCancelled,
+.badgeExpired {
+  border-color: color-mix(
+    in srgb,
+    var(--st-auth-danger-background, var(--color-error)) 42%,
+    transparent
+  );
+  background: color-mix(
+    in srgb,
+    var(--st-auth-danger-background, var(--color-error)) 18%,
+    transparent
+  );
+}
+
+.badgePast {
+  border-color: var(--st-auth-border, var(--color-border-subtle));
+  background: color-mix(in srgb, var(--color-canvas-deep) 42%, transparent);
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
 }
 
 .past {
-  filter: saturate(0.55);
-  opacity: 0.72;
+  color: var(--st-auth-text, var(--color-text-primary));
+}
+
+.bookingList .past {
+  border-color: color-mix(
+    in srgb,
+    var(--st-auth-border, var(--color-border-subtle)) 72%,
+    transparent
+  );
+  background: color-mix(
+    in srgb,
+    var(--color-canvas-deep) 58%,
+    var(--st-auth-surface, var(--color-panel-glass))
+  );
+  box-shadow: none;
+}
+
+.bookingList .past .cardTitle,
+.bookingList .past .cardMeta {
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
 }
 
 .detailList {
@@ -87,69 +179,133 @@
 }
 
 .detailList dt {
-  color: var(--color-text-muted);
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-emphasis);
 }
 
 .detailList dd {
   margin: 0;
+  color: var(--st-auth-text, var(--color-text-primary));
+  overflow-wrap: anywhere;
 }
 
 .field {
   display: grid;
   gap: 0.4rem;
-  font-weight: 700;
+  color: var(--st-auth-text, var(--color-text-primary));
+  font-weight: var(--font-weight-emphasis);
 }
 
 .field textarea {
   min-height: 7rem;
   resize: vertical;
   padding: 0.7rem;
-  border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
+  border: 1px solid var(--st-auth-border, var(--color-border-subtle));
+  border-radius: var(--control-radius);
+  color: var(--st-auth-text, var(--color-text-primary));
+  background: var(--color-canvas-deep);
   font: inherit;
+  color-scheme: dark;
+}
+
+.field textarea::placeholder {
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
+  opacity: 1;
+}
+
+.field textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.form fieldset {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--st-auth-border, var(--color-border-subtle));
+  border-radius: var(--control-radius);
+  color: var(--st-auth-text, var(--color-text-primary));
+  background: color-mix(in srgb, var(--color-canvas-deep) 62%, transparent);
+}
+
+.form legend {
+  padding: 0 0.35rem;
+  color: var(--st-auth-heading, var(--color-heading-primary));
+  font-weight: var(--font-weight-emphasis);
+}
+
+.form fieldset:disabled {
+  opacity: 0.72;
+}
+
+.feedback,
+.fieldError,
+.error {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-radius: var(--control-radius);
+  color: var(--st-auth-text, var(--color-text-primary));
+}
+
+.feedback {
+  border: 1px solid var(--st-auth-border, var(--color-border-subtle));
+  background: color-mix(in srgb, var(--color-canvas-deep) 42%, transparent);
 }
 
 .fieldError,
 .error {
-  color: var(--color-danger, #9b1c1c);
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--st-auth-danger-background, var(--color-error)) 58%,
+      transparent
+    );
+  background: color-mix(
+    in srgb,
+    var(--st-auth-danger-background, var(--color-error)) 28%,
+    transparent
+  );
 }
 
-.primaryButton,
-.secondaryButton,
 .optionButton {
-  min-height: 2.75rem;
+  min-height: var(--control-min-size);
   padding: 0.6rem 0.9rem;
-  border-radius: 0.55rem;
+  border: 1px solid
+    var(--st-auth-secondary-border, var(--color-cta-secondary-border));
+  border-radius: var(--control-radius);
+  color: var(--st-auth-secondary-text, var(--color-cta-secondary-text));
+  background: var(
+    --st-auth-secondary-background,
+    var(--color-cta-secondary-background)
+  );
   font: inherit;
-  font-weight: 750;
+  font-weight: var(--font-weight-interface);
   cursor: pointer;
-}
-
-.primaryButton {
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-background-elevated);
-}
-
-.secondaryButton,
-.optionButton {
-  border: 1px solid var(--color-primary);
-  background: transparent;
-  color: var(--color-primary);
+  transition:
+    color var(--motion-duration-short) ease,
+    border-color var(--motion-duration-short) ease,
+    background var(--motion-duration-short) ease,
+    box-shadow var(--motion-duration-short) ease;
 }
 
 .optionButtonSelected {
-  background: var(--color-primary);
-  color: var(--color-background-elevated);
+  border-color: var(
+    --st-auth-primary-background,
+    var(--color-cta-primary-background)
+  );
+  color: var(--st-auth-primary-text, var(--color-cta-primary-text));
+  background: var(
+    --st-auth-primary-background,
+    var(--color-cta-primary-background)
+  );
+  box-shadow: 0 0 1.25rem var(--st-auth-glow, var(--color-glow-teal));
 }
 
-.primaryButton:disabled,
-.secondaryButton:disabled,
 .optionButton:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.72;
 }
 
 .actionRow {
@@ -160,6 +316,7 @@
 
 .status {
   margin: 0;
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
 }
 
 @media (min-width: 48rem) {
@@ -169,5 +326,19 @@
 
   .detailList {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card,
+  .decision,
+  .error,
+  .empty {
+    padding: 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bookingList .card,
+  .optionButton {
+    transition: none;
   }
 }

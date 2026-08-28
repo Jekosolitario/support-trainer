@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { createBooking } from '../../api/bookingApi';
 import { listProfessionalAvailability } from '../../api/availabilityApi';
@@ -9,6 +9,8 @@ import type {
 } from '../../api/availabilityTypes';
 import { HttpApiError } from '../../api/types';
 import { PageTemplate } from '../../components/page/PageTemplate';
+import { ActionLink } from '../../components/ui/ActionLink';
+import { Button } from '../../components/ui/Button';
 import {
   formatBookingDay,
   formatBookingTime,
@@ -180,7 +182,9 @@ function AvailabilityFlow({
       return (
         <div className={styles.empty}>
           <p>Professionista non disponibile</p>
-          <Link to="/app/client/professionals">Torna ai professionisti</Link>
+          <ActionLink to="/app/client/professionals" variant="secondary">
+            Torna ai professionisti
+          </ActionLink>
         </div>
       );
     }
@@ -195,25 +199,26 @@ function AvailabilityFlow({
     return (
       <div className={styles.empty}>
         <p>Non ci sono orari disponibili al momento.</p>
-        <button
-          className={styles.secondaryButton}
-          type="button"
-          onClick={reload}
-        >
+        <Button onClick={reload} type="button" variant="secondary">
           Aggiorna
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
     <div className={styles.form}>
-      {feedback !== null ? <p role="alert">{feedback}</p> : null}
+      {feedback !== null ? (
+        <p className={styles.fieldError} role="alert">
+          {feedback}
+        </p>
+      ) : null}
       <fieldset disabled={submitting}>
         <legend>1. Scegli il giorno</legend>
         <div className={styles.actionRow}>
           {days.map((day) => (
             <button
+              aria-pressed={selectedDay === day}
               className={`${styles.optionButton} ${selectedDay === day ? styles.optionButtonSelected : ''}`}
               key={day}
               type="button"
@@ -235,6 +240,11 @@ function AvailabilityFlow({
           <div className={styles.actionRow}>
             {starts.map((choice) => (
               <button
+                aria-pressed={
+                  selectedStart?.occurrenceId === choice.occurrenceId &&
+                  selectedStart.option.startDateTime ===
+                    choice.option.startDateTime
+                }
                 className={`${styles.optionButton} ${selectedStart?.occurrenceId === choice.occurrenceId && selectedStart.option.startDateTime === choice.option.startDateTime ? styles.optionButtonSelected : ''}`}
                 key={`${String(choice.occurrenceId)}-${choice.option.startDateTime}`}
                 type="button"
@@ -257,6 +267,7 @@ function AvailabilityFlow({
           <div className={styles.actionRow}>
             {selectedStart.option.allowedDurations.map((duration) => (
               <button
+                aria-pressed={selectedDuration === duration}
                 className={`${styles.optionButton} ${selectedDuration === duration ? styles.optionButtonSelected : ''}`}
                 key={duration}
                 type="button"
@@ -300,13 +311,9 @@ function AvailabilityFlow({
               {noteError}
             </p>
           ) : null}
-          <button
-            className={styles.primaryButton}
-            disabled={submitting}
-            type="submit"
-          >
+          <Button disabled={submitting} type="submit" variant="primary">
             {submitting ? 'Invio in corso…' : 'Invia richiesta'}
-          </button>
+          </Button>
         </form>
       ) : null}
     </div>
@@ -318,6 +325,7 @@ export function ClientProfessionalAvailabilityPage() {
   const professionalId = parseBookingId(rawId);
   return (
     <PageTemplate
+      appearance="authenticated"
       eyebrow="Area cliente"
       title="Disponibilità professionista"
       description="Scegli giorno, orario e durata tra le opzioni disponibili."

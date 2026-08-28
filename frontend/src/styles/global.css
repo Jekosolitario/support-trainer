@@ -196,6 +196,16 @@ html {
   min-height: 100%;
 }
 
+/* Canvas autenticato su html/body: attributo applicato e rimosso da AuthenticatedLayout. */
+html[data-st-authenticated] {
+  background: var(--color-canvas);
+  color-scheme: dark;
+}
+
+html[data-st-authenticated] body {
+  background: var(--color-canvas);
+}
+
 body {
   min-height: 100vh;
   margin: 0;

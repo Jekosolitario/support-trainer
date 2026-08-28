@@ -21,6 +21,7 @@ describe('App BrowserRouter useTransitions={false}', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    document.documentElement.removeAttribute('data-st-authenticated');
     navigateBrowser('/');
   });
 
@@ -33,6 +34,10 @@ describe('App BrowserRouter useTransitions={false}', () => {
     navigateBrowser('/');
     render(<App />);
 
+    expect(document.documentElement).not.toHaveAttribute(
+      'data-st-authenticated',
+    );
+
     const loginLinks = await screen.findAllByRole('link', {
       name: /Accedi|Login|login/i,
     });
@@ -44,6 +49,9 @@ describe('App BrowserRouter useTransitions={false}', () => {
     expect(
       await screen.findByRole('heading', { name: 'Login' }),
     ).toBeInTheDocument();
+    expect(document.documentElement).not.toHaveAttribute(
+      'data-st-authenticated',
+    );
   });
 
   it('RequireAuth redirige anonymous a /login', async () => {

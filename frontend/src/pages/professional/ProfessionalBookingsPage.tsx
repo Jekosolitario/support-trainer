@@ -8,6 +8,7 @@ import {
   ErrorState,
   LoadingState,
 } from '../shared/booking/BookingUi';
+import styles from '../shared/booking/BookingWorkflow.module.css';
 import { useBookingLoad } from '../shared/booking/useBookingLoad';
 
 export function ProfessionalBookingsPage() {
@@ -20,6 +21,7 @@ export function ProfessionalBookingsPage() {
     state.status === 'success' ? groupProfessionalBookings(state.data) : null;
   return (
     <PageTemplate
+      appearance="authenticated"
       eyebrow="Area personal trainer"
       title="Prenotazioni"
       description="Gestisci le richieste e consulta gli appuntamenti."
@@ -34,7 +36,7 @@ export function ProfessionalBookingsPage() {
         />
       ) : null}
       {state.status === 'success' && state.data.length === 0 ? (
-        <p>Non ci sono prenotazioni.</p>
+        <p className={styles.empty}>Non ci sono prenotazioni.</p>
       ) : null}
       {groups !== null ? (
         <>

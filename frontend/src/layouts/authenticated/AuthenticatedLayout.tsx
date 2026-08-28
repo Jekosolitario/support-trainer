@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Outlet } from 'react-router-dom';
 
 import {
@@ -21,6 +21,14 @@ export function AuthenticatedLayout({
   headerActions,
   children,
 }: AuthenticatedLayoutProps) {
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-st-authenticated', '');
+    return () => {
+      root.removeAttribute('data-st-authenticated');
+    };
+  }, []);
+
   return (
     <div className={styles.layout}>
       <a className={styles.skipLink} href="#main-content">

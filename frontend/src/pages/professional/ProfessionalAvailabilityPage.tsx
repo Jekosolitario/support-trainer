@@ -21,6 +21,7 @@ import {
 } from '../../api/availabilityTypes';
 import { HttpApiError } from '../../api/types';
 import { PageTemplate } from '../../components/page/PageTemplate';
+import { Button } from '../../components/ui/Button';
 import styles from './ProfessionalAvailabilityPage.module.css';
 
 const DAY_LABELS: Record<DayOfWeek, string> = {
@@ -349,19 +350,20 @@ export function ProfessionalAvailabilityPage() {
 
   return (
     <PageTemplate
+      appearance="authenticated"
       eyebrow="Area personal trainer"
       title="Disponibilità"
       description="Configura finestre ricorrenti con più durate: Support Trainer mantiene le occorrenze concrete dei prossimi sei mesi."
     >
       <div className={styles.toolbar}>
-        <button
-          type="button"
-          className={styles.primaryButton}
+        <Button
           disabled={pending}
           onClick={() => open({ kind: 'create' })}
+          type="button"
+          variant="primary"
         >
           Aggiungi fascia
-        </button>
+        </Button>
       </div>
 
       {feedback ? (
@@ -415,27 +417,27 @@ export function ProfessionalAvailabilityPage() {
             />
           </label>
           <div className={styles.formActions}>
-            <button
-              type="button"
-              className={styles.dangerButton}
+            <Button
               disabled={pending || blockReason.trim() === ''}
               onClick={() => {
                 void performSlotAction(blockTarget, blockReason.trim());
               }}
+              type="button"
+              variant="danger"
             >
               Conferma blocco
-            </button>
-            <button
-              type="button"
-              className={styles.secondaryButton}
+            </Button>
+            <Button
               disabled={pending}
               onClick={() => {
                 setBlockTarget(null);
                 setBlockReason('');
               }}
+              type="button"
+              variant="secondary"
             >
               Annulla
-            </button>
+            </Button>
           </div>
         </section>
       ) : null}
@@ -448,15 +450,15 @@ export function ProfessionalAvailabilityPage() {
       {listStatus === 'error' ? (
         <div className={`${styles.feedback} ${styles.failure}`} role="alert">
           <p>{error ?? 'Impossibile caricare le fasce.'}</p>
-          <button
-            type="button"
-            className={styles.secondaryButton}
+          <Button
             onClick={() => {
               void loadRules();
             }}
+            type="button"
+            variant="secondary"
           >
             Riprova
-          </button>
+          </Button>
         </div>
       ) : null}
       {listStatus === 'success' && rules.length === 0 ? (
@@ -697,26 +699,26 @@ function RuleForm({
         </p>
       ) : null}
       <div className={styles.formActions}>
-        <button
-          type="button"
-          className={isDeactivate ? styles.dangerButton : styles.primaryButton}
+        <Button
           disabled={pending}
           onClick={onSubmit}
+          type="button"
+          variant={isDeactivate ? 'danger' : 'primary'}
         >
           {pending
             ? 'Salvataggio…'
             : isDeactivate
               ? 'Disattiva fascia'
               : 'Salva fascia'}
-        </button>
-        <button
-          type="button"
-          className={styles.secondaryButton}
+        </Button>
+        <Button
           disabled={pending}
           onClick={onCancel}
+          type="button"
+          variant="secondary"
         >
           Annulla
-        </button>
+        </Button>
       </div>
     </section>
   );
@@ -766,14 +768,14 @@ function RuleCard({
         </div>
       </dl>
       <div className={styles.cardActions}>
-        <button
-          type="button"
-          className={styles.secondaryButton}
+        <Button
           disabled={disabled}
           onClick={onEdit}
+          type="button"
+          variant="secondary"
         >
           Modifica
-        </button>
+        </Button>
         <button
           type="button"
           className={styles.textDangerButton}
@@ -828,16 +830,15 @@ function SlotCard({
             ? 'Bloccato'
             : `${String(slot.minimumRemainingCapacity)} di ${String(slot.capacity)} posti minimi liberi`}
         </span>
-        <button
-          type="button"
-          className={
-            slot.blocked ? styles.secondaryButton : styles.textDangerButton
-          }
+        <Button
+          className={slot.blocked ? undefined : styles.dangerOutline}
           disabled={disabled}
           onClick={onClick}
+          type="button"
+          variant={slot.blocked ? 'secondary' : 'ghost'}
         >
           {slot.blocked ? 'Sblocca' : 'Blocca'}
-        </button>
+        </Button>
       </div>
     </li>
   );

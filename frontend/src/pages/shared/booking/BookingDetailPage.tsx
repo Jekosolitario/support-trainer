@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 
 import {
   cancelBooking,
@@ -10,6 +10,8 @@ import {
 import type { BookingDetail } from '../../../api/bookingTypes';
 import { HttpApiError } from '../../../api/types';
 import { PageTemplate } from '../../../components/page/PageTemplate';
+import { ActionLink } from '../../../components/ui/ActionLink';
+import { Button } from '../../../components/ui/Button';
 import {
   bookingTemporalState,
   isAbortError,
@@ -198,7 +200,11 @@ function DetailFlow({
   return (
     <div className={styles.form}>
       <BookingDetailView booking={booking} viewer={viewer} />
-      {feedback !== null ? <p role="status">{feedback}</p> : null}
+      {feedback !== null ? (
+        <p className={styles.feedback} role="status">
+          {feedback}
+        </p>
+      ) : null}
 
       {showsReason ? (
         <section
@@ -227,51 +233,52 @@ function DetailFlow({
           <div className={styles.actionRow}>
             {professionalCanDecide ? (
               <>
-                <button
-                  className={styles.primaryButton}
+                <Button
                   disabled={pendingAction !== null}
-                  type="button"
                   onClick={() => void runAction('confirm', booking)}
+                  type="button"
+                  variant="primary"
                 >
                   {pendingAction === 'confirm' ? 'Conferma…' : 'Conferma'}
-                </button>
-                <button
-                  className={styles.secondaryButton}
+                </Button>
+                <Button
                   disabled={pendingAction !== null}
-                  type="button"
                   onClick={() => void runAction('reject', booking)}
+                  type="button"
+                  variant="danger"
                 >
                   {pendingAction === 'reject' ? 'Rifiuto…' : 'Rifiuta'}
-                </button>
+                </Button>
               </>
             ) : null}
             {clientCanCancel || professionalCanCancel ? (
-              <button
-                className={styles.secondaryButton}
+              <Button
                 disabled={pendingAction !== null}
-                type="button"
                 onClick={() => void runAction('cancel', booking)}
+                type="button"
+                variant="secondary"
               >
                 {pendingAction === 'cancel'
                   ? 'Annullamento…'
                   : booking.status === 'CONFIRMED'
                     ? 'Annulla appuntamento'
                     : 'Annulla richiesta'}
-              </button>
+              </Button>
             ) : null}
           </div>
         </section>
       ) : null}
 
-      <Link
+      <ActionLink
         to={
           viewer === 'CLIENT'
             ? '/app/client/bookings'
             : '/app/professional/bookings'
         }
+        variant="secondary"
       >
         Torna alle prenotazioni
-      </Link>
+      </ActionLink>
     </div>
   );
 }
@@ -285,6 +292,7 @@ export function BookingDetailPage({
   const bookingId = parseBookingId(rawBookingId);
   return (
     <PageTemplate
+      appearance="authenticated"
       eyebrow={viewer === 'CLIENT' ? 'Area cliente' : 'Area personal trainer'}
       title="Dettaglio prenotazione"
       description="Consulta lo stato e i dati storici della prenotazione."

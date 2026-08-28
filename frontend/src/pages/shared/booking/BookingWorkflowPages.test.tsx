@@ -9,10 +9,12 @@ import type { ClientAvailabilityWindow } from '../../../api/availabilityTypes';
 import * as bookingApi from '../../../api/bookingApi';
 import type { BookingDetail, BookingSummary } from '../../../api/bookingTypes';
 import { HttpApiError, type ErrorResponse } from '../../../api/types';
+import pageTemplateStyles from '../../../components/page/PageTemplate.module.css';
 import { ClientBookingDetailPage } from '../../client/ClientBookingDetailPage';
 import { ClientBookingsPage } from '../../client/ClientBookingsPage';
 import { ClientProfessionalAvailabilityPage } from '../../client/ClientProfessionalAvailabilityPage';
 import { ProfessionalBookingDetailPage } from '../../professional/ProfessionalBookingDetailPage';
+import { ProfessionalBookingsPage } from '../../professional/ProfessionalBookingsPage';
 
 const FUTURE_START = '2099-01-20T10:00:00+01:00';
 const FUTURE_END = '2099-01-20T11:00:00+01:00';
@@ -201,10 +203,24 @@ describe('Client availability Booking flow', () => {
     );
     render(<RouterProvider router={router} />);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Aggiorna' }));
+    expect(
+      await screen.findByRole('button', { name: 'Aggiorna' }),
+    ).toBeVisible();
+    expect(
+      screen
+        .getByRole('heading', {
+          level: 1,
+          name: 'Disponibilità professionista',
+        })
+        .closest('article'),
+    ).toHaveClass(pageTemplateStyles.authenticated);
+    await user.click(screen.getByRole('button', { name: 'Aggiorna' }));
     expect(
       await screen.findByText('Professionista non disponibile'),
     ).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Torna ai professionisti' }),
+    ).toHaveAttribute('href', '/app/client/professionals');
     expect(listSpy).toHaveBeenCalledTimes(2);
   });
 
@@ -437,6 +453,93 @@ describe('Client availability Booking flow', () => {
     expect(listSpy).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+
+  it('espone programmaticamente lo stato selezionato di giorno, orario e durata', async () => {
+    vi.spyOn(availabilityApi, 'listProfessionalAvailability').mockResolvedValue(
+      [
+        {
+          occurrenceId: 31,
+          windowStart: '2026-08-20T09:00:00+02:00',
+          windowEnd: '2026-08-20T12:00:00+02:00',
+          allowedDurations: [45, 60],
+          startIntervalMinutes: 15,
+          location: 'Studio A',
+          capacity: 99,
+          bookableOptions: [
+            {
+              startDateTime: '2026-08-20T10:00:00+02:00',
+              allowedDurations: [45, 60],
+            },
+            {
+              startDateTime: '2026-08-20T11:00:00+02:00',
+              allowedDurations: [60],
+            },
+          ],
+        },
+        {
+          occurrenceId: 32,
+          windowStart: '2026-08-21T09:00:00+02:00',
+          windowEnd: '2026-08-21T12:00:00+02:00',
+          allowedDurations: [60],
+          startIntervalMinutes: 15,
+          location: 'Studio B',
+          capacity: 99,
+          bookableOptions: [
+            {
+              startDateTime: '2026-08-21T11:00:00+02:00',
+              allowedDurations: [60],
+            },
+          ],
+        },
+      ],
+    );
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/app/client/professionals/:professionalId/availability',
+          element: <ClientProfessionalAvailabilityPage />,
+        },
+      ],
+      { initialEntries: ['/app/client/professionals/7/availability'] },
+    );
+    render(<RouterProvider router={router} />);
+    const user = userEvent.setup();
+
+    const day20 = await screen.findByRole('button', { name: /20 agosto/ });
+    const day21 = screen.getByRole('button', { name: /21 agosto/ });
+    expect(day20).toHaveAttribute('aria-pressed', 'false');
+    expect(day21).toHaveAttribute('aria-pressed', 'false');
+
+    day20.focus();
+    await user.keyboard('{Enter}');
+    expect(day20).toHaveAttribute('aria-pressed', 'true');
+    expect(day21).toHaveAttribute('aria-pressed', 'false');
+
+    const time10 = screen.getByRole('button', { name: /10:00.*Studio A/ });
+    const time11 = screen.getByRole('button', { name: /11:00.*Studio A/ });
+    expect(time10).toHaveAttribute('aria-pressed', 'false');
+    time10.focus();
+    await user.keyboard('{Enter}');
+    expect(time10).toHaveAttribute('aria-pressed', 'true');
+    expect(time11).toHaveAttribute('aria-pressed', 'false');
+
+    const duration45 = screen.getByRole('button', { name: '45 minuti' });
+    const duration60 = screen.getByRole('button', { name: '60 minuti' });
+    duration45.focus();
+    await user.keyboard('{Enter}');
+    expect(duration45).toHaveAttribute('aria-pressed', 'true');
+    expect(duration60).toHaveAttribute('aria-pressed', 'false');
+    await user.click(duration60);
+    expect(duration60).toHaveAttribute('aria-pressed', 'true');
+    expect(duration45).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(day21);
+    expect(day21).toHaveAttribute('aria-pressed', 'true');
+    expect(day20).toHaveAttribute('aria-pressed', 'false');
+    expect(
+      screen.queryByRole('button', { name: '45 minuti' }),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe('Booking list and detail actions', () => {
@@ -459,6 +562,14 @@ describe('Booking list and detail actions', () => {
     expect(
       await screen.findByRole('heading', { name: 'Prossime' }),
     ).toBeVisible();
+    expect(
+      screen
+        .getByRole('heading', { level: 1, name: 'Prenotazioni' })
+        .closest('article'),
+    ).toHaveClass(pageTemplateStyles.authenticated);
+    const upcomingLink = screen.getByRole('link', { name: /In attesa/ });
+    expect(upcomingLink).toHaveAttribute('href', '/app/client/bookings/1');
+    expect(upcomingLink.closest('li')).not.toBeNull();
     expect(screen.getByRole('heading', { name: 'Prossime' })).toHaveAttribute(
       'id',
       'client-bookings-upcoming-title',
@@ -469,6 +580,39 @@ describe('Booking list and detail actions', () => {
     );
     expect(screen.getByRole('heading', { name: 'Storico' })).toBeVisible();
     expect(screen.getByText('Richiesta scaduta')).toBeVisible();
+  });
+
+  it('raggruppa da gestire, confermate e storico per il professionista', async () => {
+    vi.spyOn(bookingApi, 'listProfessionalBookings').mockResolvedValue([
+      summary({ id: 1, status: 'PENDING' }),
+      summary({ id: 2, status: 'CONFIRMED' }),
+      summary({ id: 3, status: 'REJECTED' }),
+    ]);
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/app/professional/bookings',
+          element: <ProfessionalBookingsPage />,
+        },
+      ],
+      { initialEntries: ['/app/professional/bookings'] },
+    );
+    render(<RouterProvider router={router} />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Da gestire' }),
+    ).toBeVisible();
+    expect(
+      screen
+        .getByRole('heading', { level: 1, name: 'Prenotazioni' })
+        .closest('article'),
+    ).toHaveClass(pageTemplateStyles.authenticated);
+    const pendingLink = screen.getByRole('link', { name: /In attesa/ });
+    expect(pendingLink).toHaveAttribute('href', '/app/professional/bookings/1');
+    expect(pendingLink.closest('li')).not.toBeNull();
+    expect(screen.getByRole('heading', { name: 'Confermate' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Storico' })).toBeVisible();
+    expect(screen.getByText('Rifiutata')).toBeVisible();
   });
 
   it('applica requiredness Client CONFIRMED e usa la response server autorevole', async () => {
@@ -508,6 +652,17 @@ describe('Booking list and detail actions', () => {
       await screen.findByRole('heading', { name: 'Annullata da te' }),
     ).toBeVisible();
     expect(screen.getByText('Imprevisto')).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Torna alle prenotazioni' }),
+    ).toHaveAttribute('href', '/app/client/bookings');
+    expect(
+      screen
+        .getByRole('heading', {
+          level: 1,
+          name: 'Dettaglio prenotazione',
+        })
+        .closest('article'),
+    ).toHaveClass(pageTemplateStyles.authenticated);
   });
 
   it('riconcilia un 409 PT con GET detail senza ripetere la mutation', async () => {
@@ -536,6 +691,9 @@ describe('Booking list and detail actions', () => {
     await waitFor(() => expect(getSpy).toHaveBeenCalledTimes(2));
     expect(confirmSpy).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('Confermata')).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Torna alle prenotazioni' }),
+    ).toHaveAttribute('href', '/app/professional/bookings');
   });
 
   it('mantiene un lock reale in StrictMode e disabilita tutte le azioni durante la mutation', async () => {

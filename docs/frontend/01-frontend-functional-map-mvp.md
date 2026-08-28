@@ -1,6 +1,6 @@
 # Frontend Functional Map MVP - Support Trainer
 
-> Stato corrente: Availability PT e Booking Client ↔ PT sono UI operative end-to-end; resta placeholder la dashboard dati. Booking usa decoder fail-closed, `bookableOptions` come unica fonte di selezione, stati temporali derivati, lock mutation senza optimistic state e riconciliazione GET dopo `409`. Reason/actor nullable legacy sono mostrati nel detail. Vedi [Booking Domain Contract V1](../19-booking-domain-contract-v1.md).
+> Stato corrente: Availability PT e Booking Client ↔ PT sono UI operative end-to-end; resta placeholder la dashboard dati. Availability PT, Booking CLIENT/PT, Client Professional Availability e Invites PT/NUT usano l’aspetto autenticato della [Authenticated UI Foundation V1](./08-authenticated-ui-foundation-v1.md); Clients, Professionals e Profile restano visivamente legacy. Booking usa decoder fail-closed, `bookableOptions` come unica fonte di selezione, stati temporali derivati, lock mutation senza optimistic state e riconciliazione GET dopo `409`. Reason/actor nullable legacy sono mostrati nel detail. Vedi [Booking Domain Contract V1](../19-booking-domain-contract-v1.md).
 
 ## 1. Obiettivo del documento
 
@@ -41,7 +41,7 @@ La baseline certificata richiede inoltre che il client usi la risposta neutra `2
 - La **registrazione pubblica PROFESSIONAL** e la **verifica email** (confirm + resend pertinente) sono **implementate**. Dettaglio tecnico: [Professional Onboarding Implementation](./04-professional-onboarding-implementation.md).
 - La **gestione inviti PROFESSIONAL** (`/app/professional/invites`: lista, genera, copia codice valido) è **implementata**. Dettaglio tecnico: [Professional Invites Implementation](./05-professional-invites-implementation.md).
 - La **validazione invito e registrazione pubblica CLIENT** sono **implementate** con provider memory-only, auth gate locale, outcome conservativi e cleanup del draft. Dettaglio tecnico: [Client Onboarding Implementation](./06-client-onboarding-implementation.md).
-- La dashboard dati resta **placeholder**; la pagina Dashboard è la **reference UI** della foundation autenticata, senza dati aggregati. Relazioni, Availability PT e Booking Client ↔ PT sono flussi applicativi completi.
+- La dashboard dati resta **placeholder**; la pagina Dashboard è la **reference UI** della foundation autenticata, senza dati aggregati. Relazioni, Availability PT e Booking Client ↔ PT sono flussi applicativi completi. Availability PT, Booking CLIENT/PT (liste e dettaglio), Client Professional Availability e Invites PT/NUT non sono più visivamente legacy: usano `appearance="authenticated"`. Clients, Professionals e Profile restano visivamente legacy nello shell dark.
 - Il client usa path relativi `/api/v1/...` con `credentials: 'same-origin'`. In sviluppo Vite proxya `/api` → `http://localhost:8080`. In produzione la topologia è same-origin dietro reverse proxy.
 - Un'app mobile con React Native + Expo è una possibile evoluzione futura, fuori dall'MVP.
 - L'implementazione corrente del frontend non modifica il contratto backend descritto in questa mappa.
@@ -300,11 +300,11 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 | `/invite/validate`, `/register/client`                  | Pubblico                  | **Implementate** (provider memory-only e auth gate locale)   |
 | Guardie auth (`RequireAuth` / ruolo / specializzazione) | Privato                   | **Implementate**                                             |
 | `/app/client/profile`, `/app/professional/profile`      | CLIENT / PROFESSIONAL     | **Implementata** (Profilo + Account RO + Operational Status) |
-| `/app/professional/invites`                             | PROFESSIONAL              | **Implementata** (lista, genera, copia se Valido)            |
+| `/app/professional/invites`                             | PROFESSIONAL              | **Implementata** (lista, genera, copia se Valido); **UI autenticata** |
 | `/app/*/dashboard`                                      | CLIENT / PROFESSIONAL     | **Placeholder dati**; **UI foundation** (reference shell autenticato, senza aggregati business) |
 | `/app/professional/clients` e dettaglio                 | PROFESSIONAL (PT + NUT)   | **Implementate**                                             |
 | `/app/client/professionals` e dettaglio                 | CLIENT                    | **Implementate**                                             |
-| Availability / bookings                                 | CLIENT; PROFESSIONAL + PT | **UI operativa end-to-end**                                  |
+| Availability / bookings                                 | CLIENT; PROFESSIONAL + PT | **UI operativa end-to-end**; **UI autenticata** (PT availability, liste/dettaglio booking, availability cliente) |
 | `/dev/role-preview`                                     | Dev-only                  | **Implementata** (solo `import.meta.env.DEV`)                |
 
 ## 8. Protezione rotte frontend

@@ -1,7 +1,8 @@
+import { StrictMode } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   CLIENT_ACCESS_PROFILE,
@@ -11,6 +12,10 @@ import { AuthenticatedLayout } from './AuthenticatedLayout';
 import layoutCss from './AuthenticatedLayout.module.css?raw';
 
 describe('AuthenticatedLayout', () => {
+  afterEach(() => {
+    document.documentElement.removeAttribute('data-st-authenticated');
+  });
+
   it('preserva landmark, skip link, branding, navigation e contenuto main', async () => {
     const user = userEvent.setup();
     render(
@@ -107,6 +112,65 @@ describe('AuthenticatedLayout', () => {
     expect(headerBlock).not.toMatch(/backdrop-filter/);
     expect(layoutCss).toMatch(
       /\.mobileHeader::before\s*\{[^}]*backdrop-filter:[^}]*\}/,
+    );
+  });
+
+  it('applica data-st-authenticated su html e lo rimuove all’unmount', () => {
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/app/client/dashboard']}>
+        <AuthenticatedLayout profile={CLIENT_ACCESS_PROFILE}>
+          <p>Pagina privata</p>
+        </AuthenticatedLayout>
+      </MemoryRouter>,
+    );
+
+    expect(document.documentElement).toHaveAttribute(
+      'data-st-authenticated',
+      '',
+    );
+
+    unmount();
+
+    expect(document.documentElement).not.toHaveAttribute(
+      'data-st-authenticated',
+    );
+  });
+
+  it('non lascia residui di data-st-authenticated con StrictMode', () => {
+    const { rerender, unmount } = render(
+      <StrictMode>
+        <MemoryRouter initialEntries={['/app/client/dashboard']}>
+          <AuthenticatedLayout profile={CLIENT_ACCESS_PROFILE}>
+            <p>Pagina privata</p>
+          </AuthenticatedLayout>
+        </MemoryRouter>
+      </StrictMode>,
+    );
+
+    expect(document.documentElement).toHaveAttribute(
+      'data-st-authenticated',
+      '',
+    );
+
+    rerender(
+      <StrictMode>
+        <MemoryRouter initialEntries={['/app/client/dashboard']}>
+          <AuthenticatedLayout profile={PERSONAL_TRAINER_ACCESS_PROFILE}>
+            <p>Pagina privata</p>
+          </AuthenticatedLayout>
+        </MemoryRouter>
+      </StrictMode>,
+    );
+
+    expect(document.documentElement).toHaveAttribute(
+      'data-st-authenticated',
+      '',
+    );
+
+    unmount();
+
+    expect(document.documentElement).not.toHaveAttribute(
+      'data-st-authenticated',
     );
   });
 });

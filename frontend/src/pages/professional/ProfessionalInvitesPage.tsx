@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createInvite, listMyInvites } from '../../api/invitesApi';
 import type { InviteCodeResponse } from '../../api/invitesTypes';
 import { PageTemplate } from '../../components/page/PageTemplate';
+import { Button } from '../../components/ui/Button';
 import { formatAccountDate } from '../shared/profile/profileLabels';
 import {
   CREATE_OUTCOME_UNCONFIRMED_MESSAGE,
@@ -22,6 +23,14 @@ import styles from './ProfessionalInvitesPage.module.css';
 type ListStatus = 'loading' | 'success' | 'error';
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
+
+function inviteStatusClass(status: InviteDisplayStatus): string {
+  if (status === 'Valido') return styles.statusValid;
+  if (status === 'Usato') return styles.statusUsed;
+  if (status === 'Scaduto') return styles.statusExpired;
+  if (status === 'Non attivo') return styles.statusInactive;
+  return styles.statusUnavailable;
+}
 
 function prependInvite(
   invites: readonly InviteCodeResponse[],
@@ -374,21 +383,22 @@ export function ProfessionalInvitesPage() {
 
   return (
     <PageTemplate
+      appearance="authenticated"
       eyebrow="Area professionista"
       title="Inviti"
       description="Genera e consulta i codici invito da condividere con i clienti fuori dall’app. La validità definitiva del codice è sempre determinata dal server."
     >
       <div className={styles.toolbar}>
-        <button
-          type="button"
-          className={styles.button}
+        <Button
           disabled={generateDisabled}
           onClick={() => {
             void handleGenerate();
           }}
+          type="button"
+          variant="primary"
         >
           {createPending ? 'Generazione…' : 'Genera invito'}
-        </button>
+        </Button>
       </div>
 
       {successMessage ? (
@@ -435,16 +445,16 @@ export function ProfessionalInvitesPage() {
           <p>{CREATE_OUTCOME_UNCONFIRMED_MESSAGE}</p>
           {listStatus === 'error' ? (
             <div className={styles.toolbar}>
-              <button
-                type="button"
-                className={styles.buttonSecondary}
+              <Button
                 disabled={listBusy}
                 onClick={() => {
                   void reconcileAfterAmbiguousCreate();
                 }}
+                type="button"
+                variant="secondary"
               >
                 Aggiorna elenco
-              </button>
+              </Button>
             </div>
           ) : null}
           {listBusy || listStatus === 'loading' ? (
@@ -466,16 +476,16 @@ export function ProfessionalInvitesPage() {
         >
           <p>{listError ?? getInviteListErrorMessage(null)}</p>
           <div className={styles.toolbar}>
-            <button
-              type="button"
-              className={styles.buttonSecondary}
+            <Button
               disabled={listRetryDisabled}
               onClick={() => {
                 void loadInvites({ mode: 'retry' });
               }}
+              type="button"
+              variant="secondary"
             >
               Riprova
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
@@ -528,7 +538,10 @@ function InviteCard({ invite, status, onCopy }: InviteCardProps) {
     <li className={styles.card}>
       <div className={styles.cardHeader}>
         <p className={styles.code}>{invite.code}</p>
-        <p className={styles.status} aria-label={`Stato ${status}`}>
+        <p
+          className={`${styles.status} ${inviteStatusClass(status)}`}
+          aria-label={`Stato ${status}`}
+        >
           {status}
         </p>
       </div>
@@ -552,14 +565,14 @@ function InviteCard({ invite, status, onCopy }: InviteCardProps) {
 
       {canCopy ? (
         <div className={styles.cardActions}>
-          <button
-            type="button"
-            className={styles.buttonSecondary}
-            onClick={onCopy}
+          <Button
             aria-label={`Copia codice ${invite.code}`}
+            onClick={onCopy}
+            type="button"
+            variant="secondary"
           >
             Copia codice
-          </button>
+          </Button>
         </div>
       ) : null}
     </li>

@@ -11,6 +11,11 @@ import {
   type ErrorResponse,
 } from '../../api/types';
 import {
+  NUTRITIONIST_ACCESS_PROFILE,
+  PERSONAL_TRAINER_ACCESS_PROFILE,
+} from '../../app/config/access';
+import pageTemplateStyles from '../../components/page/PageTemplate.module.css';
+import {
   createAuthenticatedAuthState,
   createAuthContextValue,
   renderWithAuthContext,
@@ -54,15 +59,14 @@ function invite(
   };
 }
 
-function renderPage() {
+function renderPage(
+  accessProfile:
+    | typeof PERSONAL_TRAINER_ACCESS_PROFILE
+    | typeof NUTRITIONIST_ACCESS_PROFILE = PERSONAL_TRAINER_ACCESS_PROFILE,
+) {
   return renderWithAuthContext(
     <ProfessionalInvitesPage />,
-    createAuthContextValue(
-      createAuthenticatedAuthState({
-        role: 'PROFESSIONAL',
-        specialization: 'PERSONAL_TRAINER',
-      }),
-    ),
+    createAuthContextValue(createAuthenticatedAuthState(accessProfile)),
   );
 }
 
@@ -93,6 +97,25 @@ describe('ProfessionalInvitesPage', () => {
     });
 
     expect(await screen.findByText(/Non hai ancora inviti/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Genera invito' })).toBeEnabled();
+    expect(
+      screen
+        .getByRole('heading', { level: 1, name: 'Inviti' })
+        .closest('article'),
+    ).toHaveClass(pageTemplateStyles.authenticated);
+  });
+
+  it('resta specialization-safe per NUTRITIONIST', async () => {
+    vi.spyOn(invitesApi, 'listMyInvites').mockResolvedValueOnce([]);
+    renderPage(NUTRITIONIST_ACCESS_PROFILE);
+
+    expect(await screen.findByText(/Non hai ancora inviti/)).toBeVisible();
+    expect(
+      screen
+        .getByRole('heading', { level: 1, name: 'Inviti' })
+        .closest('article'),
+    ).toHaveClass(pageTemplateStyles.authenticated);
+    expect(screen.getByText('Area professionista')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Genera invito' })).toBeEnabled();
   });
 

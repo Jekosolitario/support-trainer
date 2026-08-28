@@ -22,6 +22,7 @@ import type {
   AvailabilitySlot,
   WeeklyAvailabilityRule,
 } from '../../api/availabilityTypes';
+import pageTemplateStyles from '../../components/page/PageTemplate.module.css';
 import { ProfessionalAvailabilityPage } from './ProfessionalAvailabilityPage';
 
 vi.mock('../../api/availabilityApi', () => ({
@@ -92,6 +93,14 @@ describe('ProfessionalAvailabilityPage', () => {
   it('mostra giorno, orario, luogo e capacità della settimana tipo', async () => {
     render(<ProfessionalAvailabilityPage />);
 
+    const heading = await screen.findByRole('heading', {
+      level: 1,
+      name: 'Disponibilità',
+    });
+
+    expect(heading.closest('article')).toHaveClass(
+      pageTemplateStyles.authenticated,
+    );
     expect(await screen.findByText('Lunedì')).toBeVisible();
     expect(screen.getByRole('heading', { name: '09:00–13:00' })).toBeVisible();
     expect(screen.getByText('Palestra X')).toBeVisible();
@@ -105,6 +114,9 @@ describe('ProfessionalAvailabilityPage', () => {
 
     await screen.findByRole('heading', { name: 'Nessuna fascia configurata' });
     await user.click(screen.getByRole('button', { name: 'Aggiungi fascia' }));
+    expect(
+      screen.getByRole('group', { name: 'Durate disponibili' }),
+    ).toBeVisible();
     await user.selectOptions(screen.getByLabelText('Giorno'), 'TUESDAY');
     await user.clear(screen.getByLabelText('Luogo'));
     await user.type(screen.getByLabelText('Luogo'), 'Studio privato');
@@ -225,6 +237,33 @@ describe('ProfessionalAvailabilityPage', () => {
     expect(updateWeeklyAvailabilityRule).not.toHaveBeenCalled();
   });
 
+  it('preserva lo stesso host Blocca/Sblocca dopo il blocco', async () => {
+    vi.mocked(listMyAvailabilitySlots).mockResolvedValue([slot]);
+    vi.mocked(setAvailabilitySlotBlocked).mockResolvedValue({
+      ...slot,
+      blocked: true,
+      bookable: false,
+    });
+    const user = userEvent.setup();
+    render(<ProfessionalAvailabilityPage />);
+
+    const toggle = await screen.findByRole('button', { name: 'Blocca' });
+    toggle.focus();
+    expect(toggle).toHaveFocus();
+    await user.click(toggle);
+    await user.type(
+      screen.getByLabelText('Motivazione del blocco'),
+      'Manutenzione straordinaria',
+    );
+    await user.click(screen.getByRole('button', { name: 'Conferma blocco' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Sblocca' })).toBe(toggle);
+    });
+    toggle.focus();
+    expect(document.activeElement).toBe(toggle);
+  });
+
   it('sblocca direttamente una singola occorrenza', async () => {
     const blockedSlot = { ...slot, blocked: true, bookable: false };
     vi.mocked(listMyAvailabilitySlots).mockResolvedValue([blockedSlot]);
@@ -245,6 +284,28 @@ describe('ProfessionalAvailabilityPage', () => {
         null,
       );
     });
+  });
+
+  it('preserva lo stesso host Sblocca/Blocca dopo lo sblocco', async () => {
+    const blockedSlot = { ...slot, blocked: true, bookable: false };
+    vi.mocked(listMyAvailabilitySlots).mockResolvedValue([blockedSlot]);
+    vi.mocked(setAvailabilitySlotBlocked).mockResolvedValue({
+      ...blockedSlot,
+      blocked: false,
+      bookable: true,
+    });
+    const user = userEvent.setup();
+    render(<ProfessionalAvailabilityPage />);
+
+    const toggle = await screen.findByRole('button', { name: 'Sblocca' });
+    toggle.focus();
+    expect(toggle).toHaveFocus();
+    await user.click(toggle);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Blocca' })).toBe(toggle);
+    });
+    expect(document.activeElement).toBe(toggle);
   });
 
   it('isola il double-submit same-tick mentre la create è pending', async () => {

@@ -5,90 +5,42 @@
   align-items: center;
 }
 
-.button,
-.buttonSecondary {
-  min-height: 2.75rem;
-  min-width: 2.75rem;
-  padding: 0.65rem 1.15rem;
-  border-radius: 0.75rem;
-  font-family: var(--font-body, inherit);
-  font-size: 1rem;
-  font-weight: 650;
-  line-height: 1.2;
-  cursor: pointer;
-  transition:
-    opacity 0.15s ease,
-    border-color 0.15s ease,
-    background-color 0.15s ease;
-}
-
-.button {
-  border: 1px solid transparent;
-  background: linear-gradient(
-    135deg,
-    var(--palette-teal-medium, #2dd4bf),
-    var(--palette-indigo-medium, #6366f1)
-  );
-  color: var(--palette-canvas-deep, #0b1220);
-}
-
-.buttonSecondary {
-  border: 1px solid var(--color-border, #334155);
-  background: transparent;
-  color: var(--color-text-primary, #e2e8f0);
-}
-
-.button:disabled,
-.buttonSecondary:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.button:focus-visible,
-.buttonSecondary:focus-visible {
-  outline: 2px solid var(--color-primary, #2dd4bf);
-  outline-offset: 2px;
-}
-
 .feedback {
   margin: 0;
   padding: 0.85rem 1rem;
-  border-radius: 0.75rem;
-  font-weight: 650;
+  border-radius: var(--control-radius);
+  color: var(--st-auth-text, var(--color-text-primary));
+  font-weight: var(--font-weight-interface);
 }
 
 .feedbackSuccess {
-  border: 1px solid
-    color-mix(in srgb, var(--palette-teal-pale, #99f6e4) 55%, transparent);
-  background: color-mix(
-    in srgb,
-    var(--color-surface-teal, #134e4a) 62%,
-    transparent
-  );
-  color: var(--color-text-primary, #e2e8f0);
+  border: 1px solid color-mix(in srgb, var(--color-glow-teal) 55%, transparent);
+  background: color-mix(in srgb, var(--color-surface-teal) 58%, transparent);
 }
 
 .feedbackError {
   border: 1px solid
-    color-mix(in srgb, var(--color-danger, #f87171) 55%, transparent);
-  background: color-mix(in srgb, var(--color-danger, #f87171) 18%, transparent);
-  color: var(--color-text-primary, #e2e8f0);
+    color-mix(
+      in srgb,
+      var(--st-auth-danger-background, var(--color-error)) 58%,
+      transparent
+    );
+  background: color-mix(
+    in srgb,
+    var(--st-auth-danger-background, var(--color-error)) 28%,
+    transparent
+  );
 }
 
 .feedbackWarning {
-  border: 1px solid
-    color-mix(in srgb, var(--color-warning, #fbbf24) 55%, transparent);
-  background: color-mix(
-    in srgb,
-    var(--color-warning, #fbbf24) 16%,
-    transparent
-  );
-  color: var(--color-text-primary, #e2e8f0);
+  border: 1px solid var(--st-auth-warning-border, var(--st-auth-warning));
+  background: var(--st-auth-warning-background, var(--st-auth-warning));
+  color: var(--st-auth-warning);
 }
 
 .statusRegion {
   margin: 0;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
 }
 
 .list {
@@ -103,9 +55,11 @@
   display: grid;
   gap: 0.75rem;
   padding: 1rem;
-  border: 1px solid var(--color-border, #334155);
-  border-radius: 0.75rem;
-  background: var(--color-background-elevated, #111827);
+  border: 1px solid var(--st-auth-border, var(--color-border-subtle));
+  border-radius: var(--card-radius);
+  color: var(--st-auth-text, var(--color-text-primary));
+  background: var(--st-auth-surface, var(--color-panel-glass));
+  box-shadow: var(--panel-shadow);
 }
 
 .cardHeader {
@@ -118,10 +72,10 @@
 
 .code {
   margin: 0;
-  color: var(--color-primary, #2dd4bf);
+  color: var(--st-auth-heading, var(--color-heading-primary));
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-emphasis);
   letter-spacing: 0.04em;
   overflow-wrap: anywhere;
   user-select: text;
@@ -129,9 +83,31 @@
 
 .status {
   margin: 0;
-  color: var(--color-text-primary, #e2e8f0);
+  padding: 0.25rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--st-auth-text, var(--color-text-primary));
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-emphasis);
+}
+
+.statusValid {
+  border-color: color-mix(in srgb, var(--color-glow-teal) 48%, transparent);
+  background: color-mix(in srgb, var(--color-surface-teal) 58%, transparent);
+}
+
+.statusUsed,
+.statusInactive,
+.statusUnavailable {
+  border-color: var(--st-auth-border, var(--color-border-subtle));
+  background: color-mix(in srgb, var(--color-canvas-deep) 42%, transparent);
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
+}
+
+.statusExpired {
+  border-color: var(--st-auth-warning-border, var(--st-auth-warning));
+  background: var(--st-auth-warning-background, var(--st-auth-warning));
+  color: var(--st-auth-warning);
 }
 
 .meta {
@@ -147,16 +123,16 @@
 
 .metaRow dt {
   margin: 0;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--st-auth-text-muted, var(--color-text-secondary));
   font-size: 0.8rem;
-  font-weight: 650;
-  letter-spacing: 0.04em;
+  font-weight: var(--font-weight-emphasis);
+  letter-spacing: var(--tracking-micro-label);
   text-transform: uppercase;
 }
 
 .metaRow dd {
   margin: 0;
-  color: var(--color-text-primary, #e2e8f0);
+  color: var(--st-auth-text, var(--color-text-primary));
   overflow-wrap: anywhere;
 }
 

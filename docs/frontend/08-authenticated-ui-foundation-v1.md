@@ -11,7 +11,7 @@ Authenticated UI Foundation V1 fornisce un linguaggio visivo e un insieme di pri
 - primitive UI (`Button`, `Card`, `PageHeader`, `ActionLink`);
 - Dashboard come **reference integration** statica.
 
-La foundation non introduce dati aggregati, API nuove o migrazione delle feature private esistenti.
+La Dashboard resta la reference UI. Availability PT, Booking condiviso CLIENT/PT, Client Professional Availability e Invites PT/NUT consumano già la stessa foundation. La foundation non introduce dati aggregati, API nuove, StatusBadge, Skeleton o un design system di form.
 
 ## 2. Visual identity
 
@@ -44,6 +44,21 @@ Definiti in `frontend/src/styles/global.css`. Descrivono misure e motori condivi
 ### Namespace `--st-auth-*`
 
 Lo shell autenticato e le pagine con `appearance="authenticated"` mappano i token di brand su un namespace locale `--st-auth-*`. Le primitive UI leggono prima `--st-auth-*` e fanno fallback ai token di brand.
+
+I token `--st-auth-*` sono dichiarati in due scope CSS Module, da tenere allineati:
+
+- `AuthenticatedLayout.module.css` su `.layout` (vale per tutto lo shell autenticato);
+- `PageTemplate.module.css` su `.authenticated` (vale per le pagine opt-in, anche nei test senza layout).
+
+Oltre a canvas, testo, bordo, focus e danger, lo scope include una semantica warning autenticata:
+
+| Token | Ruolo |
+| --- | --- |
+| `--st-auth-warning` | Accento/testo warning su dark |
+| `--st-auth-warning-border` | Bordo warning |
+| `--st-auth-warning-background` | Superficie warning |
+
+Availability (feedback warning) e Invites (feedback warning, stato Scaduto) consumano questi token. I valori non sono duplicati nei CSS di feature. Non esistono nuovi token generici `--color-*` e i valori legacy light (`--color-warning`, `--color-warning-surface`) restano invariati.
 
 ### Perché i legacy `--color-*` non vengono ridefiniti
 
@@ -83,7 +98,7 @@ Stili scoped per layout, primitive e pagine. Nessuna dipendenza CSS-in-JS.
 
 - Compone `PageHeader` e lo slot contenuto.
 - Default `appearance="legacy"`: le pagine non migrate restano invariate.
-- `appearance="authenticated"` è opt-in. La Dashboard è il primo consumer.
+- `appearance="authenticated"` è opt-in. Consumer attuali: Dashboard (reference), Availability PT, Booking CLIENT/PT (lista e dettaglio), Client Professional Availability, Invites PT/NUT.
 
 ## 6. Layout
 
@@ -98,7 +113,22 @@ Stili scoped per layout, primitive e pagine. Nessuna dipendenza CSS-in-JS.
 
 Sotto `48rem` la sidebar è nascosta e vale il drawer. Da `48rem` in su vale la sidebar; il drawer non è modalmente attivo.
 
-Altezza topbar mobile: `--st-auth-mobile-header-height` (`4rem`). Il main mobile usa `calc(100vh − …)` con fallback `100dvh`.
+Altezza topbar mobile: `--st-auth-mobile-header-height` (`4rem`). Il main e lo shell usano `100vh` come fallback e `100dvh` come override progressivo.
+
+### Canvas root autenticato
+
+`:root` conserva il background legacy light (`--color-background`). Lo shell dipinge il canvas dark solo internamente; la scrollbar o il gutter del viewport può quindi esporre il root chiaro.
+
+Per coprire html/body senza tematizzare le pagine pubbliche, `AuthenticatedLayout` applica `data-st-authenticated` su `document.documentElement` al mount e lo rimuove al cleanup (StrictMode-safe: add → remove → add, nessun residuo dopo unmount). `global.css` tematizza **solo** quello stato:
+
+```css
+html[data-st-authenticated] {
+  background: var(--color-canvas);
+  color-scheme: dark;
+}
+```
+
+`--color-background` globale non viene modificato. Home, Login, Register, Verify email e `PublicLayout` non ricevono l’attributo; all’uscita dall’area autenticata il canvas pubblico torna quello originale.
 
 ## 7. Navigation contract
 
@@ -182,26 +212,31 @@ Resta **static/reference**: stessi link e sezioni di prima, nessuna API, nessun 
 | Button, Card, PageHeader, ActionLink, PageTemplate | Booking, Availability, Invites, Clients, Professionals, Profile, FutureFeature |
 | AuthenticatedLayout, navigation, drawer | Pagine di dominio e form operativi |
 
-Le primitive non conoscono il dominio. I feature component non devono duplicare Button/Card se già coprono il caso; la migrazione visiva delle feature è un lotto dedicato.
+Le primitive non conoscono il dominio. I feature component non devono duplicare Button/Card se già coprono il caso. I controlli form nativi (`select`, `input`, `textarea`, checkbox) restano feature-local, con `color-scheme: dark` dove serve su canvas autenticato. Non è stata introdotta una `StatusBadge` condivisa: gli stati (booking, inviti) restano markup locale.
 
 ## 13. Migration strategy
 
-Le pagine private legacy restano navigabili nello shell dark. Non vanno uniformate in un mega-restyling.
+Le pagine private non ancora migrate restano navigabili nello shell dark. Non vanno uniformate in un mega-restyling.
 
-Ordine atteso, una superficie alla volta:
+Superfici già migrate a `appearance="authenticated"`:
 
-1. Clients / Professionals
-2. Booking
-3. Availability
-4. Invites
-5. Profile
+- Dashboard (reference statica);
+- Availability PT (`/app/professional/availability`);
+- Booking condiviso CLIENT/PT (liste e dettaglio);
+- Client Professional Availability (`/app/client/professionals/:id/availability`);
+- Invites PT/NUT (`/app/professional/invites`).
+
+Migrazione visiva restante, deferred:
+
+- Clients / Professionals (liste e dettaglio);
+- Profile / Account.
 
 Ogni migrazione deve restare backward-compatible sul contract funzionale e usare `appearance="authenticated"` solo quando la pagina è pronta.
 
 ## 14. Known follow-ups
 
 - **L2-03** — il selettore focusable del drawer è permissivo (`[tabindex]:not([tabindex="-1"])` e analoghi). Non è stata introdotta una focus-management utility. Follow-up se un contenuto reale nel drawer espone il problema.
-- Feature private visivamente legacy nello shell dark: atteso, non un bug della foundation.
+- Feature private visivamente legacy nello shell dark (Clients, Professionals, Profile): atteso, non un bug della foundation.
 - Dashboard dati, analytics, Workout/Nutrition operativi: fuori da questa foundation.
 
 ## 15. Out of scope
@@ -209,7 +244,7 @@ Ogni migrazione deve restare backward-compatible sul contract funzionale e usare
 - Dashboard data / KPI / activity feed
 - analytics e notification center
 - Workout / Nutrition operativi
-- migrazione feature in questo documento come lavoro già fatto
+- migrazione visiva restante (Clients / Professionals, Profile e altre private ancora legacy), form design system, StatusBadge e feature future fuori da questo slice. Availability PT, Booking CLIENT/PT, Client Professional Availability e Invites PT/NUT sono già migrate (sezione 13) e non sono out of scope
 - backend / domain / API nuove
 - light theme autenticato
 - dipendenze UI esterne per dialog/drawer
