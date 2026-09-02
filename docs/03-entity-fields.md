@@ -63,6 +63,7 @@ Per campi con valori chiusi si consiglia:
 - `ProfessionalClientLink`
 - `InviteCode`
 - `EmailVerificationToken`
+- `PasswordResetToken`
 - `AvailabilitySlot`
 - `BookingRequest`
 - `BookingRequestItem`
@@ -96,6 +97,7 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 | `role`            | `Enum`    |           Sì |       No | —                      | `CLIENT`, `PROFESSIONAL`                         |
 | `accountStatus`   | `Enum`    |           Sì |       No | `PENDING_VERIFICATION` | Stato account                                    |
 | `emailVerified`   | `Boolean` |           Sì |       No | `false`                | Verifica email completata o no                   |
+| `sessionVersion`  | `Long`    |           Sì |       No | `0`                    | Revoca logica sessioni; incrementato al reset    |
 | `createdAt`       | `Instant` |           Sì |       No | audit app              | Istante UTC di creazione                         |
 | `updatedAt`       | `Instant` |           Sì |       No | audit app              | Istante UTC ultimo aggiornamento                 |
 
@@ -106,6 +108,7 @@ Le sezioni dedicate alle entità pianificate descrivono ipotesi di dominio futur
 - `accountStatus` è diverso da `operationalStatus`
 - per le nuove registrazioni entrambi i ruoli mantengono i default `PENDING_VERIFICATION` ed `emailVerified=false` fino alla conferma email
 - i clienti già persistiti come `ACTIVE` e verificati non sono modificati da questa regola
+- `sessionVersion` parte da `0`; un confirm recovery lo incrementa nella stessa transazione dell'hash password
 
 ---
 
@@ -269,6 +272,26 @@ Il cliente proprietario continua a leggere i dati completi tramite `/api/v1/me/p
 - il token scade quando `expiresAt <= now`;
 - questa entity non eredita da `BaseEntity`;
 - non contiene `updatedAt`.
+
+---
+
+## 3.6.2 PasswordResetToken
+
+| Campo        | Tipo      | Obbligatorio | Nullable | Default   | Note                                         |
+| ------------ | --------- | -----------: | -------: | --------- | -------------------------------------------- |
+| `id`         | `Long`    |           Sì |       No | auto      | Identificativo univoco                       |
+| `user`       | `User`    |           Sì |       No | —         | Titolare del recupero                        |
+| `tokenHash`  | `String`  |           Sì |       No | —         | SHA-256 hex lowercase, `CHAR(64)` univoco    |
+| `createdAt`  | `Instant` |           Sì |       No | audit app | Istante UTC di creazione                     |
+| `expiresAt`  | `Instant` |           Sì |       No | —         | Scadenza UTC dopo 30 minuti                  |
+| `consumedAt` | `Instant` |           No |       Sì | `null`    | Consumo o invalidazione                      |
+
+### Note
+
+- il raw token non è persistito;
+- one-active-token: i token aperti precedenti vengono consumati alla nuova request eligible;
+- one-time: `consumedAt != null` rende il token inutilizzabile;
+- questa entity non eredita da `BaseEntity` e non ha `updatedAt`.
 
 ---
 

@@ -22,7 +22,11 @@ public class UserReadinessValidator {
     }
 
     public void validateAccountAndEmail(User user) {
-        if (user.getAccountStatus() != AccountStatus.ACTIVE) {
+        validateAccountAndEmail(user.getAccountStatus(), user.getEmailVerified());
+    }
+
+    public void validateAccountAndEmail(AccountStatus accountStatus, Boolean emailVerified) {
+        if (accountStatus != AccountStatus.ACTIVE) {
             throw new AppException(
                     HttpStatus.FORBIDDEN,
                     "ACCOUNT_NOT_ACTIVE",
@@ -30,7 +34,7 @@ public class UserReadinessValidator {
             );
         }
 
-        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+        if (!Boolean.TRUE.equals(emailVerified)) {
             throw new AppException(
                     HttpStatus.FORBIDDEN,
                     "EMAIL_NOT_VERIFIED",

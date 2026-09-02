@@ -64,7 +64,8 @@ Nel backend reale risultano implementate:
 - gestione disponibilità del personal trainer;
 - lettura availability lato cliente collegato;
 - creazione e gestione richieste booking;
-- conferma, rifiuto e cancellazione booking.
+- conferma, rifiuto e cancellazione booking;
+- recupero e reset password V1 (request neutra `202`, confirm `204`, nessun auto-login).
 
 ### 3.2 Funzionalità pianificate ma non ancora implementate
 
@@ -74,9 +75,8 @@ Non risultano ancora implementate:
 - piani alimentari;
 - feedback o segnalazioni sui contenuti;
 - misurazioni e storico progressi;
-- recupero e reset password;
 - upload immagine profilo;
-- editing account (email, password, cancellazione) e gestione dispositivi/sessioni;
+- editing account (email, password autenticata, cancellazione) e gestione dispositivi/sessioni;
 - dashboard frontend con dati ancora placeholder; Availability e Booking Client ↔ Personal Trainer sono flussi operativi;
 - preparazione completa al deploy.
 
@@ -528,6 +528,14 @@ Dopo un aggiornamento riuscito dello stato operativo, eventuali errori di campo 
 - non bloccante;
 - follow-up separato;
 - dettaglio frontend/UX: [`docs/frontend/01-frontend-functional-map-mvp.md`](frontend/01-frontend-functional-map-mvp.md).
+
+#### PR-004 — FOLLOW-UP (deployment compatibility)
+
+`AuthenticatedUserPrincipal.serialVersionUID` e compatibilità di deserializzazione delle sessioni Spring pre-deployment restano un follow-up di deploy. Non è un fix di Password Recovery V1. Dettaglio: [`docs/09-security-flow.md`](09-security-flow.md) §14.8.
+
+#### VerifyEmail cooldown — FOLLOW-UP (frontend test determinism)
+
+Il test di timing del cooldown UX di VerifyEmail può essere flaky. Non va corretto in questo slice; dettaglio in [`docs/frontend/03-authentication-session-flow.md`](frontend/03-authentication-session-flow.md).
 
 ## 13.B Frontend Validazione invito + Onboarding CLIENT — Implementato
 

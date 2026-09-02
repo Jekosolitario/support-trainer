@@ -38,7 +38,7 @@ Non documenta:
 
 - `/invite/validate`, `/register/client` e onboarding CLIENT → implementati e documentati in [`06-client-onboarding-implementation.md`](./06-client-onboarding-implementation.md);
 - auto-login dopo register o verify;
-- password reset / forgot password;
+- password reset / forgot password → implementati e documentati in [`03-authentication-session-flow.md`](./03-authentication-session-flow.md) e [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md); restano fuori dal perimetro di questo documento;
 - dashboard o altre pagine business.
 
 Non anticipare feature future oltre questi confini.

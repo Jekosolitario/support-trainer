@@ -6,18 +6,24 @@ import java.security.Principal;
 import java.util.Objects;
 
 /**
- * Minimal authenticated principal for the future server-side session model.
+ * Minimal authenticated principal for the server-side session model.
  * Canonical identity is {@code userId}; {@code email} is informational only.
+ * {@code sessionVersion} is the snapshot taken at authentication time.
  */
 public final class AuthenticatedUserPrincipal implements Principal, Serializable {
 
     @Serial
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L;
 
     private final Long userId;
     private final String email;
+    private final long sessionVersion;
 
     public AuthenticatedUserPrincipal(Long userId, String email) {
+        this(userId, email, 0L);
+    }
+
+    public AuthenticatedUserPrincipal(Long userId, String email, long sessionVersion) {
         if (userId == null) {
             throw new IllegalArgumentException("userId must not be null");
         }
@@ -26,6 +32,7 @@ public final class AuthenticatedUserPrincipal implements Principal, Serializable
         }
         this.userId = userId;
         this.email = email.trim();
+        this.sessionVersion = sessionVersion;
     }
 
     public Long getUserId() {
@@ -34,6 +41,10 @@ public final class AuthenticatedUserPrincipal implements Principal, Serializable
 
     public String getEmail() {
         return email;
+    }
+
+    public long getSessionVersion() {
+        return sessionVersion;
     }
 
     @Override
@@ -59,6 +70,6 @@ public final class AuthenticatedUserPrincipal implements Principal, Serializable
 
     @Override
     public String toString() {
-        return "AuthenticatedUserPrincipal[userId=" + userId + "]";
+        return "AuthenticatedUserPrincipal[userId=" + userId + ", sessionVersion=" + sessionVersion + "]";
     }
 }

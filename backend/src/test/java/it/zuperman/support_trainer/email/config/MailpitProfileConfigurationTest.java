@@ -27,6 +27,8 @@ class MailpitProfileConfigurationTest {
             assertThat(properties.mode()).isEqualTo(EmailMode.SMTP);
             assertThat(properties.verificationPageUrl().toString())
                     .isEqualTo("http://localhost:5173/verify-email");
+            assertThat(properties.passwordRecoveryPageUrl().toString())
+                    .isEqualTo("http://localhost:5173/reset-password");
             assertThat(properties.smtp().host()).isEqualTo("localhost");
             assertThat(properties.smtp().port()).isEqualTo(1025);
             assertThat(properties.smtp().auth()).isFalse();

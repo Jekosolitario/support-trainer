@@ -15,12 +15,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 import it.zuperman.support_trainer.auth.dto.request.ConfirmEmailVerificationRequest;
 import it.zuperman.support_trainer.auth.dto.request.LoginRequest;
+import it.zuperman.support_trainer.auth.dto.request.PasswordRecoveryConfirmRequest;
+import it.zuperman.support_trainer.auth.dto.request.PasswordRecoveryRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterClientRequest;
 import it.zuperman.support_trainer.auth.dto.request.RegisterProfessionalRequest;
 import it.zuperman.support_trainer.auth.dto.request.ResendEmailVerificationRequest;
 import it.zuperman.support_trainer.auth.dto.response.CsrfTokenResponse;
+import it.zuperman.support_trainer.auth.dto.response.PasswordRecoveryAcceptedResponse;
 import it.zuperman.support_trainer.auth.dto.response.RegistrationAcceptedResponse;
 import it.zuperman.support_trainer.auth.service.AuthService;
+import it.zuperman.support_trainer.auth.service.PasswordRecoveryService;
 import it.zuperman.support_trainer.invite.dto.request.ValidateInviteCodeRequest;
 import it.zuperman.support_trainer.invite.dto.response.ValidateInviteCodeResponse;
 import it.zuperman.support_trainer.invite.entity.InviteCode;
@@ -36,15 +40,18 @@ import jakarta.validation.Valid;
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordRecoveryService passwordRecoveryService;
     private final InviteCodeService inviteCodeService;
     private final SessionLoginOrchestrator sessionLoginOrchestrator;
 
     public AuthController(
             AuthService authService,
+            PasswordRecoveryService passwordRecoveryService,
             InviteCodeService inviteCodeService,
             SessionLoginOrchestrator sessionLoginOrchestrator
     ) {
         this.authService = authService;
+        this.passwordRecoveryService = passwordRecoveryService;
         this.inviteCodeService = inviteCodeService;
         this.sessionLoginOrchestrator = sessionLoginOrchestrator;
     }
@@ -91,6 +98,22 @@ public class AuthController {
                 "message",
                 "Se l'indirizzo è associato a un account da verificare, riceverai le istruzioni necessarie"
         ));
+    }
+
+    @PostMapping("/password-recovery/request")
+    public ResponseEntity<PasswordRecoveryAcceptedResponse> requestPasswordRecovery(
+            @Valid @RequestBody PasswordRecoveryRequest request
+    ) {
+        PasswordRecoveryAcceptedResponse response = passwordRecoveryService.requestRecovery(request);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+    }
+
+    @PostMapping("/password-recovery/confirm")
+    public ResponseEntity<Void> confirmPasswordRecovery(
+            @Valid @RequestBody PasswordRecoveryConfirmRequest request
+    ) {
+        passwordRecoveryService.confirmRecovery(request);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/login")

@@ -61,7 +61,8 @@ Il modulo **Auth** gestisce:
 - verifica email uniforme per professionisti e clienti;
 - esposizione del token CSRF di sessione;
 - login session-based (`204`, cookie HttpOnly, senza JWT/Bearer);
-- logout con invalidazione sessione.
+- logout con invalidazione sessione;
+- recupero/reset password V1 (request `202` neutro, confirm `204`).
 
 ### Endpoint implementati
 
@@ -71,6 +72,8 @@ Il modulo **Auth** gestisce:
 - `POST /api/v1/auth/register/client/validate-invite`
 - `POST /api/v1/auth/email-verification/confirm`
 - `POST /api/v1/auth/email-verification/resend`
+- `POST /api/v1/auth/password-recovery/request`
+- `POST /api/v1/auth/password-recovery/confirm`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/logout`
 
@@ -84,12 +87,13 @@ Il modulo **Auth** gestisce:
 
 ### Cosa non gestisce ancora
 
-Non risultano ancora implementati:
+Non risultano ancora implementati in Auth:
 
-- forgot password;
-- reset password.
+- cambio password da sessione autenticata;
+- MFA;
+- gestione dispositivi / elenco sessioni.
 
-Entrambe le registrazioni producono account pending senza sessione di login e un token email valido 24 ore. La registrazione cliente continua a consumare l'invito e creare il link nella stessa transazione, ma le query Clients escludono il cliente fino alla conferma. La conferma POST è idempotente sullo stato finale coerente; il vecchio GET mutante è stato rimosso. Il reinvio è comune ai due ruoli, risponde sempre 202 per email valide, applica 60 secondi di cooldown e sostituisce tecnicamente i token non usati tramite `used/usedAt`. Non espone token o stato account e non modifica inviti o link. Auth pubblica una richiesta email nella stessa transazione; un listener sincrono la consegna `AFTER_COMMIT` tramite una porta indipendente dal provider. Il link usa `#token=...`; `DISABLED` è il default locale, `IN_MEMORY` serve test e CI senza rete e `SMTP` usa JavaMail per un messaggio testuale UTF-8. Un fallimento di consegna non annulla registrazione o reinvio; retry, outbox e rate limiting distribuito non sono implementati.
+Entrambe le registrazioni producono account pending senza sessione di login e un token email valido 24 ore. La registrazione cliente continua a consumare l'invito e creare il link nella stessa transazione, ma le query Clients escludono il cliente fino alla conferma. La conferma POST è idempotente sullo stato finale coerente; il vecchio GET mutante è stato rimosso. Il reinvio è comune ai due ruoli, risponde sempre 202 per email valide, applica 60 secondi di cooldown e sostituisce tecnicamente i token non usati tramite `used/usedAt`. Non espone token o stato account e non modifica inviti o link. Auth pubblica la richiesta di verifica email nella stessa transazione; il listener `AFTER_COMMIT` (`fallbackExecution=false`) costruisce il link `#token=...` e invoca il sender. Password Recovery riusa `AFTER_COMMIT` senza fallback, ma l'invio è solo enqueue su executor dedicato (nessun fallback sincrono; saturazione coda = lost-delivery V1). `DISABLED` è il default locale, `IN_MEMORY` serve test e CI senza rete e `SMTP` usa JavaMail per un messaggio testuale UTF-8. Un fallimento di consegna non annulla registrazione, reinvio o request recovery; retry, outbox e rate limiting distribuito non sono implementati.
 
 ---
 
@@ -396,8 +400,6 @@ Modulo futuro dedicato allo storico delle misurazioni fisiche del cliente.
 
 Oltre ai moduli business non ancora implementati, restano da valutare o sviluppare:
 
-- forgot password;
-- reset password;
 - upload immagine profilo;
 - cambio password autenticato;
 - API dedicate per gestione link;

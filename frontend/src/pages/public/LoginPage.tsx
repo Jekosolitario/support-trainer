@@ -341,6 +341,7 @@ function LoginInteraction({ state, login }: LoginInteractionProps) {
       </section>
 
       <nav className={styles.secondaryLinks} aria-label="Altre opzioni">
+        <Link to="/forgot-password">Password dimenticata?</Link>
         <Link to="/register/professional">
           Sei un professionista? Registrati
         </Link>

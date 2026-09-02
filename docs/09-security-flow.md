@@ -403,15 +403,62 @@ Il logout invalida **la sessione corrente** server-side (cookie presentato). Non
 
 ---
 
-## 14. Forgot password / reset password
+## 14. Password recovery / reset password V1
 
 ## 14.1 Stato attuale
 
-Nel codice attuale **forgot password** e **reset password** **non sono implementati**.
+Password Recovery V1 è implementato end-to-end (backend + frontend pubblico). Non è un cambio password autenticato, non è MFA e non è gestione dispositivi.
 
-## 14.2 Implicazione documentale
+## 14.2 Request (neutra)
 
-Questi flussi non devono essere considerati parte della sicurezza già disponibile nel progetto corrente.
+`POST /api/v1/auth/password-recovery/request` con `{ "email" }`:
+
+- `permitAll` + CSRF obbligatorio;
+- successo **solo** `202 Accepted` con messaggio identico per account esistente, inesistente, non verificato, non `ACTIVE` e cooldown;
+- email malformata → `400 VALIDATION_ERROR` (field `email`: `NotBlank` / `Email` / `Size`);
+- eligibility server-side per generare il token: `accountStatus=ACTIVE` e `emailVerified=true`; `profile.active=false` non è un blocco, come per il login;
+- la UI non espone eligibility: dopo ogni `202` mostra lo stesso successo generico.
+
+## 14.3 Token
+
+Generazione: CSPRNG 32 byte, Base64 URL-safe senza padding. Persistenza: solo SHA-256 hex lowercase in `password_reset_tokens.token_hash` (`CHAR(64)` UNIQUE). Il raw token vive nella generazione, nell'evento after-commit e nel messaggio email; non è in DB, response o log applicativi. TTL 30 minuti; cooldown request 60 secondi; un solo token attivo per utente (i precedenti aperti vengono consumati); uso one-time.
+
+Link email: `{password-recovery-page-url}#token={RAW_TOKEN}` (default pagina `/reset-password`). Il frontend legge `window.location.hash`, tiene il raw token solo in memoria e sanitizza subito l'URL a `/reset-password` senza fragment. Refresh dopo sanitization → missing-token. Nessuna persistenza client (localStorage, sessionStorage, query, path, `location.state`).
+
+## 14.4 Confirm
+
+`POST /api/v1/auth/password-recovery/confirm` con `{ "token", "newPassword" }`:
+
+- successo **solo** `204 No Content`;
+- nessun auto-login e nessuna nuova sessione;
+- token unknown/expired/consumed/invalidated o account non più eligible → `400 PASSWORD_RESET_TOKEN_INVALID_OR_EXPIRED` (stato UI unico);
+- password non conforme alla **stessa** policy di registrazione → `400 VALIDATION_ERROR` su `newPassword`;
+- un `2xx` diverso da `204` è trattato dal frontend come errore tecnico, anche se il body assomiglia a un `ErrorResponse`.
+
+Nella stessa transazione: aggiornamento hash password, consumo del token, incremento `users.session_version`.
+
+## 14.5 Revoca sessioni
+
+La sicurezza della revoca **non** dipende dalla cancellazione fisica delle righe Spring Session.
+
+- il principal autenticato (`AuthenticatedUserPrincipal`) conserva lo snapshot di `sessionVersion` al login;
+- ogni request autenticata confronta lo snapshot con `User.sessionVersion` nel DB;
+- mismatch → autenticazione non più valida (`401`);
+- dopo il commit, un listener best-effort tenta il delete fisico delle sessioni JDBC per principal; un fallimento non annulla password/token/`sessionVersion` già committed.
+
+## 14.6 Login concorrente
+
+`password` hash e `sessionVersion` usati al login provengono dallo stesso authentication snapshot persistito. Un login concorrente con la vecchia password non può ottenere la `sessionVersion` nuova.
+
+## 14.7 Consegna email
+
+`transaction commit` → listener `AFTER_COMMIT` (`fallbackExecution=false`) → enqueue su executor dedicato (core 1, max 2, coda 50, `AbortPolicy`) → worker sender. Nessun fallback sincrono. Saturazione della coda = lost-delivery V1 (warn, response `202` già emessa). Default locale `DISABLED`; `IN_MEMORY` per test; `SMTP` richiede configurazione. Production SMTP/deploy non è completato.
+
+## 14.8 Follow-up espliciti
+
+- **PR-004** (`AuthenticatedUserPrincipal.serialVersionUID`): compatibilità serializzazione sessioni pre-deployment; non è un fix di questo slice.
+- **VerifyEmail cooldown** (frontend test determinism): flakiness possibile del test di timing; non è un difetto del recovery.
+- Cambio password autenticato, MFA, session/device UI: fuori scope.
 
 ---
 
@@ -708,9 +755,10 @@ Algoritmo, costo e formato degli hash esistenti restano invariati.
 
 ## 20.1 Token realmente presenti
 
-Nel codice attuale esiste un token applicativo dedicato per:
+Nel codice attuale esistono token applicativi dedicati per:
 
 - verifica email
+- reset password (hash SHA-256 in DB; raw token solo generation/email)
 
 Non esistono JWT di autenticazione runtime.
 
@@ -728,9 +776,8 @@ Il token di verifica email è:
 
 ## 20.3 Token non presenti
 
-Nel codice attuale **non** risulta ancora implementato un token applicativo per:
+Nel codice attuale **non** risulta implementato un token applicativo per:
 
-- reset password
 - refresh autenticazione
 
 ---
@@ -861,7 +908,8 @@ Per Support Trainer, nello stato attuale del progetto, si confermano le seguenti
 - registrazione CLIENT confermata soltanto da `202`; outcome incerti trattati in modo conservativo e senza retry applicativo
 - business authorization gestita nel service layer
 - password hashata con BCrypt
-- forgot password / reset password non ancora implementati
+- password recovery / reset password V1 implementato (`202`/`204` esatti, anti-enumerazione, `sessionVersion`)
+- cambio password autenticato, MFA e gestione dispositivi/sessioni non implementati
 - Availability è modulo backend implementato e protetto
 - Bookings è modulo backend implementato e protetto
 - gli endpoint booking principali hanno regole esplicite in `SecurityConfig`

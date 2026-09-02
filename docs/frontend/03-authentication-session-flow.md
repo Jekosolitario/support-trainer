@@ -12,6 +12,7 @@ Documenta:
 - bootstrap / reconciliation;
 - CSRF client;
 - login / logout;
+- recupero/reset password pubblico (`/forgot-password`, `/reset-password`);
 - guards e safe redirect;
 - integrazione delle mutation Profilo / Operational Status con la source of truth auth (soft commit);
 - protezione race tramite auth epoch;
@@ -130,7 +131,7 @@ Le mutation Profilo e Operational Status usano `invalidateOn401: true` tramite l
 5. Su `403 CSRF_VALIDATION_FAILED` è consentito **un solo** retry dopo refresh del token; non ci sono retry generici illimitati.
 6. Nessuna persistenza su disco o storage del browser.
 
-Le mutation Profile/Status riusano questa foundation (`csrfMutation`): non duplicano ensure/retry CSRF nella pagina.
+Le mutation Profile/Status riusano questa foundation (`csrfMutation`): non duplicano ensure/retry CSRF nella pagina. Password recovery request/confirm riusa lo stesso stack (`performCsrfMutation` / observed); non esiste bypass CSRF specifico del recovery.
 
 La configurazione CSRF backend resta in [`docs/09-security-flow.md`](../09-security-flow.md).
 
@@ -178,6 +179,41 @@ Follow-up **E2E-1** (MINOR, non bloccante):
 - `RequireRole` / `RequireSpecialization` bloccano correttamente: **nessun bypass autorizzativo**;
 - impatto: UX (pagina forbidden invece dell’home di ruolo);
 - remediation non decisa in questo documento; follow-up auth/routing separato.
+
+### 10.2 Recupero password (pubblico, nessuna sessione)
+
+Password Recovery V1 è unauthenticated: **non** crea sessione, **non** modifica `AuthProvider` e **non** avanza l'auth epoch. Le mutazioni riusano CSRF come login/onboarding.
+
+#### Forgot (`/forgot-password`)
+
+Stati:
+
+- **initial** — form email;
+- **submitting** — mutazione in corso;
+- **generic success** — soltanto HTTP `202`; copy identica indipendentemente da esistenza account, verifica, `ACTIVE` o cooldown;
+- **validation** — `400 VALIDATION_ERROR` su `email`;
+- **technical** — rete, `5xx`, o `2xx` diverso da `202` (anche con body `ErrorResponse`).
+
+Eligibility resta solo server-side e non è esposta in UI.
+
+#### Reset (`/reset-password`)
+
+Il backend costruisce `{password-recovery-page-url}#token={RAW_TOKEN}`. Il client legge `window.location.hash`, non la query string. Dopo il parse sanitizza subito a `/reset-password` (niente fragment, query, path extra). Refresh dopo sanitization → **missing-token**.
+
+Il raw token resta solo in memoria: non va in `localStorage`, `sessionStorage`, `history.state` / `location.state`, path, query o log.
+
+Stati:
+
+- **missing token** — fragment assente/illeggibile dopo init;
+- **ready** — token in memoria, form nuova password + conferma locale (`confirmPassword` non è inviato);
+- **submitting**;
+- **invalid/expired** — `400 PASSWORD_RESET_TOKEN_INVALID_OR_EXPIRED` (stato unico);
+- **technical** — rete/`5xx`/altro `2xx` (successo **solo** `204`);
+- **success** — “Password aggiornata” e CTA Accedi. Nessun auto-login.
+
+Policy password: stessa di registrazione (`validateRegistrationPassword`); il server resta autoritativo.
+
+Dettaglio backend (token, `sessionVersion`, email after-commit): [`docs/09-security-flow.md`](../09-security-flow.md) §14.
 
 ## 11. Soft commit Profilo / Operational Status
 
@@ -302,8 +338,11 @@ Il client continua a usare path relativi `/api/v1/...` e `credentials: 'same-ori
 | Altre pagine business (dashboard dati, clients, professionals, availability, bookings) | **Placeholder** |
 | Registrazione pubblica PROFESSIONAL + verify/resend email | **Implementati** (dettaglio tecnico in [`04-professional-onboarding-implementation.md`](./04-professional-onboarding-implementation.md)) |
 | Validazione invito + registrazione CLIENT | **Implementate** (provider memory-only e auth gate locale; dettaglio in [`06-client-onboarding-implementation.md`](./06-client-onboarding-implementation.md)) |
+| Recupero/reset password V1 (`/forgot-password`, `/reset-password`) | **Implementato** (request `202` / confirm `204` esatti; fragment memory-only; nessun auto-login) |
 
 La matrice completa delle pagine resta in [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md). Il follow-up UI **M1-R** (fieldErrors dopo update Status) è high-level in [`docs/01-functional-scope.md`](../01-functional-scope.md) e nel dettaglio frontend/UX in [`01-frontend-functional-map-mvp.md`](./01-frontend-functional-map-mvp.md); FE03 non lo tratta come backlog dedicato. Il dettaglio tecnico di **E2E-1** resta in §10.1.
+
+Follow-up **VerifyEmail cooldown** (`FOLLOW-UP — frontend test determinism`): il test di timing del cooldown UX di VerifyEmail può risultare flaky; non è un difetto del recovery e non va “corretto” in questo slice.
 
 ## 17. Confini
 
@@ -322,7 +361,8 @@ Confini rispetto all’onboarding pubblico:
 
 - register / confirm / resend **non** creano sessione autenticata;
 - **Login** resta l’unico punto di creazione sessione autenticata documentato in FE03;
-- le mutazioni di onboarding **riusano** la foundation CSRF (`performCsrfMutation`) senza un secondo client HTTP/CSRF;
+- il reset password riuscito (`204`) **non** autentica: CTA verso Login;
+- le mutazioni di onboarding e password recovery **riusano** la foundation CSRF (`performCsrfMutation`) senza un secondo client HTTP/CSRF;
 - `AuthProvider` resta la source of truth dello stato autenticato; l’onboarding **non** lo modifica e non avanza l’auth epoch.
 
 Riferimenti primari:

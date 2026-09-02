@@ -239,6 +239,9 @@ describe('LoginPage auth state', () => {
       'type',
       'submit',
     );
+    expect(
+      screen.getByRole('link', { name: 'Password dimenticata?' }),
+    ).toHaveAttribute('href', '/forgot-password');
   });
 
   it('riusa la recovery unavailable senza montare il form', () => {

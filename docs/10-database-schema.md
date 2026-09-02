@@ -1,6 +1,8 @@
 # Database Schema — Support Trainer
 
 > V9 additiva: `booking_requests` include `rejection_reason VARCHAR(1000) NULL`, `cancellation_reason VARCHAR(1000) NULL`, `cancelled_by VARCHAR(32) NULL`. Nessun backfill, indice o vincolo aggiuntivo: i metadata legacy null restano validi. `cancelled_by` mappa l'enum dedicato `BookingCancellationActor`, non `UserRole`.
+>
+> V10: tabella runtime `password_reset_tokens` (hash SHA-256, niente raw token). V11: `users.session_version BIGINT NOT NULL DEFAULT 0`. Lo schema Flyway runtime termina a V11.
 
 ## 1. Obiettivo del documento
 
@@ -79,6 +81,7 @@ Tabella base della gerarchia utenti.
 - `role`
 - `account_status`
 - `email_verified`
+- `session_version`
 - `created_at`
 - `updated_at`
 
@@ -92,12 +95,13 @@ Tabella base della gerarchia utenti.
 - `role` `NOT NULL`
 - `account_status` `NOT NULL`
 - `email_verified` `NOT NULL`
+- `session_version` `BIGINT NOT NULL DEFAULT 0` (V11)
 - `profile_image_url` `VARCHAR(500)` nullable
 - `role` e `account_status` `VARCHAR(50)`
 
 ### Note
 
-Questa tabella contiene i campi comuni a tutti gli utenti.
+Questa tabella contiene i campi comuni a tutti gli utenti. `session_version` è il confine di revoca logica delle sessioni: un reset password lo incrementa nella stessa transazione dell'aggiornamento hash; le request autenticate confrontano lo snapshot del principal con il valore persistito.
 
 ---
 
@@ -510,7 +514,39 @@ Sono create da Flyway `V7__create_spring_session_jdbc_schema.sql` (schema uffici
 
 ### Relazione con l’autenticazione
 
-Lo store JDBC persiste le sessioni autenticate (cookie HttpOnly + attributi di sessione, incluso `authenticatedAt`). Non sostituisce né estende le tabelle di dominio della sezione 3.1–3.9.
+Lo store JDBC persiste le sessioni autenticate (cookie HttpOnly + attributi di sessione, incluso `authenticatedAt`). Non sostituisce né estende le tabelle di dominio della sezione 3.1–3.9. La revoca dopo password reset è logica (`users.session_version`); la pulizia fisica delle righe Spring Session è best-effort post-commit.
+
+---
+
+## 3.11 `password_reset_tokens` (V10)
+
+Tabella runtime Flyway per Password Recovery V1. Non memorizza il raw token.
+
+### Colonne principali
+
+- `id` `BIGINT` PK auto-increment
+- `user_id` `BIGINT NOT NULL`
+- `token_hash` `CHAR(64) NOT NULL`
+- `created_at` `DATETIME(6) NOT NULL`
+- `expires_at` `DATETIME(6) NOT NULL`
+- `consumed_at` `DATETIME(6) NULL`
+
+### Foreign key
+
+- `fk_password_reset_tokens_user`: `user_id` → `users(id)` `ON DELETE RESTRICT ON UPDATE RESTRICT`
+
+### Vincoli e indici
+
+- `uk_password_reset_tokens_token_hash` UNIQUE su `token_hash`
+- `idx_password_reset_tokens_user_id` su `user_id`
+- `ENGINE=InnoDB` `utf8mb4_0900_ai_ci`
+
+### Note
+
+- `token_hash` è SHA-256 hex lowercase del raw token (64 caratteri);
+- TTL applicativo 30 minuti su `expires_at`;
+- consumo one-time e invalidazione dei token aperti tramite `consumed_at`;
+- i timestamp sono `DATETIME(6)` UTC di proprietà applicativa, non fanno parte del set convertito da V4.
 
 ---
 
@@ -518,7 +554,7 @@ Lo store JDBC persiste le sessioni autenticate (cookie HttpOnly + attributi di s
 
 Queste tabelle possono già essere presenti nel database MySQL locale come preparazione ai moduli successivi, ma **al momento non risultano ancora integrate nei flussi runtime del backend attuale e non sono governate da Flyway**.
 
-Il perimetro legacy non governato comprende tredici tabelle: `refresh_tokens`, `password_reset_tokens`, `workout_plans`, `workout_weeks`, `workout_days`, `workout_exercises`, `workout_feedbacks`, `nutrition_plans`, `nutrition_weeks`, `nutrition_days`, `nutrition_entries`, `nutrition_feedbacks` e `client_measurements`. Le migrazioni runtime non le creano, non le modificano e non le eliminano.
+Il perimetro legacy non governato comprende dodici tabelle: `refresh_tokens`, `workout_plans`, `workout_weeks`, `workout_days`, `workout_exercises`, `workout_feedbacks`, `nutrition_plans`, `nutrition_weeks`, `nutrition_days`, `nutrition_entries`, `nutrition_feedbacks` e `client_measurements`. Le migrazioni runtime non le creano, non le modificano e non le eliminano. `password_reset_tokens` appartiene allo schema Flyway V10 (sezione 3.11), non a questo perimetro.
 
 ## 4.1 `refresh_tokens`
 
@@ -553,35 +589,6 @@ Nel backend attuale:
 - l’autenticazione usa Spring Session JDBC e cookie HttpOnly (`docs/09-security-flow.md`).
 
 La tabella resta documentata qui solo come reperto legacy / non utilizzato dal flusso runtime corrente.
-
----
-
-## 4.2 `password_reset_tokens`
-
-### Colonne principali
-
-- `id`
-- `user_id`
-- `token`
-- `expires_at`
-- `used`
-- `used_at`
-- `created_at`
-
-### Foreign key
-
-- `user_id` → `users(id)`
-
-### Vincoli principali
-
-- `user_id` `NOT NULL`
-- `token` `NOT NULL UNIQUE`
-- `expires_at` `NOT NULL`
-- `used` `NOT NULL DEFAULT FALSE`
-
-### Nota importante
-
-Questa tabella può già essere presente nel database, ma il flusso di forgot/reset password **non è ancora implementato nel backend attuale**.
 
 ---
 
@@ -940,6 +947,7 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 ### Area sicurezza
 
 - `email_verification_tokens.user_id` → `users.id`
+- `password_reset_tokens.user_id` → `users.id`
 
 ### Area availability
 
@@ -959,7 +967,6 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 ### Tabelle già presenti nel DB ma non ancora integrate
 
 - `refresh_tokens.user_id` → `users.id`
-- `password_reset_tokens.user_id` → `users.id`
 
 ### Area workout
 
@@ -999,12 +1006,12 @@ Quando verranno implementati i moduli futuri, andranno salvati come stringhe leg
 - `users.email` tramite `uk_users_email`
 - `invite_codes.code` tramite `uk_invite_codes_code`
 - `email_verification_tokens.token` tramite `uk_email_verification_tokens_token`
+- `password_reset_tokens.token_hash` tramite `uk_password_reset_tokens_token_hash`
 - coppia `booking_request_items(booking_request_id, availability_slot_id)` tramite `uk_booking_request_items_request_slot`
 
 ## 9.2 Tabelle già presenti nel DB ma non ancora integrate
 
 - `refresh_tokens.token`
-- `password_reset_tokens.token`
 
 ## 9.3 Da gestire a livello business/service
 
@@ -1154,9 +1161,11 @@ Le risorse versionate sono applicate in questo ordine:
 22. `V6__add_booking_historical_snapshots`;
 23. `V7__create_spring_session_jdbc_schema.sql`;
 24. `V8__add_weekly_availability_and_capacity.sql`;
-25. `V9__add_booking_transition_metadata.sql`.
+25. `V9__add_booking_transition_metadata.sql`;
+26. `V10__password_recovery.sql`;
+27. `V11__user_session_version.sql`.
 
-Questo è l’elenco delle migrazioni Flyway correnti. Lo schema runtime versionato termina a V9.
+Questo è l’elenco delle migrazioni Flyway correnti. Lo schema runtime versionato termina a V11.
 
 La V1 crea esclusivamente le nove tabelle di dominio runtime, con PK, FK restrittive, unique, nullability, default, precisioni, engine, charset, collation e indici dello schema legacy. Non contiene dati applicativi.
 
@@ -1171,7 +1180,7 @@ Le nove V3 contengono esclusivamente un `ALTER TABLE` ciascuna. Portano a `DATET
 
 Il passaggio strutturale delle sole V3 da `DATETIME(0)` a `DATETIME(6)` mantiene invariati anno, mese, giorno, ora, minuto e secondo e aggiunge una frazione zero. Le V3 non usano `CONVERT_TZ` e non convertono i valori da `Europe/Rome` a UTC: questa responsabilità appartiene alla successiva V4, mentre le V5 trasferiscono l'ownership degli audit all'applicazione.
 
-La V4 Java verifica schema, precisione, gap/overlap e dati prima di convertire i datetime legacy `Europe/Rome` verso UTC. Le V5 rimuovono default e `ON UPDATE` dagli audit, trasferendone l'ownership a Spring Data JPA; i timestamp ombra dei profili diventano nullable e congelati. La V6 Java aggiunge gli snapshot storici Booking e ne esegue il backfill dopo preflight, senza inventare dati o orari. La V7 crea `SPRING_SESSION` e `SPRING_SESSION_ATTRIBUTES` per lo store JDBC delle sessioni server-side. La V8 aggiunge `weekly_availability_rules`, la tabella normalizzata delle durate, gli audit di regola e occorrenza, i campi `weekly_rule_id`, `location_label`, `capacity`, `blocked` sugli slot e `location_label_snapshot` sugli item Booking, con backfill conservativo degli slot legacy. La V9 aggiunge `rejection_reason`, `cancellation_reason` e `cancelled_by` nullable a `booking_requests`, senza backfill né nuovi indici.
+La V4 Java verifica schema, precisione, gap/overlap e dati prima di convertire i datetime legacy `Europe/Rome` verso UTC. Le V5 rimuovono default e `ON UPDATE` dagli audit, trasferendone l'ownership a Spring Data JPA; i timestamp ombra dei profili diventano nullable e congelati. La V6 Java aggiunge gli snapshot storici Booking e ne esegue il backfill dopo preflight, senza inventare dati o orari. La V7 crea `SPRING_SESSION` e `SPRING_SESSION_ATTRIBUTES` per lo store JDBC delle sessioni server-side. La V8 aggiunge `weekly_availability_rules`, la tabella normalizzata delle durate, gli audit di regola e occorrenza, i campi `weekly_rule_id`, `location_label`, `capacity`, `blocked` sugli slot e `location_label_snapshot` sugli item Booking, con backfill conservativo degli slot legacy. La V9 aggiunge `rejection_reason`, `cancellation_reason` e `cancelled_by` nullable a `booking_requests`, senza backfill né nuovi indici. La V10 crea `password_reset_tokens` (hash SHA-256, TTL/consumo applicativi). La V11 aggiunge `users.session_version BIGINT NOT NULL DEFAULT 0`.
 
 ### 12.2 Indici di convergenza
 

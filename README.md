@@ -4,7 +4,7 @@
 
 Support Trainer è un progetto full stack per la gestione del rapporto tra professionisti del benessere e clienti. Il backend MVP copre autenticazione, profili, inviti, collegamenti professionista-cliente, disponibilità e richieste di prenotazione. Il frontend dispone di una fondazione React, home pubblica (direzione visuale dark-tech), autenticazione session-based (login/logout/CSRF/guards) e foundation API client, oltre alle pagine Profilo autenticata, gestione inviti PROFESSIONAL e liste/dettagli delle relazioni CLIENT ↔ PROFESSIONAL.
 
-Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Login, logout, routing protetto, foundation auth, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status, **gestione inviti PROFESSIONAL**, navigazione delle relazioni collegate, Availability settimanale del Personal Trainer e Booking end-to-end Client ↔ Personal Trainer sono implementati. Resta placeholder la dashboard con dati.
+Il repository contiene il backend Spring Boot, il frontend separato e la documentazione funzionale e tecnica. Login, logout, routing protetto, foundation auth, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, **recupero/reset password V1**, Profilo/Account/Operational Status, **gestione inviti PROFESSIONAL**, navigazione delle relazioni collegate, Availability settimanale del Personal Trainer e Booking end-to-end Client ↔ Personal Trainer sono implementati. Resta placeholder la dashboard con dati.
 
 ## 2. Stato attuale del progetto
 
@@ -14,7 +14,7 @@ Stato sintetico:
 
 - backend Spring Boot presente;
 - API per i flussi principali implementate;
-- 36 endpoint applicativi documentati; `/error` resta un fallback tecnico separato;
+- 38 endpoint applicativi documentati (Auth 10, Me 4, Client 2, Professional 3, Invite 2, Availability 10, Booking 7); `/error` resta un fallback tecnico separato;
 - autenticazione session-based, CSRF e autorizzazione per ruolo presenti;
 - test di integrazione per auth, sessione, inviti, access control, profili, availability, booking e Security / Common presenti;
 - database applicativo MySQL con migrazioni Flyway (schema di dominio e infrastruttura Spring Session JDBC);
@@ -23,6 +23,7 @@ Stato sintetico:
 - autenticazione session-based frontend implementata (httpClient, CSRF, AuthProvider, login, logout, guards, bootstrap `/me`);
 - pagina Profilo autenticata role-aware implementata (CLIENT e PROFESSIONAL), con Account in sola lettura e Operational Status modificabile;
 - registrazione pubblica PROFESSIONAL e verifica email (confirm + resend) implementate;
+- recupero/reset password V1 pubblico implementato (`/forgot-password`, `/reset-password`);
 - validazione invito e registrazione pubblica CLIENT implementate con handoff memory-only, outcome conservativi e cleanup dei dati sensibili;
 - gestione inviti PROFESSIONAL implementata (`/app/professional/invites`: lista, genera, copia codice valido);
 - liste e dettagli dei Client collegati per PT/NUT e dei Professional collegati per CLIENT implementati;
@@ -91,6 +92,8 @@ Stato sintetico:
 - controlli applicativi su stato account, specializzazione e proprietà delle risorse;
 - gestione uniforme degli errori API.
 
+Password Recovery V1: `POST /api/v1/auth/password-recovery/request` (`202` neutro) e `POST /api/v1/auth/password-recovery/confirm` (`204`, nessun auto-login). Token CSPRNG 32 byte, persistito solo come SHA-256 hex; link `{page}#token=...`; CSRF obbligatorio; stessa policy password della registrazione; `sessionVersion` incrementato nella stessa transazione del reset. La consegna email riusa il modello after-commit (executor dedicato, no sync fallback). SMTP di produzione e deploy non sono completati.
+
 Entrambi i ruoli nascono con account `PENDING_VERIFICATION` ed `emailVerified=false`, ricevono un token valido 24 ore e possono effettuare login soltanto dopo la conferma. Le due registrazioni pubbliche restituiscono sempre lo stesso `202 Accepted` neutro e non espongono l'esistenza dell'email, ruoli, identificativi o token. Per il cliente l'invito viene validato prima del controllo neutro dell'email: solo per una nuova email il link professionale viene creato e l'invito consumato nella stessa transazione; per un'email già presente l'invito resta inutilizzato. Il resend è l'unico percorso pubblico per richiedere un nuovo invio su un account esistente. Il precedente GET mutante è stato rimosso; token scaduti producono `410 Gone` e un secondo POST sul token già consumato restituisce successo soltanto se lo stato finale dell'utente è coerente.
 
 Il reinvio accetta l'email nel body, risponde sempre `202 Accepted` con lo stesso messaggio per ogni indirizzo sintatticamente valido e crea un token solo per profili attivi ancora pending. Il cooldown è di 60 secondi dal token più recente, con reinvio consentito al boundary esatto. Quando il reinvio è consentito, i precedenti token non usati vengono invalidati tecnicamente tramite `used=true` e `usedAt`, lasciando un solo token utilizzabile da 24 ore. Token, email, stato account e tempo residuo non sono esposti. Invito e link cliente-professionista restano invariati. Dopo il commit di registrazione o reinvio, un listener applicativo costruisce il link `{verification-page-url}#token={tokenEncoded}` e lo affida a una porta indipendente dal provider. Il default locale è `DISABLED`; i test usano il sender `IN_MEMORY` senza rete. In modalità `SMTP`, l'adapter invia un messaggio MIME `text/plain` UTF-8 in italiano con subject comune, URL visibile e scadenza nella zona business. Un errore del sender è assorbito dopo il commit e non cambia le risposte `202`, ma senza outbox o retry la consegna non è garantita. La neutralizzazione non elimina un possibile side-channel di timing; l'MVP non introduce ritardi artificiali o rate limiting. I clienti già persistiti non vengono migrati.
@@ -148,7 +151,6 @@ Le liste usano un riepilogo autosufficiente e create, dettaglio e transizioni re
 - piani alimentari;
 - feedback del cliente;
 - misurazioni e monitoraggio dei progressi;
-- recupero e reset della password;
 - upload dell'immagine profilo;
 - editing account (email, password, cancellazione) e gestione dispositivi/sessioni;
 - limite di sessioni concorrenti;
@@ -236,6 +238,7 @@ Non è richiesta un'installazione globale di Maven. Il progetto frontend non dic
    | `app.time.clock-zone`                                               | `APP_TIME_CLOCK_ZONE`                                                                             | zona tecnica, deve rappresentare UTC                                                       |
    | `app.email.mode`                                                    | `APP_EMAIL_MODE`                                                                                  | `DISABLED` (default locale sicuro), `IN_MEMORY` oppure `SMTP`                              |
    | `app.email.verification-page-url`                                   | `APP_EMAIL_VERIFICATION_PAGE_URL`                                                                 | URL assoluto senza query/fragment; HTTPS per host remoti, HTTP solo loopback               |
+   | `app.email.password-recovery-page-url`                              | `APP_EMAIL_PASSWORD_RECOVERY_PAGE_URL`                                                            | URL assoluto della pagina `/reset-password`; stesse regole di sanitization del verification URL |
    | `app.email.sender.address`                                          | `APP_EMAIL_SENDER_ADDRESS`                                                                        | indirizzo mittente obbligatorio in `SMTP`                                                  |
    | `app.email.sender.name`                                             | `APP_EMAIL_SENDER_NAME`                                                                           | nome visualizzato obbligatorio in `SMTP`                                                   |
    | `app.email.sender.reply-to`                                         | `APP_EMAIL_SENDER_REPLY_TO`                                                                       | indirizzo Reply-To SMTP facoltativo                                                        |
@@ -246,13 +249,13 @@ Non è richiesta un'installazione globale di Maven. Il progetto frontend non dic
 
 Non sono più richieste proprietà `app.security.jwt.*` né `app.cors.allowed-origins`: non esiste JWT runtime e CORS applicativo è disabilitato. In produzione l’autenticazione browser assume topologia same-origin dietro reverse proxy. Il file `application.properties` resta escluso da Git.
 
-Anche `app.email` è tipizzata e fail-fast. `verification-page-url` punta alla pagina frontend di verifica email (`/verify-email`, già implementata) e può includere un base path; il backend aggiunge il token codificato nel fragment `#token=...`. `DISABLED` è soltanto un default locale sicuro e non rende la configurazione pronta per produzione. `IN_MEMORY` conserva messaggi esclusivamente nel processo, non espone inbox HTTP e viene usato dal profilo `test`; non sono configurati host SMTP, credenziali o accessi di rete. `SMTP` richiede mittente valido, host, porta, tre timeout positivi e, quando `auth=true`, username e password; applica UTF-8, `mail.smtp.auth`, STARTTLS e i timeout JavaMail in millisecondi. Nessuna connessione viene eseguita durante la validazione. Le combinazioni incoerenti impediscono l'avvio e password o credenziali non sono incluse nei `toString` o nei log.
+Anche `app.email` è tipizzata e fail-fast. `verification-page-url` punta alla pagina frontend di verifica email (`/verify-email`, già implementata) e può includere un base path; il backend aggiunge il token codificato nel fragment `#token=...`. `password-recovery-page-url` punta a `/reset-password` con le stesse regole (URL assoluto, niente query/fragment nella base); il raw token di reset è aggiunto solo nel fragment. `DISABLED` è soltanto un default locale sicuro e non rende la configurazione pronta per produzione. `IN_MEMORY` conserva messaggi esclusivamente nel processo, non espone inbox HTTP e viene usato dal profilo `test`; non sono configurati host SMTP, credenziali o accessi di rete. `SMTP` richiede mittente valido, host, porta, tre timeout positivi e, quando `auth=true`, username e password; applica UTF-8, `mail.smtp.auth`, STARTTLS e i timeout JavaMail in millisecondi. Nessuna connessione viene eseguita durante la validazione. Le combinazioni incoerenti impediscono l'avvio e password o credenziali non sono incluse nei `toString` o nei log.
 
 La configurazione locale validata usa `app.email.verification-page-url=http://localhost:5173/verify-email`. La pagina frontend `/verify-email` è implementata: legge e rimuove il token dal fragment, conferma via API e offre il resend neutro. Lo startup controllato è stato eseguito con email `DISABLED`, senza invii SMTP reali.
 
 Anche la configurazione temporale è tipizzata e validata all'avvio. L'applicazione usa un unico `Clock` tecnico UTC; `ApplicationTimeProvider.nowInstant()` tronca, senza arrotondare, alla precisione canonica di sei cifre. Gli istanti persistiti e gli audit applicativi sono `Instant` su colonne `DATETIME(6)`, con `spring.jpa.properties.hibernate.jdbc.time_zone=UTC`; `Europe/Rome` resta la zona business per la generazione degli slot. Spring Data JPA valorizza `createdAt` e `updatedAt`. Le scadenze email e invito sono rispettivamente 24 e 168 ore reali e sono esposte con `Z`. Sul confine HTTP gli orari degli slot restano `OffsetDateTime` con offset valido per `Europe/Rome`.
 
-La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle undici tabelle runtime e dello schema Spring Session tramite `classpath:db/migration`.
+La configurazione di esempio usa `spring.jpa.hibernate.ddl-auto=validate`: Hibernate valida il contratto JPA, mentre Flyway governa la creazione e l'evoluzione delle tabelle runtime di dominio (inclusa `password_reset_tokens` da V10 e `users.session_version` da V11) e dello schema Spring Session tramite `classpath:db/migration`.
 
 Flyway è configurato con `baseline-on-migrate=false` e `clean-disabled=true` e governa lo schema di dominio insieme all'infrastruttura Spring Session. V4 converte i dati temporali legacy, V5 trasferisce l'auditing all'applicazione, V6 aggiunge gli snapshot Booking, V7 introduce Spring Session JDBC, V8 aggiunge regole settimanali, audit delle modifiche, capacità e luogo dello slot e V9 aggiunge i metadata nullable di rifiuto/cancellazione Booking. L'elenco aggiornato delle migrazioni e i dettagli di schema restano in [docs/10-database-schema.md](docs/10-database-schema.md).
 
@@ -476,7 +479,7 @@ Il profilo tracciato `mailpit` è un aiuto manuale locale, non un profilo di pro
 ## 14. Roadmap sintetica
 
 1. dashboard frontend con dati ancora placeholder;
-2. completare il lifecycle account (recupero/reset password, editing account, upload immagine profilo);
+2. completare il lifecycle account (editing account, upload immagine profilo, cambio password autenticato);
 3. implementare le schede di allenamento;
 4. implementare i piani alimentari;
 5. aggiungere feedback, misurazioni e progressi;
@@ -491,11 +494,12 @@ La cartella `frontend` contiene un'applicazione React/TypeScript/Vite con:
 - routing, layout, navigazione per ruolo e pagine di errore;
 - home pubblica completa sulla route `/` (direzione visuale dark-tech);
 - autenticazione session-based: httpClient, CSRF memory-only, AuthProvider, login, logout, guards, bootstrap `/me`;
+- recupero/reset password pubblico: `/forgot-password` e `/reset-password` (fragment `#token=`, memory-only, nessun auto-login);
 - onboarding pubblico CLIENT: `/invite/validate` e `/register/client`, provider memory-only, auth gate locale, outcome conservativi e reinvio neutro;
 - pagina Profilo autenticata role-aware per CLIENT e PROFESSIONAL, con Account in sola lettura e Operational Status modificabile indipendentemente dal form profilo;
 - proxy Vite `/api` → `http://localhost:8080` in sviluppo;
 - test con Vitest / React Testing Library; gate locali lint/format/build.
 
-Auth foundation, login/logout, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, Profilo/Account/Operational Status, inviti, relazioni CLIENT ↔ PROFESSIONAL, Availability settimanale PT e Booking end-to-end sono implementati. Resta placeholder la dashboard con dati. Nessun JWT/Bearer né storage di token o codici invito nel client.
+Auth foundation, login/logout, onboarding pubblico PROFESSIONAL e CLIENT, verifica email con resend, recupero/reset password V1, Profilo/Account/Operational Status, inviti, relazioni CLIENT ↔ PROFESSIONAL, Availability settimanale PT e Booking end-to-end sono implementati. Resta placeholder la dashboard con dati. Nessun JWT/Bearer né storage di token o codici invito nel client.
 
 Riferimenti: [Authentication Session Flow](docs/frontend/03-authentication-session-flow.md), [Professional Onboarding Implementation](docs/frontend/04-professional-onboarding-implementation.md), [Professional Invites Implementation](docs/frontend/05-professional-invites-implementation.md), [Client Onboarding Implementation](docs/frontend/06-client-onboarding-implementation.md), [Client-Professional Relationships Implementation](docs/frontend/07-client-professional-relationships-implementation.md), [Frontend Functional Map](docs/frontend/01-frontend-functional-map-mvp.md), [Public Home](docs/frontend/02-public-home-implementation.md), [Security Flow](docs/09-security-flow.md), [Functional Scope](docs/01-functional-scope.md).

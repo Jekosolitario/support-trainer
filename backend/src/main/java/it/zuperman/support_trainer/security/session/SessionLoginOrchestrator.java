@@ -51,7 +51,8 @@ public class SessionLoginOrchestrator {
 
         AuthenticatedUserPrincipal principal = new AuthenticatedUserPrincipal(
                 identity.userId(),
-                identity.email()
+                identity.email(),
+                identity.sessionVersion()
         );
         Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(
                 principal,

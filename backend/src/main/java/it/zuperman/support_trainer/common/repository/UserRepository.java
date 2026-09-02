@@ -26,7 +26,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 user.id,
                 user.role,
                 user.accountStatus,
-                user.emailVerified
+                user.emailVerified,
+                user.sessionVersion
             )
             from User user
             where user.id = :userId

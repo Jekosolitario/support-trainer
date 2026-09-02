@@ -48,6 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "app.email.mode=SMTP",
         "app.email.verification-page-url=https://frontend.test/verify-email",
+        "app.email.password-recovery-page-url=https://frontend.test/reset-password",
         "app.email.sender.address=no-reply@example.test",
         "app.email.sender.name=Support Trainer",
         "app.email.smtp.host=smtp.example.test",

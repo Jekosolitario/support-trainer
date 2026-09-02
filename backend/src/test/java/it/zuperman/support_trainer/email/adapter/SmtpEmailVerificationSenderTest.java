@@ -116,6 +116,7 @@ class SmtpEmailVerificationSenderTest {
                 new EmailProperties(
                         EmailMode.SMTP,
                         URI.create("https://frontend.example/verify-email"),
+                        URI.create("https://frontend.example/reset-password"),
                         new EmailProperties.Sender("no-reply@example.test", "Support Trainer", replyTo),
                         new EmailProperties.Smtp(
                                 "smtp.internal.example", 587, "smtp-user", "smtp-password", true, true,

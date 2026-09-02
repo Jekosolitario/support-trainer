@@ -15,6 +15,7 @@ import jakarta.mail.internet.InternetAddress;
 public record EmailProperties(
         @DefaultValue("DISABLED") EmailMode mode,
         URI verificationPageUrl,
+        @DefaultValue("http://localhost:5173/reset-password") URI passwordRecoveryPageUrl,
         Sender sender,
         Smtp smtp
 ) {
@@ -23,16 +24,17 @@ public record EmailProperties(
         if (mode == null) {
             throw new IllegalArgumentException("app.email.mode must not be null");
         }
-        validateVerificationPageUrl(mode, verificationPageUrl);
+        validatePageUrl(mode, verificationPageUrl, "app.email.verification-page-url");
+        validatePageUrl(mode, passwordRecoveryPageUrl, "app.email.password-recovery-page-url");
         if (mode == EmailMode.SMTP) {
             validateSender(sender);
             validateSmtp(smtp);
         }
     }
 
-    private static void validateVerificationPageUrl(EmailMode mode, URI uri) {
+    private static void validatePageUrl(EmailMode mode, URI uri, String propertyName) {
         if (uri == null) {
-            throw invalidVerificationPageUrl();
+            throw invalidPageUrl(propertyName);
         }
 
         String scheme = uri.getScheme();
@@ -50,14 +52,14 @@ public record EmailProperties(
                 || rawPath.endsWith("/")
                 || rawPath.contains("//")
                 || !uri.normalize().equals(uri)) {
-            throw invalidVerificationPageUrl();
+            throw invalidPageUrl(propertyName);
         }
 
         if (mode != EmailMode.DISABLED
                 && scheme.equalsIgnoreCase("http")
                 && !isLoopbackHost(uri.getHost())) {
             throw new IllegalArgumentException(
-                    "app.email.verification-page-url must use HTTPS outside the local loopback"
+                    propertyName + " must use HTTPS outside the local loopback"
             );
         }
     }
@@ -111,9 +113,9 @@ public record EmailProperties(
         }
     }
 
-    private static IllegalArgumentException invalidVerificationPageUrl() {
+    private static IllegalArgumentException invalidPageUrl(String propertyName) {
         return new IllegalArgumentException(
-                "app.email.verification-page-url must be an absolute HTTP or HTTPS page URL "
+                propertyName + " must be an absolute HTTP or HTTPS page URL "
                 + "without query, fragment, trailing slash or ambiguous path"
         );
     }

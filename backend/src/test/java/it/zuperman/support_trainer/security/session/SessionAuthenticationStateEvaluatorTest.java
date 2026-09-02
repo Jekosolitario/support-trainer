@@ -212,6 +212,36 @@ class SessionAuthenticationStateEvaluatorTest {
     }
 
     @Test
+    @DisplayName("sessionVersion del principal diversa dallo snapshot deve invalidare")
+    void shouldRejectSessionVersionMismatch() {
+        Authentication authentication = authentication(7L, Role.CLIENT, 0L);
+        when(userRepository.findSecuritySnapshotById(7L)).thenReturn(Optional.of(snapshot(
+                7L,
+                Role.CLIENT,
+                AccountStatus.ACTIVE,
+                true,
+                1L
+        )));
+
+        assertThat(evaluator.isAuthenticationStillValid(authentication, AUTHENTICATED_AT)).isFalse();
+    }
+
+    @Test
+    @DisplayName("sessionVersion coincidente deve restare valida")
+    void shouldAcceptMatchingSessionVersion() {
+        Authentication authentication = authentication(7L, Role.CLIENT, 3L);
+        when(userRepository.findSecuritySnapshotById(7L)).thenReturn(Optional.of(snapshot(
+                7L,
+                Role.CLIENT,
+                AccountStatus.ACTIVE,
+                true,
+                3L
+        )));
+
+        assertThat(evaluator.isAuthenticationStillValid(authentication, AUTHENTICATED_AT)).isTrue();
+    }
+
+    @Test
     @DisplayName("Non deve dipendere da profile.active: nessuna query oltre lo snapshot")
     void shouldNotDependOnProfileActive() {
         Authentication authentication = authentication(7L, Role.PROFESSIONAL);
@@ -241,8 +271,12 @@ class SessionAuthenticationStateEvaluatorTest {
     }
 
     private static Authentication authentication(Long userId, Role role) {
+        return authentication(userId, role, 0L);
+    }
+
+    private static Authentication authentication(Long userId, Role role, long sessionVersion) {
         return new UsernamePasswordAuthenticationToken(
-                new AuthenticatedUserPrincipal(userId, "user" + userId + "@example.com"),
+                new AuthenticatedUserPrincipal(userId, "user" + userId + "@example.com", sessionVersion),
                 null,
                 List.of(new SimpleGrantedAuthority(role.name()))
         );
@@ -254,6 +288,16 @@ class SessionAuthenticationStateEvaluatorTest {
             AccountStatus accountStatus,
             boolean emailVerified
     ) {
-        return new UserSecuritySnapshot(id, role, accountStatus, emailVerified);
+        return snapshot(id, role, accountStatus, emailVerified, 0L);
+    }
+
+    private static UserSecuritySnapshot snapshot(
+            Long id,
+            Role role,
+            AccountStatus accountStatus,
+            boolean emailVerified,
+            long sessionVersion
+    ) {
+        return new UserSecuritySnapshot(id, role, accountStatus, emailVerified, sessionVersion);
     }
 }

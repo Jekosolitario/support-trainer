@@ -83,7 +83,7 @@ La password deve rispettare almeno queste regole:
 - almeno **un numero ASCII** (`[0-9]`)
 - almeno **un carattere speciale** fuori da `[A-Za-z0-9]`
 
-Il limite massimo è calcolato sui byte UTF-8, non sul solo numero di unità UTF-16. Il backend rifiuta il valore oltre soglia prima dell’hashing e non tronca, normalizza, fa trim o trasforma la password. Il frontend della registrazione PROFESSIONAL pre-valida in modo coerente; il server resta autoritativo. Dettaglio client: [`docs/frontend/04-professional-onboarding-implementation.md`](frontend/04-professional-onboarding-implementation.md).
+Il limite massimo è calcolato sui byte UTF-8, non sul solo numero di unità UTF-16. Il backend rifiuta il valore oltre soglia prima dell’hashing e non tronca, normalizza, fa trim o trasforma la password. Il frontend della registrazione PROFESSIONAL, della registrazione CLIENT e del reset password riusa la stessa pre-validazione (`validateRegistrationPassword`); il server resta autoritativo.
 
 ### 3.4 Stato iniziale account
 
@@ -183,6 +183,12 @@ La conferma usa `POST /api/v1/auth/email-verification/confirm` con un token non 
 Il reinvio usa `POST /api/v1/auth/email-verification/resend` con un'email obbligatoria, valida e lunga al massimo 100 caratteri. Dopo `trim` e lowercase, ogni input sintatticamente valido restituisce lo stesso `202 Accepted`: account inesistente, verificato, non idoneo o in cooldown non sono distinguibili. Solo `CLIENT` e `PROFESSIONAL` con profilo attivo, `PENDING_VERIFICATION` ed `emailVerified=false` possono generare un nuovo token.
 
 Il cooldown è attivo quando `now < latestToken.createdAt + 60 secondi`; al boundary esatto il reinvio è consentito. Sotto lock pessimista sull'utente, tutti i precedenti token `used=false` vengono marcati `used=true` con `usedAt=now`, quindi viene creato un solo token da 24 ore. I token già usati non cambiano. Questa invalidazione riusa semanticamente `used/usedAt` perché lo schema corrente non contiene campi di revoca. Invito e `ProfessionalClientLink` non vengono modificati; token, email, stato e tempo residuo non compaiono nella risposta o nei log. La richiesta email viene pubblicata dopo la creazione del nuovo token e consumata solo dopo commit; errori del sender non annullano dati o risposta uniforme. `app.email.verification-page-url` è obbligatoria, assoluta e priva di query e fragment: HTTP è ammesso solo per loopback, mentre un host remoto richiede HTTPS. In modalità `SMTP` sono obbligatori mittente valido, host, porta e timeout positivi; con `auth=true` sono obbligatori anche username e password. Retry, outbox e rate limiting distribuito restano fuori perimetro.
+
+### 4.9 Recupero password
+
+Request: `POST /api/v1/auth/password-recovery/request` con `email` obbligatoria, formato email, massimo 100 caratteri (stesse annotazioni della registrazione). Input sintatticamente valido → sempre `202`. Field errors solo su `email` (`NotBlank`, `Email`, `Size`).
+
+Confirm: `POST /api/v1/auth/password-recovery/confirm` con `token` (`NotBlank`, `Size` max 500) e `newPassword` (stessa policy §3.3, incluso `@BcryptCompatiblePassword`). `confirmPassword` è solo frontend e non è nel payload. Token inutilizzabile → `400 PASSWORD_RESET_TOKEN_INVALID_OR_EXPIRED` senza field errors. Password invalida → `400 VALIDATION_ERROR` su `newPassword`.
 
 ---
 
@@ -785,6 +791,7 @@ Esempi:
 
 - registrazione professionista;
 - registrazione cliente;
+- request/confirm password recovery (`email`, `token`, `newPassword`);
 - creazione slot availability;
 - creazione booking.
 
@@ -810,6 +817,7 @@ Il service layer gestisce le regole business reali, tra cui:
 - occupancy prodotta da `PENDING` e `CONFIRMED`, con rilascio su `REJECTED` e `CANCELLED`;
 - normalizzazione della nota booking;
 - transizioni booking consentite;
+- eligibility e consumo one-time dei token di password recovery;
 - blocco mutation Booking a fine snapshot esatta o oltre;
 - nessuna mutation globale dello stato slot durante confirm, reject o cancel;
 - protezione da overlap Availability concorrenti tramite lock sul professionista;

@@ -15,6 +15,7 @@ class SmtpMailSenderConfigurationTest {
         EmailProperties properties = new EmailProperties(
                 EmailMode.SMTP,
                 URI.create("https://frontend.example/verify-email"),
+                URI.create("https://frontend.example/reset-password"),
                 new EmailProperties.Sender("no-reply@example.test", "Support Trainer", "reply@example.test"),
                 new EmailProperties.Smtp(
                         "smtp.example.test", 2525, "smtp-user", "smtp-password", true, true,

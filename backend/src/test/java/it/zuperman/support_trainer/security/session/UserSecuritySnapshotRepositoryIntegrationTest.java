@@ -70,6 +70,7 @@ class UserSecuritySnapshotRepositoryIntegrationTest {
         assertThat(snapshot.get().getRole()).isEqualTo(Role.CLIENT);
         assertThat(snapshot.get().getAccountStatus()).isEqualTo(AccountStatus.ACTIVE);
         assertThat(snapshot.get().getEmailVerified()).isTrue();
+        assertThat(snapshot.get().getSessionVersion()).isZero();
 
         Optional<UserSecuritySnapshot> professionalSnapshot
                 = userRepository.findSecuritySnapshotById(professional.getId());
@@ -84,6 +85,7 @@ class UserSecuritySnapshotRepositoryIntegrationTest {
 
         for (String sql : snapshotStatements) {
             assertThat(sql).contains("from users");
+            assertThat(containsIdentifier(sql, "session_version")).isTrue();
             assertThat(containsIdentifier(sql, "client_profiles")).isFalse();
             assertThat(containsIdentifier(sql, "professional_profiles")).isFalse();
             assertThat(containsIdentifier(sql, "specialization")).isFalse();

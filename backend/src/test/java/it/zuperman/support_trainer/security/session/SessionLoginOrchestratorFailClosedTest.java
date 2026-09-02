@@ -46,7 +46,7 @@ class SessionLoginOrchestratorFailClosedTest {
     void shouldFailClosedWhenLaterCompositeDelegateFailsAfterFixation() {
         AuthService authService = mock(AuthService.class);
         when(authService.authenticateForSession(any())).thenReturn(
-                new SessionLoginIdentity(42L, "user@example.com", Role.CLIENT)
+                new SessionLoginIdentity(42L, "user@example.com", Role.CLIENT, 0L)
         );
 
         AtomicReference<String> sessionIdAfterFixation = new AtomicReference<>();
@@ -94,7 +94,7 @@ class SessionLoginOrchestratorFailClosedTest {
     void shouldFailClosedWhenSaveContextFails() {
         AuthService authService = mock(AuthService.class);
         when(authService.authenticateForSession(any())).thenReturn(
-                new SessionLoginIdentity(7L, "pro@example.com", Role.PROFESSIONAL)
+                new SessionLoginIdentity(7L, "pro@example.com", Role.PROFESSIONAL, 0L)
         );
 
         SessionAuthenticationStrategy strategy = new ChangeSessionIdAuthenticationStrategy();
@@ -132,7 +132,7 @@ class SessionLoginOrchestratorFailClosedTest {
     void shouldFailClosedWhenAuthenticatedAtWriteFails() {
         AuthService authService = mock(AuthService.class);
         when(authService.authenticateForSession(any())).thenReturn(
-                new SessionLoginIdentity(9L, "write@example.com", Role.CLIENT)
+                new SessionLoginIdentity(9L, "write@example.com", Role.CLIENT, 0L)
         );
 
         SessionAuthenticationStrategy strategy = mock(SessionAuthenticationStrategy.class);
@@ -177,7 +177,7 @@ class SessionLoginOrchestratorFailClosedTest {
     void cleanupMustInvalidateSessionEvenWhenRollbackSaveContextFails() {
         AuthService authService = mock(AuthService.class);
         when(authService.authenticateForSession(any())).thenReturn(
-                new SessionLoginIdentity(11L, "rollback@example.com", Role.CLIENT)
+                new SessionLoginIdentity(11L, "rollback@example.com", Role.CLIENT, 0L)
         );
 
         AtomicBoolean strategyInvoked = new AtomicBoolean(false);
@@ -227,7 +227,7 @@ class SessionLoginOrchestratorFailClosedTest {
     void invalidateRuntimeExceptionMustNotMaskOriginalFailure() {
         AuthService authService = mock(AuthService.class);
         when(authService.authenticateForSession(any())).thenReturn(
-                new SessionLoginIdentity(13L, "invalidate@example.com", Role.CLIENT)
+                new SessionLoginIdentity(13L, "invalidate@example.com", Role.CLIENT, 0L)
         );
 
         SessionAuthenticationStrategy strategy = (authentication, request, response) -> {
@@ -276,7 +276,7 @@ class SessionLoginOrchestratorFailClosedTest {
     void repositoryAndInvalidateFailuresKeepOriginalPrimary() {
         AuthService authService = mock(AuthService.class);
         when(authService.authenticateForSession(any())).thenReturn(
-                new SessionLoginIdentity(15L, "both@example.com", Role.CLIENT)
+                new SessionLoginIdentity(15L, "both@example.com", Role.CLIENT, 0L)
         );
 
         SessionAuthenticationStrategy strategy = (authentication, request, response) -> {

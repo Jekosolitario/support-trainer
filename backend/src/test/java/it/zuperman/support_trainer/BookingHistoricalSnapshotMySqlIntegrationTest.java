@@ -32,7 +32,7 @@ class BookingHistoricalSnapshotMySqlIntegrationTest {
         migrateToV59(legacySchema, password);
         seedLegacyBooking(legacySchema, password);
         Flyway latest = flyway(legacySchema, password, null);
-        assertThat(latest.migrate().migrationsExecuted).isEqualTo(3);
+        assertThat(latest.migrate().migrationsExecuted).isEqualTo(6);
         assertThat(latest.migrate().migrationsExecuted).isZero();
         assertLegacySnapshot(legacySchema, password);
         assertSnapshotColumns(legacySchema, password);
@@ -146,7 +146,8 @@ class BookingHistoricalSnapshotMySqlIntegrationTest {
                         "--spring.jpa.hibernate.ddl-auto=validate",
                         "--spring.jpa.open-in-view=false",
                         "--app.email.mode=DISABLED",
-                        "--app.email.verification-page-url=http://localhost:5173/verify-email"
+                        "--app.email.verification-page-url=http://localhost:5173/verify-email",
+                        "--app.email.password-recovery-page-url=http://localhost:5173/reset-password"
                 )) {
             assertThat(ignored.isRunning()).isTrue();
         }

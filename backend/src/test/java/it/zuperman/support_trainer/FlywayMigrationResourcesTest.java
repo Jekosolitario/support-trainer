@@ -48,8 +48,16 @@ class FlywayMigrationResourcesTest {
             "db/migration/V5_9__transfer_booking_item_audit_ownership_to_application.sql",
             "db/migration/V7__create_spring_session_jdbc_schema.sql",
             "db/migration/V8__add_weekly_availability_and_capacity.sql",
-            "db/migration/V9__add_booking_transition_metadata.sql"
+            "db/migration/V9__add_booking_transition_metadata.sql",
+            "db/migration/V10__password_recovery.sql",
+            "db/migration/V11__user_session_version.sql"
     );
+
+    private static final String V7_MIGRATION = "db/migration/V7__create_spring_session_jdbc_schema.sql";
+    private static final String V8_MIGRATION = "db/migration/V8__add_weekly_availability_and_capacity.sql";
+    private static final String V9_MIGRATION = "db/migration/V9__add_booking_transition_metadata.sql";
+    private static final String V10_MIGRATION = "db/migration/V10__password_recovery.sql";
+    private static final String V11_MIGRATION = "db/migration/V11__user_session_version.sql";
 
     private static final List<V5MigrationContract> V5_MIGRATIONS = List.of(
             new V5MigrationContract(MIGRATIONS.get(11), "users", false),
@@ -132,7 +140,6 @@ class FlywayMigrationResourcesTest {
             "nutrition_feedbacks",
             "nutrition_plans",
             "nutrition_weeks",
-            "password_reset_tokens",
             "refresh_tokens",
             "workout_days",
             "workout_exercises",
@@ -193,7 +200,9 @@ class FlywayMigrationResourcesTest {
                         "V5_9__transfer_booking_item_audit_ownership_to_application.sql",
                         "V7__create_spring_session_jdbc_schema.sql",
                         "V8__add_weekly_availability_and_capacity.sql",
-                        "V9__add_booking_transition_metadata.sql"
+                        "V9__add_booking_transition_metadata.sql",
+                        "V10__password_recovery.sql",
+                        "V11__user_session_version.sql"
                 )
                 .allMatch(name -> VALID_MIGRATION_NAME.matcher(name).matches());
 
@@ -202,7 +211,7 @@ class FlywayMigrationResourcesTest {
     }
 
     @Test
-    void migrationDirectoryShouldContainOnlyApprovedSqlMigrationsThroughV9() throws IOException {
+    void migrationDirectoryShouldContainOnlyApprovedSqlMigrationsThroughV11() throws IOException {
         Resource[] resources = new PathMatchingResourcePatternResolver()
                 .getResources("classpath*:db/migration/V*__*.sql");
 
@@ -398,7 +407,7 @@ class FlywayMigrationResourcesTest {
 
     @Test
     void v7ShouldCreateOfficialSpringSessionJdbcSchemaWithoutLegacyReuse() throws IOException {
-        String sql = readResource(MIGRATIONS.get(MIGRATIONS.size() - 3));
+        String sql = readResource(V7_MIGRATION);
         Matcher matcher = CREATE_TABLE.matcher(sql);
         Set<String> createdTables = new LinkedHashSet<>();
         while (matcher.find()) {
@@ -438,7 +447,7 @@ class FlywayMigrationResourcesTest {
 
     @Test
     void v8ShouldAddWeeklyRulesCapacityAndChangeAuditWithoutDestroyingHistory() throws IOException {
-        String sql = readResource(MIGRATIONS.get(MIGRATIONS.size() - 2));
+        String sql = readResource(V8_MIGRATION);
 
         assertThat(sql)
                 .contains("CREATE TABLE weekly_availability_rules")
@@ -463,7 +472,7 @@ class FlywayMigrationResourcesTest {
 
     @Test
     void v9ShouldAddNullableBookingTransitionMetadata() throws IOException {
-        String sql = readResource(MIGRATIONS.getLast());
+        String sql = readResource(V9_MIGRATION);
 
         assertThat(sql)
                 .contains("ADD COLUMN rejection_reason VARCHAR(1000) NULL")
@@ -472,6 +481,46 @@ class FlywayMigrationResourcesTest {
                 .doesNotContainIgnoringCase("UPDATE booking_requests")
                 .doesNotContainIgnoringCase("DROP ")
                 .doesNotContainIgnoringCase("DELETE FROM");
+    }
+
+    @Test
+    void v10ShouldCreatePasswordResetTokensWithHashedTokenContract() throws IOException {
+        String sql = readResource(V10_MIGRATION);
+        Matcher matcher = CREATE_TABLE.matcher(sql);
+        Set<String> createdTables = new LinkedHashSet<>();
+        while (matcher.find()) {
+            createdTables.add(matcher.group(1).toLowerCase(Locale.ROOT));
+        }
+
+        assertThat(createdTables).containsExactly("password_reset_tokens");
+        assertThat(sql)
+                .contains("user_id BIGINT NOT NULL")
+                .contains("token_hash CHAR(64) NOT NULL")
+                .contains("created_at DATETIME(6) NOT NULL")
+                .contains("expires_at DATETIME(6) NOT NULL")
+                .contains("consumed_at DATETIME(6) NULL")
+                .contains("CONSTRAINT uk_password_reset_tokens_token_hash UNIQUE (token_hash)")
+                .contains("INDEX idx_password_reset_tokens_user_id (user_id)")
+                .contains("REFERENCES users (id) ON DELETE RESTRICT ON UPDATE RESTRICT")
+                .contains("ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci")
+                .doesNotContainIgnoringCase("CREATE TABLE IF NOT EXISTS")
+                .doesNotContainIgnoringCase("ON DELETE CASCADE")
+                .doesNotContainIgnoringCase("raw_token")
+                .doesNotContainIgnoringCase("token VARCHAR");
+        assertThat(DESTRUCTIVE_STATEMENT.matcher(sql).find()).isFalse();
+    }
+
+    @Test
+    void v11ShouldAddNonNullUserSessionVersionWithDefaultZero() throws IOException {
+        String sql = readResource(V11_MIGRATION);
+
+        assertThat(sql)
+                .contains("ALTER TABLE users")
+                .contains("ADD COLUMN session_version BIGINT NOT NULL DEFAULT 0")
+                .doesNotContainIgnoringCase("DROP ")
+                .doesNotContainIgnoringCase("DELETE FROM")
+                .doesNotContainIgnoringCase("UPDATE users");
+        assertThat(DESTRUCTIVE_STATEMENT.matcher(sql).find()).isFalse();
     }
 
     @Test

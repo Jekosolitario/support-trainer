@@ -58,7 +58,7 @@ class SpringSessionJdbcMySqlIntegrationTest {
         assertThat(flyway(fromV6Schema, password, "6").migrate().migrationsExecuted).isGreaterThan(0);
         assertThat(tableExists(fromV6Schema, password, "SPRING_SESSION")).isFalse();
         Flyway upgrade = flyway(fromV6Schema, password, null);
-        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(5);
         assertThat(upgrade.migrate().migrationsExecuted).isZero();
         assertSpringSessionSchema(fromV6Schema, password);
         validateWithHibernate(fromV6Schema, password);
@@ -246,7 +246,8 @@ class SpringSessionJdbcMySqlIntegrationTest {
                         "--spring.session.jdbc.initialize-schema=never",
                         "--spring.session.timeout=30m",
                         "--app.email.mode=DISABLED",
-                        "--app.email.verification-page-url=http://localhost:5173/verify-email"
+                        "--app.email.verification-page-url=http://localhost:5173/verify-email",
+                        "--app.email.password-recovery-page-url=http://localhost:5173/reset-password"
                 );
     }
 

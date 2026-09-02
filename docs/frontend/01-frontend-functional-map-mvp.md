@@ -26,7 +26,7 @@ La mappa distingue sempre tre stati:
 | **Futuro / non attivo** | La UX può prevederne la posizione, ma non deve presentarlo come funzionante. |
 | **Non presente**        | Non deve comparire come azione attiva né generare chiamate API.              |
 
-La presenza di una pagina frontend non implica necessariamente un endpoint dedicato: una landing statica non ne richiede uno, mentre una dashboard MVP deve comporre dati restituiti da endpoint già esistenti. Nel backend risultano implementati **36 endpoint applicativi**: Auth 8, Me 4, Client 2, Professional 3, Invite 2, Availability 10 e Booking 7. `/error` è un fallback tecnico separato e non va trattato come endpoint funzionale.
+La presenza di una pagina frontend non implica necessariamente un endpoint dedicato: una landing statica non ne richiede uno, mentre una dashboard MVP deve comporre dati restituiti da endpoint già esistenti. Nel backend risultano implementati **38 endpoint applicativi**: Auth 10, Me 4, Client 2, Professional 3, Invite 2, Availability 10 e Booking 7. `/error` è un fallback tecnico separato e non va trattato come endpoint funzionale.
 
 La baseline certificata richiede inoltre che il client usi la risposta neutra `202` per entrambe le registrazioni, non cerchi `EMAIL_ALREADY_REGISTERED`, gestisca `ErrorResponse` tramite `code` e tratti gli orari Availability e gli snapshot Booking come `OffsetDateTime` con offset autorevole. Le sezioni successive dettagliano questi contratti.
 
@@ -52,7 +52,7 @@ Nel backend i soli ruoli di sicurezza sono `CLIENT` e `PROFESSIONAL`. `PERSONAL_
 
 | Profilo UX          | Identità backend                    | Può fare ora                                                                                                                                          | Non può fare ora                                                                               | Pagine private necessarie                                                               |
 | ------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Visitatore pubblico | Nessuna                             | Consultare contenuti statici, registrare un professionista, validare un invito, registrare un cliente, verificare l'email tramite token, fare login   | Accedere a dati applicativi o registrarsi come cliente senza invito                            | Nessuna                                                                                 |
+| Visitatore pubblico | Nessuna                             | Consultare contenuti statici, registrare un professionista, validare un invito, registrare un cliente, verificare l'email tramite token, richiedere/reimpostare la password, fare login   | Accedere a dati applicativi o registrarsi come cliente senza invito                            | Nessuna                                                                                 |
 | Cliente             | `CLIENT`                            | Gestire profilo/account, vedere professionisti collegati, consultare disponibilità di personal trainer collegati, creare e gestire booking consentiti | Creare inviti/slot, vedere clienti, usare moduli Workout, Nutrition, Feedback o Measurements   | Dashboard, profilo/account, professionisti, disponibilità, booking                      |
 | Professionista      | `PROFESSIONAL`                      | Gestire profilo/account, vedere clienti collegati, generare e consultare inviti                                                                       | Usare funzionalità non compatibili con la propria specializzazione; gestire manualmente i link | Dashboard, profilo/account, clienti, inviti; aree specialistiche solo quando supportate |
 | Personal trainer    | `PROFESSIONAL` + `PERSONAL_TRAINER` | Tutte le funzioni comuni del professionista, più gestione availability e richieste booking                                                            | Workout, Feedback e Measurements, ancora non implementati                                      | Anche availability e booking                                                            |
@@ -72,17 +72,19 @@ Gli endpoint sotto `/api/v1/auth/**` sono pubblici.
 | Schermata                    | Scopo ed endpoint                                                                                                                                                                                                                                                                 | Stati UI necessari                                                                                                                         | Errori principali                                                                                                                                                             |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Home / landing               | Pagina statica di ingresso. Nessun endpoint richiesto. CTA verso login e registrazione professionista; l'accesso cliente parte da un invito.                                                                                                                                      | Contenuto pronto, eventuale fallback contenuti                                                                                             | Nessun errore API                                                                                                                                                             |
-| Login                        | Ottenere CSRF (`GET /api/v1/auth/csrf`), poi autenticare con `POST /api/v1/auth/login` + header CSRF. Campi: email e password. Risposta `204` senza token; il browser conserva il cookie HttpOnly. Dopo successo: nuovo `GET /csrf`, poi bootstrap `/me/account` e `/me/profile`. | Idle, invio, successo e redirect per ruolo, errore credenziali, account non attivo / email non verificata                                  | `400` validazione/body, `401 AUTHENTICATION_ERROR`, `403 ACCOUNT_NOT_ACTIVE` / `EMAIL_NOT_VERIFIED`, `403 CSRF_VALIDATION_FAILED`. `profile.active=false` non blocca il login |
+| Login                        | Ottenere CSRF (`GET /api/v1/auth/csrf`), poi autenticare con `POST /api/v1/auth/login` + header CSRF. Campi: email e password. Risposta `204` senza token; il browser conserva il cookie HttpOnly. Dopo successo: nuovo `GET /csrf`, poi bootstrap `/me/account` e `/me/profile`. Link pubblico `Password dimenticata?` verso `/forgot-password`. | Idle, invio, successo e redirect per ruolo, errore credenziali, account non attivo / email non verificata                                  | `400` validazione/body, `401 AUTHENTICATION_ERROR`, `403 ACCOUNT_NOT_ACTIVE` / `EMAIL_NOT_VERIFIED`, `403 CSRF_VALIDATION_FAILED`. `profile.active=false` non blocca il login |
 | Registrazione professionista | Inviare `POST /api/v1/auth/register/professional`. Campi: nome, cognome, email, password, specializzazione `PERSONAL_TRAINER` o `NUTRITIONIST`.                                                                                                                                   | Form, validazione, invio, `202` neutro, istruzione di verifica email                                                                       | `400 VALIDATION_ERROR`; non cercare `EMAIL_ALREADY_REGISTERED`                                                                                                                |
 | Verifica email               | Ricevere `/verify-email#token=...`, rimuovere subito il fragment e inviare `POST /api/v1/auth/email-verification/confirm` con body `token`.                                                                                                                                       | Verifica in corso, verificata, non valido o scaduto; secondo utilizzo idempotente; CTA al login dopo successo                              | `400` body/validazione, `404 EMAIL_VERIFICATION_TOKEN_NOT_FOUND`, `410 EMAIL_VERIFICATION_TOKEN_EXPIRED`                                                                      |
 | Reinvio verifica             | Dalla schermata “Controlla la tua email”, inviare `POST /api/v1/auth/email-verification/resend` con body `email`.                                                                                                                                                                 | Messaggio sempre neutro; azione “Invia di nuovo”; pulsante UX disabilitato 60 secondi, senza assumere che il backend abbia creato un token | `400` validazione/body, `415` media type; ogni email valida riceve `202` identico                                                                                             |
 | Validazione invito           | Verificare il codice prima di mostrare il form cliente con `POST /api/v1/auth/register/client/validate-invite`. Body: `code`.                                                                                                                                                     | Form codice, validazione, valido con scadenza, non valido/scaduto/usato, retry                                                             | `400 VALIDATION_ERROR` e codici `INVITE_CODE_*`; `404 INVITE_CODE_NOT_FOUND`                                                                                                  |
 | Registrazione cliente        | Inviare `POST /api/v1/auth/register/client` dopo validazione invito. Campi: nome, cognome, email, password, codice, data di nascita, altezza, obiettivo, genere; note mediche/infortuni/generali facoltative.                                                                     | Form multi-sezione, validazione campo, invio, `202` neutro, schermata “Controlla la tua email”                                             | `400` validazione o invito non più valido, `403` professionista non utilizzabile; nessun `EMAIL_ALREADY_REGISTERED`                                                           |
+| Password dimenticata         | `POST /api/v1/auth/password-recovery/request` `{ email }` + CSRF. Link da Login.                                                                                                                                                                                                  | Form, submitting, successo generico identico per ogni `202`, validation email, errore tecnico retryable                                    | `400 VALIDATION_ERROR` su email; network/5xx/`2xx` inatteso → tecnico. Nessuna enumerazione account/cooldown                                                                  |
+| Reimposta password           | Link `{page}#token=...`; sanitizza fragment; `POST /api/v1/auth/password-recovery/confirm` `{ token, newPassword }` + CSRF.                                                                                                                                                       | missing-token, ready, submitting, invalid/expired unico, tecnico retryable, success con CTA Accedi (niente auto-login)                     | `400 PASSWORD_RESET_TOKEN_INVALID_OR_EXPIRED`; `400 VALIDATION_ERROR` su `newPassword`; mismatch conferma solo locale. Refresh dopo sanitization → missing-token              |
 | Pagine informative statiche  | Eventuali pagine legali o informative non richiedono backend, ma vanno create solo quando contenuti e requisiti sono definiti.                                                                                                                                                    | Contenuto e pagina non trovata frontend                                                                                                    | Nessun errore API                                                                                                                                                             |
 
 Note di flusso verificate:
 
-- tutte le mutazioni Auth (login, registrazioni, confirm/resend, validate-invite, logout) richiedono CSRF: prima `GET /api/v1/auth/csrf`, poi header `headerName` (tipicamente `X-CSRF-TOKEN`); il token va solo in memoria;
+- tutte le mutazioni Auth (login, registrazioni, confirm/resend, validate-invite, password recovery request/confirm, logout) richiedono CSRF: prima `GET /api/v1/auth/csrf`, poi header `headerName` (tipicamente `X-CSRF-TOKEN`); il token va solo in memoria;
 - entrambe le registrazioni usano una risposta pubblica `202 Accepted` intenzionalmente neutra: il frontend non può dedurre se l'email fosse già registrata né quali effetti persistenti siano stati eseguiti e non deve cercare `EMAIL_ALREADY_REGISTERED`;
 - nel ramo di una nuova registrazione, cliente e professionista nascono `PENDING_VERIFICATION`, con `emailVerified=false`, e non possono fare login prima della conferma;
 - nel ramo di una nuova registrazione CLIENT il backend crea account e collegamento, consuma l'invito e genera il token di verifica; per un'email già esistente può terminare anticipatamente mantenendo la risposta neutra, quindi nessuno di questi effetti è inferibile dal solo `202`;
@@ -94,6 +96,7 @@ Note di flusso verificate:
 - Validate e Register CLIENT condividono un provider limitato al proprio subtree che conserva soltanto il codice canonico. Il codice non passa in URL, router state o storage; reload e uscita dal subtree lo eliminano.
 - l'accesso diretto a `/register/client` senza invito memory-only è fail-closed e usa redirect `replace` verso `/invite/validate`;
 - Register CLIENT considera confermato soltanto `202`, tratta gli outcome incerti come ambigui e non ripete automaticamente la registrazione. Dettaglio: [FE06](./06-client-onboarding-implementation.md).
+- Password Recovery V1: request successo **solo** `202` (copy anti-enumerazione identica); confirm successo **solo** `204` e CTA Accedi, senza auto-login. Il raw token vive solo in memoria dopo lettura del fragment; sanitization immediata a `/reset-password`. Dettaglio: [FE03](./03-authentication-session-flow.md).
 
 ## 5. Funzionalità private implementabili ora
 
@@ -237,7 +240,6 @@ Il nutrizionista usa le funzionalità comuni del professionista, ma non dispone 
 | Nutrition               | Area nutrizionista e area cliente                      | Nascosta; non usare l'assenza di booking per simulare piani alimentari.                         |
 | Feedback                | Dettaglio futuro di workout/nutrition o area progressi | Nascosto: non esistono endpoint né dati.                                                        |
 | Measurements            | Profilo/progressi cliente                              | Nascosta; niente grafici o inserimento misure.                                                  |
-| Reset password          | Login / recupero account                               | Non mostrare un link attivo. Può apparire disabilitato solo in prototipi esplicitamente futuri. |
 | Upload immagine profilo | Profilo                                                | Mostrare immagine esistente o avatar fallback; nessun controllo upload attivo.                  |
 | App mobile              | Fuori dalla web app                                    | Nessun elemento nell'MVP web. React Native + Expo resta un'evoluzione separata.                 |
 
@@ -245,13 +247,15 @@ Sono inoltre non presenti e da non esporre come attivi: cambio password autentic
 
 ## 7. Sitemap MVP
 
-I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzionalità completa.** Home, login/auth foundation, onboarding pubblico **PROFESSIONAL e CLIENT**, **verifica email**, **Profilo/Account/Operational Status** e **gestione inviti PROFESSIONAL** sono implementati; le altre pagine business restano placeholder. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
+I path seguenti sono registrati nel router frontend. **Route esistente ≠ funzionalità completa.** Home, login/auth foundation, onboarding pubblico **PROFESSIONAL e CLIENT**, **verifica email**, **recupero/reset password**, **Profilo/Account/Operational Status** e **gestione inviti PROFESSIONAL** sono implementati; le altre pagine business restano placeholder. È usato il plurale `professionals` perché il backend restituisce una lista di professionisti collegati.
 
 ### Pubblico
 
 ```text
 /
 /login
+/forgot-password
+/reset-password
 /register/professional
 /invite/validate
 /register/client
@@ -295,6 +299,8 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 | ------------------------------------------------------- | ------------------------- | ------------------------------------------------------------ |
 | `/` home                                                | Pubblico                  | **Implementata**                                             |
 | `/login`                                                | Pubblico                  | **Implementata**                                             |
+| `/forgot-password`                                      | Pubblico                  | **Implementata** (request `202` neutro, anti-enumerazione)   |
+| `/reset-password`                                       | Pubblico                  | **Implementata** (fragment `#token=`, confirm `204`, no auto-login) |
 | `/register/professional`                                | Pubblico                  | **Implementata**                                             |
 | `/verify-email`                                         | Pubblico                  | **Implementata**                                             |
 | `/invite/validate`, `/register/client`                  | Pubblico                  | **Implementate** (provider memory-only e auth gate locale)   |
@@ -311,7 +317,7 @@ Non servono route separate per personal trainer e nutrizionista: condividono il 
 
 ### 8.1 Classificazione
 
-- Rotte pubbliche: landing, login, registrazioni, validazione invito e verifica email.
+- Rotte pubbliche: landing, login, password recovery (`/forgot-password`, `/reset-password`), registrazioni, validazione invito e verifica email.
 - Rotte private comuni: profilo/account e bootstrap sessione.
 - Rotte `CLIENT`: professionisti collegati, availability consultabile e booking cliente.
 - Rotte `PROFESSIONAL`: clienti e inviti.
@@ -410,6 +416,8 @@ Regole pratiche:
 | Tipo pagina/azione                  | Loading                                     | Empty                                                         | Error/forbidden                                                                 | Success e validazione                                                          |
 | ----------------------------------- | ------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | Login/registrazione                 | Disabilitare submit e mostrare progresso    | Non applicabile                                               | Errore generale e per campo; stato account distinto                             | Redirect o conferma; validazione client coerente ma il server resta autorevole |
+| Password dimenticata                | Submit in corso                             | Non applicabile                                               | Validazione email; errore tecnico retryable                                     | Successo generico identico per ogni `202`                                      |
+| Reimposta password                  | Submit in corso                             | Token assente dopo sanitization/refresh                       | Token invalid/expired unico; validazione password; errore tecnico retryable     | `204` → “Password aggiornata” e CTA Accedi                                     |
 | Verifica email/invito               | Stato iniziale automatico o submit in corso | Token/codice mancante                                         | Non valido, usato, scaduto o non trovato                                        | Conferma e CTA al passo successivo                                             |
 | Dashboard                           | Skeleton dei widget                         | Messaggio utile senza dati inventati                          | Errore per singolo blocco, non pagina bianca se gli altri dati sono disponibili | Dati composti dagli endpoint esistenti                                         |
 | Liste clienti/professionisti/inviti | Skeleton righe/card                         | “Nessun … disponibile” con CTA solo se esiste un'azione reale | Retry; `403` dedicato                                                           | Lista aggiornata dopo mutazioni                                                |
@@ -422,7 +430,7 @@ Ogni pagina privata deve prevedere anche gli stati trasversali `unauthorized` e 
 
 ## 11. Priorità implementazione React
 
-Completati: setup React/Vite/TypeScript, routing, layout, home pubblica, foundation API/auth session-based, **Profilo/Account/Operational Status**, onboarding/verifica email, inviti, relazioni CLIENT ↔ PROFESSIONAL, Availability settimanale PT e Booking Client ↔ PT end-to-end. Dettagli auth: [FE03](./03-authentication-session-flow.md); inviti: [FE05](./05-professional-invites-implementation.md); onboarding CLIENT: [FE06](./06-client-onboarding-implementation.md); relazioni: [FE07](./07-client-professional-relationships-implementation.md).
+Completati: setup React/Vite/TypeScript, routing, layout, home pubblica, foundation API/auth session-based, **Profilo/Account/Operational Status**, onboarding/verifica email, **recupero/reset password V1**, inviti, relazioni CLIENT ↔ PROFESSIONAL, Availability settimanale PT e Booking Client ↔ PT end-to-end. Dettagli auth: [FE03](./03-authentication-session-flow.md); inviti: [FE05](./05-professional-invites-implementation.md); onboarding CLIENT: [FE06](./06-client-onboarding-implementation.md); relazioni: [FE07](./07-client-professional-relationships-implementation.md).
 
 Ordine pragmatico **residuo**:
 
@@ -436,7 +444,7 @@ La scelta del prossimo vertical slice business resta una decisione di prodotto. 
 - un design system complesso o una libreria interna estesa;
 - JWT, Bearer auth, refresh token o storage di token in `localStorage`/`sessionStorage`;
 - Workout, Nutrition, Feedback o Measurements;
-- recupero/reset o cambio password;
+- cambio password autenticato;
 - upload immagine profilo;
 - gestione manuale dei collegamenti o disattivazione inviti;
 - applicazione mobile React Native / Expo;

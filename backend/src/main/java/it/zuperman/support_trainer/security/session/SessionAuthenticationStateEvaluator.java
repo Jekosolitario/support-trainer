@@ -53,6 +53,12 @@ public final class SessionAuthenticationStateEvaluator {
         }
 
         UserSecuritySnapshot securitySnapshot = snapshot.get();
+        if (!(authentication.getPrincipal() instanceof AuthenticatedUserPrincipal principal)) {
+            return false;
+        }
+        if (principal.getSessionVersion() != securitySnapshot.getSessionVersion()) {
+            return false;
+        }
         if (securitySnapshot.getAccountStatus() != AccountStatus.ACTIVE) {
             return false;
         }

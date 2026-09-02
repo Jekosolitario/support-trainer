@@ -52,7 +52,7 @@ Regola generale:
 
 Questo file include **solo endpoint realmente presenti nel codice attuale**.
 
-Il conteggio è di **36 endpoint applicativi**: Auth 8, Me 4, Client 2, Professional 3, Invite 2, Availability 10 e Booking 7. `/error` è un endpoint tecnico di fallback e non è contato fra le API funzionali.
+Il conteggio è di **38 endpoint applicativi**: Auth 10, Me 4, Client 2, Professional 3, Invite 2, Availability 10 e Booking 7. `/error` è un endpoint tecnico di fallback e non è contato fra le API funzionali. Lo slice Password Recovery V1 aggiunge due mutazioni Auth rispetto alla baseline da 36.
 
 Gli endpoint futuri o ancora da definire non vengono elencati qui.  
 Devono essere mantenuti in un documento separato dedicato agli endpoint pianificati.
@@ -104,6 +104,18 @@ Verifica che il codice invito esista, sia attivo, non sia scaduto e non sia già
 
 **POST** `/api/v1/auth/register/client`  
 Completa la registrazione cliente usando un codice invito valido e restituisce sempre lo stesso `202 Accepted` neutro. L'invito viene validato prima del controllo email; per un'email già esistente, con invito ancora valido, non vengono creati profilo, link, token o messaggio e l'invito non viene consumato. Per una nuova email cliente, link, consumo invito e token email sono atomici; il login resta vietato fino alla conferma. Richiede CSRF.
+
+### 4.9 Richiesta recupero password
+
+**POST** `/api/v1/auth/password-recovery/request`
+
+Body: `{ "email": "..." }`. Per ogni email sintatticamente valida risponde sempre `202 Accepted` con lo stesso messaggio neutro, sia che l'account esista, sia che non esista, non sia `ACTIVE`, non sia verificato o sia in cooldown. Solo un account eligible (`ACTIVE` + `emailVerified=true`; `profile.active=false` non è un blocco) genera un nuovo token; il cooldown è 60 secondi dal token più recente. I token aperti precedenti dello stesso utente vengono consumati, lasciando un solo token attivo con TTL 30 minuti. Il raw token non è nella response; la consegna email avviene `AFTER_COMMIT`. Email malformata → `400 VALIDATION_ERROR`. Il frontend considera successo **solo** HTTP `202`; ogni altro `2xx` è errore tecnico. Richiede CSRF. Nessun alias `/forgot-password`.
+
+### 4.10 Conferma recupero password
+
+**POST** `/api/v1/auth/password-recovery/confirm`
+
+Body: `{ "token": "...", "newPassword": "..." }`. `confirmPassword` non fa parte del contratto. Successo esatto: `204 No Content`, senza auto-login e senza nuova sessione. Token unknown/expired/consumed/invalidated o account non più eligible → `400 PASSWORD_RESET_TOKEN_INVALID_OR_EXPIRED`. Password non conforme alla policy di registrazione → `400 VALIDATION_ERROR` (field `newPassword`). Nella stessa transazione: hash password, consumo token, incremento `sessionVersion`. Il frontend considera successo **solo** HTTP `204`. Richiede CSRF. Nessun alias `/reset-password`.
 
 ---
 
@@ -467,8 +479,10 @@ In particolare:
 - `POST /api/v1/auth/logout`
 - `POST /api/v1/auth/email-verification/confirm`
 - `POST /api/v1/auth/email-verification/resend`
+- `POST /api/v1/auth/password-recovery/request`
+- `POST /api/v1/auth/password-recovery/confirm`
 
-Le mutazioni pubbliche e protette richiedono CSRF. Il logout è pubblico come URL ma invalida la sessione corrente quando presente.
+Le mutazioni pubbliche e protette richiedono CSRF. Il logout è pubblico come URL ma invalida la sessione corrente quando presente. I due endpoint di password recovery sono `permitAll` sotto `/api/v1/auth/**` ma restano mutazioni CSRF-protected, senza bypass dedicato.
 
 ### 11.2 Endpoint protetti
 

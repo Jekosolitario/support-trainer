@@ -24,6 +24,7 @@ class AuthenticatedUserPrincipalTest {
 
         assertThat(principal.getUserId()).isEqualTo(42L);
         assertThat(principal.getEmail()).isEqualTo("user@example.com");
+        assertThat(principal.getSessionVersion()).isZero();
         assertThat(principal.getName()).isEqualTo("42");
     }
 
@@ -53,7 +54,7 @@ class AuthenticatedUserPrincipalTest {
     }
 
     @Test
-    @DisplayName("I soli campi di istanza ammessi devono essere userId ed email")
+    @DisplayName("I soli campi di istanza ammessi devono essere userId, email e sessionVersion")
     void shouldExposeOnlyCanonicalInstanceFields() {
         Field[] instanceFields = Arrays.stream(AuthenticatedUserPrincipal.class.getDeclaredFields())
                 .filter(field -> !Modifier.isStatic(field.getModifiers()))
@@ -61,24 +62,25 @@ class AuthenticatedUserPrincipalTest {
 
         assertThat(instanceFields)
                 .extracting(Field::getName)
-                .containsExactlyInAnyOrder("userId", "email");
+                .containsExactlyInAnyOrder("userId", "email", "sessionVersion");
         assertThat(instanceFields).allMatch(field -> Modifier.isFinal(field.getModifiers()));
     }
 
     @Test
-    @DisplayName("Deve dichiarare serialVersionUID esplicito e serializzare soltanto id ed email")
+    @DisplayName("Deve dichiarare serialVersionUID esplicito e serializzare id, email e sessionVersion")
     void shouldDeclareSerialVersionUidAndSerializeMinimalGraph() throws Exception {
         Field serialVersionUid = AuthenticatedUserPrincipal.class.getDeclaredField("serialVersionUID");
         serialVersionUid.setAccessible(true);
-        assertThat(serialVersionUid.getLong(null)).isEqualTo(1L);
+        assertThat(serialVersionUid.getLong(null)).isEqualTo(2L);
         assertThat(ObjectStreamClass.lookup(AuthenticatedUserPrincipal.class).getSerialVersionUID())
-                .isEqualTo(1L);
+                .isEqualTo(2L);
 
-        AuthenticatedUserPrincipal original = new AuthenticatedUserPrincipal(99L, "serial@example.com");
+        AuthenticatedUserPrincipal original = new AuthenticatedUserPrincipal(99L, "serial@example.com", 4L);
         AuthenticatedUserPrincipal restored = roundTrip(original);
 
         assertThat(restored).isEqualTo(original);
         assertThat(restored.getEmail()).isEqualTo("serial@example.com");
+        assertThat(restored.getSessionVersion()).isEqualTo(4L);
         assertThat(restored.getName()).isEqualTo("99");
 
         byte[] bytes = serialize(original);

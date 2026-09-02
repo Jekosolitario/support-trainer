@@ -183,6 +183,7 @@ class SessionAuthenticationMySqlIntegrationTest {
                         "--server.servlet.session.cookie.path=/",
                         "--app.email.mode=DISABLED",
                         "--app.email.verification-page-url=http://localhost:5173/verify-email",
+                        "--app.email.password-recovery-page-url=http://localhost:5173/reset-password",
                         "--app.time.business-zone=Europe/Rome",
                         "--app.time.clock-zone=UTC"
                 );

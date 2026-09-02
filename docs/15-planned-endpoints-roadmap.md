@@ -50,10 +50,11 @@ Alla data attuale risultano già implementati:
 - lettura professionisti del cliente
 - availability
 - bookings
+- password recovery / reset password V1 (`POST /api/v1/auth/password-recovery/request` e `.../confirm`)
 
-Availability e Bookings non devono più essere considerati endpoint pianificati.
+Availability, Bookings e Password Recovery V1 non devono più essere considerati endpoint pianificati.
 
-Secondo `08-endpoint-map.md`, il backend espone **36 endpoint applicativi** già implementati (Auth 8 incluso login/logout/CSRF, Me 4, Client 2, Professional 3, Invite 2, Availability 10, Booking 7). L’autenticazione runtime è session-based (cookie HttpOnly + CSRF); login, logout e CSRF **non** sono lavoro futuro.
+Secondo `08-endpoint-map.md`, il backend espone **38 endpoint applicativi** già implementati (Auth 10 incluso login/logout/CSRF e password recovery, Me 4, Client 2, Professional 3, Invite 2, Availability 10, Booking 7). L’autenticazione runtime è session-based (cookie HttpOnly + CSRF); login, logout, CSRF e recupero password unauthenticated **non** sono lavoro futuro.
 
 Le evoluzioni future dello schema devono usare esclusivamente nuove migrazioni forward-only.
 
@@ -64,8 +65,7 @@ I prossimi blocchi da valutare sono:
 3. modulo nutrition
 4. feedback
 5. measurements
-6. password reset / forgot-reset password
-7. preparazione deploy
+6. preparazione deploy
 
 ---
 
@@ -91,25 +91,17 @@ Questi endpoint erano stati ipotizzati nella documentazione iniziale, ma non ris
 
 ## 5. Endpoint pianificati — area security/account lifecycle
 
-L'infrastruttura applicativa di richiesta email è già presente: pubblicazione nella transazione, consegna sincrona `AFTER_COMMIT`, sender locale disabilitato, sender in-memory per test/CI e adapter SMTP JavaMail configurabile. Non introduce endpoint. Restano futuri un provider API, template HTML, una convenzione production esplicita e, se richiesta affidabilità di consegna, outbox e retry.
+L'infrastruttura applicativa di richiesta email di verifica è già presente: pubblicazione nella transazione, listener `AFTER_COMMIT` che invoca il sender, sender locale disabilitato, sender in-memory per test/CI e adapter SMTP JavaMail configurabile. Password Recovery V1 riusa `AFTER_COMMIT` (`fallbackExecution=false`) ma accoda l'invio su un executor dedicato (nessun fallback sincrono; saturazione coda = lost-delivery V1 dopo `202` già emesso). Non introduce endpoint extra oltre request/confirm già in mappa. Restano futuri un provider API, template HTML, una convenzione production esplicita e, se richiesta affidabilità di consegna, outbox e retry.
 
-Login (`POST /api/v1/auth/login`), logout (`POST /api/v1/auth/logout`) e CSRF (`GET /api/v1/auth/csrf`) sono **già implementati** nella mappa reale (`08-endpoint-map.md`, `09-security-flow.md`) e non appartengono a questa roadmap. Un endpoint di refresh JWT/Bearer **non** è previsto: l’architettura corrente è session-based e ha abbandonato quel modello.
+Login (`POST /api/v1/auth/login`), logout (`POST /api/v1/auth/logout`), CSRF (`GET /api/v1/auth/csrf`) e password recovery unauthenticated (`POST /api/v1/auth/password-recovery/request`, `POST /api/v1/auth/password-recovery/confirm`) sono **già implementati** nella mappa reale (`08-endpoint-map.md`, `09-security-flow.md`) e non appartengono a questa roadmap. Un endpoint di refresh JWT/Bearer **non** è previsto: l’architettura corrente è session-based e ha abbandonato quel modello.
 
-### 5.1 Forgot password
+### 5.1 Cambio password autenticato
 
-**POST** `/api/v1/auth/forgot-password`
-
-Endpoint futuro per avviare il recupero password.
-
-### 5.2 Reset password
-
-**POST** `/api/v1/auth/reset-password`
-
-Endpoint futuro per impostare una nuova password tramite token valido.
+Resta futuro (non è Password Recovery V1). Possibile evoluzione sotto `/api/v1/me/**` da definire quando esisterà un caso d’uso autenticato distinto dal reset via email.
 
 ### Nota
 
-Forgot/reset password restano lavoro futuro. Refresh token JWT e logout non vanno ripianificati qui: il primo è architetturalmente superato; il secondo è già runtime.
+Refresh token JWT e logout non vanno ripianificati qui: il primo è architetturalmente superato; il secondo è già runtime. Il recupero password **non autenticato** è runtime; restano futuri MFA, gestione dispositivi/sessioni e il cambio password da area autenticata.
 
 ---
 

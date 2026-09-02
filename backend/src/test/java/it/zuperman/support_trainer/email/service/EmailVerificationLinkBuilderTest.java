@@ -69,7 +69,13 @@ class EmailVerificationLinkBuilderTest {
 
     private EmailVerificationLinkBuilder builder(String pageUrl) {
         return new EmailVerificationLinkBuilder(
-                new EmailProperties(EmailMode.DISABLED, URI.create(pageUrl), null, null)
+                new EmailProperties(
+                        EmailMode.DISABLED,
+                        URI.create(pageUrl),
+                        URI.create("https://frontend.example/reset-password"),
+                        null,
+                        null
+                )
         );
     }
 }

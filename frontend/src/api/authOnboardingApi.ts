@@ -8,6 +8,9 @@ import { decodeValidateInviteCodeResponse } from '../auth/validateInviteCodeResp
 import type {
   ConfirmEmailVerificationRequest,
   MessageResponse,
+  PasswordRecoveryAcceptedResponse,
+  PasswordRecoveryConfirmRequest,
+  PasswordRecoveryRequest,
   RegisterClientRequest,
   RegisterProfessionalRequest,
   RegistrationAcceptedResponse,
@@ -69,6 +72,51 @@ function throwForNonExactValidateStatus(observed: ObservedHttpResponse): never {
     observed.body,
     `Validate invite expected HTTP 200, received ${String(observed.status)}`,
   );
+}
+
+function throwForNonExactPasswordRecoveryStatus(
+  observed: ObservedHttpResponse,
+  expectedStatus: number,
+): never {
+  if (observed.ok) {
+    throw new UnexpectedResponseError(
+      observed.status,
+      observed.response,
+      observed.body,
+      `Password recovery expected HTTP ${String(expectedStatus)}, received ${String(observed.status)}`,
+    );
+  }
+
+  const apiError = httpApiErrorFromObservation(observed);
+  if (apiError !== null) {
+    throw apiError;
+  }
+
+  throw new UnexpectedResponseError(
+    observed.status,
+    observed.response,
+    observed.body,
+    `Password recovery expected HTTP ${String(expectedStatus)}, received ${String(observed.status)}`,
+  );
+}
+
+function decodePasswordRecoveryAccepted(
+  observed: ObservedHttpResponse,
+): PasswordRecoveryAcceptedResponse {
+  if (observed.body.kind !== 'json' || observed.body.value === null) {
+    return { message: '' };
+  }
+
+  const value = observed.body.value;
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return { message: '' };
+  }
+
+  if (!('message' in value) || typeof value.message !== 'string') {
+    return { message: '' };
+  }
+
+  return { message: value.message };
 }
 
 /**
@@ -191,4 +239,56 @@ export function resendEmailVerification(
       invalidateCsrfOnCommit: false,
     },
   );
+}
+
+/**
+ * Public password-recovery request. Success only on exact HTTP 202.
+ * Other 2xx statuses are unexpected technical responses, not generic success.
+ */
+export async function requestPasswordRecovery(
+  body: PasswordRecoveryRequest,
+): Promise<PasswordRecoveryAcceptedResponse> {
+  const observed = await performCsrfObservedMutation(
+    '/auth/password-recovery/request',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      invalidateOn401: false,
+      invalidateCsrfOnCommit: false,
+    },
+  );
+
+  if (observed.status !== 202) {
+    throwForNonExactPasswordRecoveryStatus(observed, 202);
+  }
+
+  return decodePasswordRecoveryAccepted(observed);
+}
+
+/**
+ * Public password-recovery confirm. Success only on exact HTTP 204.
+ * Other 2xx statuses are unexpected technical responses, not password-updated.
+ */
+export async function confirmPasswordRecovery(
+  body: PasswordRecoveryConfirmRequest,
+): Promise<void> {
+  const observed = await performCsrfObservedMutation(
+    '/auth/password-recovery/confirm',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      invalidateOn401: false,
+      invalidateCsrfOnCommit: false,
+    },
+  );
+
+  if (observed.status !== 204) {
+    throwForNonExactPasswordRecoveryStatus(observed, 204);
+  }
 }

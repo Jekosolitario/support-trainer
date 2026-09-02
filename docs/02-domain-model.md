@@ -60,6 +60,7 @@ Rappresenta la base comune di tutti gli utenti del sistema.
 - `role`
 - `accountStatus`
 - `emailVerified`
+- `sessionVersion`
 - `createdAt`
 - `updatedAt`
 
@@ -544,6 +545,7 @@ Questa decisione verrà definita meglio in una fase successiva.
 - `ProfessionalClientLink`
 - `InviteCode`
 - `EmailVerificationToken`
+- `PasswordResetToken`
 - `AvailabilitySlot`
 - `BookingRequest`
 - `BookingRequestItem`

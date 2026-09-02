@@ -7,7 +7,8 @@ import it.zuperman.support_trainer.common.enums.Role;
 
 /**
  * Minimal readiness projection for session authentication checks.
- * Contains only the fields required to validate account readiness and role coherence.
+ * Contains only the fields required to validate account readiness, role coherence
+ * and logical session revocation via {@code sessionVersion}.
  */
 public final class UserSecuritySnapshot {
 
@@ -15,12 +16,14 @@ public final class UserSecuritySnapshot {
     private final Role role;
     private final AccountStatus accountStatus;
     private final Boolean emailVerified;
+    private final long sessionVersion;
 
     public UserSecuritySnapshot(
             Long id,
             Role role,
             AccountStatus accountStatus,
-            Boolean emailVerified
+            Boolean emailVerified,
+            Long sessionVersion
     ) {
         if (id == null) {
             throw new IllegalArgumentException("id must not be null");
@@ -34,10 +37,14 @@ public final class UserSecuritySnapshot {
         if (emailVerified == null) {
             throw new IllegalArgumentException("emailVerified must not be null");
         }
+        if (sessionVersion == null) {
+            throw new IllegalArgumentException("sessionVersion must not be null");
+        }
         this.id = id;
         this.role = role;
         this.accountStatus = accountStatus;
         this.emailVerified = emailVerified;
+        this.sessionVersion = sessionVersion;
     }
 
     public Long getId() {
@@ -56,6 +63,10 @@ public final class UserSecuritySnapshot {
         return emailVerified;
     }
 
+    public long getSessionVersion() {
+        return sessionVersion;
+    }
+
     @Override
     public boolean equals(Object other) {
         if (this == other) {
@@ -67,11 +78,12 @@ public final class UserSecuritySnapshot {
         return id.equals(that.id)
                 && role == that.role
                 && accountStatus == that.accountStatus
-                && emailVerified.equals(that.emailVerified);
+                && emailVerified.equals(that.emailVerified)
+                && sessionVersion == that.sessionVersion;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, role, accountStatus, emailVerified);
+        return Objects.hash(id, role, accountStatus, emailVerified, sessionVersion);
     }
 }

@@ -11,6 +11,12 @@
     "description": "Absolute frontend page URL used to build email verification links."
   },
   {
+    "name": "app.email.password-recovery-page-url",
+    "type": "java.net.URI",
+    "defaultValue": "http://localhost:5173/reset-password",
+    "description": "Absolute frontend page URL used to build password recovery links. Defaults to the local non-production reset page when omitted."
+  },
+  {
     "name": "app.email.sender.address",
     "type": "java.lang.String",
     "description": "Required sender address when app.email.mode is SMTP."

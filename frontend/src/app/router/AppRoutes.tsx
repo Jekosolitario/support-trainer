@@ -24,10 +24,12 @@ import {
   ProfessionalClientsPage,
 } from '../../pages/professional/ProfessionalPages';
 import { ProfessionalInvitesPage } from '../../pages/professional/ProfessionalInvitesPage';
+import { ForgotPasswordPage } from '../../pages/public/ForgotPasswordPage';
 import { HomePage } from '../../pages/public/HomePage';
 import { LoginPage } from '../../pages/public/LoginPage';
 import { RegisterClientPage } from '../../pages/public/PublicPages';
 import { RegisterProfessionalPage } from '../../pages/public/RegisterProfessionalPage';
+import { ResetPasswordPage } from '../../pages/public/ResetPasswordPage';
 import { ValidateInvitePage } from '../../pages/public/ValidateInvitePage';
 import { VerifyEmailPage } from '../../pages/public/VerifyEmailPage';
 import { DashboardPage } from '../../pages/shared/DashboardPage';
@@ -51,6 +53,8 @@ function createAppRoutes(isDevelopment: boolean): RouteObject[] {
       children: [
         { path: '/', element: <HomePage /> },
         { path: '/login', element: <LoginPage /> },
+        { path: '/forgot-password', element: <ForgotPasswordPage /> },
+        { path: '/reset-password', element: <ResetPasswordPage /> },
         {
           path: '/register/professional',
           element: <RegisterProfessionalPage />,

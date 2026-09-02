@@ -62,6 +62,19 @@ export interface ResendEmailVerificationRequest {
   email: string;
 }
 
+export interface PasswordRecoveryRequest {
+  email: string;
+}
+
+export interface PasswordRecoveryConfirmRequest {
+  token: string;
+  newPassword: string;
+}
+
+export interface PasswordRecoveryAcceptedResponse {
+  message: string;
+}
+
 export interface MessageResponse {
   message: string;
 }

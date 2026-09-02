@@ -169,6 +169,8 @@ describe('AppRoutes', () => {
   it.each([
     ['/', 'Il tuo lavoro, più semplice da organizzare.'],
     ['/login', 'Login'],
+    ['/forgot-password', 'Password dimenticata'],
+    ['/reset-password', 'Reimposta la password'],
     ['/register/professional', 'Registrazione professionista'],
     ['/invite/validate', 'Validazione invito'],
     ['/verify-email', 'Verifica dell’indirizzo email'],
@@ -180,6 +182,17 @@ describe('AppRoutes', () => {
     }
 
     expectPageHeading(heading);
+  });
+
+  it('collega Login a Password dimenticata senza autenticazione', async () => {
+    const user = userEvent.setup();
+    renderUnauthenticatedApp('/login');
+
+    await user.click(
+      screen.getByRole('link', { name: 'Password dimenticata?' }),
+    );
+
+    expectPageHeading('Password dimenticata');
   });
 
   it('rende una pagina 404 per un percorso sconosciuto', () => {

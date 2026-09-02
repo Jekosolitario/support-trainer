@@ -64,7 +64,7 @@ class BookingHistoricalSnapshotMigrationTest {
                 .baselineVersion("5.9")
                 .load();
 
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(4);
+        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(6);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
 
         try (Connection connection = DriverManager.getConnection(JDBC_URL, "sa", "");
@@ -84,6 +84,19 @@ class BookingHistoricalSnapshotMigrationTest {
             )) {
                 assertThat(resultSet.next()).isTrue();
                 assertThat(resultSet.getInt(1)).isEqualTo(4);
+            }
+            try (ResultSet resultSet = statement.executeQuery(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
+                            + "WHERE UPPER(TABLE_NAME) = 'PASSWORD_RESET_TOKENS'"
+            )) {
+                assertThat(resultSet.next()).isTrue();
+                assertThat(resultSet.getInt(1)).isEqualTo(1);
+            }
+            try (ResultSet resultSet = statement.executeQuery(
+                    "SELECT session_version FROM users WHERE id = 1"
+            )) {
+                assertThat(resultSet.next()).isTrue();
+                assertThat(resultSet.getLong("session_version")).isZero();
             }
             try (ResultSet resultSet = statement.executeQuery(
                     "SELECT client_display_name, professional_display_name, confirmed_at, rejected_at, cancelled_at "

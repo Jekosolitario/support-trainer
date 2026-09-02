@@ -1,8 +1,5 @@
 package it.zuperman.support_trainer.security.service;
 
-import java.util.List;
-
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -27,10 +24,14 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Utente non trovato con email: " + username));
 
-        return org.springframework.security.core.userdetails.User.builder()
-                .username(user.getEmail())
-                .password(user.getPassword())
-                .authorities(List.of(new SimpleGrantedAuthority(user.getRole().name())))
-                .build();
+        return new AuthenticationUserDetails(
+                user.getId(),
+                user.getEmail(),
+                user.getPassword(),
+                user.getRole(),
+                user.currentSessionVersion(),
+                user.getAccountStatus(),
+                user.getEmailVerified()
+        );
     }
 }

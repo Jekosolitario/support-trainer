@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ import it.zuperman.support_trainer.email.event.EmailVerificationRequestedEvent;
 import it.zuperman.support_trainer.email.model.EmailVerificationReason;
 import it.zuperman.support_trainer.professional.entity.ProfessionalProfile;
 import it.zuperman.support_trainer.security.password.BcryptPasswordPolicy;
+import it.zuperman.support_trainer.security.service.AuthenticationUserDetails;
 import it.zuperman.support_trainer.security.session.SessionLoginIdentity;
 
 @Service
@@ -287,23 +289,28 @@ public class AuthService {
             throw new BadCredentialsException("Credenziali non valide");
         }
 
-        authenticationManager.authenticate(
+        Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         normalizedEmail,
                         request.getPassword()
                 )
         );
 
-        User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new AppException(
-                HttpStatus.NOT_FOUND,
-                "USER_NOT_FOUND",
-                "Utente non trovato"
-        ));
+        if (!(authentication.getPrincipal() instanceof AuthenticationUserDetails snapshot)) {
+            throw new IllegalStateException("Authenticated principal is not an authentication snapshot");
+        }
 
-        userReadinessValidator.validateAuthenticationEligibility(user);
+        userReadinessValidator.validateAccountAndEmail(
+                snapshot.getAccountStatus(),
+                snapshot.getEmailVerified()
+        );
 
-        return new SessionLoginIdentity(user.getId(), user.getEmail(), user.getRole());
+        return new SessionLoginIdentity(
+                snapshot.getUserId(),
+                snapshot.getEmail(),
+                snapshot.getRole(),
+                snapshot.getSessionVersion()
+        );
     }
 
     private RegistrationAcceptedResponse handleEmailUniqueCollision(DataIntegrityViolationException ex) {

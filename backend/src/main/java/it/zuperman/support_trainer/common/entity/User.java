@@ -49,6 +49,18 @@ public abstract class User extends BaseEntity {
     @Column(name = "email_verified", nullable = false)
     private Boolean emailVerified = false;
 
+    @Column(name = "session_version", nullable = false)
+    private Long sessionVersion = 0L;
+
+    public void incrementSessionVersion() {
+        long current = this.sessionVersion == null ? 0L : this.sessionVersion;
+        this.sessionVersion = current + 1L;
+    }
+
+    public long currentSessionVersion() {
+        return this.sessionVersion == null ? 0L : this.sessionVersion;
+    }
+
     protected User(Role role) {
         this.role = role;
     }
